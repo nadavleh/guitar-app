@@ -74,6 +74,22 @@ fun scaleMarks(
     }
 }
 
+fun pickedMarks(state: AppState): Map<FretPosition, FretMark> {
+    val result = HashMap<FretPosition, FretMark>()
+    for (pos in state.pickedPositions) {
+        if (pos.stringIndex >= state.liveTuning.stringCount) continue
+        val note = Fretboard.noteAt(state.liveTuning, pos)
+        result[pos] = FretMark(
+            label = when (state.labelMode) {
+                LabelMode.Notes -> NoteSpeller.spell(note.pitchClass)
+                LabelMode.Intervals, LabelMode.Empty -> ""
+            },
+            isRoot = false,
+        )
+    }
+    return result
+}
+
 fun shapeMarks(
     shape: ChordShape,
     labelMode: LabelMode,

@@ -21,6 +21,8 @@ const val DISPLAY_FRETS = 14
 
 enum class Highlight { Chord, Scale, None }
 enum class LabelMode { Notes, Intervals, Empty }
+enum class Mode { Tuning, Chord, Scale, Pick }
+enum class DisplayMode { AllNotes, Positions }
 
 @Stable
 class AppState(
@@ -44,6 +46,12 @@ class AppState(
     var labelMode by mutableStateOf(LabelMode.Notes)
     var selectedPosition by mutableStateOf<FretPosition?>(null)
     var leftHanded by mutableStateOf(false)
+
+    // v1 GUI state
+    var mode by mutableStateOf(Mode.Chord)
+    var chordDisplay by mutableStateOf(DisplayMode.AllNotes)
+    var scaleDisplay by mutableStateOf(DisplayMode.AllNotes)
+    var pickedPositions by mutableStateOf<Set<FretPosition>>(emptySet())
 
     val customTunings get() = repo.customTunings
     val savedSelectedName get() = repo.selectedTuningName
@@ -113,6 +121,32 @@ class AppState(
         val midis = shape.notes.mapNotNull { it?.midi?.value }
         if (midis.isNotEmpty()) {
             audio.playChord(midis, strumDelayMillis = 40, sustainMillis = 2000)
+        }
+    }
+
+    // ---------- Pick mode ----------
+
+    fun togglePick(pos: FretPosition) {
+        if (pos.stringIndex < 0 || pos.stringIndex >= liveTuning.stringCount) return
+        pickedPositions = if (pos in pickedPositions) pickedPositions - pos else pickedPositions + pos
+    }
+
+    fun clearPicked() {
+        pickedPositions = emptySet()
+    }
+
+    fun strumPicked(arpeggio: Boolean = false) {
+        if (pickedPositions.isEmpty()) return
+        val midis = pickedPositions
+            .filter { it.stringIndex < liveTuning.stringCount }
+            .sortedWith(compareBy({ it.stringIndex }, { it.fret }))
+            .map { Fretboard.noteAt(liveTuning, it).midi.value }
+        if (midis.isNotEmpty()) {
+            audio.playChord(
+                midis,
+                strumDelayMillis = if (arpeggio) 120 else 35,
+                sustainMillis = 2000
+            )
         }
     }
 
