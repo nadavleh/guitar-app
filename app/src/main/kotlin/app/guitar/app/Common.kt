@@ -48,6 +48,7 @@ fun chordMarks(
                 LabelMode.Empty -> ""
             },
             isRoot = h.isRoot,
+            kind = MarkKind.Chord,
         )
     }
 }
@@ -70,6 +71,7 @@ fun scaleMarks(
                 LabelMode.Empty -> ""
             },
             isRoot = h.isRoot,
+            kind = MarkKind.Scale,
         )
     }
 }
@@ -85,6 +87,7 @@ fun pickedMarks(state: AppState): Map<FretPosition, FretMark> {
                 LabelMode.Intervals, LabelMode.Empty -> ""
             },
             isRoot = false,
+            kind = MarkKind.Pick,
         )
     }
     return result
