@@ -2,7 +2,8 @@ package app.guitar.app
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -16,6 +17,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import app.guitar.theory.FretPosition
 import app.guitar.theory.Tuning
 import kotlin.math.max
@@ -30,8 +32,8 @@ data class FretMark(
 
 private const val OPEN_COL_FRAC = 0.06f
 private const val NUT_FRAC = 0.022f
-private const val STRING_DP = 38
-private const val FRET_NUMBER_DP = 14   // extra height below for fret-number row
+private const val STRING_DP = 42
+private const val FRET_NUMBER_DP = 18   // extra height below for fret-number row
 
 /**
  * Realistic horizontal fretboard.
@@ -63,10 +65,16 @@ fun FretboardView(
     leftHanded: Boolean = false,
 ) {
     val measurer = rememberTextMeasurer()
+    // Fixed total height = strings * STRING_DP + fret-number strip. This guarantees
+    // the fretboard always renders in a horizontal guitar-neck aspect, regardless of
+    // how much vertical space the parent gives us (the spec calls for the fretboard
+    // to look horizontal in both portrait and landscape).
+    val totalHeightDp = (tuning.stringCount * STRING_DP + FRET_NUMBER_DP).dp
 
     Canvas(
         modifier = modifier
-            .fillMaxSize()
+            .fillMaxWidth()
+            .height(totalHeightDp)
             .pointerInput(tuning, numFrets, leftHanded) {
                 detectTapGestures { off ->
                     val pos = pixelToPosition(

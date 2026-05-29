@@ -142,9 +142,8 @@ fun App(audio: AudioEngine) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         StatusBar(state)
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-        // The fretboard fills all available space between the status bar and the
-        // context strip. The whole screen IS the fretboard, just as the spec asks.
-        Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp)) {
+        // Fretboard at the top, locked to its natural horizontal-neck height.
+        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp)) {
             FretboardView(
                 tuning = state.liveTuning,
                 marks = marks,
@@ -155,10 +154,11 @@ fun App(audio: AudioEngine) {
                 },
                 numFrets = DISPLAY_FRETS,
                 leftHanded = state.leftHanded,
-                modifier = Modifier.fillMaxSize(),
             )
         }
         SelectedPositionInfo(state.liveTuning, state.selectedPosition, parsedChord)
+        // Empty area between the fretboard and the bottom controls.
+        Spacer(modifier = Modifier.weight(1f))
         ContextBar(state, chordShapes, scalePositions)
         BottomActionBar(state)
     }
