@@ -5,14 +5,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.guitar.audio.AudioEngine
+import app.guitar.theory.ChordLibrary
 import app.guitar.theory.ChordShape
+import app.guitar.theory.ChordShapeGenerator
 import app.guitar.theory.FretPosition
 import app.guitar.theory.Fretboard
 import app.guitar.theory.Midi
 import app.guitar.theory.Note
 import app.guitar.theory.Tuning
 import app.guitar.theory.Tunings
+import app.guitar.theory.VoicingStyle
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 const val MIDI_MIN = 28   // E1
@@ -26,7 +31,7 @@ enum class LabelMode { Notes, Intervals, Empty }
 enum class DisplayMode { None, Chord, Scale, Pick }
 
 /** Which bottom sheet is currently open (null = none). */
-enum class Sheet { Chord, Scale, Pick, Options }
+enum class Sheet { Chord, Scale, Pick, Options, Loop }
 
 /** All-notes vs single-position view, for chord & scale display. */
 enum class ChordScaleView { AllNotes, Positions }
@@ -62,6 +67,17 @@ class AppState(
     var chordPositionIndex by mutableStateOf(0)
     var scalePositionIndex by mutableStateOf(0)
     var pickedPositions by mutableStateOf<Set<FretPosition>>(emptySet())
+
+    // Jazz/shell voicing toggle — affects ChordShapeGenerator calls everywhere
+    var voicingStyle by mutableStateOf(VoicingStyle.Standard)
+
+    // Loop builder state
+    var bpm by mutableStateOf(80)
+    var loopBars by mutableStateOf(listOf<String?>("C", "Am", "F", "G"))
+    var isLooping by mutableStateOf(false)
+    var loopCurrentBar by mutableStateOf(0)
+    private var loopJob: Job? = null
+    private val loopShapeGen get() = ChordShapeGenerator(style = voicingStyle)
 
     val customTunings get() = repo.customTunings
     val savedSelectedName get() = repo.selectedTuningName
@@ -174,6 +190,7 @@ class AppState(
             Sheet.Scale -> displayMode = DisplayMode.Scale
             Sheet.Pick -> displayMode = DisplayMode.Pick
             Sheet.Options -> {} // tunings/options doesn't change what's lit
+            Sheet.Loop -> {}    // loop sheet plays its own audio; fretboard view unchanged
         }
     }
 
@@ -189,5 +206,55 @@ class AppState(
     fun stepScalePosition(delta: Int, count: Int) {
         if (count <= 0) return
         scalePositionIndex = ((scalePositionIndex + delta) % count + count) % count
+    }
+
+    // ---------- Loop transport ----------
+
+    fun setLoopBar(index: Int, chordSymbol: String?) {
+        if (index !in loopBars.indices) return
+        loopBars = loopBars.toMutableList().also { it[index] = chordSymbol?.ifBlank { null } }
+    }
+
+    fun setBarCount(count: Int) {
+        val clamped = count.coerceIn(1, 16)
+        loopBars = (0 until clamped).map { loopBars.getOrNull(it) }
+    }
+
+    fun startLoop() {
+        if (isLooping) return
+        isLooping = true
+        loopJob = scope.launch {
+            while (isLooping) {
+                for (i in loopBars.indices) {
+                    if (!isLooping) break
+                    loopCurrentBar = i
+                    playBar(loopBars[i])
+                }
+            }
+        }
+    }
+
+    fun stopLoop() {
+        isLooping = false
+        loopJob?.cancel()
+        loopJob = null
+        audio.stop()
+    }
+
+    private suspend fun playBar(chordSymbol: String?) {
+        val beatMs = (60_000L / bpm.coerceAtLeast(20))
+        val parsed = chordSymbol?.let { ChordLibrary.parse(it) }
+        if (parsed == null) { delay(beatMs * 4); return }
+        val (root, q) = parsed
+        val shapes = loopShapeGen.shapesFor(root, q, liveTuning, frets = DISPLAY_FRETS)
+        val shape = shapes.firstOrNull()
+        if (shape == null) { delay(beatMs * 4); return }
+        val midis = shape.notes.mapNotNull { it?.midi?.value }
+        if (midis.isEmpty()) { delay(beatMs * 4); return }
+        repeat(4) {                              // 4 quarter-note strums per bar (v1: 4/4 only)
+            if (!isLooping) return
+            audio.playChord(midis, strumDelayMillis = 30, sustainMillis = (beatMs * 0.9).toInt().coerceAtLeast(150))
+            delay(beatMs)
+        }
     }
 }

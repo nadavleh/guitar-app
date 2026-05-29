@@ -4,6 +4,7 @@ class ChordShapeGenerator(
     val maxFretSpan: Int = 4,
     val requireAllChordTones: Boolean = true,
     val minStringsPlayed: Int = 3,
+    val style: VoicingStyle = VoicingStyle.Standard,
 ) {
     fun shapesFor(
         root: PitchClass,
@@ -14,6 +15,10 @@ class ChordShapeGenerator(
     ): List<ChordShape> {
         require(frets >= maxFretSpan) { "frets ($frets) must be >= maxFretSpan ($maxFretSpan)" }
         val chordPcs: Set<PitchClass> = quality.notesFrom(root).toSet()
+        val essentialPcs: Set<PitchClass> = when (style) {
+            VoicingStyle.Standard -> chordPcs   // require every chord tone
+            VoicingStyle.Shell -> essentialShellIntervals(quality).map { root + it }.toSet()
+        }
         val firstFret = (fretRange?.first ?: 0).coerceAtLeast(0)
         val lastFret = (fretRange?.last ?: frets).coerceAtMost(frets)
         if (firstFret > lastFret) return emptyList()
@@ -50,7 +55,7 @@ class ChordShapeGenerator(
             }
 
             enumerate(candidates) { shapeFrets ->
-                if (!isValid(shapeFrets, chordPcs, tuning)) return@enumerate
+                if (!isValid(shapeFrets, chordPcs, essentialPcs, tuning)) return@enumerate
                 if (!seen.add(shapeFrets)) return@enumerate
                 results.add(
                     ChordShape(
@@ -75,6 +80,7 @@ class ChordShapeGenerator(
     private fun isValid(
         shapeFrets: List<Int?>,
         chordPcs: Set<PitchClass>,
+        essentialPcs: Set<PitchClass>,
         tuning: Tuning,
     ): Boolean {
         var played = 0
@@ -90,12 +96,18 @@ class ChordShapeGenerator(
             }
             playedPcs.add(Fretboard.noteAt(tuning, FretPosition(i, f)).pitchClass)
         }
-        if (played < minStringsPlayed) return false
+        // In Shell mode we allow fewer strings (2 jazz "guide tones" voicings are valid).
+        val minStrings = if (style == VoicingStyle.Shell) 2 else minStringsPlayed
+        if (played < minStrings) return false
         if (minFretted != Int.MAX_VALUE) {
             val span = maxFretted - minFretted
             if (span > maxFretSpan) return false
         }
-        if (requireAllChordTones && !playedPcs.containsAll(chordPcs)) return false
+        // All-chord-tones rule applies in Standard mode only.
+        if (style == VoicingStyle.Standard && requireAllChordTones &&
+            !playedPcs.containsAll(chordPcs)) return false
+        // Essential tones must always be present (chordPcs in Standard, shell subset in Shell).
+        if (!playedPcs.containsAll(essentialPcs)) return false
         return true
     }
 

@@ -72,8 +72,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private val shapeGen = ChordShapeGenerator()
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(audio: AudioEngine) {
@@ -101,11 +99,12 @@ fun App(audio: AudioEngine) {
     val scalePc = try { NoteSpeller.parsePitchClass(state.scaleRoot) } catch (_: Exception) { null }
     val scale = ScaleLibrary.scales[state.scaleType]
 
-    val chordShapes: List<ChordShape> = remember(parsedChord, state.liveTuning) {
+    val chordShapes: List<ChordShape> = remember(parsedChord, state.liveTuning, state.voicingStyle) {
         if (parsedChord == null) emptyList()
         else {
             val (r, q) = parsedChord
-            shapeGen.shapesFor(r, q, state.liveTuning, frets = DISPLAY_FRETS).take(8)
+            ChordShapeGenerator(style = state.voicingStyle)
+                .shapesFor(r, q, state.liveTuning, frets = DISPLAY_FRETS).take(8)
         }
     }
     val scalePositions: List<ScalePosition> = remember(scalePc, scale, state.liveTuning) {
@@ -189,6 +188,7 @@ fun App(audio: AudioEngine) {
                 Sheet.Scale   -> ScaleSheet(state)
                 Sheet.Pick    -> PickSheet(state)
                 Sheet.Options -> OptionsSheet(state, customTunings)
+                Sheet.Loop    -> LoopSheet(state)
             }
         }
     }
@@ -237,6 +237,10 @@ private fun StatusBar(state: AppState) {
                 DropdownMenuItem(
                     text = { Text("✋    Pick & strum") },
                     onClick = { menuOpen = false; state.openSheet(Sheet.Pick) }
+                )
+                DropdownMenuItem(
+                    text = { Text("⟲    Loop") },
+                    onClick = { menuOpen = false; state.openSheet(Sheet.Loop) }
                 )
                 DropdownMenuItem(
                     text = { Text("⚙    Options") },

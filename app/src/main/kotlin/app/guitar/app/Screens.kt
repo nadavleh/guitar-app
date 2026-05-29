@@ -37,11 +37,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.guitar.theory.ChordLibrary
+import app.guitar.theory.ChordShapeGenerator
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
 import app.guitar.theory.ScaleLibrary
 import app.guitar.theory.Tuning
 import app.guitar.theory.Tunings
+import app.guitar.theory.VoicingStyle
 
 private val PITCH_CLASS_ROW = listOf(
     PitchClass.C, PitchClass.Cs, PitchClass.D, PitchClass.Ds,
@@ -336,6 +338,102 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Left-handed", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             Switch(checked = state.leftHanded, onCheckedChange = { state.toggleLeftHanded(it) })
+        }
+
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Jazz / shell voicings", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Drop the 5th (and root for 7+ chords); favor 2-4 note voicings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = state.voicingStyle == VoicingStyle.Shell,
+                onCheckedChange = {
+                    state.voicingStyle = if (it) VoicingStyle.Shell else VoicingStyle.Standard
+                    state.resetChordPosition()
+                }
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = { state.closeSheet() }) { Text("Done") }
+        }
+    }
+}
+
+// ---------- LOOP SHEET ----------
+
+@Composable
+fun LoopSheet(state: AppState) {
+    SheetBody {
+        SheetHeader("Progression loop")
+        Text(
+            "Lay out a chord progression and loop it. v1: 4/4, quarter-note strums, one chord per bar.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(12.dp))
+
+        // BPM
+        Text("BPM: ${state.bpm}", style = MaterialTheme.typography.bodyMedium)
+        androidx.compose.material3.Slider(
+            value = state.bpm.toFloat(),
+            onValueChange = { state.bpm = it.toInt() },
+            valueRange = 40f..200f,
+            steps = 0,
+        )
+
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Bars: ${state.loopBars.size}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { state.setBarCount(state.loopBars.size - 1) }, enabled = state.loopBars.size > 1) { Text("−") }
+            Spacer(Modifier.width(6.dp))
+            OutlinedButton(onClick = { state.setBarCount(state.loopBars.size + 1) }, enabled = state.loopBars.size < 16) { Text("+") }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        // Bar grid (max 4 per row)
+        val chunks = state.loopBars.withIndex().chunked(4)
+        for (chunk in chunks) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                for ((i, sym) in chunk) {
+                    val isCurrent = state.isLooping && state.loopCurrentBar == i
+                    val bg = if (isCurrent)
+                        androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    else
+                        androidx.compose.material3.CardDefaults.cardColors()
+                    Card(modifier = Modifier.weight(1f), colors = bg) {
+                        Column(modifier = Modifier.padding(6.dp)) {
+                            Text("Bar ${i + 1}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            OutlinedTextField(
+                                value = sym ?: "",
+                                onValueChange = { state.setLoopBar(i, it) },
+                                placeholder = { Text("chord", style = MaterialTheme.typography.bodySmall) },
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+                // Pad row to 4 cells so widths are equal
+                repeat(4 - chunk.size) { Spacer(Modifier.weight(1f)) }
+            }
+            Spacer(Modifier.height(6.dp))
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (state.isLooping) {
+                Button(onClick = { state.stopLoop() }) { Text("Stop ⏹") }
+            } else {
+                Button(onClick = { state.startLoop() }, enabled = state.loopBars.any { it != null }) { Text("Play ▶") }
+            }
         }
 
         Spacer(Modifier.height(12.dp))
