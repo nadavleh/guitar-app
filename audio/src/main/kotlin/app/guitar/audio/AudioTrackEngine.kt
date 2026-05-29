@@ -33,12 +33,12 @@ class AudioTrackEngine(
     private val synth = PluckedSynth(sampleRate)
     private val running = AtomicBoolean(true)
 
-    private val bufferSizeBytes: Int = run {
-        val minB = AudioTrack.getMinBufferSize(
-            sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
-        ).coerceAtLeast(2048)
-        maxOf(minB, sampleRate * 100 / 1000 * 2)   // ≥ 100 ms
-    }
+    private val systemMinBufferBytes: Int = AudioTrack.getMinBufferSize(
+        sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
+    ).coerceAtLeast(2048)
+
+    // Use exactly the system min — anything bigger just adds latency in idle-skip mode.
+    private val bufferSizeBytes: Int = systemMinBufferBytes
 
     private val track: AudioTrack = AudioTrack.Builder()
         .setAudioAttributes(
@@ -56,6 +56,7 @@ class AudioTrackEngine(
         )
         .setBufferSizeInBytes(bufferSizeBytes)
         .setTransferMode(AudioTrack.MODE_STREAM)
+        .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
         .build()
         .also {
             if (it.state == AudioTrack.STATE_INITIALIZED) {
@@ -83,7 +84,13 @@ class AudioTrackEngine(
     }
 
     init {
-        Log.i(TAG, "engine init: sampleRate=$sampleRate bufferBytes=$bufferSizeBytes (${bufferSizeBytes * 1000.0 / (sampleRate * 2)} ms)")
+        Log.i(
+            TAG,
+            "engine init: sampleRate=$sampleRate " +
+                "minBufBytes=$systemMinBufferBytes (${systemMinBufferBytes * 1000.0 / (sampleRate * 2)} ms) " +
+                "trackBufFrames=${track.bufferSizeInFrames} (${track.bufferSizeInFrames * 1000.0 / sampleRate} ms) " +
+                "perfMode=LOW_LATENCY"
+        )
     }
 
     private fun runOutputLoop() {
@@ -133,13 +140,26 @@ class AudioTrackEngine(
     override fun playNote(midiNote: Int, durationMillis: Int) {
         if (midiNote !in 0..127 || durationMillis <= 0) return
         if (!running.get()) return
+        val tCall = System.nanoTime()
         synthesizer.execute {
+            val tStart = System.nanoTime()
             val samples = synth.synthesize(
                 midiNote = midiNote,
                 durationSec = durationMillis / 1000.0,
                 seed = System.nanoTime(),
             )
+            val tEnd = System.nanoTime()
             addVoice(samples)
+            val tAdded = System.nanoTime()
+            Log.i(
+                TAG,
+                "midi=$midiNote " +
+                    "queue=${(tStart - tCall) / 1_000_000} ms " +
+                    "synth=${(tEnd - tStart) / 1_000_000} ms " +
+                    "add=${(tAdded - tEnd) / 1_000_000} ms " +
+                    "bufFrames=${track.bufferSizeInFrames} " +
+                    "head=${track.playbackHeadPosition}"
+            )
         }
     }
 
