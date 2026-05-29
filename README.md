@@ -199,6 +199,8 @@ Notable coverage:
 | 🚧 | Realistic strings (wound vs plain) | Phase C of redesign |
 | 🚧 | Scale position algorithm | Phase B — CAGED-like positions per scale degree |
 | 📅 | Position scroller for chords/scales | Phase D |
+| 📅 | **Jazz / shell voicings toggle** | A toggle in **Options** that re-ranks chord shapes to favor jazz voicings: drop the 5th (it's the most expendable chord tone), sometimes also drop the root (relying on the bass to provide it). Reference: `guitar lesson chord shapes.pdf`. Should affect both the shape list in the Chord sheet and the position scroller. |
+| 📅 | **Chord-progression loop builder** | A new menu option ("Loop" or "Progression") to lay out a repeating progression and hear it: <ul><li>Define a loop of *N* bars with meter *Y* (e.g. 4/4, 3/4, 6/8) and BPM</li><li>Each bar can hold one chord (full bar) or two chords (half bars each). Each chord plays as quarter-note strums for the duration of its bar slice.</li><li>Per slot, pick the voicing from the generated shape list OR draw an arbitrary chord by tapping positions on the fretboard (carried over from Pick mode).</li><li>Transport: play / stop / loop indefinitely. Visual indicator of the currently-sounding bar.</li></ul> Phase 2 extensions (not for v1): swing feel, finer subdivision than quarter notes, comping rhythms, sound-on-sound recording for practice. |
 | 📅 | Custom-chord favorites | §10.5 from requirements |
 | 📅 | Practice prompts (random challenges) | §10.6 |
 | 📅 | Cavaquinho / non-6-string instruments | §15 — engine already n-string ready |

@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -30,8 +32,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -148,8 +152,14 @@ fun App(audio: AudioEngine) {
     ) {
         StatusBar(state)
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-        // Fretboard at the top, locked to its natural horizontal-neck height.
-        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp)) {
+        // Fretboard fills all remaining vertical space (landscape-locked, so this
+        // is always wider than tall — renders as a horizontal neck).
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 4.dp)
+        ) {
             FretboardView(
                 tuning = state.liveTuning,
                 marks = marks,
@@ -163,10 +173,7 @@ fun App(audio: AudioEngine) {
             )
         }
         SelectedPositionInfo(state.liveTuning, state.selectedPosition, parsedChord)
-        // Empty area between the fretboard and the bottom controls.
-        Spacer(modifier = Modifier.weight(1f))
         ContextBar(state, chordShapes, scalePositions)
-        BottomActionBar(state)
     }
 
     // ---------- Bottom sheet ----------
@@ -189,12 +196,13 @@ fun App(audio: AudioEngine) {
 
 @Composable
 private fun StatusBar(state: AppState) {
+    var menuOpen by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
     ) {
         Text("GUITAR", style = MaterialTheme.typography.displaySmall)
         Spacer(Modifier.width(12.dp))
@@ -206,6 +214,36 @@ private fun StatusBar(state: AppState) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
+        Box {
+            TextButton(
+                onClick = { menuOpen = true },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+            ) {
+                Text("Menu  ☰", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
+            }
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface),
+            ) {
+                DropdownMenuItem(
+                    text = { Text("♪    Chord") },
+                    onClick = { menuOpen = false; state.openSheet(Sheet.Chord) }
+                )
+                DropdownMenuItem(
+                    text = { Text("♫    Scale") },
+                    onClick = { menuOpen = false; state.openSheet(Sheet.Scale) }
+                )
+                DropdownMenuItem(
+                    text = { Text("✋    Pick & strum") },
+                    onClick = { menuOpen = false; state.openSheet(Sheet.Pick) }
+                )
+                DropdownMenuItem(
+                    text = { Text("⚙    Options") },
+                    onClick = { menuOpen = false; state.openSheet(Sheet.Options) }
+                )
+            }
+        }
     }
 }
 
@@ -296,20 +334,6 @@ private fun PickActionBar(state: AppState) {
     }
 }
 
-@Composable
-private fun BottomActionBar(state: AppState) {
-    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(68.dp)
-            .background(MaterialTheme.colorScheme.surface)
-    ) {
-        ActionBarItem("Chord",   "♪", Sheet.Chord,   state)
-        ActionBarItem("Scale",   "♫", Sheet.Scale,   state)
-        ActionBarItem("Pick",    "✋", Sheet.Pick,    state)
-        ActionBarItem("Options", "⚙", Sheet.Options, state)
-    }
-}
+// Persistent bottom action bar was removed (the menu now lives in the top-right
+// dropdown in [StatusBar]). [ActionBarItem] is still defined in ModeBar.kt in
+// case we want to expose the menu items somewhere else later.

@@ -2,8 +2,7 @@ package app.guitar.app
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -17,7 +16,6 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import app.guitar.theory.FretPosition
 import app.guitar.theory.Tuning
 import kotlin.math.max
@@ -65,16 +63,13 @@ fun FretboardView(
     leftHanded: Boolean = false,
 ) {
     val measurer = rememberTextMeasurer()
-    // Fixed total height = strings * STRING_DP + fret-number strip. This guarantees
-    // the fretboard always renders in a horizontal guitar-neck aspect, regardless of
-    // how much vertical space the parent gives us (the spec calls for the fretboard
-    // to look horizontal in both portrait and landscape).
-    val totalHeightDp = (tuning.stringCount * STRING_DP + FRET_NUMBER_DP).dp
+    // Fretboard fills whatever rectangle the parent gives it. With the activity
+    // locked to landscape (see AndroidManifest) the available space is always
+    // wider than tall, so the rendering naturally renders as a horizontal neck.
 
     Canvas(
         modifier = modifier
-            .fillMaxWidth()
-            .height(totalHeightDp)
+            .fillMaxSize()
             .pointerInput(tuning, numFrets, leftHanded) {
                 detectTapGestures { off ->
                     val pos = pixelToPosition(
