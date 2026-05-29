@@ -2,8 +2,7 @@ package app.guitar.app
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -17,7 +16,6 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import app.guitar.theory.FretPosition
 import app.guitar.theory.Tuning
 import kotlin.math.max
@@ -65,12 +63,10 @@ fun FretboardView(
     leftHanded: Boolean = false,
 ) {
     val measurer = rememberTextMeasurer()
-    val height = (tuning.stringCount * STRING_DP + FRET_NUMBER_DP).dp
 
     Canvas(
         modifier = modifier
-            .fillMaxWidth()
-            .height(height)
+            .fillMaxSize()
             .pointerInput(tuning, numFrets, leftHanded) {
                 detectTapGestures { off ->
                     val pos = pixelToPosition(

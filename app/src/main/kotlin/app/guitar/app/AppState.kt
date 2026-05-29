@@ -21,8 +21,15 @@ const val DISPLAY_FRETS = 14
 
 enum class Highlight { Chord, Scale, None }
 enum class LabelMode { Notes, Intervals, Empty }
-enum class Mode { Tuning, Chord, Scale, Pick }
-enum class DisplayMode { AllNotes, Positions }
+
+/** What the fretboard is currently lighting up. */
+enum class DisplayMode { None, Chord, Scale, Pick }
+
+/** Which bottom sheet is currently open (null = none). */
+enum class Sheet { Chord, Scale, Pick, Options }
+
+/** All-notes vs single-position view, for chord & scale display. */
+enum class ChordScaleView { AllNotes, Positions }
 
 @Stable
 class AppState(
@@ -48,9 +55,12 @@ class AppState(
     var leftHanded by mutableStateOf(false)
 
     // v1 GUI state
-    var mode by mutableStateOf(Mode.Chord)
-    var chordDisplay by mutableStateOf(DisplayMode.AllNotes)
-    var scaleDisplay by mutableStateOf(DisplayMode.AllNotes)
+    var displayMode by mutableStateOf(DisplayMode.Chord)
+    var currentSheet by mutableStateOf<Sheet?>(null)
+    var chordView by mutableStateOf(ChordScaleView.AllNotes)
+    var scaleView by mutableStateOf(ChordScaleView.AllNotes)
+    var chordPositionIndex by mutableStateOf(0)
+    var scalePositionIndex by mutableStateOf(0)
     var pickedPositions by mutableStateOf<Set<FretPosition>>(emptySet())
 
     val customTunings get() = repo.customTunings
@@ -153,5 +163,31 @@ class AppState(
     fun toggleLeftHanded(value: Boolean) {
         leftHanded = value
         scope.launch { repo.setLeftHanded(value) }
+    }
+
+    // ---------- Sheet / display-mode interactions ----------
+
+    fun openSheet(sheet: Sheet) {
+        currentSheet = sheet
+        when (sheet) {
+            Sheet.Chord -> displayMode = DisplayMode.Chord
+            Sheet.Scale -> displayMode = DisplayMode.Scale
+            Sheet.Pick -> displayMode = DisplayMode.Pick
+            Sheet.Options -> {} // tunings/options doesn't change what's lit
+        }
+    }
+
+    fun closeSheet() { currentSheet = null }
+
+    fun resetChordPosition() { chordPositionIndex = 0 }
+    fun resetScalePosition() { scalePositionIndex = 0 }
+
+    fun stepChordPosition(delta: Int, count: Int) {
+        if (count <= 0) return
+        chordPositionIndex = ((chordPositionIndex + delta) % count + count) % count
+    }
+    fun stepScalePosition(delta: Int, count: Int) {
+        if (count <= 0) return
+        scalePositionIndex = ((scalePositionIndex + delta) % count + count) % count
     }
 }

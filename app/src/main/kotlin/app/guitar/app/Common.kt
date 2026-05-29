@@ -22,6 +22,7 @@ import app.guitar.theory.Interval
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
 import app.guitar.theory.Scale
+import app.guitar.theory.ScalePosition
 import app.guitar.theory.Tuning
 
 fun intervalName(iv: Interval): String = when (iv.semitones % 12) {
@@ -74,6 +75,31 @@ fun scaleMarks(
             kind = MarkKind.Scale,
         )
     }
+}
+
+fun scalePositionMarks(
+    position: ScalePosition,
+    root: PitchClass,
+    tuning: Tuning,
+    labelMode: LabelMode,
+): Map<FretPosition, FretMark> {
+    val result = HashMap<FretPosition, FretMark>(position.positions.size)
+    for (pos in position.positions) {
+        if (pos.stringIndex >= tuning.stringCount) continue
+        val note = Fretboard.noteAt(tuning, pos)
+        val isRoot = note.pitchClass == root
+        val interval = Interval(((note.pitchClass.value - root.value) % 12 + 12) % 12)
+        result[pos] = FretMark(
+            label = when (labelMode) {
+                LabelMode.Notes -> NoteSpeller.spell(note.pitchClass)
+                LabelMode.Intervals -> intervalName(interval)
+                LabelMode.Empty -> ""
+            },
+            isRoot = isRoot,
+            kind = MarkKind.Scale,
+        )
+    }
+    return result
 }
 
 fun pickedMarks(state: AppState): Map<FretPosition, FretMark> {

@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -37,14 +37,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.guitar.theory.ChordLibrary
-import app.guitar.theory.ChordShapeGenerator
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
 import app.guitar.theory.ScaleLibrary
 import app.guitar.theory.Tuning
 import app.guitar.theory.Tunings
-
-private val shapeGen = ChordShapeGenerator()
 
 private val PITCH_CLASS_ROW = listOf(
     PitchClass.C, PitchClass.Cs, PitchClass.D, PitchClass.Ds,
@@ -60,315 +57,316 @@ private val COMMON_QUALITY_SYMBOLS = listOf(
 private fun qualityLabel(symbol: String): String =
     if (symbol.isEmpty()) "major" else symbol
 
-@Composable
-fun ModePanel(state: AppState, customTunings: Map<String, Tuning>) {
-    val scroll = rememberScrollState()
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scroll)
-            .padding(16.dp)
-    ) {
-        when (state.mode) {
-            Mode.Tuning -> TuningPanel(state, customTunings)
-            Mode.Chord  -> ChordPanel(state)
-            Mode.Scale  -> ScalePanel(state)
-            Mode.Pick   -> PickPanel(state)
-        }
-    }
-}
-
-// ---------- Tuning ----------
+// ---------- CHORD SHEET ----------
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TuningPanel(state: AppState, customTunings: Map<String, Tuning>) {
-    var editorOpen by remember { mutableStateOf(false) }
-    var saveName by remember { mutableStateOf("") }
-
-    PanelHeader("Tuning")
-
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Tunings.all.forEach { (name, t) ->
-            FilterChip(
-                selected = name == state.tuningName && !state.isEditedTuning,
-                onClick = { state.selectTuning(name, t) },
-                label = { Text(name) }
-            )
-        }
-    }
-    if (customTunings.isNotEmpty()) {
-        Spacer(Modifier.height(8.dp))
-        Text("My tunings", style = MaterialTheme.typography.labelMedium)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            customTunings.forEach { (name, t) ->
-                FilterChip(
-                    selected = name == state.tuningName && !state.isEditedTuning,
-                    onClick = { state.selectTuning(name, t) },
-                    label = { Text(name) },
-                    trailingIcon = {
-                        TextButton(onClick = { state.deleteCustomTuning(name) }) { Text("✕") }
-                    }
-                )
-            }
-        }
-    }
-
-    Spacer(Modifier.height(8.dp))
-    Text(
-        "Open strings (low → high):  " +
-            state.liveTuning.openStrings.joinToString(" ") { NoteSpeller.spell(it) },
-        fontFamily = FontFamily.Monospace,
-        style = MaterialTheme.typography.bodyMedium,
-    )
-    if (state.isEditedTuning) {
-        Spacer(Modifier.height(4.dp))
-        Text("(unsaved edits)", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-    }
-
-    Spacer(Modifier.height(12.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = { editorOpen = !editorOpen }) {
-            Text(if (editorOpen) "Close editor" else "Customize…")
-        }
-        if (state.isEditedTuning) {
-            TextButton(onClick = { state.resetTuningToSaved(customTunings) }) { Text("Discard edits") }
-        }
-    }
-
-    if (editorOpen) {
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp)) {
-                for (s in (state.liveTuning.stringCount - 1) downTo 0) {
-                    val stringNumber = state.liveTuning.stringCount - s
-                    val note = state.liveTuning.openStrings[s]
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-                        Text(
-                            "S$stringNumber  ${NoteSpeller.spell(note).padEnd(4)}",
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.width(96.dp)
-                        )
-                        OutlinedButton(onClick = { state.adjustString(s, -1) }) { Text("−") }
-                        Spacer(Modifier.width(6.dp))
-                        OutlinedButton(onClick = { state.adjustString(s, +1) }) { Text("+") }
-                        Spacer(Modifier.width(12.dp))
-                        OutlinedButton(onClick = { state.adjustString(s, -12) }) { Text("−oct") }
-                        Spacer(Modifier.width(6.dp))
-                        OutlinedButton(onClick = { state.adjustString(s, +12) }) { Text("+oct") }
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = saveName,
-                        onValueChange = { saveName = it },
-                        label = { Text("Save as…") },
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Button(
-                        onClick = { state.saveCustomTuning(saveName); saveName = "" },
-                        enabled = saveName.trim().isNotEmpty() && '|' !in saveName && ';' !in saveName
-                    ) { Text("Save") }
-                }
-            }
-        }
-    }
-
-    Spacer(Modifier.height(16.dp))
-    HorizontalDivider()
-    Spacer(Modifier.height(12.dp))
-
-    Text("Display", style = MaterialTheme.typography.titleSmall)
-    Spacer(Modifier.height(6.dp))
-    Text("Labels", style = MaterialTheme.typography.labelMedium)
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-        LabelMode.entries.forEachIndexed { i, m ->
-            SegmentedButton(
-                selected = m == state.labelMode,
-                onClick = { state.labelMode = m },
-                shape = SegmentedButtonDefaults.itemShape(index = i, count = LabelMode.entries.size),
-                label = { Text(m.name) }
-            )
-        }
-    }
-
-    Spacer(Modifier.height(10.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Left-handed", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Switch(checked = state.leftHanded, onCheckedChange = { state.toggleLeftHanded(it) })
-    }
-}
-
-// ---------- Chord ----------
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ChordPanel(state: AppState) {
+fun ChordSheet(state: AppState) {
     val parsed = ChordLibrary.parse(state.chordInput)
     val currentRoot = parsed?.first
     val currentQualitySymbol = parsed?.second?.symbol
 
-    PanelHeader("Chord")
+    SheetBody {
+        SheetHeader("Chord")
 
-    Text("Root", style = MaterialTheme.typography.labelMedium)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        PITCH_CLASS_ROW.forEach { pc ->
-            FilterChip(
-                selected = pc == currentRoot,
-                onClick = { state.chordInput = NoteSpeller.spell(pc) + (currentQualitySymbol ?: "") },
-                label = { Text(NoteSpeller.spell(pc)) }
-            )
+        Text("Root", style = MaterialTheme.typography.labelMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            PITCH_CLASS_ROW.forEach { pc ->
+                FilterChip(
+                    selected = pc == currentRoot,
+                    onClick = {
+                        state.chordInput = NoteSpeller.spell(pc) + (currentQualitySymbol ?: "")
+                        state.resetChordPosition()
+                    },
+                    label = { Text(NoteSpeller.spell(pc)) }
+                )
+            }
         }
-    }
 
-    Spacer(Modifier.height(6.dp))
-    Text("Quality", style = MaterialTheme.typography.labelMedium)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        COMMON_QUALITY_SYMBOLS.forEach { sym ->
-            FilterChip(
-                selected = sym == currentQualitySymbol,
-                onClick = { state.chordInput = NoteSpeller.spell(currentRoot ?: PitchClass.C) + sym },
-                label = { Text(qualityLabel(sym)) }
-            )
+        Spacer(Modifier.height(8.dp))
+        Text("Quality", style = MaterialTheme.typography.labelMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            COMMON_QUALITY_SYMBOLS.forEach { sym ->
+                FilterChip(
+                    selected = sym == currentQualitySymbol,
+                    onClick = {
+                        state.chordInput = NoteSpeller.spell(currentRoot ?: PitchClass.C) + sym
+                        state.resetChordPosition()
+                    },
+                    label = { Text(qualityLabel(sym)) }
+                )
+            }
         }
-    }
-
-    Spacer(Modifier.height(8.dp))
-    if (parsed != null) {
-        val (root, q) = parsed
-        val notes = q.notesFrom(root).joinToString(" ") { NoteSpeller.spell(it) }
-        val intervalsLine = q.intervals.joinToString(" ") { intervalName(it) }
-        Text(
-            "${NoteSpeller.spell(root)}${q.symbol}:  $notes",
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Text(
-            "intervals:  $intervalsLine",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
 
         Spacer(Modifier.height(12.dp))
-        Text("Shapes", style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.height(4.dp))
-        val shapes = remember(root, q, state.liveTuning) {
-            shapeGen.shapesFor(root, q, state.liveTuning, frets = DISPLAY_FRETS).take(6)
+        Text("Display", style = MaterialTheme.typography.labelMedium)
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            ChordScaleView.entries.forEachIndexed { i, v ->
+                SegmentedButton(
+                    selected = state.chordView == v,
+                    onClick = { state.chordView = v },
+                    shape = SegmentedButtonDefaults.itemShape(index = i, count = ChordScaleView.entries.size),
+                    label = { Text(if (v == ChordScaleView.AllNotes) "All notes" else "Positions") }
+                )
+            }
         }
-        shapes.forEachIndexed { i, sh ->
-            ShapeCard(
-                shape = sh,
-                selected = state.selectedShapeIndex == i,
-                onClick = {
-                    state.selectedShapeIndex = if (state.selectedShapeIndex == i) null else i
-                    state.playShape(sh)
-                }
+
+        Spacer(Modifier.height(12.dp))
+        if (parsed != null) {
+            val (root, q) = parsed
+            val notes = q.notesFrom(root).joinToString(" ") { NoteSpeller.spell(it) }
+            val intervalsLine = q.intervals.joinToString(" ") { intervalName(it) }
+            Text("${NoteSpeller.spell(root)}${q.symbol}:  $notes", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "intervals:  $intervalsLine",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(6.dp))
+        } else {
+            Text("(chord not recognized)", color = MaterialTheme.colorScheme.error)
         }
-        if (shapes.isEmpty()) {
-            Text("(no shapes found in 14 frets)", color = MaterialTheme.colorScheme.error)
+
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = { state.closeSheet() }) { Text("Done") }
         }
-    } else {
-        Text("(chord not recognized)", color = MaterialTheme.colorScheme.error)
     }
 }
 
-// ---------- Scale ----------
+// ---------- SCALE SHEET ----------
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ScalePanel(state: AppState) {
+fun ScaleSheet(state: AppState) {
     val scalePc = try { NoteSpeller.parsePitchClass(state.scaleRoot) } catch (_: Exception) { null }
     val scale = ScaleLibrary.scales[state.scaleType]
 
-    PanelHeader("Scale")
+    SheetBody {
+        SheetHeader("Scale")
 
-    Text("Root", style = MaterialTheme.typography.labelMedium)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        PITCH_CLASS_ROW.forEach { pc ->
-            val pcName = NoteSpeller.spell(pc)
-            FilterChip(
-                selected = pcName == state.scaleRoot,
-                onClick = { state.scaleRoot = pcName },
-                label = { Text(pcName) }
-            )
+        Text("Root", style = MaterialTheme.typography.labelMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            PITCH_CLASS_ROW.forEach { pc ->
+                val pcName = NoteSpeller.spell(pc)
+                FilterChip(
+                    selected = pcName == state.scaleRoot,
+                    onClick = { state.scaleRoot = pcName; state.resetScalePosition() },
+                    label = { Text(pcName) }
+                )
+            }
         }
-    }
 
-    Spacer(Modifier.height(6.dp))
-    Text("Scale", style = MaterialTheme.typography.labelMedium)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ScaleLibrary.scales.keys.forEach { name ->
-            FilterChip(
-                selected = name == state.scaleType,
-                onClick = { state.scaleType = name },
-                label = { Text(name) }
-            )
+        Spacer(Modifier.height(8.dp))
+        Text("Scale", style = MaterialTheme.typography.labelMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ScaleLibrary.scales.keys.forEach { name ->
+                FilterChip(
+                    selected = name == state.scaleType,
+                    onClick = { state.scaleType = name; state.resetScalePosition() },
+                    label = { Text(name) }
+                )
+            }
         }
-    }
 
-    Spacer(Modifier.height(8.dp))
-    if (scalePc != null && scale != null) {
-        val notes = scale.notesFrom(scalePc).joinToString(" ") { NoteSpeller.spell(it) }
-        val formula = scale.intervals.joinToString(" ") { intervalName(it) }
-        Text("${state.scaleRoot} ${scale.name}", style = MaterialTheme.typography.bodyMedium)
-        Text("notes    $notes",   fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyMedium)
-        Text("formula  $formula", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyMedium)
-    } else {
-        Text("(invalid root or scale)", color = MaterialTheme.colorScheme.error)
+        Spacer(Modifier.height(12.dp))
+        Text("Display", style = MaterialTheme.typography.labelMedium)
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            ChordScaleView.entries.forEachIndexed { i, v ->
+                SegmentedButton(
+                    selected = state.scaleView == v,
+                    onClick = { state.scaleView = v },
+                    shape = SegmentedButtonDefaults.itemShape(index = i, count = ChordScaleView.entries.size),
+                    label = { Text(if (v == ChordScaleView.AllNotes) "All notes" else "Positions") }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        if (scalePc != null && scale != null) {
+            val notes = scale.notesFrom(scalePc).joinToString(" ") { NoteSpeller.spell(it) }
+            val formula = scale.intervals.joinToString(" ") { intervalName(it) }
+            Text("${state.scaleRoot} ${scale.name}", style = MaterialTheme.typography.bodyMedium)
+            Text("notes    $notes",   fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+            Text("formula  $formula", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+        } else {
+            Text("(invalid root or scale)", color = MaterialTheme.colorScheme.error)
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = { state.closeSheet() }) { Text("Done") }
+        }
     }
 }
 
-// ---------- Pick ----------
+// ---------- PICK SHEET ----------
 
 @Composable
-private fun PickPanel(state: AppState) {
-    PanelHeader("Pick & strum")
+fun PickSheet(state: AppState) {
+    SheetBody {
+        SheetHeader("Pick & strum")
+        Text(
+            "Tap any fret on the neck to add or remove it from your selection. " +
+                "Use the bottom strip to strum or clear.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(8.dp))
+        Text("Picked: ${state.pickedPositions.size}", style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { state.strumPicked(arpeggio = false) }, enabled = state.pickedPositions.isNotEmpty()) { Text("Strum") }
+            OutlinedButton(onClick = { state.strumPicked(arpeggio = true) }, enabled = state.pickedPositions.isNotEmpty()) { Text("Arpeggio") }
+            OutlinedButton(onClick = { state.clearPicked() }, enabled = state.pickedPositions.isNotEmpty()) { Text("Clear") }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = { state.closeSheet() }) { Text("Done") }
+        }
+    }
+}
 
+// ---------- OPTIONS SHEET ----------
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
+    var editorOpen by remember { mutableStateOf(false) }
+    var saveName by remember { mutableStateOf("") }
+
+    SheetBody {
+        SheetHeader("Options")
+
+        Text("Tuning", style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(6.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Tunings.all.forEach { (name, t) ->
+                FilterChip(
+                    selected = name == state.tuningName && !state.isEditedTuning,
+                    onClick = { state.selectTuning(name, t) },
+                    label = { Text(name) }
+                )
+            }
+        }
+        if (customTunings.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Text("My tunings", style = MaterialTheme.typography.labelMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                customTunings.forEach { (name, t) ->
+                    FilterChip(
+                        selected = name == state.tuningName && !state.isEditedTuning,
+                        onClick = { state.selectTuning(name, t) },
+                        label = { Text(name) },
+                        trailingIcon = {
+                            TextButton(onClick = { state.deleteCustomTuning(name) }) { Text("✕") }
+                        }
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Open strings (low → high):  " +
+                state.liveTuning.openStrings.joinToString(" ") { NoteSpeller.spell(it) },
+            fontFamily = FontFamily.Monospace,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (state.isEditedTuning) {
+            Text("(unsaved edits)", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { editorOpen = !editorOpen }) { Text(if (editorOpen) "Close editor" else "Customize…") }
+            if (state.isEditedTuning) {
+                TextButton(onClick = { state.resetTuningToSaved(customTunings) }) { Text("Discard edits") }
+            }
+        }
+        if (editorOpen) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(10.dp)) {
+                    for (s in (state.liveTuning.stringCount - 1) downTo 0) {
+                        val n = state.liveTuning.stringCount - s
+                        val note = state.liveTuning.openStrings[s]
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                            Text("S$n  ${NoteSpeller.spell(note).padEnd(4)}", fontFamily = FontFamily.Monospace, modifier = Modifier.width(88.dp))
+                            OutlinedButton(onClick = { state.adjustString(s, -1) }) { Text("−") }
+                            Spacer(Modifier.width(4.dp))
+                            OutlinedButton(onClick = { state.adjustString(s, +1) }) { Text("+") }
+                            Spacer(Modifier.width(10.dp))
+                            OutlinedButton(onClick = { state.adjustString(s, -12) }) { Text("−oct") }
+                            Spacer(Modifier.width(4.dp))
+                            OutlinedButton(onClick = { state.adjustString(s, +12) }) { Text("+oct") }
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                        OutlinedTextField(
+                            value = saveName,
+                            onValueChange = { saveName = it },
+                            label = { Text("Save as…") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Button(
+                            onClick = { state.saveCustomTuning(saveName); saveName = "" },
+                            enabled = saveName.trim().isNotEmpty() && '|' !in saveName && ';' !in saveName
+                        ) { Text("Save") }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(8.dp))
+
+        Text("Display", style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(6.dp))
+        Text("Labels on dots", style = MaterialTheme.typography.labelMedium)
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            LabelMode.entries.forEachIndexed { i, m ->
+                SegmentedButton(
+                    selected = m == state.labelMode,
+                    onClick = { state.labelMode = m },
+                    shape = SegmentedButtonDefaults.itemShape(index = i, count = LabelMode.entries.size),
+                    label = { Text(m.name) }
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Left-handed", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Switch(checked = state.leftHanded, onCheckedChange = { state.toggleLeftHanded(it) })
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = { state.closeSheet() }) { Text("Done") }
+        }
+    }
+}
+
+// ---------- helpers ----------
+
+@Composable
+private fun SheetBody(content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 600.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        content()
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun SheetHeader(title: String) {
     Text(
-        "Tap any fret on the neck above to add or remove it. Then strum.",
-        style = MaterialTheme.typography.bodyMedium,
+        title.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
-    Spacer(Modifier.height(12.dp))
-
-    val noteNames = remember(state.pickedPositions, state.liveTuning) {
-        state.pickedPositions
-            .filter { it.stringIndex < state.liveTuning.stringCount }
-            .sortedWith(compareBy({ it.stringIndex }, { it.fret }))
-            .map { NoteSpeller.spell(
-                app.guitar.theory.Fretboard.noteAt(state.liveTuning, it).pitchClass
-            ) }
-    }
-    Text(
-        "Selected: ${state.pickedPositions.size} note(s)" +
-            if (noteNames.isNotEmpty()) "  ·  ${noteNames.joinToString(" ")}" else "",
-        style = MaterialTheme.typography.bodyMedium,
-    )
-
-    Spacer(Modifier.height(16.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(
-            onClick = { state.strumPicked(arpeggio = false) },
-            enabled = state.pickedPositions.isNotEmpty()
-        ) { Text("Strum ▶") }
-        OutlinedButton(
-            onClick = { state.strumPicked(arpeggio = true) },
-            enabled = state.pickedPositions.isNotEmpty()
-        ) { Text("Arpeggio ◐") }
-        OutlinedButton(
-            onClick = { state.clearPicked() },
-            enabled = state.pickedPositions.isNotEmpty()
-        ) { Text("Clear") }
-    }
-}
-
-// ---------- Helpers ----------
-
-@Composable
-private fun PanelHeader(text: String) {
-    Text(text.uppercase(), style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(8.dp))
 }
