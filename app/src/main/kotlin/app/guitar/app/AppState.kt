@@ -33,7 +33,7 @@ enum class DisplayMode { None, Chord, Scale, Pick }
 
 /** Which bottom sheet (or full-screen route) is currently open (null = none).
  *  Loop and Tuner are full-screen; the others are bottom sheets. */
-enum class Sheet { Chord, Scale, Pick, Options, Loop, Tuner }
+enum class Sheet { Chord, Scale, Pick, Options, Loop, Tuner, EarTraining }
 
 /** All-notes vs single-position view, for chord & scale display. */
 enum class ChordScaleView { AllNotes, Positions }
@@ -41,8 +41,8 @@ enum class ChordScaleView { AllNotes, Positions }
 @Stable
 class AppState(
     private val repo: TuningRepository,
-    private val scope: CoroutineScope,
-    private val audio: AudioEngine,
+    val scope: CoroutineScope,
+    val audio: AudioEngine,
 ) {
     var tuningName by mutableStateOf("Standard")
     var liveTuning by mutableStateOf<Tuning>(Tunings.standard)
@@ -241,6 +241,7 @@ class AppState(
             Sheet.Options -> {} // tunings/options doesn't change what's lit
             Sheet.Loop -> {}    // loop sheet plays its own audio; fretboard view unchanged
             Sheet.Tuner -> {}   // tuner reads the mic; fretboard view unchanged
+            Sheet.EarTraining -> {} // ear training plays its own audio
         }
     }
 

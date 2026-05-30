@@ -194,6 +194,8 @@ fun App(audio: AudioEngine) {
             LoopScreen(state)
         } else if (state.currentSheet == Sheet.Tuner) {
             TunerScreen(state, onBack = { state.closeSheet() })
+        } else if (state.currentSheet == Sheet.EarTraining) {
+            EarTrainingScreen(state, onBack = { state.closeSheet() })
         } else {
             StatusBar(state)
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -223,7 +225,7 @@ fun App(audio: AudioEngine) {
     }
 
     // ---------- Bottom sheet (Chord / Scale / Pick / Options) ----------
-    if (state.currentSheet != null && state.currentSheet != Sheet.Loop && state.currentSheet != Sheet.Tuner) {
+    if (state.currentSheet != null && state.currentSheet != Sheet.Loop && state.currentSheet != Sheet.Tuner && state.currentSheet != Sheet.EarTraining) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
         ModalBottomSheet(
             onDismissRequest = { state.closeSheet() },
@@ -235,8 +237,9 @@ fun App(audio: AudioEngine) {
                 Sheet.Scale   -> ScaleSheet(state)
                 Sheet.Pick    -> PickSheet(state)
                 Sheet.Options -> OptionsSheet(state, customTunings)
-                Sheet.Loop    -> {} // handled by full-screen route above
-                Sheet.Tuner   -> {} // handled by full-screen route above
+                Sheet.Loop        -> {} // handled by full-screen route above
+                Sheet.Tuner       -> {} // handled by full-screen route above
+                Sheet.EarTraining -> {} // handled by full-screen route above
             }
         }
     }
@@ -249,6 +252,7 @@ private fun sheetLabel(s: Sheet): String = when (s) {
     Sheet.Loop -> "Loop"
     Sheet.Options -> "Options"
     Sheet.Tuner -> "Tuner"
+    Sheet.EarTraining -> "Ear"
 }
 
 @Composable
@@ -287,16 +291,21 @@ private fun StatusBar(state: AppState) {
                 Spacer(Modifier.width(2.dp))
             }
         }
-        // Tuner is a top-level button next to the menu (always visible).
+        // Top-level buttons: Ear-training and Tuner (always visible).
+        TextButton(
+            onClick = { state.openSheet(Sheet.EarTraining) },
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        ) {
+            Text("Ear", color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleSmall)
+        }
+        Spacer(Modifier.width(2.dp))
         TextButton(
             onClick = { state.openSheet(Sheet.Tuner) },
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
         ) {
-            Text(
-                "Tuner",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.titleSmall
-            )
+            Text("Tuner", color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleSmall)
         }
         Spacer(Modifier.width(2.dp))
         Box {
