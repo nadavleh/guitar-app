@@ -17,13 +17,20 @@ class ChordShapeGenerator(
         // Prefer the canonical chord-dictionary voicings when they exist for this
         // (style, quality, tuning) and the user didn't restrict to a sub-range:
         //  - Standard → 5 CAGED shapes spread along the neck.
-        //  - Shell   → jazz drop-2 voicings (jazzguitar.be dictionary), 4-5 inversions.
-        // The brute-force fallback below otherwise tends to flood the list with similar
-        // shapes clustered in one area, defeating the "scroll along the neck" UX.
+        //  - Shell    → jazz drop-2 voicings (jazzguitar.be dictionary). When the
+        //    quality has no jazz drop-2 table (triads, suspended, augmented), we
+        //    fall back to CAGED rather than the brute-force generator — otherwise
+        //    Shell mode clusters voicings in one fret area for these chords.
+        // The brute-force fallback below applies only when neither canonical table
+        // has anything for the (quality, tuning) combination.
         if (fretRange == null) {
             val canonical = when (style) {
                 VoicingStyle.Standard -> cagedShapesFor(root, quality, tuning, frets)
-                VoicingStyle.Shell    -> jazzShellVoicingsFor(root, quality, tuning, frets)
+                VoicingStyle.Shell -> {
+                    val jazz = jazzShellVoicingsFor(root, quality, tuning, frets)
+                    if (jazz.isNotEmpty()) jazz
+                    else cagedShapesFor(root, quality, tuning, frets)
+                }
             }
             if (canonical.isNotEmpty()) return canonical
         }

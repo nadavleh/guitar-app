@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.guitar.audio.AudioEngine
+import app.guitar.theory.CagedShape
 import app.guitar.theory.ChordLibrary
 import app.guitar.theory.ChordShape
 import app.guitar.theory.ChordShapeGenerator
@@ -62,6 +63,9 @@ class AppState(
     // v1 GUI state
     var displayMode by mutableStateOf(DisplayMode.Chord)
     var currentSheet by mutableStateOf<Sheet?>(null)
+    /** The last sheet the user explicitly opened. Used by the bottom drag-up affordance
+     *  so the user can re-open the same sheet without going through the menu again. */
+    var lastSheet by mutableStateOf<Sheet?>(null)
     var chordView by mutableStateOf(ChordScaleView.AllNotes)
     var scaleView by mutableStateOf(ChordScaleView.AllNotes)
     var chordPositionIndex by mutableStateOf(0)
@@ -71,11 +75,29 @@ class AppState(
     // Jazz/shell voicing toggle — affects ChordShapeGenerator calls everywhere
     var voicingStyle by mutableStateOf(VoicingStyle.Standard)
 
-    // Loop builder state
+    fun toggleVoicingStyle(shell: Boolean) {
+        voicingStyle = if (shell) VoicingStyle.Shell else VoicingStyle.Standard
+        scope.launch { repo.setVoicingShell(shell) }
+    }
+
+    /** JVM-name avoids clash with `var labelMode`'s synthetic setter. */
+    @JvmName("applyLabelMode")
+    fun setLabelMode(mode: LabelMode) {
+        labelMode = mode
+        scope.launch { repo.setLabelMode(mode.name) }
+    }
+
+    // Loop builder state.
+    // The progression is a List<List<LoopSlot>>: each inner list is one bar; each slot is one beat.
+    // slotsPerBar lets the user split a bar into 1 (whole-note), 2 (half-note), or 4 (quarter-note).
     var bpm by mutableStateOf(80)
-    var loopBars by mutableStateOf(listOf<String?>("C", "Am", "F", "G"))
+    var slotsPerBar by mutableStateOf(1)   // start with one chord per bar (whole-bar slots)
+    var loopProgression by mutableStateOf(DEFAULT_PROGRESSION)
     var isLooping by mutableStateOf(false)
     var loopCurrentBar by mutableStateOf(0)
+    var loopCurrentSlot by mutableStateOf(0)
+    /** Currently-edited (barIdx, slotIdx) for the slot-edit panel, or null. */
+    var loopEditingSlot by mutableStateOf<Pair<Int, Int>?>(null)
     private var loopJob: Job? = null
     private val loopShapeGen get() = ChordShapeGenerator(style = voicingStyle)
 
@@ -185,6 +207,7 @@ class AppState(
 
     fun openSheet(sheet: Sheet) {
         currentSheet = sheet
+        lastSheet = sheet
         when (sheet) {
             Sheet.Chord -> displayMode = DisplayMode.Chord
             Sheet.Scale -> displayMode = DisplayMode.Scale
@@ -192,6 +215,10 @@ class AppState(
             Sheet.Options -> {} // tunings/options doesn't change what's lit
             Sheet.Loop -> {}    // loop sheet plays its own audio; fretboard view unchanged
         }
+    }
+
+    fun reopenLastSheet() {
+        lastSheet?.let { openSheet(it) }
     }
 
     fun closeSheet() { currentSheet = null }
@@ -210,14 +237,74 @@ class AppState(
 
     // ---------- Loop transport ----------
 
-    fun setLoopBar(index: Int, chordSymbol: String?) {
-        if (index !in loopBars.indices) return
-        loopBars = loopBars.toMutableList().also { it[index] = chordSymbol?.ifBlank { null } }
+    /** Replace one slot in the progression. */
+    fun setLoopSlot(barIdx: Int, slotIdx: Int, slot: LoopSlot) {
+        if (barIdx !in loopProgression.indices) return
+        val bar = loopProgression[barIdx]
+        if (slotIdx !in bar.indices) return
+        loopProgression = loopProgression.toMutableList().also { bars ->
+            bars[barIdx] = bar.toMutableList().also { it[slotIdx] = slot }
+        }
+    }
+
+    /** Update only the chord-symbol field of a slot (keep voicing/strum, default to fresh slot if empty). */
+    fun setLoopSlotChord(barIdx: Int, slotIdx: Int, chordSymbol: String?) {
+        val current = loopProgression.getOrNull(barIdx)?.getOrNull(slotIdx) ?: return
+        val cleaned = chordSymbol?.ifBlank { null }
+        val newSlot =
+            if (cleaned != current.chordSymbol)
+                current.copy(chordSymbol = cleaned, voicingIndex = defaultVoicingIndexFor(cleaned))
+            else current.copy(chordSymbol = cleaned)
+        setLoopSlot(barIdx, slotIdx, newSlot)
+    }
+
+    /** Pick the index of the E-shape voicing for [chordSymbol], or 0 if none exists.
+     *  E-shape is the canonical movable barre — typically the easiest "default" voicing. */
+    fun defaultVoicingIndexFor(chordSymbol: String?): Int {
+        val parsed = chordSymbol?.let { ChordLibrary.parse(it) } ?: return 0
+        val (r, q) = parsed
+        val shapes = loopShapeGen.shapesFor(r, q, liveTuning, frets = DISPLAY_FRETS)
+        val idx = shapes.indexOfFirst { it.cagedShape == CagedShape.E }
+        return if (idx >= 0) idx else 0
+    }
+
+    /** Tracks whether we've already normalized the initial progression's voicings to the
+     *  E-shape default for the active tuning/voicing style. */
+    var loopNormalized by mutableStateOf(false)
+
+    /** Update every slot's voicingIndex to the E-shape default. Idempotent — safe to call repeatedly. */
+    fun normalizeLoopVoicings() {
+        loopProgression = loopProgression.map { bar ->
+            bar.map { slot ->
+                if (slot.chordSymbol != null)
+                    slot.copy(voicingIndex = defaultVoicingIndexFor(slot.chordSymbol))
+                else slot
+            }
+        }
+        loopNormalized = true
+    }
+
+    /** Change how many slots make up a bar (1 = whole, 2 = half, 4 = quarter). Preserves existing chords. */
+    @JvmName("applySlotsPerBar")
+    fun setSlotsPerBar(n: Int) {
+        val clamped = n.coerceIn(1, 4)
+        if (clamped == slotsPerBar) return
+        loopProgression = loopProgression.map { bar ->
+            // Stretch or compress: keep slot 0; fill the rest with sustain (chord=null) so we don't
+            // accidentally duplicate the same chord on every beat.
+            val first = bar.firstOrNull() ?: LoopSlot()
+            buildList {
+                add(first)
+                repeat(clamped - 1) { add(LoopSlot()) }
+            }
+        }
+        slotsPerBar = clamped
     }
 
     fun setBarCount(count: Int) {
         val clamped = count.coerceIn(1, 16)
-        loopBars = (0 until clamped).map { loopBars.getOrNull(it) }
+        val empty = List(slotsPerBar) { LoopSlot() }
+        loopProgression = (0 until clamped).map { loopProgression.getOrNull(it) ?: empty }
     }
 
     fun startLoop() {
@@ -225,10 +312,10 @@ class AppState(
         isLooping = true
         loopJob = scope.launch {
             while (isLooping) {
-                for (i in loopBars.indices) {
+                for (barIdx in loopProgression.indices) {
                     if (!isLooping) break
-                    loopCurrentBar = i
-                    playBar(loopBars[i])
+                    loopCurrentBar = barIdx
+                    playBar(loopProgression[barIdx])
                 }
             }
         }
@@ -241,20 +328,33 @@ class AppState(
         audio.stop()
     }
 
-    private suspend fun playBar(chordSymbol: String?) {
+    private suspend fun playBar(bar: List<LoopSlot>) {
         val beatMs = (60_000L / bpm.coerceAtLeast(20))
-        val parsed = chordSymbol?.let { ChordLibrary.parse(it) }
-        if (parsed == null) { delay(beatMs * 4); return }
-        val (root, q) = parsed
-        val shapes = loopShapeGen.shapesFor(root, q, liveTuning, frets = DISPLAY_FRETS)
-        val shape = shapes.firstOrNull()
-        if (shape == null) { delay(beatMs * 4); return }
-        val midis = shape.notes.mapNotNull { it?.midi?.value }
-        if (midis.isEmpty()) { delay(beatMs * 4); return }
-        repeat(4) {                              // 4 quarter-note strums per bar (v1: 4/4 only)
+        // Each slot is one (whole bar / slotsPerBar) division.
+        val slotMs = beatMs * 4 / bar.size.coerceAtLeast(1)
+        for (slotIdx in bar.indices) {
             if (!isLooping) return
-            audio.playChord(midis, strumDelayMillis = 30, sustainMillis = (beatMs * 0.9).toInt().coerceAtLeast(150))
-            delay(beatMs)
+            loopCurrentSlot = slotIdx
+            val slot = bar[slotIdx]
+            val parsed = slot.chordSymbol?.let { ChordLibrary.parse(it) }
+            if (parsed != null && slot.strum != StrumPattern.Sustain) {
+                val (root, q) = parsed
+                val shapes = loopShapeGen.shapesFor(root, q, liveTuning, frets = DISPLAY_FRETS)
+                val shape = shapes.getOrNull(slot.voicingIndex) ?: shapes.firstOrNull()
+                if (shape != null) {
+                    val midis = shape.notes.mapNotNull { it?.midi?.value }
+                    val ordered = if (slot.strum == StrumPattern.Up) midis.asReversed() else midis
+                    val strumDelay = when (slot.strum) {
+                        StrumPattern.Down -> 25
+                        StrumPattern.Up -> 25
+                        StrumPattern.Arpeggio -> 100
+                        StrumPattern.Sustain -> 0
+                    }
+                    audio.playChord(ordered, strumDelayMillis = strumDelay,
+                        sustainMillis = (slotMs * 0.9).toInt().coerceAtLeast(150))
+                }
+            }
+            delay(slotMs)
         }
     }
 }

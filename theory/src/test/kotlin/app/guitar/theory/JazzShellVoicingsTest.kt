@@ -87,6 +87,39 @@ class JazzShellVoicingsTest {
     @Test fun `Cdim7 includes A-shape x 3 4 5 4 x`() =
         assertContainsShape("Cdim7", listOf(null, 3, 4, 5, 4, null))
 
+    // ---------- C6 ----------
+
+    @Test fun `C6 includes drop-2 root-pos x x 5 5 5 5`() =
+        assertContainsShape("C6", listOf(null, null, 5, 5, 5, 5))
+
+    @Test fun `C6 includes drop-2 1st-inv x x 7 9 8 8`() =
+        assertContainsShape("C6", listOf(null, null, 7, 9, 8, 8))
+
+    @Test fun `C6 includes drop-2 2nd-inv x x 10 12 10 12`() =
+        assertContainsShape("C6", listOf(null, null, 10, 12, 10, 12))
+
+    @Test fun `C6 includes drop-2 3rd-inv x x 2 2 1 3`() =
+        assertContainsShape("C6", listOf(null, null, 2, 2, 1, 3))
+
+    // ---------- Cm6 ----------
+
+    @Test fun `Cm6 includes drop-2 root-pos x x 5 5 4 5`() =
+        assertContainsShape("Cm6", listOf(null, null, 5, 5, 4, 5))
+
+    @Test fun `Cm6 includes drop-2 1st-inv x x 7 8 8 8`() =
+        assertContainsShape("Cm6", listOf(null, null, 7, 8, 8, 8))
+
+    @Test fun `Cm6 includes drop-2 2nd-inv x x 10 12 10 11`() =
+        assertContainsShape("Cm6", listOf(null, null, 10, 12, 10, 11))
+
+    @Test fun `Cm6 includes drop-2 3rd-inv x x 1 2 1 3`() =
+        assertContainsShape("Cm6", listOf(null, null, 1, 2, 1, 3))
+
+    // ---------- C9 ----------
+
+    @Test fun `C9 includes A-rooted standard x 3 2 3 3 3`() =
+        assertContainsShape("C9", listOf(null, 3, 2, 3, 3, 3))
+
     // ---------- Properties ----------
 
     @Test fun `every Cmaj7 jazz voicing contains only C E G B`() {

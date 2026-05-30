@@ -69,6 +69,46 @@ class CagedShapesTest {
     @Test fun `Edim7 E-shape is 0 1 2 0 2 x`() = assertShape("Edim7", CagedShape.E, listOf(0, 1, 2, 0, 2, null))
     @Test fun `Ddim7 D-shape is x x 0 1 0 1`() = assertShape("Ddim7", CagedShape.D, listOf(null, null, 0, 1, 0, 1))
 
+    // ---------------- SUS 2 ----------------
+
+    @Test fun `Csus2 C-shape is x 3 0 0 1 x`() = assertShape("Csus2", CagedShape.C, listOf(null, 3, 0, 0, 1, null))
+    @Test fun `Asus2 A-shape is x 0 2 2 0 0`() = assertShape("Asus2", CagedShape.A, listOf(null, 0, 2, 2, 0, 0))
+    @Test fun `Gsus2 G-shape is 3 0 0 0 x 3`() = assertShape("Gsus2", CagedShape.G, listOf(3, 0, 0, 0, null, 3))
+    @Test fun `Esus2 E-shape is 0 2 4 4 0 0`() = assertShape("Esus2", CagedShape.E, listOf(0, 2, 4, 4, 0, 0))
+    @Test fun `Dsus2 D-shape is x x 0 2 3 0`() = assertShape("Dsus2", CagedShape.D, listOf(null, null, 0, 2, 3, 0))
+
+    // ---------------- SUS 4 ----------------
+
+    @Test fun `Csus4 C-shape is x 3 3 0 1 1`() = assertShape("Csus4", CagedShape.C, listOf(null, 3, 3, 0, 1, 1))
+    @Test fun `Asus4 A-shape is x 0 2 2 3 0`() = assertShape("Asus4", CagedShape.A, listOf(null, 0, 2, 2, 3, 0))
+    @Test fun `Gsus4 G-shape is 3 3 0 0 1 3`() = assertShape("Gsus4", CagedShape.G, listOf(3, 3, 0, 0, 1, 3))
+    @Test fun `Esus4 E-shape is 0 2 2 2 0 0`() = assertShape("Esus4", CagedShape.E, listOf(0, 2, 2, 2, 0, 0))
+    @Test fun `Dsus4 D-shape is x x 0 2 3 3`() = assertShape("Dsus4", CagedShape.D, listOf(null, null, 0, 2, 3, 3))
+
+    // ---------------- 6 ----------------
+
+    @Test fun `C6 C-shape is x 3 2 2 1 0`() = assertShape("C6", CagedShape.C, listOf(null, 3, 2, 2, 1, 0))
+    @Test fun `A6 A-shape is x 0 2 2 2 2`() = assertShape("A6", CagedShape.A, listOf(null, 0, 2, 2, 2, 2))
+    @Test fun `G6 G-shape is 3 2 0 0 0 0`() = assertShape("G6", CagedShape.G, listOf(3, 2, 0, 0, 0, 0))
+    @Test fun `E6 E-shape is 0 2 2 1 2 0`() = assertShape("E6", CagedShape.E, listOf(0, 2, 2, 1, 2, 0))
+    @Test fun `D6 D-shape is x x 0 2 0 2`() = assertShape("D6", CagedShape.D, listOf(null, null, 0, 2, 0, 2))
+
+    // ---------------- m6 ----------------
+
+    @Test fun `Cm6 C-shape is x 3 1 2 1 3`() = assertShape("Cm6", CagedShape.C, listOf(null, 3, 1, 2, 1, 3))
+    @Test fun `Am6 A-shape is x 0 2 2 1 2`() = assertShape("Am6", CagedShape.A, listOf(null, 0, 2, 2, 1, 2))
+    @Test fun `Gm6 G-shape is 3 1 2 0 x 0`() = assertShape("Gm6", CagedShape.G, listOf(3, 1, 2, 0, null, 0))
+    @Test fun `Em6 E-shape is 0 2 2 0 2 0`() = assertShape("Em6", CagedShape.E, listOf(0, 2, 2, 0, 2, 0))
+    @Test fun `Dm6 D-shape is x x 0 2 0 1`() = assertShape("Dm6", CagedShape.D, listOf(null, null, 0, 2, 0, 1))
+
+    // ---------------- add9 ----------------
+
+    @Test fun `Cadd9 C-shape is x 3 2 0 3 0`() = assertShape("Cadd9", CagedShape.C, listOf(null, 3, 2, 0, 3, 0))
+    @Test fun `Aadd9 A-shape is x 0 2 4 2 0`() = assertShape("Aadd9", CagedShape.A, listOf(null, 0, 2, 4, 2, 0))
+    @Test fun `Gadd9 G-shape is 3 2 0 2 0 3`() = assertShape("Gadd9", CagedShape.G, listOf(3, 2, 0, 2, 0, 3))
+    @Test fun `Eadd9 E-shape is 0 2 4 1 0 0`() = assertShape("Eadd9", CagedShape.E, listOf(0, 2, 4, 1, 0, 0))
+    @Test fun `Dadd9 D-shape is x x 0 2 3 0`() = assertShape("Dadd9", CagedShape.D, listOf(null, null, 0, 2, 3, 0))
+
     // ---------------- NECK-SPANNING POSITIONS ----------------
 
     @Test fun `C major produces 5 CAGED shapes spanning the neck`() {

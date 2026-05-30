@@ -122,6 +122,76 @@ internal object CagedTemplates {
         CagedShape.D to listOf(null, null,  0, +1,  0, +1),
     )
 
+    // ===== sus2 (1 2 5) =====
+    val sus2: Map<CagedShape, List<Int?>> = mapOf(
+        // Csus2 at X=3:  x 3 0 0 1 x   (e muted — open e at X-3 plays maj3 which is not in sus2)
+        CagedShape.C to listOf(null,  0, -3, -3, -2, null),
+        // Asus2 at X=0:  x 0 2 2 0 0
+        CagedShape.A to listOf(null,  0, +2, +2,  0,  0),
+        // Gsus2 at X=3:  3 0 0 0 x 3   (B-string muted)
+        CagedShape.G to listOf(   0, -3, -3, -3, null, 0),
+        // Esus2 at X=0:  0 2 4 4 0 0
+        CagedShape.E to listOf(   0, +2, +4, +4,  0,  0),
+        // Dsus2 at X=0:  x x 0 2 3 0
+        CagedShape.D to listOf(null, null,  0, +2, +3,  0),
+    )
+
+    // ===== sus4 (1 4 5) =====
+    val sus4: Map<CagedShape, List<Int?>> = mapOf(
+        // Csus4 at X=3:  x 3 3 0 1 1
+        CagedShape.C to listOf(null,  0,  0, -3, -2, -2),
+        // Asus4 at X=0:  x 0 2 2 3 0
+        CagedShape.A to listOf(null,  0, +2, +2, +3,  0),
+        // Gsus4 at X=3:  3 3 0 0 1 3
+        CagedShape.G to listOf(   0,  0, -3, -3, -2,  0),
+        // Esus4 at X=0:  0 2 2 2 0 0
+        CagedShape.E to listOf(   0, +2, +2, +2,  0,  0),
+        // Dsus4 at X=0:  x x 0 2 3 3
+        CagedShape.D to listOf(null, null,  0, +2, +3, +3),
+    )
+
+    // ===== 6 (1 3 5 6) =====
+    val sixth: Map<CagedShape, List<Int?>> = mapOf(
+        // C6 at X=3:  x 3 2 2 1 0   (omits the 5th on top — Joe Pass voicing)
+        CagedShape.C to listOf(null,  0, -1, -1, -2, -3),
+        // A6 at X=0:  x 0 2 2 2 2
+        CagedShape.A to listOf(null,  0, +2, +2, +2, +2),
+        // G6 at X=3:  3 2 0 0 0 0
+        CagedShape.G to listOf(   0, -1, -3, -3, -3, -3),
+        // E6 at X=0:  0 2 2 1 2 0
+        CagedShape.E to listOf(   0, +2, +2, +1, +2,  0),
+        // D6 at X=0:  x x 0 2 0 2
+        CagedShape.D to listOf(null, null,  0, +2,  0, +2),
+    )
+
+    // ===== m6 (1 b3 5 6) =====
+    val minor6: Map<CagedShape, List<Int?>> = mapOf(
+        // Cm6 at X=3:  x 3 1 2 1 3
+        CagedShape.C to listOf(null,  0, -2, -1, -2,  0),
+        // Am6 at X=0:  x 0 2 2 1 2
+        CagedShape.A to listOf(null,  0, +2, +2, +1, +2),
+        // Gm6 at X=3:  3 1 2 0 x 0   (B muted, no P5 — uses 6 instead)
+        CagedShape.G to listOf(   0, -2, -1, -3, null, -3),
+        // Em6 at X=0:  0 2 2 0 2 0
+        CagedShape.E to listOf(   0, +2, +2,  0, +2,  0),
+        // Dm6 at X=0:  x x 0 2 0 1
+        CagedShape.D to listOf(null, null,  0, +2,  0, +1),
+    )
+
+    // ===== add9 (1 3 5 9) =====
+    val add9: Map<CagedShape, List<Int?>> = mapOf(
+        // Cadd9 at X=3:  x 3 2 0 3 0
+        CagedShape.C to listOf(null,  0, -1, -3,  0, -3),
+        // Aadd9 at X=0:  x 0 2 4 2 0    (9 on G-string, P5 on A and B, root on A and e)
+        CagedShape.A to listOf(null,  0, +2, +4, +2,  0),
+        // Gadd9 at X=3:  3 2 0 2 0 3
+        CagedShape.G to listOf(   0, -1, -3, -1, -3,  0),
+        // Eadd9 at X=0:  0 2 4 1 0 0
+        CagedShape.E to listOf(   0, +2, +4, +1,  0,  0),
+        // Dadd9 at X=0:  x x 0 2 3 0
+        CagedShape.D to listOf(null, null,  0, +2, +3,  0),
+    )
+
     /** Lookup template map by chord-quality symbol. */
     fun forQuality(symbol: String): Map<CagedShape, List<Int?>>? = when (symbol) {
         "", "maj"     -> major
@@ -131,6 +201,11 @@ internal object CagedTemplates {
         "m7", "min7"  -> m7
         "m7b5"        -> m7b5
         "dim7"        -> dim7
+        "sus2"        -> sus2
+        "sus4"        -> sus4
+        "6"           -> sixth
+        "m6"          -> minor6
+        "add9"        -> add9
         else          -> null
     }
 }
@@ -188,5 +263,6 @@ private fun buildCagedShape(
         quality = quality,
         frets = frets,
         tuning = tuning,
+        cagedShape = shape,
     )
 }

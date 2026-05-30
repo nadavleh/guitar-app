@@ -83,6 +83,8 @@ fun App(audio: AudioEngine) {
     val customTunings by state.customTunings.collectAsState(initial = emptyMap())
     val savedSelected by state.savedSelectedName.collectAsState(initial = "Standard")
     val persistedLeftHanded by repo.leftHanded.collectAsState(initial = false)
+    val persistedVoicingShell by repo.voicingShell.collectAsState(initial = false)
+    val persistedLabelMode by repo.labelMode.collectAsState(initial = LabelMode.Notes.name)
 
     LaunchedEffect(savedSelected, customTunings) {
         if (!state.isEditedTuning) {
@@ -93,6 +95,14 @@ fun App(audio: AudioEngine) {
         }
     }
     LaunchedEffect(persistedLeftHanded) { state.leftHanded = persistedLeftHanded }
+    LaunchedEffect(persistedVoicingShell) {
+        state.voicingStyle =
+            if (persistedVoicingShell) app.guitar.theory.VoicingStyle.Shell
+            else app.guitar.theory.VoicingStyle.Standard
+    }
+    LaunchedEffect(persistedLabelMode) {
+        state.labelMode = runCatching { LabelMode.valueOf(persistedLabelMode) }.getOrDefault(LabelMode.Notes)
+    }
     DisposableEffect(Unit) { onDispose { audio.stop() } }
 
     val parsedChord = ChordLibrary.parse(state.chordInput)
@@ -152,34 +162,39 @@ fun App(audio: AudioEngine) {
             .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()   // keep content clear of status bar + nav gesture
     ) {
-        StatusBar(state)
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-        // Fretboard fills all remaining vertical space (landscape-locked, so this
-        // is always wider than tall — renders as a horizontal neck).
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 4.dp)
-        ) {
-            FretboardView(
-                tuning = state.liveTuning,
-                marks = marks,
-                selectedPosition = state.selectedPosition,
-                onTap = { pos ->
-                    if (state.displayMode == DisplayMode.Pick) state.togglePick(pos)
-                    else state.tapPosition(pos)
-                },
-                numFrets = DISPLAY_FRETS,
-                leftHanded = state.leftHanded,
-            )
+        if (state.currentSheet == Sheet.Loop) {
+            // Loop takes over the whole screen — it has its own controls and Back button.
+            LoopScreen(state)
+        } else {
+            StatusBar(state)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            // Fretboard fills all remaining vertical space (landscape-locked, so this
+            // is always wider than tall — renders as a horizontal neck).
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 4.dp)
+            ) {
+                FretboardView(
+                    tuning = state.liveTuning,
+                    marks = marks,
+                    selectedPosition = state.selectedPosition,
+                    onTap = { pos ->
+                        if (state.displayMode == DisplayMode.Pick) state.togglePick(pos)
+                        else state.tapPosition(pos)
+                    },
+                    numFrets = DISPLAY_FRETS,
+                    leftHanded = state.leftHanded,
+                )
+            }
+            SelectedPositionInfo(state.liveTuning, state.selectedPosition, parsedChord)
+            ContextBar(state, chordShapes, scalePositions)
         }
-        SelectedPositionInfo(state.liveTuning, state.selectedPosition, parsedChord)
-        ContextBar(state, chordShapes, scalePositions)
     }
 
-    // ---------- Bottom sheet ----------
-    if (state.currentSheet != null) {
+    // ---------- Bottom sheet (Chord / Scale / Pick / Options) ----------
+    if (state.currentSheet != null && state.currentSheet != Sheet.Loop) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
         ModalBottomSheet(
             onDismissRequest = { state.closeSheet() },
@@ -191,10 +206,18 @@ fun App(audio: AudioEngine) {
                 Sheet.Scale   -> ScaleSheet(state)
                 Sheet.Pick    -> PickSheet(state)
                 Sheet.Options -> OptionsSheet(state, customTunings)
-                Sheet.Loop    -> LoopSheet(state)
+                Sheet.Loop    -> {} // handled by full-screen route above
             }
         }
     }
+}
+
+private fun sheetLabel(s: Sheet): String = when (s) {
+    Sheet.Chord -> "Chord"
+    Sheet.Scale -> "Scale"
+    Sheet.Pick -> "Pick"
+    Sheet.Loop -> "Loop"
+    Sheet.Options -> "Options"
 }
 
 @Composable
@@ -217,6 +240,23 @@ private fun StatusBar(state: AppState) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
+        // Re-open the last-used sheet without going through the menu.
+        // Shows only after the user has opened a sheet at least once this session.
+        state.lastSheet?.let { sh ->
+            if (state.currentSheet == null) {
+                TextButton(
+                    onClick = { state.reopenLastSheet() },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        "↑ ${sheetLabel(sh)}",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                }
+                Spacer(Modifier.width(2.dp))
+            }
+        }
         Box {
             TextButton(
                 onClick = { menuOpen = true },

@@ -61,4 +61,26 @@ class TuningRepository(private val context: Context) {
             prefs[keyLeftHanded] = value
         }
     }
+
+    private val keyVoicingShell = booleanPreferencesKey("voicing_shell")
+
+    val voicingShell: Flow<Boolean> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyVoicingShell] ?: false }
+
+    suspend fun setVoicingShell(value: Boolean) {
+        context.tuningDataStore.edit { prefs ->
+            prefs[keyVoicingShell] = value
+        }
+    }
+
+    private val keyLabelMode = stringPreferencesKey("label_mode")
+
+    val labelMode: Flow<String> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyLabelMode] ?: "Notes" }
+
+    suspend fun setLabelMode(value: String) {
+        context.tuningDataStore.edit { prefs ->
+            prefs[keyLabelMode] = value
+        }
+    }
 }

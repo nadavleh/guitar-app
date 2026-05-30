@@ -1,5 +1,7 @@
 package app.guitar.app
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,6 +9,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -113,6 +116,19 @@ fun ChordSheet(state: AppState) {
             }
         }
 
+        Spacer(Modifier.height(8.dp))
+        Text("Labels", style = MaterialTheme.typography.labelMedium)
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            LabelMode.entries.forEachIndexed { i, m ->
+                SegmentedButton(
+                    selected = m == state.labelMode,
+                    onClick = { state.setLabelMode(m) },
+                    shape = SegmentedButtonDefaults.itemShape(index = i, count = LabelMode.entries.size),
+                    label = { Text(m.name) }
+                )
+            }
+        }
+
         Spacer(Modifier.height(12.dp))
         if (parsed != null) {
             val (root, q) = parsed
@@ -179,6 +195,19 @@ fun ScaleSheet(state: AppState) {
                     onClick = { state.scaleView = v },
                     shape = SegmentedButtonDefaults.itemShape(index = i, count = ChordScaleView.entries.size),
                     label = { Text(if (v == ChordScaleView.AllNotes) "All notes" else "Positions") }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Text("Labels", style = MaterialTheme.typography.labelMedium)
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            LabelMode.entries.forEachIndexed { i, m ->
+                SegmentedButton(
+                    selected = m == state.labelMode,
+                    onClick = { state.setLabelMode(m) },
+                    shape = SegmentedButtonDefaults.itemShape(index = i, count = LabelMode.entries.size),
+                    label = { Text(m.name) }
                 )
             }
         }
@@ -328,7 +357,7 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
             LabelMode.entries.forEachIndexed { i, m ->
                 SegmentedButton(
                     selected = m == state.labelMode,
-                    onClick = { state.labelMode = m },
+                    onClick = { state.setLabelMode(m) },
                     shape = SegmentedButtonDefaults.itemShape(index = i, count = LabelMode.entries.size),
                     label = { Text(m.name) }
                 )
@@ -353,7 +382,7 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
             Switch(
                 checked = state.voicingStyle == VoicingStyle.Shell,
                 onCheckedChange = {
-                    state.voicingStyle = if (it) VoicingStyle.Shell else VoicingStyle.Standard
+                    state.toggleVoicingStyle(it)
                     state.resetChordPosition()
                 }
             )
@@ -366,79 +395,282 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
     }
 }
 
-// ---------- LOOP SHEET ----------
+// ---------- LOOP SCREEN (full-screen, not a sheet) ----------
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun LoopSheet(state: AppState) {
-    SheetBody {
-        SheetHeader("Progression loop")
-        Text(
-            "Lay out a chord progression and loop it. v1: 4/4, quarter-note strums, one chord per bar.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(12.dp))
-
-        // BPM
-        Text("BPM: ${state.bpm}", style = MaterialTheme.typography.bodyMedium)
-        androidx.compose.material3.Slider(
-            value = state.bpm.toFloat(),
-            onValueChange = { state.bpm = it.toInt() },
-            valueRange = 40f..200f,
-            steps = 0,
-        )
-
-        Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Bars: ${state.loopBars.size}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = { state.setBarCount(state.loopBars.size - 1) }, enabled = state.loopBars.size > 1) { Text("−") }
-            Spacer(Modifier.width(6.dp))
-            OutlinedButton(onClick = { state.setBarCount(state.loopBars.size + 1) }, enabled = state.loopBars.size < 16) { Text("+") }
+fun LoopScreen(state: AppState) {
+    androidx.compose.runtime.LaunchedEffect(state.voicingStyle, state.liveTuning) {
+        // Re-normalize whenever the user changes voicing style or tuning, so the
+        // default chord voicing matches the current display mode.
+        state.normalizeLoopVoicings()
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        // ----- Top: title + transport + back -----
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("PROGRESSION LOOP",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f))
+            if (state.isLooping) {
+                Button(onClick = { state.stopLoop() }) { Text("Stop ⏹") }
+            } else {
+                Button(onClick = { state.startLoop() },
+                    enabled = state.loopProgression.any { bar -> bar.any { it.chordSymbol != null } }) {
+                    Text("Play ▶")
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(onClick = { state.stopLoop(); state.closeSheet() }) { Text("Back") }
         }
 
-        Spacer(Modifier.height(12.dp))
-        // Bar grid (max 4 per row)
-        val chunks = state.loopBars.withIndex().chunked(4)
-        for (chunk in chunks) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for ((i, sym) in chunk) {
-                    val isCurrent = state.isLooping && state.loopCurrentBar == i
-                    val bg = if (isCurrent)
-                        androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                    else
-                        androidx.compose.material3.CardDefaults.cardColors()
-                    Card(modifier = Modifier.weight(1f), colors = bg) {
-                        Column(modifier = Modifier.padding(6.dp)) {
-                            Text("Bar ${i + 1}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            OutlinedTextField(
-                                value = sym ?: "",
-                                onValueChange = { state.setLoopBar(i, it) },
-                                placeholder = { Text("chord", style = MaterialTheme.typography.bodySmall) },
-                                singleLine = true,
-                                textStyle = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.fillMaxWidth()
+        Spacer(Modifier.height(8.dp))
+
+        // ----- Controls row: BPM, slots/bar, bars +/- -----
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("BPM: ${state.bpm}", style = MaterialTheme.typography.bodyMedium)
+                androidx.compose.material3.Slider(
+                    value = state.bpm.toFloat(),
+                    onValueChange = { state.bpm = it.toInt() },
+                    valueRange = 40f..200f,
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Slots/bar", style = MaterialTheme.typography.labelSmall)
+                SingleChoiceSegmentedButtonRow {
+                    listOf(1, 2, 4).forEachIndexed { i, n ->
+                        SegmentedButton(
+                            selected = state.slotsPerBar == n,
+                            onClick = { state.setSlotsPerBar(n) },
+                            shape = SegmentedButtonDefaults.itemShape(index = i, count = 3),
+                            label = { Text("$n") },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Bars: ${state.loopProgression.size}", style = MaterialTheme.typography.labelSmall)
+                Row {
+                    OutlinedButton(
+                        onClick = { state.setBarCount(state.loopProgression.size - 1) },
+                        enabled = state.loopProgression.size > 1,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    ) { Text("−") }
+                    Spacer(Modifier.width(4.dp))
+                    OutlinedButton(
+                        onClick = { state.setBarCount(state.loopProgression.size + 1) },
+                        enabled = state.loopProgression.size < 16,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    ) { Text("+") }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(6.dp))
+
+        // ----- Main area: bars grid (left) + slot editor (right, when open) -----
+        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            // Bars grid
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                // 2 bars per row when each bar has 4 slots, otherwise 4 per row.
+                val barsPerRow = if (state.slotsPerBar >= 4) 2 else 4
+                val rows = state.loopProgression.withIndex().chunked(barsPerRow)
+                for (row in rows) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        for ((barIdx, bar) in row) {
+                            BarCard(
+                                barIdx = barIdx,
+                                bar = bar,
+                                isCurrentBar = state.isLooping && state.loopCurrentBar == barIdx,
+                                currentSlot = state.loopCurrentSlot,
+                                isLooping = state.isLooping,
+                                onSlotTap = { slotIdx -> state.loopEditingSlot = barIdx to slotIdx },
+                                editingSlot = state.loopEditingSlot,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        // Pad the row to keep widths equal
+                        repeat(barsPerRow - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+            }
+            // Slot editor sits to the right of the bars grid when a slot is selected.
+            state.loopEditingSlot?.let { (barIdx, slotIdx) ->
+                Spacer(Modifier.width(8.dp))
+                Column(
+                    modifier = Modifier
+                        .width(420.dp)
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    SlotEditor(state, barIdx, slotIdx)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BarCard(
+    barIdx: Int,
+    bar: List<LoopSlot>,
+    isCurrentBar: Boolean,
+    currentSlot: Int,
+    isLooping: Boolean,
+    onSlotTap: (Int) -> Unit,
+    editingSlot: Pair<Int, Int>?,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier,
+        colors = if (isCurrentBar)
+            androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        else androidx.compose.material3.CardDefaults.cardColors(),
+    ) {
+        Column(modifier = Modifier.padding(6.dp)) {
+            Text("Bar ${barIdx + 1}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                for ((slotIdx, slot) in bar.withIndex()) {
+                    val isEditing = editingSlot == (barIdx to slotIdx)
+                    val isPlaying = isLooping && isCurrentBar && currentSlot == slotIdx
+                    val bg = when {
+                        isEditing -> MaterialTheme.colorScheme.tertiaryContainer
+                        isPlaying -> MaterialTheme.colorScheme.secondaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(54.dp)
+                            .background(bg, androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                            .clickable { onSlotTap(slotIdx) }
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                slot.chordSymbol ?: "·",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (slot.chordSymbol == null)
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                            )
+                            Text(
+                                slot.strum.glyph,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
                 }
-                // Pad row to 4 cells so widths are equal
-                repeat(4 - chunk.size) { Spacer(Modifier.weight(1f)) }
-            }
-            Spacer(Modifier.height(6.dp))
-        }
-
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (state.isLooping) {
-                Button(onClick = { state.stopLoop() }) { Text("Stop ⏹") }
-            } else {
-                Button(onClick = { state.startLoop() }, enabled = state.loopBars.any { it != null }) { Text("Play ▶") }
             }
         }
+    }
+}
 
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-            TextButton(onClick = { state.closeSheet() }) { Text("Done") }
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SlotEditor(state: AppState, barIdx: Int, slotIdx: Int) {
+    val slot = state.loopProgression.getOrNull(barIdx)?.getOrNull(slotIdx) ?: return
+    val parsed = slot.chordSymbol?.let { app.guitar.theory.ChordLibrary.parse(it) }
+    val shapes: List<app.guitar.theory.ChordShape> = remember(parsed, state.liveTuning, state.voicingStyle) {
+        if (parsed == null) emptyList()
+        else {
+            val (r, q) = parsed
+            app.guitar.theory.ChordShapeGenerator(style = state.voicingStyle)
+                .shapesFor(r, q, state.liveTuning, frets = DISPLAY_FRETS)
+        }
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Edit · Bar ${barIdx + 1} / slot ${slotIdx + 1}",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(1f))
+                TextButton(onClick = { state.loopEditingSlot = null }) { Text("Close") }
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = slot.chordSymbol ?: "",
+                    onValueChange = { state.setLoopSlotChord(barIdx, slotIdx, it) },
+                    label = { Text("Chord") },
+                    placeholder = { Text("e.g. Cmaj7, Dm7, G7") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(onClick = {
+                    state.setLoopSlot(barIdx, slotIdx, slot.copy(chordSymbol = null))
+                }) { Text("Clear") }
+            }
+
+            // ----- Voicing picker -----
+            if (slot.chordSymbol != null) {
+                Spacer(Modifier.height(8.dp))
+                Text("Voicing", style = MaterialTheme.typography.labelMedium)
+                if (shapes.isEmpty()) {
+                    Text("(chord not recognized)",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall)
+                } else {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        shapes.forEachIndexed { i, sh ->
+                            val label = sh.cagedShape?.displayName
+                                ?: sh.templateName?.substringBefore(" (")
+                                ?: "shape ${i + 1}"
+                            val played = sh.frets.filterNotNull().filter { it > 0 }
+                            val fretText = if (played.isEmpty()) "open"
+                                else if (played.min() == played.max()) "fret ${played.min()}"
+                                else "frets ${played.min()}–${played.max()}"
+                            FilterChip(
+                                selected = i == slot.voicingIndex,
+                                onClick = {
+                                    state.setLoopSlot(barIdx, slotIdx, slot.copy(voicingIndex = i))
+                                },
+                                label = { Text("$label · $fretText") },
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ----- Strum picker -----
+            Spacer(Modifier.height(8.dp))
+            Text("Strum", style = MaterialTheme.typography.labelMedium)
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                StrumPattern.entries.forEachIndexed { i, s ->
+                    SegmentedButton(
+                        selected = s == slot.strum,
+                        onClick = { state.setLoopSlot(barIdx, slotIdx, slot.copy(strum = s)) },
+                        shape = SegmentedButtonDefaults.itemShape(index = i, count = StrumPattern.entries.size),
+                        label = { Text("${s.glyph} ${s.displayName}") },
+                    )
+                }
+            }
         }
     }
 }

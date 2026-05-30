@@ -90,12 +90,46 @@ internal object JazzShellTable {
         JazzVoicing("dim7 A-shape (R-b5-bb7-b3)",       rootString = 1, offsets = listOf(null,  0, +1, +2, +1, null)),
     )
 
+    // -------- 6 drop-2 on top 4 (1 3 5 6) --------
+    // (Note: drop-2 root-pos of C6 is x x 5 5 5 5 — same notes as Am7's Freddie-Green box.)
+    private val sixth = listOf(
+        // 5-R-3-6 → C6: x x 5 5 5 5
+        JazzVoicing("6 drop-2 root-pos (5-R-3-6)",      rootString = 3, offsets = listOf(null, null,  0,  0,  0,  0)),
+        // 6-3-5-R → C6: x x 7 9 8 8
+        JazzVoicing("6 drop-2 1st-inv (6-3-5-R)",       rootString = 5, offsets = listOf(null, null, -1, +1,  0,  0)),
+        // R-5-6-3 → C6: x x 10 12 10 12
+        JazzVoicing("6 drop-2 2nd-inv (R-5-6-3)",       rootString = 2, offsets = listOf(null, null,  0, +2,  0, +2)),
+        // 3-6-R-5 → C6: x x 2 2 1 3
+        JazzVoicing("6 drop-2 3rd-inv (3-6-R-5)",       rootString = 4, offsets = listOf(null, null, +1, +1,  0, +2)),
+    )
+
+    // -------- m6 drop-2 on top 4 (1 b3 5 6) --------
+    private val minor6 = listOf(
+        // 5-R-b3-6 → Cm6: x x 5 5 4 5
+        JazzVoicing("m6 drop-2 root-pos (5-R-b3-6)",    rootString = 3, offsets = listOf(null, null,  0,  0, -1,  0)),
+        // 6-b3-5-R → Cm6: x x 7 8 8 8
+        JazzVoicing("m6 drop-2 1st-inv (6-b3-5-R)",     rootString = 5, offsets = listOf(null, null, -1,  0,  0,  0)),
+        // R-5-6-b3 → Cm6: x x 10 12 10 11
+        JazzVoicing("m6 drop-2 2nd-inv (R-5-6-b3)",     rootString = 2, offsets = listOf(null, null,  0, +2,  0, +1)),
+        // b3-6-R-5 → Cm6: x x 1 2 1 3
+        JazzVoicing("m6 drop-2 3rd-inv (b3-6-R-5)",     rootString = 4, offsets = listOf(null, null,  0, +1,  0, +2)),
+    )
+
+    // -------- 9 (1 3 5 b7 9) — 5-note chord; we use the standard A-rooted form --------
+    private val ninth = listOf(
+        // C9 at A-3:  x 3 2 3 3 3   (all chord tones — R, 3, b7, 9, 5)
+        JazzVoicing("9 standard (R-3-b7-9-5)",          rootString = 1, offsets = listOf(null,  0, -1,  0,  0,  0)),
+    )
+
     fun forQuality(symbol: String): List<JazzVoicing>? = when (symbol) {
         "maj7"        -> maj7
         "m7", "min7"  -> m7
         "7"           -> dom7
         "m7b5"        -> m7b5
         "dim7"        -> dim7
+        "6"           -> sixth
+        "m6"          -> minor6
+        "9"           -> ninth
         else          -> null
     }
 }
@@ -147,5 +181,6 @@ private fun realizeJazzVoicing(
         quality = quality,
         frets = frets,
         tuning = tuning,
+        templateName = v.name,
     )
 }

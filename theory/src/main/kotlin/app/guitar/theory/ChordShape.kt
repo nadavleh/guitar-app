@@ -5,7 +5,11 @@ data class ChordShape(
     val root: PitchClass,
     val quality: ChordQuality,
     val frets: List<Int?>,
-    val tuning: Tuning
+    val tuning: Tuning,
+    /** Which CAGED template this shape came from. Null for non-CAGED voicings (jazz drop-2, brute-force, etc.). */
+    val cagedShape: CagedShape? = null,
+    /** Free-form label for non-CAGED voicings (e.g. "drop-2 root-pos"). Null when [cagedShape] is non-null or for brute-force shapes. */
+    val templateName: String? = null,
 ) {
     init {
         require(frets.size == tuning.stringCount) {
