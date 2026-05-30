@@ -80,21 +80,25 @@ class VoicingTest {
     }
 
     @Test
-    fun `Shell mode permits 2-string voicings`() {
-        // A pure 3-7 voicing has exactly 2 played strings; standard mode requires 3+
+    fun `Shell mode for C7 includes the canonical drop-2 root-pos x x 5 5 5 6`() {
+        // Shell mode now serves the jazzguitar.be drop-2 dictionary. This is the
+        // root-position drop-2 voicing of C7 (5-R-3-b7 on D-G-B-e).
         val gen = ChordShapeGenerator(style = VoicingStyle.Shell)
         val (root, q) = ChordLibrary.parse("C7")!!
         val shapes = gen.shapesFor(root, q, Tunings.standard, frets = 14)
-        val hasTwoStringShape = shapes.any { it.playedCount == 2 }
-        assertTrue(hasTwoStringShape, "expected at least one 2-string (3+b7) shell voicing")
+        val expected = listOf(null, null, 5, 5, 5, 6)
+        assertTrue(shapes.any { it.frets == expected },
+            "expected canonical C7 drop-2 voicing $expected, got ${shapes.map { it.frets }}")
     }
 
     @Test
-    fun `Shell mode produces MORE shapes than Standard for the same chord`() {
-        val standard = ChordShapeGenerator(style = VoicingStyle.Standard)
-            .shapesFor(PitchClass.C, ChordLibrary.parse("Cmaj7")!!.second, Tunings.standard, frets = 14).size
-        val shell = ChordShapeGenerator(style = VoicingStyle.Shell)
-            .shapesFor(PitchClass.C, ChordLibrary.parse("Cmaj7")!!.second, Tunings.standard, frets = 14).size
-        assertTrue(shell > standard, "shell ($shell) should yield more voicings than standard ($standard)")
+    fun `Shell mode for Cmaj7 spans multiple positions along the neck`() {
+        val gen = ChordShapeGenerator(style = VoicingStyle.Shell)
+        val (root, q) = ChordLibrary.parse("Cmaj7")!!
+        val shapes = gen.shapesFor(root, q, Tunings.standard, frets = 14)
+        // Each inversion sits in a different neck zone; expect distinct positions.
+        val positions = shapes.map { it.position }.toSet()
+        assertTrue(positions.size >= 4,
+            "expected Shell-mode Cmaj7 to span 4+ distinct positions, got $positions")
     }
 }

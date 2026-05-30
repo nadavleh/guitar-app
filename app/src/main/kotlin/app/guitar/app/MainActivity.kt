@@ -103,8 +103,11 @@ fun App(audio: AudioEngine) {
         if (parsedChord == null) emptyList()
         else {
             val (r, q) = parsedChord
+            // No .take() cap — for Standard mode this is 5 CAGED shapes; for Shell it's
+            // 4-5 drop-2 inversions. For qualities without canonical templates (e.g. 9, 13),
+            // the brute-force generator still applies and the list could be longer.
             ChordShapeGenerator(style = state.voicingStyle)
-                .shapesFor(r, q, state.liveTuning, frets = DISPLAY_FRETS).take(8)
+                .shapesFor(r, q, state.liveTuning, frets = DISPLAY_FRETS).take(12)
         }
     }
     val scalePositions: List<ScalePosition> = remember(scalePc, scale, state.liveTuning) {
@@ -262,9 +265,16 @@ private fun ContextBar(
             PositionScroller(
                 label = run {
                     val sh = chordShapes.getOrNull(state.chordPositionIndex)
-                    val posLabel = if (sh == null) "" else
-                        if (sh.position == 0) "open" else "pos ${sh.position}"
-                    "${sh?.chordName ?: ""}  ·  $posLabel  ·  ${state.chordPositionIndex + 1} / ${chordShapes.size}"
+                    val fretsLabel = sh?.let {
+                        val played = it.frets.filterNotNull()
+                        if (played.isEmpty()) ""
+                        else {
+                            val lo = played.min()
+                            val hi = played.max()
+                            if (lo == hi) "fret $lo" else "frets $lo–$hi"
+                        }
+                    } ?: ""
+                    "${sh?.chordName ?: ""}  ·  $fretsLabel  ·  ${state.chordPositionIndex + 1} / ${chordShapes.size}"
                 },
                 onPrev = { state.stepChordPosition(-1, chordShapes.size) },
                 onNext = { state.stepChordPosition(+1, chordShapes.size) },
