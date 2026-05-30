@@ -325,17 +325,20 @@ private fun ChordSlotCard(
 private fun Note2ChordView(ear: EarTrainingState) {
     val c = ear.n2cChallenge
     Column(
-        modifier = Modifier.fillMaxSize().padding(8.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             "A triad plays, then a single note from its diatonic scale sounds above. " +
                 "Identify the test note's degree relative to the chord (e.g. 9, b7, maj7).",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 8.dp),
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(
@@ -344,18 +347,17 @@ private fun Note2ChordView(ear: EarTrainingState) {
             ) { Text(if (ear.n2cPlaying) "Playing…" else "Play challenge ▶") }
             OutlinedButton(onClick = {
                 ear.nextN2cChallenge()
-                // Auto-play the new challenge so the user can listen immediately.
                 ear.playN2c()
             }) { Text("Next →") }
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(14.dp))
 
-        // Big reveal card with the answer label
+        // Compact reveal card: ~half the previous height, half-width.
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.6f)
-                .clip(RoundedCornerShape(14.dp))
+                .fillMaxWidth(0.55f)
+                .clip(RoundedCornerShape(12.dp))
                 .clickable { ear.toggleN2cReveal() },
             colors = CardDefaults.cardColors(
                 containerColor = if (ear.n2cRevealed) MaterialTheme.colorScheme.tertiaryContainer
@@ -363,38 +365,41 @@ private fun Note2ChordView(ear: EarTrainingState) {
             ),
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     "Answer",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(2.dp))
                 if (c == null) {
-                    Text("(no challenge yet)", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("(no challenge yet)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else if (!ear.n2cRevealed) {
                     Text(
                         "tap to reveal",
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
                     Text(
                         c.answerLabel,
-                        fontSize = 56.sp,
+                        fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onTertiaryContainer,
                     )
-                    Spacer(Modifier.height(4.dp))
                     Text(
                         "${c.chordSymbol}  ·  test note: ${c.testNoteName}",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onTertiaryContainer,
                     )
                 }
             }
         }
+        // Bottom breathing room so the card never abuts the system gesture bar.
+        Spacer(Modifier.height(20.dp))
     }
 }
