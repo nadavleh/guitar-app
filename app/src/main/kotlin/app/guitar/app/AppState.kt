@@ -31,8 +31,9 @@ enum class LabelMode { Notes, Intervals, Empty }
 /** What the fretboard is currently lighting up. */
 enum class DisplayMode { None, Chord, Scale, Pick }
 
-/** Which bottom sheet is currently open (null = none). */
-enum class Sheet { Chord, Scale, Pick, Options, Loop }
+/** Which bottom sheet (or full-screen route) is currently open (null = none).
+ *  Loop and Tuner are full-screen; the others are bottom sheets. */
+enum class Sheet { Chord, Scale, Pick, Options, Loop, Tuner }
 
 /** All-notes vs single-position view, for chord & scale display. */
 enum class ChordScaleView { AllNotes, Positions }
@@ -74,6 +75,24 @@ class AppState(
 
     // Jazz/shell voicing toggle — affects ChordShapeGenerator calls everywhere
     var voicingStyle by mutableStateOf(VoicingStyle.Standard)
+
+    // Tuner / audio configuration
+    var a4Hz by mutableStateOf(440f)
+    var ringSustainMs by mutableStateOf(1500)
+
+    @JvmName("applyA4Hz")
+    fun setA4Hz(value: Float) {
+        val clamped = value.coerceIn(435f, 445f)
+        a4Hz = clamped
+        scope.launch { repo.setA4Hz(clamped) }
+    }
+
+    @JvmName("applyRingSustainMs")
+    fun setRingSustainMs(value: Int) {
+        val clamped = value.coerceIn(200, 5000)
+        ringSustainMs = clamped
+        scope.launch { repo.setRingSustainMs(clamped) }
+    }
 
     fun toggleVoicingStyle(shell: Boolean) {
         voicingStyle = if (shell) VoicingStyle.Shell else VoicingStyle.Standard
@@ -161,16 +180,23 @@ class AppState(
         if (pos.stringIndex < 0 || pos.stringIndex >= liveTuning.stringCount) return
         selectedPosition = pos
         val note = Fretboard.noteAt(liveTuning, pos)
-        audio.playNote(note.midi.value, durationMillis = 1500)
+        audio.playNote(note.midi.value, durationMillis = ringSustainMs)
     }
 
     /** Play all (non-muted) notes of a chord shape as a strummed arpeggio low → high. */
     fun playShape(shape: ChordShape) {
         val midis = shape.notes.mapNotNull { it?.midi?.value }
         if (midis.isNotEmpty()) {
-            audio.playChord(midis, strumDelayMillis = 40, sustainMillis = 2000)
+            audio.playChord(midis, strumDelayMillis = 40, sustainMillis = ringSustainMs)
         }
     }
+
+    /** Tuner-specific: play a guitar pluck at a specific MIDI note (under the user's A4 ref). */
+    fun playReferencePitch(midi: Int) {
+        val freq = (a4Hz.toDouble() * Math.pow(2.0, (midi - 69) / 12.0)).toFloat()
+        audio.playFrequency(freq, durationMillis = ringSustainMs)
+    }
+
 
     // ---------- Pick mode ----------
 
@@ -193,7 +219,7 @@ class AppState(
             audio.playChord(
                 midis,
                 strumDelayMillis = if (arpeggio) 120 else 35,
-                sustainMillis = 2000
+                sustainMillis = ringSustainMs,
             )
         }
     }
@@ -214,6 +240,7 @@ class AppState(
             Sheet.Pick -> displayMode = DisplayMode.Pick
             Sheet.Options -> {} // tunings/options doesn't change what's lit
             Sheet.Loop -> {}    // loop sheet plays its own audio; fretboard view unchanged
+            Sheet.Tuner -> {}   // tuner reads the mic; fretboard view unchanged
         }
     }
 

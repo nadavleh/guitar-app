@@ -26,11 +26,23 @@ class PluckedSynth(val sampleRate: Int = 48000) {
         amplitude: Double = 0.6,
     ): FloatArray {
         require(midiNote in 0..127) { "MIDI note must be 0..127, got $midiNote" }
+        return synthesizeFrequency(midiToFreq(midiNote), durationSec, seed, damping, amplitude)
+    }
+
+    /** Synthesize a plucked tone at an arbitrary frequency. Lets the tuner play a reference
+     *  pitch under a custom A4 reference without going through MIDI rounding. */
+    fun synthesizeFrequency(
+        freqHz: Double,
+        durationSec: Double,
+        seed: Long = 1L,
+        damping: Double = 0.997,
+        amplitude: Double = 0.6,
+    ): FloatArray {
+        require(freqHz > 0.0) { "freq must be > 0, got $freqHz" }
         require(durationSec > 0.0) { "duration must be positive, got $durationSec" }
         require(damping in 0.0..1.0) { "damping must be in 0..1, got $damping" }
 
-        val freq = midiToFreq(midiNote)
-        val n = (sampleRate / freq).toInt().coerceAtLeast(2)
+        val n = (sampleRate / freqHz).toInt().coerceAtLeast(2)
         val buf = DoubleArray(n)
         val rng = Random(seed)
         for (i in 0 until n) buf[i] = rng.nextDouble() * 2.0 - 1.0

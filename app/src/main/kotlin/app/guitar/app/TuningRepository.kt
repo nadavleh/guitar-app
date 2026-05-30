@@ -3,6 +3,8 @@ package app.guitar.app
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import app.guitar.theory.Tuning
@@ -81,6 +83,30 @@ class TuningRepository(private val context: Context) {
     suspend fun setLabelMode(value: String) {
         context.tuningDataStore.edit { prefs ->
             prefs[keyLabelMode] = value
+        }
+    }
+
+    private val keyA4 = floatPreferencesKey("a4_hz")
+
+    /** Reference A4 frequency in Hz (default 440). Range 435..445 in UI. */
+    val a4Hz: Flow<Float> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyA4] ?: 440f }
+
+    suspend fun setA4Hz(value: Float) {
+        context.tuningDataStore.edit { prefs ->
+            prefs[keyA4] = value
+        }
+    }
+
+    private val keyRingSustain = intPreferencesKey("ring_sustain_ms")
+
+    /** Ring sustain in milliseconds (default 1500 = 1.5 s). */
+    val ringSustainMs: Flow<Int> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyRingSustain] ?: 1500 }
+
+    suspend fun setRingSustainMs(value: Int) {
+        context.tuningDataStore.edit { prefs ->
+            prefs[keyRingSustain] = value
         }
     }
 }

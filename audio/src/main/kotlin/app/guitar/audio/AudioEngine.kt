@@ -8,6 +8,12 @@ interface AudioEngine {
     fun playNote(midiNote: Int, durationMillis: Int = 1500)
 
     /**
+     * Play a single tone at an arbitrary frequency. Useful for the tuner where
+     * the user's A4 reference may not be exactly 440 Hz. No-op if [freqHz] <= 0.
+     */
+    fun playFrequency(freqHz: Float, durationMillis: Int = 1500)
+
+    /**
      * Play a list of MIDI notes as a strummed chord. Each note is delayed by
      * [strumDelayMillis] from the previous; all notes sustain [sustainMillis].
      * The notes are pre-mixed into a single buffer so they ring polyphonically.
@@ -24,6 +30,7 @@ interface AudioEngine {
         /** A no-op engine for previews and tests. */
         val Silent: AudioEngine = object : AudioEngine {
             override fun playNote(midiNote: Int, durationMillis: Int) {}
+            override fun playFrequency(freqHz: Float, durationMillis: Int) {}
             override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int) {}
             override fun stop() {}
             override fun close() {}

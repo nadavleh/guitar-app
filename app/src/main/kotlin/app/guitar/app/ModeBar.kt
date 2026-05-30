@@ -36,6 +36,7 @@ fun ActionBarItem(label: String, glyph: String, sheet: Sheet, state: AppState) {
         Sheet.Pick -> state.displayMode == DisplayMode.Pick
         Sheet.Options -> false
         Sheet.Loop -> false
+        Sheet.Tuner -> false
     }
     val fg = when {
         isActive -> MaterialTheme.colorScheme.primary

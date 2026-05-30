@@ -1,8 +1,13 @@
 package app.guitar.app
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -85,6 +90,8 @@ fun App(audio: AudioEngine) {
     val persistedLeftHanded by repo.leftHanded.collectAsState(initial = false)
     val persistedVoicingShell by repo.voicingShell.collectAsState(initial = false)
     val persistedLabelMode by repo.labelMode.collectAsState(initial = LabelMode.Notes.name)
+    val persistedA4 by repo.a4Hz.collectAsState(initial = 440f)
+    val persistedSustain by repo.ringSustainMs.collectAsState(initial = 1500)
 
     LaunchedEffect(savedSelected, customTunings) {
         if (!state.isEditedTuning) {
@@ -103,7 +110,27 @@ fun App(audio: AudioEngine) {
     LaunchedEffect(persistedLabelMode) {
         state.labelMode = runCatching { LabelMode.valueOf(persistedLabelMode) }.getOrDefault(LabelMode.Notes)
     }
+    LaunchedEffect(persistedA4) { state.a4Hz = persistedA4 }
+    LaunchedEffect(persistedSustain) { state.ringSustainMs = persistedSustain }
     DisposableEffect(Unit) { onDispose { audio.stop() } }
+
+    // ---------- RECORD_AUDIO runtime permission ----------
+    var micGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val micLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> micGranted = granted }
+
+    // When the Tuner is requested and we don't yet have permission, request it.
+    LaunchedEffect(state.currentSheet, micGranted) {
+        if (state.currentSheet == Sheet.Tuner && !micGranted) {
+            micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
 
     val parsedChord = ChordLibrary.parse(state.chordInput)
     val scalePc = try { NoteSpeller.parsePitchClass(state.scaleRoot) } catch (_: Exception) { null }
@@ -165,6 +192,8 @@ fun App(audio: AudioEngine) {
         if (state.currentSheet == Sheet.Loop) {
             // Loop takes over the whole screen — it has its own controls and Back button.
             LoopScreen(state)
+        } else if (state.currentSheet == Sheet.Tuner) {
+            TunerScreen(state, onBack = { state.closeSheet() })
         } else {
             StatusBar(state)
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -194,7 +223,7 @@ fun App(audio: AudioEngine) {
     }
 
     // ---------- Bottom sheet (Chord / Scale / Pick / Options) ----------
-    if (state.currentSheet != null && state.currentSheet != Sheet.Loop) {
+    if (state.currentSheet != null && state.currentSheet != Sheet.Loop && state.currentSheet != Sheet.Tuner) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
         ModalBottomSheet(
             onDismissRequest = { state.closeSheet() },
@@ -207,6 +236,7 @@ fun App(audio: AudioEngine) {
                 Sheet.Pick    -> PickSheet(state)
                 Sheet.Options -> OptionsSheet(state, customTunings)
                 Sheet.Loop    -> {} // handled by full-screen route above
+                Sheet.Tuner   -> {} // handled by full-screen route above
             }
         }
     }
@@ -218,6 +248,7 @@ private fun sheetLabel(s: Sheet): String = when (s) {
     Sheet.Pick -> "Pick"
     Sheet.Loop -> "Loop"
     Sheet.Options -> "Options"
+    Sheet.Tuner -> "Tuner"
 }
 
 @Composable
@@ -241,7 +272,6 @@ private fun StatusBar(state: AppState) {
             modifier = Modifier.weight(1f)
         )
         // Re-open the last-used sheet without going through the menu.
-        // Shows only after the user has opened a sheet at least once this session.
         state.lastSheet?.let { sh ->
             if (state.currentSheet == null) {
                 TextButton(
@@ -257,6 +287,18 @@ private fun StatusBar(state: AppState) {
                 Spacer(Modifier.width(2.dp))
             }
         }
+        // Tuner is a top-level button next to the menu (always visible).
+        TextButton(
+            onClick = { state.openSheet(Sheet.Tuner) },
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        ) {
+            Text(
+                "Tuner",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleSmall
+            )
+        }
+        Spacer(Modifier.width(2.dp))
         Box {
             TextButton(
                 onClick = { menuOpen = true },

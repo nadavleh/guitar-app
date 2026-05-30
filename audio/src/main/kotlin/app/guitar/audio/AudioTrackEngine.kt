@@ -163,6 +163,19 @@ class AudioTrackEngine(
         }
     }
 
+    override fun playFrequency(freqHz: Float, durationMillis: Int) {
+        if (freqHz <= 0f || durationMillis <= 0) return
+        if (!running.get()) return
+        synthesizer.execute {
+            val samples = synth.synthesizeFrequency(
+                freqHz = freqHz.toDouble(),
+                durationSec = durationMillis / 1000.0,
+                seed = System.nanoTime(),
+            )
+            addVoice(samples)
+        }
+    }
+
     override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int) {
         if (midiNotes.isEmpty() || sustainMillis <= 0) return
         if (!running.get()) return
