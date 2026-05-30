@@ -265,7 +265,7 @@ private fun StatusBar(state: AppState) {
             .background(MaterialTheme.colorScheme.surface)
             .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
     ) {
-        Text("fretboard.io", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+        Text("FretPal", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(12.dp))
         val summary = "${state.tuningName}${if (state.isEditedTuning) "*" else ""}  ·  " +
             state.liveTuning.openStrings.joinToString(" ") { NoteSpeller.spell(it.pitchClass) }
