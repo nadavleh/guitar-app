@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    App launcher foreground: a stylized fretboard with 6 strings, 2 fret bars,
+    and a single chord dot. Designed to read well at small sizes.
+
+    Viewport is 108x108; the central 66x66 region is the adaptive-icon safe zone,
+    so all meaningful content stays inside x=24..84, y=24..84.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Vertical fret bars (brushed gold for fret wire) -->
+    <path
+        android:strokeColor="#E6B66B"
+        android:strokeWidth="3"
+        android:pathData="M 36,24 L 36,84" />
+    <path
+        android:strokeColor="#E6B66B"
+        android:strokeWidth="3"
+        android:pathData="M 72,24 L 72,84" />
+
+    <!-- 6 horizontal strings (thicker toward the low-E for realism) -->
+    <path
+        android:strokeColor="#FAFAFA"
+        android:strokeWidth="1.2"
+        android:pathData="M 24,30 L 84,30" />
+    <path
+        android:strokeColor="#FAFAFA"
+        android:strokeWidth="1.5"
+        android:pathData="M 24,39 L 84,39" />
+    <path
+        android:strokeColor="#FAFAFA"
+        android:strokeWidth="1.8"
+        android:pathData="M 24,48 L 84,48" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.1"
+        android:pathData="M 24,57 L 84,57" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.4"
+        android:pathData="M 24,66 L 84,66" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.7"
+        android:pathData="M 24,75 L 84,75" />
+
+    <!-- Red chord dot between the two fret bars (i.e. fret 1) on the D string,
+         with a white outline so it pops against the wood and strings. -->
+    <path
+        android:fillColor="#E55353"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M 54,57 m -10,0 a 10,10 0 1,0 20,0 a 10,10 0 1,0 -20,0" />
+</vector>

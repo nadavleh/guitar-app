@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🎸 Guitar Practice</h1>
+  <h1>🎸 fretboard.io</h1>
   <p>
     <strong>An interactive guitar fretboard for learning chords, scales, and ear-training — built with Kotlin and Jetpack Compose.</strong>
   </p>
@@ -11,7 +11,7 @@
     <img alt="Language: Kotlin" src="https://img.shields.io/badge/language-Kotlin-7F52FF?logo=kotlin&logoColor=white">
     <img alt="UI: Jetpack Compose" src="https://img.shields.io/badge/ui-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white">
     <img alt="minSdk: 26" src="https://img.shields.io/badge/minSdk-26-blue">
-    <img alt="Tests: 88 passing" src="https://img.shields.io/badge/tests-88%20passing-brightgreen">
+    <img alt="Tests: 184 passing" src="https://img.shields.io/badge/tests-184%20passing-brightgreen">
   </p>
 </div>
 
