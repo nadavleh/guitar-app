@@ -449,7 +449,12 @@ fun LoopScreen(state: AppState) {
                 }
             }
             Spacer(Modifier.width(8.dp))
-            OutlinedButton(onClick = { state.stopLoop(); state.closeSheet() }) { Text("Back") }
+            // Don't stop the loop when navigating away — the user wants to watch
+            // the chords sound on the main fretboard live. The Stop button above
+            // is the explicit way to halt playback.
+            OutlinedButton(onClick = { state.closeSheet() }) {
+                Text(if (state.isLooping) "Watch on neck ▶" else "Back")
+            }
         }
 
         Spacer(Modifier.height(8.dp))

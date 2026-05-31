@@ -266,13 +266,15 @@ fun FretboardView(
         // ---------- Open-string labels (left of the nut) ----------
         // Note letter for each open string. Convention: uppercase for the lowest-
         // octave occurrence of each letter, lowercase for higher-octave duplicates.
-        // So standard tuning reads "E A D G B e" — the high-E is lowercase because
-        // the low-E already has the uppercase 'E'.
+        // Standard tuning reads "E A D G B e".
+        // The labels sit at the LEFT EDGE of the open column so they don't overlap
+        // the chord-tone / interval circles drawn at fret 0 (which are centered on
+        // openWidth/2). Font is small for the same reason.
         val labelStyle = TextStyle(
             color = GuitarColors.primary,
-            fontSize = (stringSpacing * 0.5f).toSp(),
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
+            fontSize = (stringSpacing * 0.32f).toSp(),
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Start,
         )
         for (s in 0 until tuning.stringCount) {
             val y = firstStringY + (tuning.stringCount - 1 - s) * stringSpacing
@@ -281,11 +283,14 @@ fun FretboardView(
             val hasLowerSamePc = (0 until s).any { tuning.openStrings[it].pitchClass == pc }
             val label = if (hasLowerSamePc) letter.lowercase() else letter
             val measured = measurer.measure(text = label, style = labelStyle)
-            val labelX = mx(openWidth / 2f)
+            // Pin to the leftmost ~3px in left-handed view, or to ~3px from the
+            // left edge in right-handed view. Either way, well clear of the
+            // open-column center where the fret-0 marks live.
+            val labelLeftX = if (leftHanded) w - measured.size.width - 4f else 4f
             drawText(
                 textLayoutResult = measured,
                 topLeft = Offset(
-                    labelX - measured.size.width / 2f,
+                    labelLeftX,
                     y - measured.size.height / 2f
                 )
             )
