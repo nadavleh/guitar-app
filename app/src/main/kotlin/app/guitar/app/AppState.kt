@@ -115,6 +115,11 @@ class AppState(
     var isLooping by mutableStateOf(false)
     var loopCurrentBar by mutableStateOf(0)
     var loopCurrentSlot by mutableStateOf(0)
+    /** The chord shape currently being played by the looper. Observers (the main
+     *  fretboard) can use this to display the sounding chord live. Null when the
+     *  loop is stopped or the current slot is empty / sustaining. */
+    var loopPlayingShape by mutableStateOf<app.guitar.theory.ChordShape?>(null)
+        private set
     /** Currently-edited (barIdx, slotIdx) for the slot-edit panel, or null. */
     var loopEditingSlot by mutableStateOf<Pair<Int, Int>?>(null)
     private var loopJob: Job? = null
@@ -275,15 +280,15 @@ class AppState(
         }
     }
 
-    /** Update only the chord-symbol field of a slot (keep voicing/strum, default to fresh slot if empty). */
+    /** Update only the chord-symbol field of a slot, then re-normalize the whole
+     *  progression so voice-leading flows naturally into and out of the change. */
     fun setLoopSlotChord(barIdx: Int, slotIdx: Int, chordSymbol: String?) {
         val current = loopProgression.getOrNull(barIdx)?.getOrNull(slotIdx) ?: return
         val cleaned = chordSymbol?.ifBlank { null }
-        val newSlot =
-            if (cleaned != current.chordSymbol)
-                current.copy(chordSymbol = cleaned, voicingIndex = defaultVoicingIndexFor(cleaned))
-            else current.copy(chordSymbol = cleaned)
-        setLoopSlot(barIdx, slotIdx, newSlot)
+        if (cleaned == current.chordSymbol) return
+        setLoopSlot(barIdx, slotIdx, current.copy(chordSymbol = cleaned, voicingIndex = 0))
+        // Re-normalize so the new chord and its neighbors get min-movement voicings.
+        normalizeLoopVoicings()
     }
 
     /** Pick the index of the E-shape voicing for [chordSymbol], or 0 if none exists.
@@ -300,15 +305,50 @@ class AppState(
      *  E-shape default for the active tuning/voicing style. */
     var loopNormalized by mutableStateOf(false)
 
-    /** Update every slot's voicingIndex to the E-shape default. Idempotent — safe to call repeatedly. */
+    /**
+     * Pick a voicing for every slot in the progression so the sequence flows
+     * smoothly: first chord prefers the E-shape (most common movable barre);
+     * every subsequent chord is picked to minimize finger movement from the
+     * previously-chosen voicing (the way a human player chooses voicings).
+     *
+     * Idempotent: re-running is safe — the chosen voicings only depend on the
+     * chord-symbol sequence, the current tuning, and the current voicing style.
+     */
     fun normalizeLoopVoicings() {
-        loopProgression = loopProgression.map { bar ->
-            bar.map { slot ->
-                if (slot.chordSymbol != null)
-                    slot.copy(voicingIndex = defaultVoicingIndexFor(slot.chordSymbol))
-                else slot
+        val newBars = ArrayList<List<LoopSlot>>(loopProgression.size)
+        var prevShape: app.guitar.theory.ChordShape? = null
+        for (bar in loopProgression) {
+            val newBar = ArrayList<LoopSlot>(bar.size)
+            for (slot in bar) {
+                val sym = slot.chordSymbol
+                if (sym == null) {
+                    // Sustain / empty — prevShape carries through.
+                    newBar.add(slot)
+                    continue
+                }
+                val parsed = ChordLibrary.parse(sym)
+                if (parsed == null) {
+                    newBar.add(slot)
+                    continue
+                }
+                val (root, q) = parsed
+                val shapes = loopShapeGen.shapesFor(root, q, liveTuning, frets = DISPLAY_FRETS)
+                if (shapes.isEmpty()) {
+                    newBar.add(slot)
+                    continue
+                }
+                val pickedIdx = if (prevShape == null) {
+                    val eIdx = shapes.indexOfFirst { it.cagedShape == CagedShape.E }
+                    if (eIdx >= 0) eIdx else 0
+                } else {
+                    app.guitar.theory.VoiceLeading.pickMinMovement(prevShape!!, shapes)
+                }
+                newBar.add(slot.copy(voicingIndex = pickedIdx))
+                prevShape = shapes[pickedIdx]
             }
+            newBars.add(newBar)
         }
+        loopProgression = newBars
         loopNormalized = true
     }
 
@@ -353,6 +393,7 @@ class AppState(
         isLooping = false
         loopJob?.cancel()
         loopJob = null
+        loopPlayingShape = null
         audio.stop()
     }
 
@@ -370,6 +411,7 @@ class AppState(
                 val shapes = loopShapeGen.shapesFor(root, q, liveTuning, frets = DISPLAY_FRETS)
                 val shape = shapes.getOrNull(slot.voicingIndex) ?: shapes.firstOrNull()
                 if (shape != null) {
+                    loopPlayingShape = shape
                     val midis = shape.notes.mapNotNull { it?.midi?.value }
                     val ordered = if (slot.strum == StrumPattern.Up) midis.asReversed() else midis
                     val strumDelay = when (slot.strum) {

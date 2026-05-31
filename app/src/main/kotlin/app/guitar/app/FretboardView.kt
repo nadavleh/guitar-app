@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import app.guitar.theory.FretPosition
+import app.guitar.theory.NoteSpeller
 import app.guitar.theory.Tuning
 import kotlin.math.max
 
@@ -260,6 +261,34 @@ fun FretboardView(
                     }
                 }
             }
+        }
+
+        // ---------- Open-string labels (left of the nut) ----------
+        // Note letter for each open string. Convention: uppercase for the lowest-
+        // octave occurrence of each letter, lowercase for higher-octave duplicates.
+        // So standard tuning reads "E A D G B e" — the high-E is lowercase because
+        // the low-E already has the uppercase 'E'.
+        val labelStyle = TextStyle(
+            color = GuitarColors.primary,
+            fontSize = (stringSpacing * 0.5f).toSp(),
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+        for (s in 0 until tuning.stringCount) {
+            val y = firstStringY + (tuning.stringCount - 1 - s) * stringSpacing
+            val pc = tuning.openStrings[s].pitchClass
+            val letter = NoteSpeller.spell(pc)
+            val hasLowerSamePc = (0 until s).any { tuning.openStrings[it].pitchClass == pc }
+            val label = if (hasLowerSamePc) letter.lowercase() else letter
+            val measured = measurer.measure(text = label, style = labelStyle)
+            val labelX = mx(openWidth / 2f)
+            drawText(
+                textLayoutResult = measured,
+                topLeft = Offset(
+                    labelX - measured.size.width / 2f,
+                    y - measured.size.height / 2f
+                )
+            )
         }
 
         // ---------- Selected (tap pulse / inspect) ring ----------

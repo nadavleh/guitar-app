@@ -161,8 +161,15 @@ fun App(audio: AudioEngine) {
         state.chordPositionIndex, state.scalePositionIndex,
         state.chordInput, state.scaleRoot, state.scaleType,
         state.liveTuning, state.labelMode, state.pickedPositions,
-        parsedChord, scalePc, scale, chordShapes, scalePositions
+        parsedChord, scalePc, scale, chordShapes, scalePositions,
+        state.isLooping, state.loopPlayingShape,
     ) {
+        // When the loop is playing AND we have a current shape, override whatever
+        // the user has set so the fretboard shows the chord that's sounding now.
+        val loopShape = state.loopPlayingShape
+        if (state.isLooping && loopShape != null) {
+            return@remember shapeMarks(loopShape, state.labelMode)
+        }
         when (state.displayMode) {
             DisplayMode.Chord -> {
                 if (parsedChord == null) emptyMap()
@@ -290,6 +297,18 @@ private fun StatusBar(state: AppState) {
                 }
                 Spacer(Modifier.width(2.dp))
             }
+        }
+        // While the loop is playing, surface a stop control here so the user can
+        // stop it without going back into the loop screen.
+        if (state.isLooping) {
+            TextButton(
+                onClick = { state.stopLoop() },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+            ) {
+                Text("⏹ Stop", color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.titleSmall)
+            }
+            Spacer(Modifier.width(2.dp))
         }
         // Top-level buttons: Ear-training and Tuner (always visible).
         TextButton(

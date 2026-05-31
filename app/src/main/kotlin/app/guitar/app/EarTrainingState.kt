@@ -72,6 +72,15 @@ class EarTrainingState(
     private var loopJob: Job? = null
     private val rng = Random.Default
 
+    /** Tracks the last voicing played so the next chord can be picked by voice-leading.
+     *  Persists across loop iterations so the wrap (bar 4 → bar 1) also flows. */
+    private var prevPlayedShape: app.guitar.theory.ChordShape? = null
+
+    /** Live broadcast: the shape currently being played by the progression looper.
+     *  Compose can observe this to display the chord on the fretboard. */
+    var currentPlayingShape by mutableStateOf<app.guitar.theory.ChordShape?>(null)
+        private set
+
     fun nextProgression() {
         // Pick a mode honoring the include flags
         val candidates = buildList {
@@ -107,6 +116,7 @@ class EarTrainingState(
     fun startLoop() {
         if (isLooping) return
         if (progResolved.isEmpty()) nextProgression()
+        prevPlayedShape = null   // reset voice-leading state so first chord = E-shape
         isLooping = true
         loopJob = scope.launch {
             val beatMs = (60_000L / progBpm.coerceAtLeast(20))
@@ -128,16 +138,26 @@ class EarTrainingState(
         isLooping = false
         loopJob?.cancel()
         loopJob = null
+        currentPlayingShape = null
         audio.stop()
     }
 
+    /** Pick the next chord's voicing via voice-leading (first chord = E-shape), play it,
+     *  and broadcast it on [currentPlayingShape] so any observer (e.g. the live fretboard)
+     *  can show what's being heard. */
     private fun playChordOnce(symbol: String, barMs: Long) {
         val parsed = ChordLibrary.parse(symbol) ?: return
         val (root, q) = parsed
         val tuning = tuningProvider()
         val shapes = ChordShapeGenerator().shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
-        // Prefer the E-shape voicing (most full-bodied); fall back to the first shape.
-        val shape = shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.firstOrNull() ?: return
+        if (shapes.isEmpty()) return
+        val shape = if (prevPlayedShape == null) {
+            shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.first()
+        } else {
+            shapes[app.guitar.theory.VoiceLeading.pickMinMovement(prevPlayedShape!!, shapes)]
+        }
+        prevPlayedShape = shape
+        currentPlayingShape = shape
         val midis = shape.notes.mapNotNull { it?.midi?.value }
         if (midis.isEmpty()) return
         audio.playChord(midis,
