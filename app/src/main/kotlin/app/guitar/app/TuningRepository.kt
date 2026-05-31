@@ -109,4 +109,16 @@ class TuningRepository(private val context: Context) {
             prefs[keyRingSustain] = value
         }
     }
+
+    private val keyInstrument = stringPreferencesKey("instrument")
+
+    /** Selected instrument (Guitar / Cavaquinho). Default Guitar. */
+    val instrument: Flow<String> =
+        context.tuningDataStore.data.map { prefs ->
+            prefs[keyInstrument] ?: app.guitar.theory.Instrument.Guitar.name
+        }
+
+    suspend fun setInstrument(value: String) {
+        context.tuningDataStore.edit { prefs -> prefs[keyInstrument] = value }
+    }
 }

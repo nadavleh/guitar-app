@@ -270,11 +270,15 @@ FretPal/
 | ✅ | Chromatic tuner — YIN, ±50 ¢ quarter-ring dial, A4 reference |
 | ✅ | Ear training — chord progressions + Note2Chord |
 | ✅ | Adaptive launcher icon (rosewood fretboard slice) |
+| ✅ | Voice-leading auto-voicing in Loop + Ear training (first chord = E-shape, each next chord = min-movement vs previous) |
+| ✅ | Live chord on the fretboard while the loop plays |
+| ✅ | Progression playback while displaying chord shapes on the fretboard live |
+| ✅ | Open-string letter labels (E A D G B e convention) |
+| 🚧 | Cavaquinho mode — Phase 1 shipped (Instrument toggle, DGBe/DGBD tunings, 4-string fretboard, brute-force voicings with 5-fret span). Phase 2 (curated chord library) and Phase 3 (audio timbre) deferred. See [`docs/CAVAQUINHO_PLAN.md`](docs/CAVAQUINHO_PLAN.md). |
+| 📅 | **Samba rhythm looper** — a percussion step-sequencer for samba practice. 2 bars of 2/4 (16 sixteenth-note slots), 4 instruments (pandeiro, tamborim, surdo, agogô), tap-to-cycle voices, BPM control. Designed to play alongside the chord-progression looper as a full backing track. See [`docs/SAMBA_LOOPER_PLAN.md`](docs/SAMBA_LOOPER_PLAN.md). |
 | 📅 | Custom-chord favorites |
 | 📅 | Practice prompts / random challenges |
-| 📅 | Cavaquinho / non-6-string instruments — engine already n-string ready |
 | 📅 | iOS port via Kotlin Multiplatform |
-| 📅 | Progression playback while displaying chord shapes on the fretboard live |
 
 ---
 

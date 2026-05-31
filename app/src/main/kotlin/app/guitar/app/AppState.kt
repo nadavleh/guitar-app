@@ -11,6 +11,7 @@ import app.guitar.theory.ChordShape
 import app.guitar.theory.ChordShapeGenerator
 import app.guitar.theory.FretPosition
 import app.guitar.theory.Fretboard
+import app.guitar.theory.Instrument
 import app.guitar.theory.Midi
 import app.guitar.theory.Note
 import app.guitar.theory.Tuning
@@ -44,9 +45,27 @@ class AppState(
     val scope: CoroutineScope,
     val audio: AudioEngine,
 ) {
+    var instrument by mutableStateOf(Instrument.Guitar)
     var tuningName by mutableStateOf("Standard")
     var liveTuning by mutableStateOf<Tuning>(Tunings.standard)
     var isEditedTuning by mutableStateOf(false)
+
+    /** Switch the active instrument. Resets the tuning to the new instrument's
+     *  default preset (e.g. Guitar→Standard, Cavaquinho→DGBe) and persists. */
+    @JvmName("applyInstrument")
+    fun setInstrument(value: Instrument) {
+        if (instrument == value) return
+        instrument = value
+        val defaultName = Tunings.defaultNameFor(value)
+        val defaultTuning = Tunings.defaultFor(value)
+        tuningName = defaultName
+        liveTuning = defaultTuning
+        isEditedTuning = false
+        scope.launch {
+            repo.setInstrument(value.name)
+            repo.setSelected(defaultName)
+        }
+    }
 
     var chordInput by mutableStateOf("Cmaj7")
     var chordFretRange by mutableStateOf(0..DISPLAY_FRETS)
@@ -123,7 +142,10 @@ class AppState(
     /** Currently-edited (barIdx, slotIdx) for the slot-edit panel, or null. */
     var loopEditingSlot by mutableStateOf<Pair<Int, Int>?>(null)
     private var loopJob: Job? = null
-    private val loopShapeGen get() = ChordShapeGenerator(style = voicingStyle)
+    private val loopShapeGen get() = ChordShapeGenerator(
+        style = voicingStyle,
+        maxFretSpan = instrument.maxFretSpan,
+    )
 
     val customTunings get() = repo.customTunings
     val savedSelectedName get() = repo.selectedTuningName

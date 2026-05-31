@@ -268,10 +268,28 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
     SheetBody {
         SheetHeader("Options")
 
+        Text("Instrument", style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(6.dp))
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            app.guitar.theory.Instrument.entries.forEachIndexed { i, inst ->
+                SegmentedButton(
+                    selected = state.instrument == inst,
+                    onClick = { state.setInstrument(inst) },
+                    shape = SegmentedButtonDefaults.itemShape(
+                        index = i,
+                        count = app.guitar.theory.Instrument.entries.size,
+                    ),
+                    label = { Text(inst.displayName) },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
         Text("Tuning", style = MaterialTheme.typography.titleSmall)
         Spacer(Modifier.height(6.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tunings.all.forEach { (name, t) ->
+            // Show only the preset tunings appropriate to the current instrument
+            Tunings.presetsFor(state.instrument).forEach { (name, t) ->
                 FilterChip(
                     selected = name == state.tuningName && !state.isEditedTuning,
                     onClick = { state.selectTuning(name, t) },

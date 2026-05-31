@@ -29,7 +29,11 @@ data class FretMark(
     val kind: MarkKind = MarkKind.Chord,
 )
 
-private const val OPEN_COL_FRAC = 0.06f
+private const val OPEN_COL_FRAC = 0.08f
+/** Where, inside the open column, to center the fret-0 chord-tone circles.
+ *  0.5 = centered (overlaps the string label on the left); 0.7 = pushed toward
+ *  the nut so the label has clear room. */
+private const val OPEN_MARK_FRAC = 0.7f
 private const val NUT_FRAC = 0.022f
 private const val STRING_DP = 42
 private const val FRET_NUMBER_DP = 18   // extra height below for fret-number row
@@ -72,13 +76,18 @@ fun FretboardView(
         modifier = modifier
             .fillMaxSize()
             .pointerInput(tuning, numFrets, leftHanded) {
-                detectTapGestures { off ->
-                    val pos = pixelToPosition(
-                        off, size.width.toFloat(), size.height.toFloat(),
-                        tuning.stringCount, numFrets, leftHanded
-                    )
-                    if (pos != null) onTap(pos)
-                }
+                // Fire on touch-down (onPress), NOT on lift (onTap), so the note
+                // sounds as soon as the user's finger meets the string — the way
+                // a real string responds.
+                detectTapGestures(
+                    onPress = { off ->
+                        val pos = pixelToPosition(
+                            off, size.width.toFloat(), size.height.toFloat(),
+                            tuning.stringCount, numFrets, leftHanded
+                        )
+                        if (pos != null) onTap(pos)
+                    }
+                )
             }
     ) {
         val w = size.width
@@ -330,8 +339,9 @@ fun FretboardView(
                 )
             )
         }
-        // "0" above the open column
-        val openX = mx(openWidth / 2f)
+        // "0" below the open column — aligned with the open-mark circles, not the
+        // string labels.
+        val openX = mx(openWidth * OPEN_MARK_FRAC)
         val openLabel = measurer.measure("0", numStyle)
         drawText(
             textLayoutResult = openLabel,
@@ -356,7 +366,7 @@ private fun positionToPixel(
     val fretSpacing = fretAreaWidth / numFrets
     val stringSpacing = h / stringCount
     val firstStringY = stringSpacing / 2
-    val cxRight = if (pos.fret == 0) openWidth / 2f
+    val cxRight = if (pos.fret == 0) openWidth * OPEN_MARK_FRAC
                   else openWidth + nutWidth + (pos.fret - 0.5f) * fretSpacing
     val cx = if (leftHanded) w - cxRight else cxRight
     val cy = firstStringY + (stringCount - 1 - pos.stringIndex) * stringSpacing

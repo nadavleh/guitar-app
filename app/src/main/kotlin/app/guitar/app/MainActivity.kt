@@ -92,6 +92,7 @@ fun App(audio: AudioEngine) {
     val persistedLabelMode by repo.labelMode.collectAsState(initial = LabelMode.Notes.name)
     val persistedA4 by repo.a4Hz.collectAsState(initial = 440f)
     val persistedSustain by repo.ringSustainMs.collectAsState(initial = 1500)
+    val persistedInstrument by repo.instrument.collectAsState(initial = app.guitar.theory.Instrument.Guitar.name)
 
     LaunchedEffect(savedSelected, customTunings) {
         if (!state.isEditedTuning) {
@@ -112,6 +113,10 @@ fun App(audio: AudioEngine) {
     }
     LaunchedEffect(persistedA4) { state.a4Hz = persistedA4 }
     LaunchedEffect(persistedSustain) { state.ringSustainMs = persistedSustain }
+    LaunchedEffect(persistedInstrument) {
+        state.instrument = runCatching { app.guitar.theory.Instrument.valueOf(persistedInstrument) }
+            .getOrDefault(app.guitar.theory.Instrument.Guitar)
+    }
     DisposableEffect(Unit) { onDispose { audio.stop() } }
 
     // ---------- RECORD_AUDIO runtime permission ----------
@@ -136,15 +141,18 @@ fun App(audio: AudioEngine) {
     val scalePc = try { NoteSpeller.parsePitchClass(state.scaleRoot) } catch (_: Exception) { null }
     val scale = ScaleLibrary.scales[state.scaleType]
 
-    val chordShapes: List<ChordShape> = remember(parsedChord, state.liveTuning, state.voicingStyle) {
+    val chordShapes: List<ChordShape> = remember(parsedChord, state.liveTuning, state.voicingStyle, state.instrument) {
         if (parsedChord == null) emptyList()
         else {
             val (r, q) = parsedChord
             // No .take() cap — for Standard mode this is 5 CAGED shapes; for Shell it's
             // 4-5 drop-2 inversions. For qualities without canonical templates (e.g. 9, 13),
             // the brute-force generator still applies and the list could be longer.
-            ChordShapeGenerator(style = state.voicingStyle)
-                .shapesFor(r, q, state.liveTuning, frets = DISPLAY_FRETS).take(12)
+            // Cavaquinho gets a wider fret-span allowance via state.instrument.maxFretSpan.
+            ChordShapeGenerator(
+                style = state.voicingStyle,
+                maxFretSpan = state.instrument.maxFretSpan,
+            ).shapesFor(r, q, state.liveTuning, frets = DISPLAY_FRETS).take(12)
         }
     }
     val scalePositions: List<ScalePosition> = remember(scalePc, scale, state.liveTuning) {
