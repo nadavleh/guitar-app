@@ -203,25 +203,32 @@ class AppState(
      * Select a position on the fretboard AND play the corresponding note.
      * No-op if [pos] is out of range for the current tuning.
      */
+    /** Per-instrument audio timbre. Cavaquinho = brighter, quicker decay. */
+    private val timbre: app.guitar.audio.Timbre get() = when (instrument) {
+        Instrument.Guitar     -> app.guitar.audio.Timbre.Guitar
+        Instrument.Cavaquinho -> app.guitar.audio.Timbre.Cavaquinho
+    }
+
     fun tapPosition(pos: FretPosition) {
         if (pos.stringIndex < 0 || pos.stringIndex >= liveTuning.stringCount) return
         selectedPosition = pos
         val note = Fretboard.noteAt(liveTuning, pos)
-        audio.playNote(note.midi.value, durationMillis = ringSustainMs)
+        audio.playNote(note.midi.value, durationMillis = ringSustainMs, timbre = timbre)
     }
 
     /** Play all (non-muted) notes of a chord shape as a strummed arpeggio low → high. */
     fun playShape(shape: ChordShape) {
         val midis = shape.notes.mapNotNull { it?.midi?.value }
         if (midis.isNotEmpty()) {
-            audio.playChord(midis, strumDelayMillis = 40, sustainMillis = ringSustainMs)
+            audio.playChord(midis, strumDelayMillis = 40, sustainMillis = ringSustainMs, timbre = timbre)
         }
     }
 
-    /** Tuner-specific: play a guitar pluck at a specific MIDI note (under the user's A4 ref). */
+    /** Tuner-specific: play a pluck at a specific MIDI note under the user's A4 ref,
+     *  with the active instrument's timbre. */
     fun playReferencePitch(midi: Int) {
         val freq = (a4Hz.toDouble() * Math.pow(2.0, (midi - 69) / 12.0)).toFloat()
-        audio.playFrequency(freq, durationMillis = ringSustainMs)
+        audio.playFrequency(freq, durationMillis = ringSustainMs, timbre = timbre)
     }
 
 
@@ -247,6 +254,7 @@ class AppState(
                 midis,
                 strumDelayMillis = if (arpeggio) 120 else 35,
                 sustainMillis = ringSustainMs,
+                timbre = timbre,
             )
         }
     }
@@ -443,7 +451,8 @@ class AppState(
                         StrumPattern.Sustain -> 0
                     }
                     audio.playChord(ordered, strumDelayMillis = strumDelay,
-                        sustainMillis = (slotMs * 0.9).toInt().coerceAtLeast(150))
+                        sustainMillis = (slotMs * 0.9).toInt().coerceAtLeast(150),
+                        timbre = timbre)
                 }
             }
             delay(slotMs)

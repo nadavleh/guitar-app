@@ -165,10 +165,13 @@ fun FretboardView(
         }
 
         // ---------- Strings ----------
-        // stringIndex 0 = lowest pitch = bottom of the screen
-        // Bottom 3 (indices 0,1,2) = wound; top 3 (indices 3,4,5) = plain
-        // For n-string instruments other than 6, scale the threshold linearly.
-        val woundCutoff = (tuning.stringCount + 1) / 2   // bottom half wound
+        // stringIndex 0 = lowest pitch = bottom of the screen.
+        // For guitar (6-string), the bottom half (E, A, D) are wound bronze and
+        // the top half (G, B, e) are plain. For cavaquinho (4-string, much
+        // shorter scale + nylon/steel of similar gauge), render every string as
+        // plain — no wound bronze.
+        val woundCutoff = if (tuning.stringCount == 4) 0    // all plain
+                          else (tuning.stringCount + 1) / 2
         val plainHatch = PathEffect.dashPathEffect(floatArrayOf(2.5f, 1.5f), 0f)
         for (s in 0 until tuning.stringCount) {
             val y = firstStringY + (tuning.stringCount - 1 - s) * stringSpacing
@@ -289,8 +292,11 @@ fun FretboardView(
             val y = firstStringY + (tuning.stringCount - 1 - s) * stringSpacing
             val pc = tuning.openStrings[s].pitchClass
             val letter = NoteSpeller.spell(pc)
-            val hasLowerSamePc = (0 until s).any { tuning.openStrings[it].pitchClass == pc }
-            val label = if (hasLowerSamePc) letter.lowercase() else letter
+            // Convention: the HIGHEST string always reads lowercase regardless of
+            // whether the letter appears elsewhere. So standard tuning is
+            // "E A D G B e", DGBe is "D G B e", DGBD is "D G B d".
+            val isHighest = s == tuning.stringCount - 1
+            val label = if (isHighest) letter.lowercase() else letter
             val measured = measurer.measure(text = label, style = labelStyle)
             // Pin to the leftmost ~3px in left-handed view, or to ~3px from the
             // left edge in right-handed view. Either way, well clear of the

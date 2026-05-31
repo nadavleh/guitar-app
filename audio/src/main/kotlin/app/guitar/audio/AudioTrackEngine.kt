@@ -137,7 +137,7 @@ class AudioTrackEngine(
         }
     }
 
-    override fun playNote(midiNote: Int, durationMillis: Int) {
+    override fun playNote(midiNote: Int, durationMillis: Int, timbre: Timbre) {
         if (midiNote !in 0..127 || durationMillis <= 0) return
         if (!running.get()) return
         val tCall = System.nanoTime()
@@ -147,6 +147,8 @@ class AudioTrackEngine(
                 midiNote = midiNote,
                 durationSec = durationMillis / 1000.0,
                 seed = System.nanoTime(),
+                damping = timbre.damping,
+                amplitude = timbre.amplitude,
             )
             val tEnd = System.nanoTime()
             addVoice(samples)
@@ -163,7 +165,7 @@ class AudioTrackEngine(
         }
     }
 
-    override fun playFrequency(freqHz: Float, durationMillis: Int) {
+    override fun playFrequency(freqHz: Float, durationMillis: Int, timbre: Timbre) {
         if (freqHz <= 0f || durationMillis <= 0) return
         if (!running.get()) return
         synthesizer.execute {
@@ -171,12 +173,14 @@ class AudioTrackEngine(
                 freqHz = freqHz.toDouble(),
                 durationSec = durationMillis / 1000.0,
                 seed = System.nanoTime(),
+                damping = timbre.damping,
+                amplitude = timbre.amplitude,
             )
             addVoice(samples)
         }
     }
 
-    override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int) {
+    override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre) {
         if (midiNotes.isEmpty() || sustainMillis <= 0) return
         if (!running.get()) return
         synthesizer.execute {
@@ -185,6 +189,8 @@ class AudioTrackEngine(
                 sustainSec = sustainMillis / 1000.0,
                 strumDelaySamples = (sampleRate * strumDelayMillis / 1000).coerceAtLeast(0),
                 seedBase = System.nanoTime(),
+                damping = timbre.damping,
+                amplitude = timbre.amplitude,
             )
             if (mix.isNotEmpty()) addVoice(mix)
         }

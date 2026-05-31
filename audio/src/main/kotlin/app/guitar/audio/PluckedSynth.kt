@@ -79,6 +79,8 @@ class PluckedSynth(val sampleRate: Int = 48000) {
         sustainSec: Double,
         strumDelaySamples: Int,
         seedBase: Long = 1L,
+        damping: Double = 0.997,
+        amplitude: Double = 0.6,
     ): FloatArray {
         require(sustainSec > 0.0)
         require(strumDelaySamples >= 0)
@@ -89,7 +91,13 @@ class PluckedSynth(val sampleRate: Int = 48000) {
         val mix = FloatArray(totalLen)
         val scale = (1.0 / kotlin.math.sqrt(voices.size.toDouble())).toFloat()
         voices.forEachIndexed { i, midi ->
-            val voice = synthesize(midi, sustainSec, seed = seedBase + i)
+            val voice = synthesize(
+                midiNote = midi,
+                durationSec = sustainSec,
+                seed = seedBase + i,
+                damping = damping,
+                amplitude = amplitude,
+            )
             val offset = i * strumDelaySamples
             val end = minOf(offset + voice.size, totalLen)
             for (j in 0 until (end - offset)) {

@@ -24,6 +24,12 @@ class ChordShapeGenerator(
         // The brute-force fallback below applies only when neither canonical table
         // has anything for the (quality, tuning) combination.
         if (fretRange == null) {
+            // Cavaquinho (4-string) has its own curated voicings — try them first
+            // regardless of voicing style, since CAGED is a guitar-only system.
+            if (tuning.stringCount == 4) {
+                val cavaq = cavaquinhoShapesFor(root, quality, tuning, frets)
+                if (cavaq.isNotEmpty()) return cavaq
+            }
             val canonical = when (style) {
                 VoicingStyle.Standard -> cagedShapesFor(root, quality, tuning, frets)
                 VoicingStyle.Shell -> {
