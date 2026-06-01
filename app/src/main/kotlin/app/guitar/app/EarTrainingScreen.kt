@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.guitar.theory.ChordTypeLevel
+import app.guitar.theory.FretPosition
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
 import app.guitar.theory.TrainingMode
@@ -59,7 +60,10 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
     }
     DisposableEffect(Unit) { onDispose { ear.release() } }
     LaunchedEffect(Unit) {
-        if (ear.progResolved.isEmpty()) ear.nextProgression()
+        // NB: deliberately do NOT auto-generate a progression here. The user
+        // wants the first progression to honor settings they pick beforehand,
+        // so we show a "Generate progression" button instead. Note2Chord still
+        // pre-generates because it has no settings to honor.
         if (ear.n2cChallenge == null) ear.nextN2cChallenge()
     }
 
@@ -83,7 +87,15 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                         selected = s == ear.progSubMode,
                         onClick = { ear.progSubMode = s; ear.stopLoop() },
                         shape = SegmentedButtonDefaults.itemShape(index = i, count = EarSubMode.entries.size),
-                        label = { Text(if (s == EarSubMode.Progression) "Progressions" else "Note2Chord") },
+                        label = {
+                            Text(
+                                when (s) {
+                                    EarSubMode.Progression -> "Progressions"
+                                    EarSubMode.Note2Chord  -> "Note2Chord"
+                                    EarSubMode.Challenge   -> "Challenge"
+                                }
+                            )
+                        },
                     )
                 }
             }
@@ -96,8 +108,9 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
         Spacer(Modifier.height(8.dp))
 
         when (ear.progSubMode) {
-            EarSubMode.Progression -> ProgressionView(ear)
+            EarSubMode.Progression -> ProgressionView(state, ear)
             EarSubMode.Note2Chord  -> Note2ChordView(ear)
+            EarSubMode.Challenge   -> ChallengeView(state, ear)
         }
     }
 }
@@ -106,78 +119,17 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ProgressionView(ear: EarTrainingState) {
+private fun ProgressionView(state: AppState, ear: EarTrainingState) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
-        // Settings row 1: key (random / fixed), mode toggles, chord-type level, BPM
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Key", style = MaterialTheme.typography.labelMedium)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    FilterChip(
-                        selected = ear.fixedKey == null,
-                        onClick = { ear.fixedKey = null },
-                        label = { Text("Random") },
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Fixed:", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(4.dp))
-                }
-                Spacer(Modifier.height(4.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    for (i in 0..11) {
-                        val pc = PitchClass(i)
-                        FilterChip(
-                            selected = ear.fixedKey == pc,
-                            onClick = { ear.fixedKey = pc },
-                            label = { Text(NoteSpeller.spell(pc)) },
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(horizontalAlignment = Alignment.Start) {
-                Text("Modes", style = MaterialTheme.typography.labelMedium)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Major", style = MaterialTheme.typography.bodySmall)
-                    Switch(checked = ear.includeMajor, onCheckedChange = { ear.includeMajor = it })
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Minor", style = MaterialTheme.typography.bodySmall)
-                    Switch(checked = ear.includeMinor, onCheckedChange = { ear.includeMinor = it })
-                }
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(horizontalAlignment = Alignment.Start) {
-                Text("Chord type", style = MaterialTheme.typography.labelMedium)
-                SingleChoiceSegmentedButtonRow {
-                    ChordTypeLevel.entries.forEachIndexed { i, lvl ->
-                        SegmentedButton(
-                            selected = ear.chordTypeLevel == lvl,
-                            onClick = {
-                                ear.chordTypeLevel = lvl
-                                // Re-resolve the current progression at the new level
-                                val prog = ear.progProgression
-                                if (prog != null) {
-                                    ear.progResolved = app.guitar.theory.EarTraining
-                                        .resolveProgression(prog, ear.progKey, lvl)
-                                }
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = i, count = ChordTypeLevel.entries.size),
-                            label = { Text(lvl.displayName) },
-                        )
-                    }
-                }
-            }
-        }
+        ProgressionSettings(ear)
 
         Spacer(Modifier.height(12.dp))
 
-        // BPM + transport + Next Progression
+        // BPM + transport + Generate / Next
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("BPM: ${ear.progBpm}", style = MaterialTheme.typography.bodyMedium)
@@ -188,16 +140,34 @@ private fun ProgressionView(ear: EarTrainingState) {
                 )
             }
             Spacer(Modifier.width(12.dp))
-            if (ear.isLooping) {
-                Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
-            } else {
-                Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
+            if (ear.hasGenerated) {
+                if (ear.isLooping) {
+                    Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
+                } else {
+                    Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
+                }
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(onClick = { ear.nextProgression() }) { Text("Next progression →") }
             }
-            Spacer(Modifier.width(8.dp))
-            OutlinedButton(onClick = { ear.nextProgression() }) { Text("Next progression →") }
         }
 
         Spacer(Modifier.height(16.dp))
+
+        if (!ear.hasGenerated) {
+            // Initial state: prominent CTA. The user adjusts settings above, then
+            // taps this to produce the first progression that honors them.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Button(onClick = { ear.nextProgression() }) {
+                    Text("Generate progression ▶", style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            return@Column
+        }
 
         // KEY + MODE reveal row
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -222,7 +192,7 @@ private fun ProgressionView(ear: EarTrainingState) {
 
         Spacer(Modifier.height(12.dp))
 
-        // Four chord-slot reveal cards
+        // Four chord-slot reveal cards (each with its own play button)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (i in 0 until 4) {
                 val resolved = ear.progResolved.getOrNull(i)
@@ -232,9 +202,110 @@ private fun ProgressionView(ear: EarTrainingState) {
                     label = resolved?.romanLabel ?: "—",
                     hidden = i !in ear.progBarRevealed,
                     onToggle = { ear.toggleBarReveal(i) },
+                    onPlay = { ear.playBarOnce(i) },
                     isPlaying = isCurrent,
                     modifier = Modifier.weight(1f),
                 )
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        // ---- Show-on-fretboard switch + optional FretboardView ----
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Show chord on fretboard",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f))
+            Switch(checked = ear.showFretboard, onCheckedChange = { ear.showFretboard = it })
+        }
+        if (ear.showFretboard) {
+            val shape = ear.currentPlayingShape ?: ear.lastShownShape
+            val marks = remember(shape, state.labelMode) {
+                shape?.let { shapeMarks(it, state.labelMode) } ?: emptyMap()
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .padding(vertical = 4.dp),
+            ) {
+                FretboardView(
+                    tuning = state.liveTuning,
+                    marks = marks,
+                    selectedPosition = null,
+                    onTap = { /* read-only inside ear training */ },
+                    numFrets = DISPLAY_FRETS,
+                    leftHanded = state.leftHanded,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ProgressionSettings(ear: EarTrainingState) {
+    // Settings row: key (random / fixed), mode toggles, chord-type level
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Key", style = MaterialTheme.typography.labelMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FilterChip(
+                    selected = ear.fixedKey == null,
+                    onClick = { ear.fixedKey = null },
+                    label = { Text("Random") },
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Fixed:", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(4.dp))
+            }
+            Spacer(Modifier.height(4.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (i in 0..11) {
+                    val pc = PitchClass(i)
+                    FilterChip(
+                        selected = ear.fixedKey == pc,
+                        onClick = { ear.fixedKey = pc },
+                        label = { Text(NoteSpeller.spell(pc)) },
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(horizontalAlignment = Alignment.Start) {
+            Text("Modes", style = MaterialTheme.typography.labelMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Major", style = MaterialTheme.typography.bodySmall)
+                Switch(checked = ear.includeMajor, onCheckedChange = { ear.includeMajor = it })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Minor", style = MaterialTheme.typography.bodySmall)
+                Switch(checked = ear.includeMinor, onCheckedChange = { ear.includeMinor = it })
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(horizontalAlignment = Alignment.Start) {
+            Text("Chord type", style = MaterialTheme.typography.labelMedium)
+            SingleChoiceSegmentedButtonRow {
+                ChordTypeLevel.entries.forEachIndexed { i, lvl ->
+                    SegmentedButton(
+                        selected = ear.chordTypeLevel == lvl,
+                        onClick = {
+                            ear.chordTypeLevel = lvl
+                            // Re-resolve the current progression at the new level (if any).
+                            val prog = ear.progProgression
+                            if (prog != null) {
+                                ear.progResolved = app.guitar.theory.EarTraining
+                                    .resolveProgression(prog, ear.progKey, lvl)
+                            }
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = i, count = ChordTypeLevel.entries.size),
+                        label = { Text(lvl.displayName) },
+                    )
+                }
             }
         }
     }
@@ -284,6 +355,7 @@ private fun ChordSlotCard(
     label: String,
     hidden: Boolean,
     onToggle: () -> Unit,
+    onPlay: () -> Unit,
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -299,7 +371,7 @@ private fun ChordSlotCard(
         colors = CardDefaults.cardColors(containerColor = bg),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp, horizontal = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -310,11 +382,17 @@ private fun ChordSlotCard(
             Spacer(Modifier.height(6.dp))
             Text(
                 if (hidden) "tap to reveal" else label,
-                fontSize = if (hidden) 14.sp else 32.sp,
+                fontSize = if (hidden) 14.sp else 30.sp,
                 fontWeight = if (hidden) FontWeight.Normal else FontWeight.SemiBold,
                 color = if (hidden) MaterialTheme.colorScheme.onSurfaceVariant
                         else MaterialTheme.colorScheme.onTertiaryContainer,
             )
+            Spacer(Modifier.height(6.dp))
+            OutlinedButton(
+                onClick = onPlay,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    horizontal = 10.dp, vertical = 2.dp),
+            ) { Text("▶ Play") }
         }
     }
 }
@@ -401,5 +479,277 @@ private fun Note2ChordView(ear: EarTrainingState) {
         }
         // Bottom breathing room so the card never abuts the system gesture bar.
         Spacer(Modifier.height(20.dp))
+    }
+}
+
+// -------- Challenge view --------
+
+/**
+ * Self-marked 15-question quiz. Each question is a fresh random progression
+ * generated under the same settings as the Progressions sub-mode (Major/Minor
+ * include flags + Triads / 7ths / Extended). The user plays it, reveals the
+ * answer, and presses "✔ Got it" or "✘ Missed it". After 15 questions a final
+ * score screen is shown with a Restart button.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChallengeView(state: AppState, ear: EarTrainingState) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        if (!ear.challengeActive) {
+            // ---- title / config screen ----
+            Text(
+                "A challenge is 15 progressions in a row. Listen, reveal the answer, " +
+                    "and self-mark whether you identified each chord correctly. Your " +
+                    "score appears at the end.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+            Spacer(Modifier.height(12.dp))
+
+            ProgressionSettings(ear)
+
+            Spacer(Modifier.height(20.dp))
+
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Button(onClick = { ear.startChallenge() }) {
+                    Text("Start challenge ▶", style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            return@Column
+        }
+
+        // ---- done screen (after Q15 advance) ----
+        if (ear.challengeIndex >= ear.challengeTotal) {
+            ChallengeDoneCard(
+                score = ear.challengeScore,
+                total = ear.challengeTotal,
+                answers = ear.challengeAnswers,
+                onRestart = { ear.startChallenge() },
+                onExit = { ear.exitChallenge() },
+            )
+            return@Column
+        }
+
+        // ---- in-flight question screen ----
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "Question ${ear.challengeIndex + 1} / ${ear.challengeTotal}",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "Score: ${ear.challengeScore}",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.width(8.dp))
+            TextButton(onClick = { ear.exitChallenge() }) { Text("Quit") }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            if (ear.isLooping) {
+                Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
+            } else {
+                Button(onClick = { ear.startLoop() }) { Text("Play progression ▶") }
+            }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(onClick = { ear.nextProgression() }) { Text("Re-roll progression") }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Reveal panel: hidden by default; shows key/mode/4 chord labels at once.
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { ear.challengeRevealed = !ear.challengeRevealed },
+            colors = CardDefaults.cardColors(
+                containerColor = if (ear.challengeRevealed) MaterialTheme.colorScheme.tertiaryContainer
+                                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            ),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    "Answer",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                if (!ear.challengeRevealed) {
+                    Text(
+                        "tap to reveal",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    val key = NoteSpeller.spell(ear.progKey)
+                    val mode = if (ear.progMode == TrainingMode.Major) "Major" else "Minor"
+                    Text(
+                        "$key  ·  $mode",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (rc in ear.progResolved) {
+                            Text(
+                                rc.romanLabel,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (rc in ear.progResolved) {
+                            Text(
+                                rc.symbol,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        // Right / Wrong (only enabled once revealed)
+        val marked = ear.challengeAnswers.getOrNull(ear.challengeIndex)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { ear.markChallenge(true) },
+                enabled = ear.challengeRevealed && marked == null,
+                modifier = Modifier.weight(1f),
+            ) { Text("✔ Got it") }
+            Button(
+                onClick = { ear.markChallenge(false) },
+                enabled = ear.challengeRevealed && marked == null,
+                modifier = Modifier.weight(1f),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+            ) { Text("✘ Missed it") }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        Button(
+            onClick = { ear.advanceChallenge() },
+            enabled = marked != null,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(if (ear.challengeIndex == ear.challengeTotal - 1) "See score →" else "Next question →")
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Optional fretboard: re-uses the same toggle as Progressions sub-mode.
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Show chord on fretboard",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f))
+            Switch(checked = ear.showFretboard, onCheckedChange = { ear.showFretboard = it })
+        }
+        if (ear.showFretboard) {
+            val shape = ear.currentPlayingShape ?: ear.lastShownShape
+            val marks = remember(shape, state.labelMode) {
+                shape?.let { shapeMarks(it, state.labelMode) } ?: emptyMap()
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .padding(vertical = 4.dp),
+            ) {
+                FretboardView(
+                    tuning = state.liveTuning,
+                    marks = marks,
+                    selectedPosition = null,
+                    onTap = { },
+                    numFrets = DISPLAY_FRETS,
+                    leftHanded = state.leftHanded,
+                )
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+@Composable
+private fun ChallengeDoneCard(
+    score: Int,
+    total: Int,
+    answers: List<Boolean?>,
+    onRestart: () -> Unit,
+    onExit: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Challenge complete!",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "$score / $total",
+                fontSize = 64.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Spacer(Modifier.height(12.dp))
+            // Per-question dot strip
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                for ((i, a) in answers.withIndex()) {
+                    val color = when (a) {
+                        true  -> MaterialTheme.colorScheme.primary
+                        false -> MaterialTheme.colorScheme.error
+                        null  -> MaterialTheme.colorScheme.outline
+                    }
+                    Box(
+                        modifier = Modifier
+                            .width(18.dp)
+                            .height(18.dp)
+                            .background(color, RoundedCornerShape(4.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("${i + 1}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimary)
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onRestart) { Text("Restart") }
+                OutlinedButton(onClick = onExit) { Text("Exit") }
+            }
+        }
     }
 }

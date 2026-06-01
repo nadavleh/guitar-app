@@ -9,11 +9,16 @@ import app.guitar.theory.CagedShape
 import app.guitar.theory.ChordLibrary
 import app.guitar.theory.ChordShape
 import app.guitar.theory.ChordShapeGenerator
+import app.guitar.theory.ChordTypeLevel
+import app.guitar.theory.EarTraining
 import app.guitar.theory.FretPosition
 import app.guitar.theory.Fretboard
 import app.guitar.theory.Instrument
 import app.guitar.theory.Midi
 import app.guitar.theory.Note
+import app.guitar.theory.NoteSpeller
+import app.guitar.theory.PitchClass
+import app.guitar.theory.TrainingMode
 import app.guitar.theory.Tuning
 import app.guitar.theory.Tunings
 import app.guitar.theory.VoicingStyle
@@ -141,6 +146,53 @@ class AppState(
         private set
     /** Currently-edited (barIdx, slotIdx) for the slot-edit panel, or null. */
     var loopEditingSlot by mutableStateOf<Pair<Int, Int>?>(null)
+
+    // ---- "Build by degree" panel state ----
+    var loopBuildExpanded by mutableStateOf(false)
+    var loopBuildKey by mutableStateOf(PitchClass.C)
+    var loopBuildMode by mutableStateOf(TrainingMode.Major)
+    var loopBuildLevel by mutableStateOf(ChordTypeLevel.Sevenths)
+    /** If non-null, this quality symbol overrides the diatonic quality for the
+     *  next tapped degree. Lets the user say "add a 13 chord on the V" by
+     *  selecting "13" then tapping V. Null = use the diatonic quality at the
+     *  current level. */
+    var loopBuildOverride by mutableStateOf<String?>(null)
+    /** Cursor that advances every time the user taps a degree button without
+     *  having an editing slot open. Wraps around the progression. */
+    var loopBuildCursor by mutableStateOf(0)
+
+    fun setLoopBuildKeyRandom() {
+        loopBuildKey = PitchClass(kotlin.random.Random.nextInt(12))
+    }
+
+    /** Compute the diatonic chord symbol for a Roman degree under the panel's
+     *  current key/mode/level, then write it into the editing slot (if any) or
+     *  into the bar at [loopBuildCursor] (advancing the cursor with wrap). */
+    fun applyLoopDegree(degree: Int) {
+        require(degree in 1..7)
+        val rootPc = EarTraining.degreeRoot(loopBuildKey, degree, loopBuildMode)
+        val rootName = NoteSpeller.spell(rootPc)
+        val quality: String = loopBuildOverride ?: run {
+            val info = (if (loopBuildMode == TrainingMode.Major) EarTraining.MAJOR_DEGREES
+                        else EarTraining.MINOR_DEGREES)[degree] ?: return
+            when (loopBuildLevel) {
+                ChordTypeLevel.Triads   -> info.triadQuality
+                ChordTypeLevel.Sevenths -> info.seventhQuality
+                ChordTypeLevel.Extended -> info.extendedQuality
+            }
+        }
+        val symbol = "$rootName$quality"
+        val target = loopEditingSlot
+        if (target != null) {
+            setLoopSlotChord(target.first, target.second, symbol)
+        } else {
+            val barIdx = loopBuildCursor.coerceIn(0, loopProgression.size - 1)
+            setLoopSlotChord(barIdx, 0, symbol)
+            loopBuildCursor = (barIdx + 1) % loopProgression.size.coerceAtLeast(1)
+        }
+    }
+
+    fun resetLoopBuildCursor() { loopBuildCursor = 0 }
     private var loopJob: Job? = null
     private val loopShapeGen get() = ChordShapeGenerator(
         style = voicingStyle,

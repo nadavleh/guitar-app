@@ -41,9 +41,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.guitar.theory.ChordLibrary
 import app.guitar.theory.ChordShapeGenerator
+import app.guitar.theory.ChordTypeLevel
+import app.guitar.theory.EarTraining
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
 import app.guitar.theory.ScaleLibrary
+import app.guitar.theory.TrainingMode
 import app.guitar.theory.Tuning
 import app.guitar.theory.Tunings
 import app.guitar.theory.VoicingStyle
@@ -524,6 +527,11 @@ fun LoopScreen(state: AppState) {
         HorizontalDivider()
         Spacer(Modifier.height(6.dp))
 
+        // ----- "Build by degree" panel (collapsed by default) -----
+        BuildByDegreePanel(state)
+
+        Spacer(Modifier.height(6.dp))
+
         // ----- Main area: bars grid (left) + slot editor (right, when open) -----
         Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
             // Bars grid
@@ -716,6 +724,153 @@ private fun SlotEditor(state: AppState, barIdx: Int, slotIdx: Int) {
                         shape = SegmentedButtonDefaults.itemShape(index = i, count = StrumPattern.entries.size),
                         label = { Text("${s.glyph} ${s.displayName}") },
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Compact panel that lets the user build a progression by Roman-numeral degree
+ * rather than typing chord symbols. Key + Mode + Level + an optional quality
+ * override drive the resolution; tapping a degree button writes the resolved
+ * chord into the currently-editing slot (if any) or into the cursor-advancing
+ * next bar.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BuildByDegreePanel(state: AppState) {
+    val expanded = state.loopBuildExpanded
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text("Build by degree",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f))
+                TextButton(onClick = { state.loopBuildExpanded = !expanded }) {
+                    Text(if (expanded) "Collapse ▲" else "Expand ▼")
+                }
+            }
+            if (!expanded) return@Column
+
+            Spacer(Modifier.height(4.dp))
+
+            // ---- Key chips + Random + Mode ----
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text("Key", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(
+                    onClick = { state.setLoopBuildKeyRandom() },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                ) { Text("Random") }
+                Spacer(Modifier.width(16.dp))
+                Text("Mode", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(6.dp))
+                SingleChoiceSegmentedButtonRow {
+                    listOf(TrainingMode.Major, TrainingMode.Minor).forEachIndexed { i, m ->
+                        SegmentedButton(
+                            selected = state.loopBuildMode == m,
+                            onClick = { state.loopBuildMode = m },
+                            shape = SegmentedButtonDefaults.itemShape(index = i, count = 2),
+                            label = { Text(if (m == TrainingMode.Major) "Major" else "Minor") },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (i in 0..11) {
+                    val pc = PitchClass(i)
+                    FilterChip(
+                        selected = pc == state.loopBuildKey,
+                        onClick = { state.loopBuildKey = pc },
+                        label = { Text(NoteSpeller.spell(pc)) },
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            // ---- Diatonic level + quality override ----
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text("Diatonic", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(6.dp))
+                SingleChoiceSegmentedButtonRow {
+                    ChordTypeLevel.entries.forEachIndexed { i, lvl ->
+                        SegmentedButton(
+                            selected = state.loopBuildLevel == lvl && state.loopBuildOverride == null,
+                            onClick = {
+                                state.loopBuildLevel = lvl
+                                state.loopBuildOverride = null
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = i, count = ChordTypeLevel.entries.size),
+                            label = { Text(lvl.displayName) },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text("Override quality (replaces diatonic)",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                // Most-useful chord-quality overrides for building a progression.
+                val overrides = listOf("", "m", "7", "maj7", "m7", "m7b5", "dim7", "6", "m6", "9", "13", "sus4", "add9")
+                for (sym in overrides) {
+                    FilterChip(
+                        selected = state.loopBuildOverride == sym,
+                        onClick = {
+                            state.loopBuildOverride = if (state.loopBuildOverride == sym) null else sym
+                        },
+                        label = { Text(if (sym.isEmpty()) "maj" else sym) },
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // ---- Cursor row + 7 degree buttons ----
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                val cursorLabel = if (state.loopEditingSlot != null)
+                    "→ writes to selected slot"
+                else
+                    "→ writes to bar ${state.loopBuildCursor + 1} (auto-advances)"
+                Text(cursorLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f))
+                if (state.loopEditingSlot == null) {
+                    TextButton(onClick = { state.resetLoopBuildCursor() }) { Text("Reset to bar 1") }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            val degreeInfo = if (state.loopBuildMode == TrainingMode.Major) EarTraining.MAJOR_DEGREES
+                             else EarTraining.MINOR_DEGREES
+            // Each row of buttons stacks Roman label + resolved chord preview.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                for (d in 1..7) {
+                    val info = degreeInfo[d]
+                    val roman = info?.roman ?: "?"
+                    val rootPc = EarTraining.degreeRoot(state.loopBuildKey, d, state.loopBuildMode)
+                    val q = state.loopBuildOverride ?: when (state.loopBuildLevel) {
+                        ChordTypeLevel.Triads   -> info?.triadQuality ?: ""
+                        ChordTypeLevel.Sevenths -> info?.seventhQuality ?: ""
+                        ChordTypeLevel.Extended -> info?.extendedQuality ?: ""
+                    }
+                    val preview = NoteSpeller.spell(rootPc) + q
+                    OutlinedButton(
+                        onClick = { state.applyLoopDegree(d) },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = 10.dp, vertical = 6.dp,
+                        ),
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(roman, style = MaterialTheme.typography.titleSmall)
+                            Text(preview,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         }
