@@ -18,6 +18,7 @@ import app.guitar.theory.Progression
 import app.guitar.theory.ResolvedChord
 import app.guitar.theory.TrainingMode
 import app.guitar.theory.Tuning
+import app.guitar.theory.VoicingStyle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -43,7 +44,23 @@ class EarTrainingState(
     private val tuningProvider: () -> Tuning,
     /** Returns the current ring-sustain ms — used for the test-note duration. */
     private val sustainProvider: () -> Int,
+    /** Returns the current strum spread in ms (0 = struck at once). */
+    private val strumProvider: () -> Int = { 30 },
 ) {
+
+    // ---- Voicing / variety options (apply to progression playback & generation) ----
+    /** Use shell (jazz drop-2) voicings for ear-training chords. */
+    var earShellVoicing by mutableStateOf(false)
+    /** Mix everything: randomize chord-type level (triad/7th/extended) per bar AND
+     *  randomize voicing (standard/shell) per chord. Overrides the single selections. */
+    var earMixAll by mutableStateOf(false)
+
+    /** Voicing style for the next chord, honoring shell / mix settings. */
+    private fun earStyle(): VoicingStyle = when {
+        earMixAll -> if (rng.nextBoolean()) VoicingStyle.Shell else VoicingStyle.Standard
+        earShellVoicing -> VoicingStyle.Shell
+        else -> VoicingStyle.Standard
+    }
     // ---------- Progression trainer ----------
 
     var progSubMode by mutableStateOf(EarSubMode.Progression)
@@ -125,7 +142,7 @@ class EarTrainingState(
         progKey = key
         progMode = mode
         progProgression = prog
-        progResolved = EarTraining.resolveProgression(prog, key, chordTypeLevel, rng)
+        progResolved = resolveCurrent(prog, key)
         // Hide all reveals for the new round
         progBarRevealed = emptySet()
         keyRevealed = false
@@ -141,6 +158,24 @@ class EarTrainingState(
         }
     }
 
+    /** Resolve the current progression's chords, honoring the mix-all setting
+     *  (random chord-type level per bar) or the single [chordTypeLevel]. */
+    private fun resolveCurrent(prog: Progression, key: PitchClass): List<ResolvedChord> =
+        if (earMixAll) {
+            prog.degrees.map { deg ->
+                val lvl = ChordTypeLevel.entries[rng.nextInt(ChordTypeLevel.entries.size)]
+                EarTraining.resolve(deg, key, prog.mode, lvl, rng)
+            }
+        } else {
+            EarTraining.resolveProgression(prog, key, chordTypeLevel, rng)
+        }
+
+    /** Re-resolve the current progression in place (e.g. after changing level / mix). */
+    fun reresolveCurrent() {
+        val prog = progProgression ?: return
+        progResolved = resolveCurrent(prog, progKey)
+    }
+
     /** Resolve the [idx]-th chord of the current progression to a shape (using
      *  voice-leading from whatever last played in the loop, or E-shape if none),
      *  play it once, and update [lastShownShape] so the optional fretboard panel
@@ -150,7 +185,7 @@ class EarTrainingState(
         val parsed = ChordLibrary.parse(resolved.symbol) ?: return
         val (root, q) = parsed
         val tuning = tuningProvider()
-        val shapes = ChordShapeGenerator().shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
+        val shapes = ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
         if (shapes.isEmpty()) return
         val shape = if (prevPlayedShape == null) {
             shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.first()
@@ -162,8 +197,8 @@ class EarTrainingState(
         currentBar = idx
         val midis = shape.notes.mapNotNull { it?.midi?.value }
         if (midis.isEmpty()) return
-        // #3: wider strum + brighter timbre so root/3rd/5th articulate distinctly.
-        audio.playChord(midis, strumDelayMillis = 80, sustainMillis = sustainProvider(),
+        // Strum spread is user-controlled (0 = struck at once); brighter timbre for clarity.
+        audio.playChord(midis, strumDelayMillis = strumProvider(), sustainMillis = sustainProvider(),
             timbre = Timbre.Clarity)
     }
 
@@ -213,7 +248,7 @@ class EarTrainingState(
         val parsed = ChordLibrary.parse(symbol) ?: return
         val (root, q) = parsed
         val tuning = tuningProvider()
-        val shapes = ChordShapeGenerator().shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
+        val shapes = ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
         if (shapes.isEmpty()) return
         val shape = if (prevPlayedShape == null) {
             shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.first()
@@ -226,7 +261,7 @@ class EarTrainingState(
         val midis = shape.notes.mapNotNull { it?.midi?.value }
         if (midis.isEmpty()) return
         audio.playChord(midis,
-            strumDelayMillis = 80,
+            strumDelayMillis = strumProvider(),
             sustainMillis = (barMs * 0.9).toInt().coerceAtLeast(200),
             timbre = Timbre.Clarity)
     }
@@ -401,8 +436,9 @@ class EarTrainingState(
         challengeGuessExt = List(4) { null }
     }
 
-    /** Whether the current chord-type level carries an extension to also identify. */
-    val challengeNeedsExt: Boolean get() = chordTypeLevel != ChordTypeLevel.Triads
+    /** Whether the challenge should ask for an extension (mix mode always does, since
+     *  bars can be 7ths/extended; triad bars are answered with the "none" option). */
+    val challengeNeedsExt: Boolean get() = earMixAll || chordTypeLevel != ChordTypeLevel.Triads
 
     private fun degreesMap() =
         if (progMode == TrainingMode.Major) EarTraining.MAJOR_DEGREES else EarTraining.MINOR_DEGREES
@@ -411,10 +447,21 @@ class EarTrainingState(
     fun challengeDegreeOptions(): List<Pair<Int, String>> =
         degreesMap().entries.sortedBy { it.key }.map { it.key to it.value.roman }
 
-    /** Distinct extension-label options for the current mode + level (empty at Triads). */
+    /** Distinct extension-label options for the current mode + level. In mix mode the
+     *  union spans triad ("") + 7th + extended suffixes so every possible bar is answerable. */
     fun challengeExtOptions(): List<String> {
         if (!challengeNeedsExt) return emptyList()
-        return degreesMap().values.flatMap { info ->
+        val m = degreesMap()
+        if (earMixAll) {
+            val labels = linkedSetOf("")   // "" = triad / no extension
+            for (info in m.values) {
+                labels.add(EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman))
+                if (info.extendedOptions.isNotEmpty()) info.extendedOptions.forEach { labels.add(it.second) }
+                else labels.add(EarTraining.romanLabel(info.roman, info.extendedQuality).removePrefix(info.roman))
+            }
+            return labels.sorted()
+        }
+        return m.values.flatMap { info ->
             when (chordTypeLevel) {
                 ChordTypeLevel.Sevenths ->
                     listOf(EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman))
@@ -618,7 +665,7 @@ class EarTrainingState(
             ?: shapes.firstOrNull() ?: return
         val midis = shape.notes.mapNotNull { it?.midi?.value }
         if (midis.isEmpty()) return
-        audio.playChord(midis, strumDelayMillis = 80, sustainMillis = sustainMs, timbre = Timbre.Clarity)
+        audio.playChord(midis, strumDelayMillis = strumProvider(), sustainMillis = sustainMs, timbre = Timbre.Clarity)
     }
 
     fun release() {

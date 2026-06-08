@@ -104,6 +104,9 @@ class AppState(
     var a4Hz by mutableStateOf(440f)
     var ringSustainMs by mutableStateOf(1500)
 
+    /** Strum/arpeggio spread in ms between consecutive chord notes. 0 = struck at once. */
+    var strumMs by mutableStateOf(30)
+
     /**
      * #7: Ear-training state is owned by AppState (app-lifetime) rather than by the
      * EarTrainingScreen composable, so navigating away (e.g. to check yourself on the
@@ -116,6 +119,7 @@ class AppState(
             scope = scope,
             tuningProvider = { liveTuning },
             sustainProvider = { ringSustainMs },
+            strumProvider = { strumMs },
         )
     }
 
@@ -287,7 +291,7 @@ class AppState(
     fun playShape(shape: ChordShape) {
         val midis = shape.notes.mapNotNull { it?.midi?.value }
         if (midis.isNotEmpty()) {
-            audio.playChord(midis, strumDelayMillis = 40, sustainMillis = ringSustainMs, timbre = timbre)
+            audio.playChord(midis, strumDelayMillis = strumMs, sustainMillis = ringSustainMs, timbre = timbre)
         }
     }
 

@@ -153,6 +153,15 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
                     onValueChange = { ear.progBpm = it.toInt() },
                     valueRange = 40f..200f,
                 )
+                Text(
+                    if (state.strumMs == 0) "Strum: struck at once" else "Strum: ${state.strumMs} ms",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                androidx.compose.material3.Slider(
+                    value = state.strumMs.toFloat(),
+                    onValueChange = { state.strumMs = it.toInt() },
+                    valueRange = 0f..150f,
+                )
             }
             Spacer(Modifier.width(12.dp))
             if (ear.hasGenerated) {
@@ -323,21 +332,37 @@ private fun ProgressionSettings(ear: EarTrainingState) {
             SingleChoiceSegmentedButtonRow {
                 ChordTypeLevel.entries.forEachIndexed { i, lvl ->
                     SegmentedButton(
-                        selected = ear.chordTypeLevel == lvl,
-                        onClick = {
-                            ear.chordTypeLevel = lvl
-                            // Re-resolve the current progression at the new level (if any).
-                            val prog = ear.progProgression
-                            if (prog != null) {
-                                ear.progResolved = app.guitar.theory.EarTraining
-                                    .resolveProgression(prog, ear.progKey, lvl)
-                            }
-                        },
+                        selected = ear.chordTypeLevel == lvl && !ear.earMixAll,
+                        onClick = { ear.chordTypeLevel = lvl; ear.reresolveCurrent() },
                         shape = SegmentedButtonDefaults.itemShape(index = i, count = ChordTypeLevel.entries.size),
                         label = { Text(lvl.displayName) },
                     )
                 }
             }
+        }
+        Spacer(Modifier.width(16.dp))
+        // Voicing style + mix-and-match (notes: shell-only / mix everything).
+        Column(horizontalAlignment = Alignment.Start) {
+            Text("Voicing", style = MaterialTheme.typography.labelMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FilterChip(
+                    selected = !ear.earShellVoicing && !ear.earMixAll,
+                    onClick = { ear.earShellVoicing = false },
+                    label = { Text("Standard") },
+                )
+                Spacer(Modifier.width(4.dp))
+                FilterChip(
+                    selected = ear.earShellVoicing && !ear.earMixAll,
+                    onClick = { ear.earShellVoicing = true },
+                    label = { Text("Shell") },
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            FilterChip(
+                selected = ear.earMixAll,
+                onClick = { ear.earMixAll = !ear.earMixAll; ear.reresolveCurrent() },
+                label = { Text("Mix all") },
+            )
         }
     }
 }
@@ -992,7 +1017,7 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                                 FilterChip(
                                     selected = ear.challengeGuessExt.getOrNull(i) == ext,
                                     onClick = { ear.guessChallengeExt(i, ext) },
-                                    label = { Text(ext) },
+                                    label = { Text(if (ext.isEmpty()) "none" else ext) },
                                 )
                             }
                         }

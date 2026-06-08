@@ -432,6 +432,16 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
             onValueChange = { state.setRingSustainMs(it.toInt()) },
             valueRange = 300f..4000f,
         )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (state.strumMs == 0) "Strum: struck at once" else "Strum spread: ${state.strumMs} ms",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        androidx.compose.material3.Slider(
+            value = state.strumMs.toFloat(),
+            onValueChange = { state.strumMs = it.toInt() },
+            valueRange = 0f..150f,
+        )
 
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
