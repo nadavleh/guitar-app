@@ -22,24 +22,27 @@ data class N2cChallenge(
     val chordSymbol: String get() = NoteSpeller.spell(chordRoot) + if (isMinor) "m" else ""
 
     /** The label the user is trying to identify — what the test note IS relative to the chord. */
-    val answerLabel: String get() = when (testNoteOffsetSemitones) {
-        0  -> "1 (root)"
-        2  -> "9 (2)"
-        3  -> "b3"
-        4  -> "3"
-        5  -> "11 (4)"
-        7  -> "5"
-        8  -> "b13 (b6)"
-        9  -> "13 (6)"
-        10 -> "b7"
-        11 -> "maj7"
-        else -> "?"
-    }
+    val answerLabel: String get() = label(testNoteOffsetSemitones)
 
     /** Spelled name of the test note, e.g. "F#". */
     val testNoteName: String get() = NoteSpeller.spell(testNote)
 
     companion object {
+        /** Degree label for a semitone offset above the chord root. */
+        fun label(offset: Int): String = when (offset) {
+            0  -> "1 (root)"
+            2  -> "9 (2)"
+            3  -> "b3"
+            4  -> "3"
+            5  -> "11 (4)"
+            7  -> "5"
+            8  -> "b13 (b6)"
+            9  -> "13 (6)"
+            10 -> "b7"
+            11 -> "maj7"
+            else -> "?"
+        }
+
         /** Diatonic NON-chord-tones for ear-training over a major triad.
          *  We exclude root/3/5 since chord tones are trivial. */
         val MAJOR_TEST_OFFSETS = intArrayOf(2, 5, 9, 11)   // 9, 11, 13, maj7

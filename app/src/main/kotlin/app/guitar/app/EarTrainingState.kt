@@ -48,6 +48,16 @@ class EarTrainingState(
 
     var progSubMode by mutableStateOf(EarSubMode.Progression)
 
+    /** Practice (free play) vs Challenge (scored rounds) — applies to the active tab. */
+    var earMode by mutableStateOf(EarMode.Practice)
+
+    /** Switch tabs: reset to Practice and stop any audio so modes don't bleed together. */
+    fun switchTab(sub: EarSubMode) {
+        progSubMode = sub
+        earMode = EarMode.Practice
+        stopLoop()
+    }
+
     /** Whether the user wants Major mode in the rotation. */
     var includeMajor by mutableStateOf(true)
     /** Whether the user wants Minor mode in the rotation. */
@@ -57,7 +67,7 @@ class EarTrainingState(
     /** Null = random key each round. Non-null = always use this key. */
     var fixedKey by mutableStateOf<PitchClass?>(null)
     /** BPM for progression loop. */
-    var progBpm by mutableStateOf(80)
+    var progBpm by mutableStateOf(120)
 
     /** Current progression state. */
     var progKey by mutableStateOf(PitchClass.C)
@@ -279,6 +289,39 @@ class EarTrainingState(
         return 60 + testPc.value   // last-resort C4-relative
     }
 
+    // ---------- Note2Chord Challenge (scored rounds) ----------
+
+    val n2cChallengeTotal: Int = 10
+    var n2cChActive by mutableStateOf(false)
+        private set
+    var n2cChIndex by mutableStateOf(0)
+        private set
+    var n2cChScore by mutableStateOf(0)
+        private set
+    var n2cChGuess by mutableStateOf<String?>(null)
+        private set
+
+    /** Distinct answer-label options across major + minor diatonic test notes. */
+    fun n2cAnswerOptions(): List<String> =
+        (app.guitar.theory.N2cChallenge.MAJOR_TEST_OFFSETS + app.guitar.theory.N2cChallenge.MINOR_TEST_OFFSETS)
+            .distinct().sorted().map { app.guitar.theory.N2cChallenge.label(it) }
+
+    fun startN2cChallenge() {
+        n2cChActive = true; n2cChIndex = 0; n2cChScore = 0; n2cChGuess = null
+        nextN2cChallenge(); playN2c()
+    }
+    fun guessN2c(label: String) {
+        if (!n2cChActive || n2cChGuess != null) return
+        n2cChGuess = label
+        if (label == n2cChallenge?.answerLabel) n2cChScore++
+    }
+    fun advanceN2cChallenge() {
+        if (!n2cChActive) return
+        if (n2cChIndex >= n2cChallengeTotal - 1) { n2cChIndex = n2cChallengeTotal; return }
+        n2cChIndex++; n2cChGuess = null; nextN2cChallenge(); playN2c()
+    }
+    fun exitN2cChallenge() { n2cChActive = false; n2cChIndex = 0; n2cChGuess = null }
+
     // ---------- Progression Challenge (15-question quiz) ----------
 
     /** Length of one challenge session. */
@@ -443,6 +486,10 @@ class EarTrainingState(
     /** Flavors currently enabled (chord-quality symbols). */
     var flavorAllowed by mutableStateOf(setOf("", "m", "7", "maj7", "m7"))
 
+    /** Which key-center modes may appear in the flavor trainer. */
+    var flavorIncludeMajor by mutableStateOf(true)
+    var flavorIncludeMinor by mutableStateOf(true)
+
     var flavorKey by mutableStateOf(PitchClass.C)
         private set
     /** Diatonic scale degree (1..7) the drawn chord's root sits on. */
@@ -483,7 +530,11 @@ class EarTrainingState(
     fun newFlavorChallenge() {
         val allowed = flavorAllowed.ifEmpty { setOf("") }.toList()
         flavorKey = fixedKey ?: PitchClass(rng.nextInt(12))
-        flavorMode = if (rng.nextBoolean()) TrainingMode.Major else TrainingMode.Minor
+        val modes = buildList {
+            if (flavorIncludeMajor) add(TrainingMode.Major)
+            if (flavorIncludeMinor) add(TrainingMode.Minor)
+        }.ifEmpty { listOf(TrainingMode.Major) }
+        flavorMode = modes[rng.nextInt(modes.size)]
         flavorDegree = rng.nextInt(7) + 1
         flavorQuality = allowed[rng.nextInt(allowed.size)]
         flavorRevealed = false
@@ -517,6 +568,36 @@ class EarTrainingState(
 
     fun toggleFlavorReveal() { flavorRevealed = !flavorRevealed }
 
+    // ---- Flavor Challenge (scored rounds) ----
+    val flavorChallengeTotal: Int = 10
+    var flavorChActive by mutableStateOf(false)
+        private set
+    var flavorChIndex by mutableStateOf(0)
+        private set
+    var flavorChScore by mutableStateOf(0)
+        private set
+    var flavorChAnswered by mutableStateOf(false)
+        private set
+
+    fun startFlavorChallenge() {
+        flavorChActive = true; flavorChIndex = 0; flavorChScore = 0; flavorChAnswered = false
+        newFlavorChallenge()
+    }
+    /** Lock in the current degree+flavor guess and score it. */
+    fun submitFlavorGuess() {
+        if (!flavorChActive || flavorChAnswered) return
+        if (flavorGuessDegree == null || flavorGuessQuality == null) return
+        flavorChAnswered = true
+        flavorRevealed = true
+        if (flavorGuessDegree == flavorDegree && flavorGuessQuality == flavorQuality) flavorChScore++
+    }
+    fun advanceFlavorChallenge() {
+        if (!flavorChActive) return
+        if (flavorChIndex >= flavorChallengeTotal - 1) { flavorChIndex = flavorChallengeTotal; return }
+        flavorChIndex++; flavorChAnswered = false; newFlavorChallenge()
+    }
+    fun exitFlavorChallenge() { flavorChActive = false; flavorChIndex = 0; flavorChAnswered = false }
+
     private suspend fun playCadenceInline() {
         val map = flavorDegreesMap()
         for (deg in listOf(1, 5, 1)) {
@@ -549,4 +630,7 @@ class EarTrainingState(
     }
 }
 
-enum class EarSubMode { Progression, Note2Chord, Challenge, Flavor }
+enum class EarSubMode { Progression, Note2Chord, Flavor }
+
+/** Within any tab: free Practice or scored Challenge rounds. */
+enum class EarMode { Practice, Challenge }

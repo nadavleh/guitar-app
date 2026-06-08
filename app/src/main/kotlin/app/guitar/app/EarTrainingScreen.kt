@@ -82,14 +82,13 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                 EarSubMode.entries.forEachIndexed { i, s ->
                     SegmentedButton(
                         selected = s == ear.progSubMode,
-                        onClick = { ear.progSubMode = s; ear.stopLoop() },
+                        onClick = { ear.switchTab(s) },
                         shape = SegmentedButtonDefaults.itemShape(index = i, count = EarSubMode.entries.size),
                         label = {
                             Text(
                                 when (s) {
                                     EarSubMode.Progression -> "Progressions"
                                     EarSubMode.Note2Chord  -> "Note2Chord"
-                                    EarSubMode.Challenge   -> "Challenge"
                                     EarSubMode.Flavor      -> "Flavor"
                                 }
                             )
@@ -105,11 +104,28 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
 
+        // Practice / Challenge toggle — every tab has both (note #3).
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.padding(bottom = 8.dp)) {
+            EarMode.entries.forEachIndexed { i, m ->
+                SegmentedButton(
+                    selected = m == ear.earMode,
+                    onClick = { ear.earMode = m },
+                    shape = SegmentedButtonDefaults.itemShape(index = i, count = EarMode.entries.size),
+                    label = { Text(if (m == EarMode.Practice) "Practice" else "Challenge") },
+                )
+            }
+        }
+
         when (ear.progSubMode) {
-            EarSubMode.Progression -> ProgressionView(state, ear)
-            EarSubMode.Note2Chord  -> Note2ChordView(ear)
-            EarSubMode.Challenge   -> ChallengeView(state, ear)
-            EarSubMode.Flavor      -> FlavorView(ear)
+            EarSubMode.Progression ->
+                if (ear.earMode == EarMode.Challenge) ProgressionChallengeView(state, ear)
+                else ProgressionView(state, ear)
+            EarSubMode.Note2Chord ->
+                if (ear.earMode == EarMode.Challenge) Note2ChordChallengeView(ear)
+                else Note2ChordView(ear)
+            EarSubMode.Flavor ->
+                if (ear.earMode == EarMode.Challenge) FlavorChallengeView(ear)
+                else FlavorView(ear)
         }
     }
 }
@@ -527,6 +543,18 @@ private fun FlavorView(ear: EarTrainingState) {
             }
         }
 
+        Spacer(Modifier.height(6.dp))
+        // Mode selection: which key-center modes may appear.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Modes", style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.width(12.dp))
+            Text("Major", style = MaterialTheme.typography.bodySmall)
+            Switch(checked = ear.flavorIncludeMajor, onCheckedChange = { ear.flavorIncludeMajor = it })
+            Spacer(Modifier.width(8.dp))
+            Text("Minor", style = MaterialTheme.typography.bodySmall)
+            Switch(checked = ear.flavorIncludeMinor, onCheckedChange = { ear.flavorIncludeMinor = it })
+        }
+
         Spacer(Modifier.height(10.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -626,7 +654,186 @@ private fun FlavorView(ear: EarTrainingState) {
     }
 }
 
-// -------- Challenge view --------
+// -------- Per-tab Challenge views (#3) --------
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Note2ChordChallengeView(ear: EarTrainingState) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(8.dp)) {
+        if (!ear.n2cChActive) {
+            Text("Identify the test note's degree over the chord. ${ear.n2cChallengeTotal} rounds, scored.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(16.dp))
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Button(onClick = { ear.startN2cChallenge() }) { Text("Start challenge ▶") }
+            }
+            return@Column
+        }
+        if (ear.n2cChIndex >= ear.n2cChallengeTotal) {
+            SimpleDoneCard(ear.n2cChScore, ear.n2cChallengeTotal,
+                onRestart = { ear.startN2cChallenge() }, onExit = { ear.exitN2cChallenge() })
+            return@Column
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Question ${ear.n2cChIndex + 1} / ${ear.n2cChallengeTotal}",
+                style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text("Score: ${ear.n2cChScore}", style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(8.dp))
+            TextButton(onClick = { ear.exitN2cChallenge() }) { Text("Quit") }
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = { ear.playN2c() }, enabled = !ear.n2cPlaying) {
+            Text(if (ear.n2cPlaying) "Playing…" else "Replay ▶")
+        }
+        Spacer(Modifier.height(12.dp))
+        val guess = ear.n2cChGuess
+        val correct = ear.n2cChallenge?.answerLabel
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (opt in ear.n2cAnswerOptions()) {
+                FilterChip(
+                    selected = guess == opt || (guess != null && opt == correct),
+                    enabled = guess == null,
+                    onClick = { ear.guessN2c(opt) },
+                    label = { Text(opt) },
+                )
+            }
+        }
+        if (guess != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(if (guess == correct) "✔ correct" else "✘ answer: $correct",
+                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = { ear.advanceN2cChallenge() }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (ear.n2cChIndex == ear.n2cChallengeTotal - 1) "See score →" else "Next →")
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FlavorChallengeView(ear: EarTrainingState) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(8.dp)) {
+        if (!ear.flavorChActive) {
+            Text("${ear.flavorChallengeTotal} rounds. A cadence sets the key, then a random chord " +
+                "plays — identify its degree and flavor.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            Text("Allowed flavors", style = MaterialTheme.typography.labelMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (sym in ear.flavorPalette) {
+                    FilterChip(selected = sym in ear.flavorAllowed,
+                        onClick = { ear.toggleFlavorAllowed(sym) },
+                        label = { Text(if (sym.isEmpty()) "maj" else sym) })
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Modes", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(12.dp))
+                Text("Major", style = MaterialTheme.typography.bodySmall)
+                Switch(checked = ear.flavorIncludeMajor, onCheckedChange = { ear.flavorIncludeMajor = it })
+                Spacer(Modifier.width(8.dp))
+                Text("Minor", style = MaterialTheme.typography.bodySmall)
+                Switch(checked = ear.flavorIncludeMinor, onCheckedChange = { ear.flavorIncludeMinor = it })
+            }
+            Spacer(Modifier.height(16.dp))
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Button(onClick = { ear.startFlavorChallenge() }) { Text("Start challenge ▶") }
+            }
+            return@Column
+        }
+        if (ear.flavorChIndex >= ear.flavorChallengeTotal) {
+            SimpleDoneCard(ear.flavorChScore, ear.flavorChallengeTotal,
+                onRestart = { ear.startFlavorChallenge() }, onExit = { ear.exitFlavorChallenge() })
+            return@Column
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Round ${ear.flavorChIndex + 1} / ${ear.flavorChallengeTotal}",
+                style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text("Score: ${ear.flavorChScore}", style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(8.dp))
+            TextButton(onClick = { ear.exitFlavorChallenge() }) { Text("Quit") }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { ear.replayFlavorCadence() }, enabled = !ear.flavorPlaying) {
+                Text("Replay I–V–I")
+            }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(onClick = { ear.playFlavorChord() }) { Text("Play chord") }
+        }
+        Spacer(Modifier.height(12.dp))
+        Text("Degree", style = MaterialTheme.typography.labelMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (deg in 1..7) {
+                FilterChip(selected = ear.flavorGuessDegree == deg, enabled = !ear.flavorChAnswered,
+                    onClick = { ear.flavorGuessDegree = deg }, label = { Text("$deg") })
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text("Flavor", style = MaterialTheme.typography.labelMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (sym in ear.flavorAllowed.toList()) {
+                FilterChip(selected = ear.flavorGuessQuality == sym, enabled = !ear.flavorChAnswered,
+                    onClick = { ear.flavorGuessQuality = sym },
+                    label = { Text(if (sym.isEmpty()) "maj" else sym) })
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        if (!ear.flavorChAnswered) {
+            Button(onClick = { ear.submitFlavorGuess() },
+                enabled = ear.flavorGuessDegree != null && ear.flavorGuessQuality != null,
+                modifier = Modifier.fillMaxWidth()) { Text("Submit") }
+        } else {
+            val degOk = ear.flavorGuessDegree == ear.flavorDegree
+            val qualOk = ear.flavorGuessQuality == ear.flavorQuality
+            Text(
+                "Answer: degree ${ear.flavorDegree} (${ear.flavorDegreeRoman()}) · " +
+                    (if (ear.flavorQuality.isEmpty()) "maj" else ear.flavorQuality) +
+                    "  [${ear.flavorChordSymbol()}, ${if (ear.flavorMode == TrainingMode.Major) "major" else "minor"}]",
+                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary)
+            Text("you: degree ${if (degOk) "✔" else "✘"} · flavor ${if (qualOk) "✔" else "✘"}",
+                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = { ear.advanceFlavorChallenge() }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (ear.flavorChIndex == ear.flavorChallengeTotal - 1) "See score →" else "Next →")
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+/** Generic score screen for the single-answer challenges (Note2Chord, Flavor). */
+@Composable
+private fun SimpleDoneCard(score: Int, total: Int, onRestart: () -> Unit, onExit: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Challenge complete!", style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Spacer(Modifier.height(8.dp))
+            Text("$score / $total", fontSize = 64.sp, fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onRestart) { Text("Restart") }
+                OutlinedButton(onClick = onExit) { Text("Exit") }
+            }
+        }
+    }
+}
+
+// -------- Progression Challenge view --------
 
 /**
  * Auto-scored 15-question quiz. Each question is a fresh random progression
@@ -638,7 +845,7 @@ private fun FlavorView(ear: EarTrainingState) {
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ChallengeView(state: AppState, ear: EarTrainingState) {
+private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -709,6 +916,18 @@ private fun ChallengeView(state: AppState, ear: EarTrainingState) {
             }
             Spacer(Modifier.width(8.dp))
             OutlinedButton(onClick = { ear.rerollChallengeQuestion() }) { Text("Re-roll progression") }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // #1: BPM control inside the challenge (mirrors the Practice transport).
+        Column {
+            Text("BPM: ${ear.progBpm}", style = MaterialTheme.typography.bodySmall)
+            androidx.compose.material3.Slider(
+                value = ear.progBpm.toFloat(),
+                onValueChange = { ear.progBpm = it.toInt() },
+                valueRange = 40f..200f,
+            )
         }
 
         Spacer(Modifier.height(12.dp))
