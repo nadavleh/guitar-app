@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.guitar.audio.AudioEngine
+import app.guitar.audio.Timbre
 import app.guitar.theory.ChordLibrary
 import app.guitar.theory.ChordShapeGenerator
 import app.guitar.theory.ChordTypeLevel
@@ -69,6 +70,11 @@ class EarTrainingState(
     var isLooping by mutableStateOf(false)
     var currentBar by mutableStateOf(0)
 
+    /** How many progressions have been generated in normal Progression training
+     *  (excludes Challenge re-rolls). Shown as a small counter to the user. */
+    var progressionCount by mutableStateOf(0)
+        private set
+
     private var loopJob: Job? = null
     private val rng = Random.Default
 
@@ -109,13 +115,15 @@ class EarTrainingState(
         progKey = key
         progMode = mode
         progProgression = prog
-        progResolved = EarTraining.resolveProgression(prog, key, chordTypeLevel)
+        progResolved = EarTraining.resolveProgression(prog, key, chordTypeLevel, rng)
         // Hide all reveals for the new round
         progBarRevealed = emptySet()
         keyRevealed = false
         modeRevealed = false
         currentBar = 0
         hasGenerated = true
+        // Count only progressions generated in normal Progression training.
+        if (progSubMode == EarSubMode.Progression) progressionCount++
         // If we're currently playing, restart cleanly so the new progression begins immediately
         if (isLooping) {
             stopLoop()
@@ -144,7 +152,9 @@ class EarTrainingState(
         currentBar = idx
         val midis = shape.notes.mapNotNull { it?.midi?.value }
         if (midis.isEmpty()) return
-        audio.playChord(midis, strumDelayMillis = 25, sustainMillis = sustainProvider())
+        // #3: wider strum + brighter timbre so root/3rd/5th articulate distinctly.
+        audio.playChord(midis, strumDelayMillis = 80, sustainMillis = sustainProvider(),
+            timbre = Timbre.Clarity)
     }
 
     fun toggleBarReveal(idx: Int) {
@@ -153,6 +163,9 @@ class EarTrainingState(
 
     fun toggleKeyReveal() { keyRevealed = !keyRevealed }
     fun toggleModeReveal() { modeRevealed = !modeRevealed }
+
+    /** Reveal/hide key and mode together — they share a single card in the UI. */
+    fun toggleKeyModeReveal() { val v = !keyRevealed; keyRevealed = v; modeRevealed = v }
 
     fun startLoop() {
         if (isLooping) return
@@ -203,8 +216,9 @@ class EarTrainingState(
         val midis = shape.notes.mapNotNull { it?.midi?.value }
         if (midis.isEmpty()) return
         audio.playChord(midis,
-            strumDelayMillis = 25,
-            sustainMillis = (barMs * 0.9).toInt().coerceAtLeast(200))
+            strumDelayMillis = 80,
+            sustainMillis = (barMs * 0.9).toInt().coerceAtLeast(200),
+            timbre = Timbre.Clarity)
     }
 
     // ---------- Note2Chord trainer ----------
@@ -273,6 +287,9 @@ class EarTrainingState(
     /** Per-question answer state: null = not yet marked, true = right, false = wrong. */
     var challengeAnswers by mutableStateOf<List<Boolean?>>(emptyList())
         private set
+    /** Per-question count of correctly-identified bars (0..4) — enables partial credit. */
+    var challengeBarsCorrect by mutableStateOf<List<Int>>(emptyList())
+        private set
     var challengeIndex by mutableStateOf(0)
         private set
     /** Whether a challenge session is currently in flight (vs. on the title/score screen). */
@@ -284,9 +301,11 @@ class EarTrainingState(
 
     fun startChallenge() {
         challengeAnswers = List(challengeTotal) { null }
+        challengeBarsCorrect = List(challengeTotal) { 0 }
         challengeIndex = 0
         challengeRevealed = false
         challengeActive = true
+        resetChallengeGuesses()
         // Generate the first question's progression honoring current Major/Minor + chord-type settings.
         nextProgression()
     }
@@ -307,6 +326,7 @@ class EarTrainingState(
         }
         challengeIndex++
         challengeRevealed = false
+        resetChallengeGuesses()
         nextProgression()
     }
 
@@ -317,14 +337,216 @@ class EarTrainingState(
         stopLoop()
     }
 
-    /** Current score so far (number of correct answers; ignores still-blank slots). */
+    /** Current score so far (number of questions with all bars correct). */
     val challengeScore: Int get() = challengeAnswers.count { it == true }
+    /** Partial-credit score: total correctly-identified bars across all questions. */
+    val challengeBarScore: Int get() = challengeBarsCorrect.sum()
+    /** Maximum possible bar score (4 bars × every question). */
+    val challengeBarTotal: Int get() = challengeTotal * 4
+
+    // ---- #8/#9: gamified per-bar answering ----
+
+    /** Per-bar degree guesses (1..7); null = unanswered. */
+    var challengeGuessDegree by mutableStateOf<List<Int?>>(List(4) { null })
+        private set
+    /** Per-bar extension-label guesses; null = unanswered. */
+    var challengeGuessExt by mutableStateOf<List<String?>>(List(4) { null })
+        private set
+
+    private fun resetChallengeGuesses() {
+        challengeGuessDegree = List(4) { null }
+        challengeGuessExt = List(4) { null }
+    }
+
+    /** Whether the current chord-type level carries an extension to also identify. */
+    val challengeNeedsExt: Boolean get() = chordTypeLevel != ChordTypeLevel.Triads
+
+    private fun degreesMap() =
+        if (progMode == TrainingMode.Major) EarTraining.MAJOR_DEGREES else EarTraining.MINOR_DEGREES
+
+    /** Degree-button options for the current mode: (degree 1..7, Roman label). */
+    fun challengeDegreeOptions(): List<Pair<Int, String>> =
+        degreesMap().entries.sortedBy { it.key }.map { it.key to it.value.roman }
+
+    /** Distinct extension-label options for the current mode + level (empty at Triads). */
+    fun challengeExtOptions(): List<String> {
+        if (!challengeNeedsExt) return emptyList()
+        return degreesMap().values.flatMap { info ->
+            when (chordTypeLevel) {
+                ChordTypeLevel.Sevenths ->
+                    listOf(EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman))
+                ChordTypeLevel.Extended ->
+                    if (info.extendedOptions.isNotEmpty()) info.extendedOptions.map { it.second }
+                    else listOf(EarTraining.romanLabel(info.roman, info.extendedQuality).removePrefix(info.roman))
+                else -> emptyList()
+            }
+        }.filter { it.isNotEmpty() }.distinct().sorted()
+    }
+
+    /** Correct extension label for bar [i] (suffix of its Roman label), or "" if none. */
+    fun correctExtLabel(i: Int): String {
+        val deg = progProgression?.degrees?.getOrNull(i) ?: return ""
+        val info = degreesMap()[deg] ?: return ""
+        return progResolved.getOrNull(i)?.romanLabel?.removePrefix(info.roman) ?: ""
+    }
+
+    /** null = bar not fully answered yet; true/false = correct/incorrect. */
+    fun challengeBarCorrect(i: Int): Boolean? {
+        val deg = progProgression?.degrees?.getOrNull(i) ?: return null
+        val g = challengeGuessDegree.getOrNull(i) ?: return null
+        if (challengeNeedsExt && challengeGuessExt.getOrNull(i) == null) return null
+        val degOk = g == deg
+        val extOk = !challengeNeedsExt || challengeGuessExt.getOrNull(i) == correctExtLabel(i)
+        return degOk && extOk
+    }
+
+    fun guessChallengeDegree(bar: Int, degree: Int) {
+        if (!challengeActive) return
+        challengeGuessDegree = challengeGuessDegree.toMutableList().also { it[bar] = degree }
+        maybeAutoMarkChallenge()
+    }
+
+    fun guessChallengeExt(bar: Int, ext: String) {
+        if (!challengeActive) return
+        challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = ext }
+        maybeAutoMarkChallenge()
+    }
+
+    /** Re-roll the current question's progression and clear its guesses. */
+    fun rerollChallengeQuestion() {
+        resetChallengeGuesses()
+        nextProgression()
+    }
+
+    /** Once every bar is fully answered, auto-score the question (all bars right = a point). */
+    private fun maybeAutoMarkChallenge() {
+        if (!challengeActive || challengeIndex >= challengeTotal) return
+        if (challengeAnswers.getOrNull(challengeIndex) != null) return
+        val degrees = progProgression?.degrees ?: return
+        for (i in degrees.indices) if (challengeBarCorrect(i) == null) return
+        val correctCount = degrees.indices.count { challengeBarCorrect(it) == true }
+        if (challengeIndex < challengeBarsCorrect.size) {
+            challengeBarsCorrect = challengeBarsCorrect.toMutableList().also { it[challengeIndex] = correctCount }
+        }
+        markChallenge(correctCount == degrees.size)
+    }
+
+    // ---------- #5 Chord Flavor trainer ----------
+
+    /** Palette of chord flavors the user may enable for the random pool. */
+    val flavorPalette: List<String> = listOf(
+        "", "m", "dim", "aug", "sus2", "sus4",
+        "7", "maj7", "m7", "m7b5",
+        "9", "m9", "maj9", "11", "13",
+    )
+
+    /** Flavors currently enabled (chord-quality symbols). */
+    var flavorAllowed by mutableStateOf(setOf("", "m", "7", "maj7", "m7"))
+
+    var flavorKey by mutableStateOf(PitchClass.C)
+        private set
+    /** Diatonic scale degree (1..7) the drawn chord's root sits on. */
+    var flavorDegree by mutableStateOf(1)
+        private set
+    /** Quality of the drawn chord (a member of [flavorAllowed]). */
+    var flavorQuality by mutableStateOf("")
+        private set
+    var flavorRevealed by mutableStateOf(false)
+    var flavorGuessDegree by mutableStateOf<Int?>(null)
+    var flavorGuessQuality by mutableStateOf<String?>(null)
+    var flavorPlaying by mutableStateOf(false)
+        private set
+    /** True once the user has generated the first flavor chord this session. */
+    var flavorStarted by mutableStateOf(false)
+        private set
+
+    private var flavorJob: Job? = null
+    /** Each flavor challenge picks a major or minor key; the cadence is I-V-I (major)
+     *  or i-V-i (minor, harmonic-minor major V). */
+    var flavorMode by mutableStateOf(TrainingMode.Major)
+        private set
+
+    fun toggleFlavorAllowed(sym: String) {
+        flavorAllowed = if (sym in flavorAllowed) flavorAllowed - sym else flavorAllowed + sym
+    }
+
+    private fun flavorRootPc(): PitchClass = EarTraining.degreeRoot(flavorKey, flavorDegree, flavorMode)
+    fun flavorChordSymbol(): String = NoteSpeller.spell(flavorRootPc()) + flavorQuality
+    private fun flavorDegreesMap() =
+        if (flavorMode == TrainingMode.Major) EarTraining.MAJOR_DEGREES else EarTraining.MINOR_DEGREES
+
+    /** Roman base for the drawn degree (e.g. "IV"/"iv"), for the reveal. */
+    fun flavorDegreeRoman(): String = flavorDegreesMap()[flavorDegree]?.roman ?: "$flavorDegree"
+
+    /** Draw a fresh challenge (new random key, diatonic root, allowed flavor),
+     *  play the I-V-I cadence, then sound the chord. */
+    fun newFlavorChallenge() {
+        val allowed = flavorAllowed.ifEmpty { setOf("") }.toList()
+        flavorKey = fixedKey ?: PitchClass(rng.nextInt(12))
+        flavorMode = if (rng.nextBoolean()) TrainingMode.Major else TrainingMode.Minor
+        flavorDegree = rng.nextInt(7) + 1
+        flavorQuality = allowed[rng.nextInt(allowed.size)]
+        flavorRevealed = false
+        flavorGuessDegree = null
+        flavorGuessQuality = null
+        flavorStarted = true
+        flavorJob?.cancel()
+        flavorPlaying = true
+        flavorJob = scope.launch {
+            try {
+                playCadenceInline()
+                delay(400)
+                playSymbolOnce(flavorChordSymbol(), sustainProvider())
+            } finally { flavorPlaying = false }
+        }
+    }
+
+    /** Replay just the I-V-I cadence (does not redraw the chord). */
+    fun replayFlavorCadence() {
+        if (flavorPlaying) return
+        flavorJob?.cancel()
+        flavorPlaying = true
+        flavorJob = scope.launch { try { playCadenceInline() } finally { flavorPlaying = false } }
+    }
+
+    /** Replay the currently-drawn flavor chord. */
+    fun playFlavorChord() {
+        flavorJob?.cancel()
+        flavorJob = scope.launch { playSymbolOnce(flavorChordSymbol(), sustainProvider()) }
+    }
+
+    fun toggleFlavorReveal() { flavorRevealed = !flavorRevealed }
+
+    private suspend fun playCadenceInline() {
+        val map = flavorDegreesMap()
+        for (deg in listOf(1, 5, 1)) {
+            val root = EarTraining.degreeRoot(flavorKey, deg, flavorMode)
+            val symbol = NoteSpeller.spell(root) + (map[deg]?.triadQuality ?: "")
+            playSymbolOnce(symbol, 600)
+            delay(650)
+        }
+    }
+
+    /** Voice [symbol] (E-shape preferred) and strum it once with the clarity timbre. */
+    private fun playSymbolOnce(symbol: String, sustainMs: Int) {
+        val parsed = ChordLibrary.parse(symbol) ?: return
+        val (root, q) = parsed
+        val tuning = tuningProvider()
+        val shapes = ChordShapeGenerator().shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
+        val shape = shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E }
+            ?: shapes.firstOrNull() ?: return
+        val midis = shape.notes.mapNotNull { it?.midi?.value }
+        if (midis.isEmpty()) return
+        audio.playChord(midis, strumDelayMillis = 80, sustainMillis = sustainMs, timbre = Timbre.Clarity)
+    }
 
     fun release() {
         stopLoop()
         n2cJob?.cancel()
         n2cJob = null
+        flavorJob?.cancel()
+        flavorJob = null
     }
 }
 
-enum class EarSubMode { Progression, Note2Chord, Challenge }
+enum class EarSubMode { Progression, Note2Chord, Challenge, Flavor }

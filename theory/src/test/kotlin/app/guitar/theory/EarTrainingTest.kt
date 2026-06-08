@@ -106,22 +106,35 @@ class EarTrainingTest {
         assertEquals("IIImaj7", r.romanLabel)
     }
 
-    @Test fun `Imaj9 in C major extended`() {
+    @Test fun `I extended uses an allowed diatonic extension`() {
         val r = EarTraining.resolve(1, PitchClass.C, TrainingMode.Major, ChordTypeLevel.Extended)
-        assertEquals("Cmaj9", r.symbol)
-        assertEquals("Imaj9", r.romanLabel)
+        assertTrue(r.symbol in setOf("Cmaj9", "Cmaj13"), "unexpected ${r.symbol}")
+        assertTrue(r.romanLabel in setOf("Imaj9", "Imaj13"), "unexpected ${r.romanLabel}")
+        assertTrue(ChordLibrary.parse(r.symbol) != null, "unparseable ${r.symbol}")
     }
 
-    @Test fun `V9 in C major extended`() {
+    @Test fun `V extended uses an allowed diatonic extension`() {
         val r = EarTraining.resolve(5, PitchClass.C, TrainingMode.Major, ChordTypeLevel.Extended)
-        assertEquals("G9", r.symbol)
-        assertEquals("V9", r.romanLabel)
+        assertTrue(r.symbol in setOf("G9", "G11", "G13"), "unexpected ${r.symbol}")
+        assertTrue(r.romanLabel in setOf("V9", "V11", "V13"), "unexpected ${r.romanLabel}")
+        assertTrue(ChordLibrary.parse(r.symbol) != null, "unparseable ${r.symbol}")
     }
 
-    @Test fun `ii9 in C major extended strips m`() {
+    @Test fun `ii extended strips m in roman and stays diatonic`() {
         val r = EarTraining.resolve(2, PitchClass.C, TrainingMode.Major, ChordTypeLevel.Extended)
-        assertEquals("Dm9", r.symbol)
-        assertEquals("ii9", r.romanLabel)
+        assertTrue(r.symbol in setOf("Dm9", "Dm11"), "unexpected ${r.symbol}")
+        assertTrue(r.romanLabel in setOf("ii9", "ii11"), "unexpected ${r.romanLabel}")
+        assertTrue(ChordLibrary.parse(r.symbol) != null, "unparseable ${r.symbol}")
+    }
+
+    @Test fun `every major degree at extended level is parseable`() {
+        // Guards the bug where extended symbols (maj9, m9, ...) weren't in ChordLibrary.
+        repeat(50) {
+            for (deg in 1..7) {
+                val r = EarTraining.resolve(deg, PitchClass.C, TrainingMode.Major, ChordTypeLevel.Extended)
+                assertTrue(ChordLibrary.parse(r.symbol) != null, "unparseable ${r.symbol} (degree $deg)")
+            }
+        }
     }
 
     // ----- progression library -----

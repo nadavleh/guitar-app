@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🎸 FretPal</h1>
+  <h1>🎸 Chorect</h1>
   <p>
     <strong>The fretboard <em>is</em> the app — an interactive guitar companion for chords, scales, progressions, ear training, and a built-in chromatic tuner.</strong>
   </p>
@@ -63,7 +63,7 @@
 
 ## About
 
-**FretPal** is a music-theory-aware fretboard companion. It treats the neck as the primary interface and layers everything you'd want to study — chord voicings, scale positions, tunings, progressions, ear training, and a chromatic tuner — on top of it.
+**Chorect** is a music-theory-aware fretboard companion. It treats the neck as the primary interface and layers everything you'd want to study — chord voicings, scale positions, tunings, progressions, ear training, and a chromatic tuner — on top of it.
 
 It's built **Android-first** in native Kotlin so the music-theory engine can stay pure-Kotlin (zero Android dependencies, fast JUnit tests) and the audio path can use the low-latency AAudio route directly. A Kotlin Multiplatform port for iOS is planned — the theory engine ports as-is, only the UI and audio drivers need replacing.
 
@@ -141,7 +141,7 @@ It's built **Android-first** in native Kotlin so the music-theory engine can sta
 The repo is a multi-module Gradle build:
 
 ```
-FretPal/
+Chorect/
 ├── theory/   ← pure Kotlin, zero Android deps — KMP-ready for iOS later
 ├── audio/    ← Android library: AudioTrack engine, Karplus-Strong synth, YIN pitch detector, MicInput
 └── app/      ← Compose UI: fretboard, sheets, tuner, loop, ear training
@@ -188,7 +188,7 @@ For an accurate feel for the audio latency, test on a real device. On a Pixel-cl
 ## Project structure
 
 ```
-FretPal/
+Chorect/
 ├── app/                                       # Android application (Compose UI)
 │   └── src/main/kotlin/app/guitar/app/
 │       ├── MainActivity.kt                    # entry point, single-Activity layout

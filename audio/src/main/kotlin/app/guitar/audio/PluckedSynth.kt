@@ -1,6 +1,8 @@
 package app.guitar.audio
 
+import kotlin.math.abs
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
 /**
@@ -42,20 +44,56 @@ class PluckedSynth(val sampleRate: Int = 48000) {
         require(durationSec > 0.0) { "duration must be positive, got $durationSec" }
         require(damping in 0.0..1.0) { "damping must be in 0..1, got $damping" }
 
-        val n = (sampleRate / freqHz).toInt().coerceAtLeast(2)
-        val buf = DoubleArray(n)
-        val rng = Random(seed)
-        for (i in 0 until n) buf[i] = rng.nextDouble() * 2.0 - 1.0
+        // Round (not truncate) the delay length: integer truncation tunes notes sharp,
+        // which makes chords beat and smear. Rounding halves the worst-case detuning so
+        // simultaneously-sounding chord tones stay in tune and stay distinguishable.
+        val n = (sampleRate / freqHz).roundToInt().coerceAtLeast(2)
 
+        // --- Excitation: shaped noise for more realistic plucked harmonics ---
+        val rng = Random(seed)
+        val raw = DoubleArray(n) { rng.nextDouble() * 2.0 - 1.0 }
+        // Pluck-position comb: a string plucked ~1/4 along its length has the 4th harmonic
+        // (and its multiples) suppressed. Subtracting a delayed copy carves those notches,
+        // giving a more natural harmonic balance than raw white noise.
+        val pluck = (n / 4).coerceAtLeast(1)
+        val buf = DoubleArray(n)
+        var warm = 0.0
+        val warmCoef = 0.55   // one-pole lowpass on the excitation → warmer, less fizzy attack
+        var maxAbs = 1e-9
+        for (i in 0 until n) {
+            val combed = raw[i] - 0.9 * raw[(i - pluck + n) % n]
+            warm = warmCoef * combed + (1.0 - warmCoef) * warm
+            buf[i] = warm
+            val a = abs(warm)
+            if (a > maxAbs) maxAbs = a
+        }
+        // Normalize excitation to unit peak so output respects the ±amplitude bound exactly.
+        val norm = 1.0 / maxAbs
+        for (i in 0 until n) buf[i] *= norm
+
+        // --- Karplus-Strong delay loop ---
         val numSamples = (sampleRate * durationSec).toInt().coerceAtLeast(1)
-        val output = FloatArray(numSamples)
+        val ks = DoubleArray(numSamples)
         var idx = 0
         for (i in 0 until numSamples) {
             val cur = buf[idx]
             val nxt = buf[(idx + 1) % n]
-            output[i] = (amplitude * cur).toFloat()
+            ks[i] = cur
             buf[idx] = damping * 0.5 * (cur + nxt)
             idx = (idx + 1) % n
+        }
+
+        // --- Body: blend in a low-passed copy for more bottom end. A convex mix of two
+        // signals each within [-1, 1] stays within [-1, 1], so the amplitude bound and
+        // amplitude-linearity both hold (the shape is independent of `amplitude`). ---
+        val output = FloatArray(numSamples)
+        var body = 0.0
+        val bodyCoef = 0.12   // one-pole lowpass cutoff for the body component (lower = deeper)
+        val bodyMix = 0.32    // how much low-passed body to blend in
+        for (i in 0 until numSamples) {
+            body = bodyCoef * ks[i] + (1.0 - bodyCoef) * body
+            val mix = (1.0 - bodyMix) * ks[i] + bodyMix * body
+            output[i] = (amplitude * mix).toFloat()
         }
 
         // 50ms linear fade-out so the very last sample ends at 0 (no click).

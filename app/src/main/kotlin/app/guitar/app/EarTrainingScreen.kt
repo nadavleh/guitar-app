@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.guitar.theory.ChordTypeLevel
+import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
@@ -50,15 +51,11 @@ import app.guitar.theory.TrainingMode
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
-    val ear = remember(state) {
-        EarTrainingState(
-            audio = state.audio,
-            scope = state.scope,
-            tuningProvider = { state.liveTuning },
-            sustainProvider = { state.ringSustainMs },
-        )
-    }
-    DisposableEffect(Unit) { onDispose { ear.release() } }
+    // #7: use the app-lifetime instance so leaving and returning preserves state.
+    val ear = state.earTraining
+    // Stop audio/looping when leaving the screen, but keep all state (progression,
+    // reveals, counters) so returning shows exactly what you left.
+    DisposableEffect(Unit) { onDispose { ear.stopLoop() } }
     LaunchedEffect(Unit) {
         // NB: deliberately do NOT auto-generate a progression here. The user
         // wants the first progression to honor settings they pick beforehand,
@@ -93,6 +90,7 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                                     EarSubMode.Progression -> "Progressions"
                                     EarSubMode.Note2Chord  -> "Note2Chord"
                                     EarSubMode.Challenge   -> "Challenge"
+                                    EarSubMode.Flavor      -> "Flavor"
                                 }
                             )
                         },
@@ -111,6 +109,7 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
             EarSubMode.Progression -> ProgressionView(state, ear)
             EarSubMode.Note2Chord  -> Note2ChordView(ear)
             EarSubMode.Challenge   -> ChallengeView(state, ear)
+            EarSubMode.Flavor      -> FlavorView(ear)
         }
     }
 }
@@ -148,6 +147,26 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
                 }
                 Spacer(Modifier.width(8.dp))
                 OutlinedButton(onClick = { ear.nextProgression() }) { Text("Next progression →") }
+                Spacer(Modifier.width(8.dp))
+                // #2: push the current progression's chords into the Looper.
+                OutlinedButton(onClick = {
+                    state.loadProgressionIntoLoop(ear.progResolved.map { it.symbol })
+                }) { Text("→ Looper") }
+                Spacer(Modifier.width(12.dp))
+                // #11: small counter of how many progressions generated this session.
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "done",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "${ear.progressionCount}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
 
@@ -169,26 +188,17 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
             return@Column
         }
 
-        // KEY + MODE reveal row
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            RevealCard(
-                label = "Key",
-                hidden = !ear.keyRevealed,
-                content = NoteSpeller.spell(ear.progKey),
-                onToggle = { ear.toggleKeyReveal() },
-                modifier = Modifier.weight(1f),
-                contentSizeSp = 56,
-            )
-            Spacer(Modifier.width(8.dp))
-            RevealCard(
-                label = "Mode",
-                hidden = !ear.modeRevealed,
-                content = if (ear.progMode == TrainingMode.Major) "Major" else "Minor",
-                onToggle = { ear.toggleModeReveal() },
-                modifier = Modifier.weight(1f),
-                contentSizeSp = 28,
-            )
-        }
+        // KEY + MODE combined reveal — deliberately small / low-emphasis (the chord
+        // labels are the focus; key+mode is a secondary hint).
+        RevealCard(
+            label = "Key & Mode",
+            hidden = !ear.keyRevealed,
+            content = NoteSpeller.spell(ear.progKey) + "  " +
+                if (ear.progMode == TrainingMode.Major) "Major" else "Minor",
+            onToggle = { ear.toggleKeyModeReveal() },
+            modifier = Modifier.width(150.dp),
+            contentSizeSp = 15,
+        )
 
         Spacer(Modifier.height(12.dp))
 
@@ -233,7 +243,12 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
                     tuning = state.liveTuning,
                     marks = marks,
                     selectedPosition = null,
-                    onTap = { /* read-only inside ear training */ },
+                    onTap = { pos ->
+                        // #1: tapping a fret plays that note so the user can
+                        // check themselves against the progression.
+                        val midi = Fretboard.noteAt(state.liveTuning, pos).midi.value
+                        state.audio.playNote(midi, durationMillis = state.ringSustainMs)
+                    },
                     numFrets = DISPLAY_FRETS,
                     leftHanded = state.leftHanded,
                 )
@@ -482,13 +497,143 @@ private fun Note2ChordView(ear: EarTrainingState) {
     }
 }
 
+// -------- Chord Flavor view (#5) --------
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FlavorView(ear: EarTrainingState) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(4.dp),
+    ) {
+        Text(
+            "Pick which flavors can appear. Tap \"New chord\" — a I–V–I cadence plays to set the " +
+                "key, then a random diatonic chord sounds. Identify its scale degree and flavor.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+
+        Text("Allowed flavors", style = MaterialTheme.typography.labelMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (sym in ear.flavorPalette) {
+                FilterChip(
+                    selected = sym in ear.flavorAllowed,
+                    onClick = { ear.toggleFlavorAllowed(sym) },
+                    label = { Text(if (sym.isEmpty()) "maj" else sym) },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = { ear.newFlavorChallenge() }, enabled = !ear.flavorPlaying) {
+                Text(if (ear.flavorPlaying) "Playing…" else "New chord ▶")
+            }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(
+                onClick = { ear.replayFlavorCadence() },
+                enabled = ear.flavorStarted && !ear.flavorPlaying,
+            ) { Text("Replay I–V–I") }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(onClick = { ear.playFlavorChord() }, enabled = ear.flavorStarted) {
+                Text("Play chord")
+            }
+        }
+
+        if (!ear.flavorStarted) return@Column
+
+        Spacer(Modifier.height(14.dp))
+
+        Text("Degree", style = MaterialTheme.typography.labelMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (deg in 1..7) {
+                FilterChip(
+                    selected = ear.flavorGuessDegree == deg,
+                    onClick = { ear.flavorGuessDegree = deg },
+                    label = { Text("$deg") },
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text("Flavor", style = MaterialTheme.typography.labelMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (sym in ear.flavorAllowed.toList()) {
+                FilterChip(
+                    selected = ear.flavorGuessQuality == sym,
+                    onClick = { ear.flavorGuessQuality = sym },
+                    label = { Text(if (sym.isEmpty()) "maj" else sym) },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        val degOk = ear.flavorGuessDegree == ear.flavorDegree
+        val qualOk = ear.flavorGuessQuality == ear.flavorQuality
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { ear.toggleFlavorReveal() },
+            colors = CardDefaults.cardColors(
+                containerColor = if (ear.flavorRevealed) MaterialTheme.colorScheme.tertiaryContainer
+                                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            ),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("Answer", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(2.dp))
+                if (!ear.flavorRevealed) {
+                    Text("tap to reveal", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Text(
+                        "Degree ${ear.flavorDegree} (${ear.flavorDegreeRoman()})  ·  " +
+                            (if (ear.flavorQuality.isEmpty()) "maj" else ear.flavorQuality),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                    Text(ear.flavorChordSymbol(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer)
+                    Text(
+                        "in ${NoteSpeller.spell(ear.flavorKey)} " +
+                            if (ear.flavorMode == TrainingMode.Major) "major" else "minor",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                    if (ear.flavorGuessDegree != null || ear.flavorGuessQuality != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "you: degree ${if (degOk) "✔" else "✘"}  ·  flavor ${if (qualOk) "✔" else "✘"}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
 // -------- Challenge view --------
 
 /**
- * Self-marked 15-question quiz. Each question is a fresh random progression
+ * Auto-scored 15-question quiz. Each question is a fresh random progression
  * generated under the same settings as the Progressions sub-mode (Major/Minor
- * include flags + Triads / 7ths / Extended). The user plays it, reveals the
- * answer, and presses "✔ Got it" or "✘ Missed it". After 15 questions a final
+ * include flags + Triads / 7ths / Extended). For each bar the user taps the
+ * correct Roman numeral (and extension, when the level has one); the question
+ * scores a point only if all four bars are right. After 15 questions a final
  * score screen is shown with a Restart button.
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -502,9 +647,9 @@ private fun ChallengeView(state: AppState, ear: EarTrainingState) {
         if (!ear.challengeActive) {
             // ---- title / config screen ----
             Text(
-                "A challenge is 15 progressions in a row. Listen, reveal the answer, " +
-                    "and self-mark whether you identified each chord correctly. Your " +
-                    "score appears at the end.",
+                "A challenge is 15 progressions in a row. Listen, then tap the correct " +
+                    "Roman numeral for each bar (and its extension when shown). Each " +
+                    "question auto-scores; your total appears at the end.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 4.dp),
@@ -529,8 +674,8 @@ private fun ChallengeView(state: AppState, ear: EarTrainingState) {
         // ---- done screen (after Q15 advance) ----
         if (ear.challengeIndex >= ear.challengeTotal) {
             ChallengeDoneCard(
-                score = ear.challengeScore,
-                total = ear.challengeTotal,
+                score = ear.challengeBarScore,
+                total = ear.challengeBarTotal,
                 answers = ear.challengeAnswers,
                 onRestart = { ear.startChallenge() },
                 onExit = { ear.exitChallenge() },
@@ -546,7 +691,7 @@ private fun ChallengeView(state: AppState, ear: EarTrainingState) {
                 modifier = Modifier.weight(1f),
             )
             Text(
-                "Score: ${ear.challengeScore}",
+                "Score: ${ear.challengeBarScore} bars",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -563,94 +708,92 @@ private fun ChallengeView(state: AppState, ear: EarTrainingState) {
                 Button(onClick = { ear.startLoop() }) { Text("Play progression ▶") }
             }
             Spacer(Modifier.width(8.dp))
-            OutlinedButton(onClick = { ear.nextProgression() }) { Text("Re-roll progression") }
+            OutlinedButton(onClick = { ear.rerollChallengeQuestion() }) { Text("Re-roll progression") }
         }
 
         Spacer(Modifier.height(12.dp))
 
-        // Reveal panel: hidden by default; shows key/mode/4 chord labels at once.
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .clickable { ear.challengeRevealed = !ear.challengeRevealed },
-            colors = CardDefaults.cardColors(
-                containerColor = if (ear.challengeRevealed) MaterialTheme.colorScheme.tertiaryContainer
-                                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            ),
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+        // Small optional key/mode hint (same low-emphasis chip as the trainer).
+        RevealCard(
+            label = "Key & Mode (hint)",
+            hidden = !ear.keyRevealed,
+            content = NoteSpeller.spell(ear.progKey) + "  " +
+                if (ear.progMode == TrainingMode.Major) "Major" else "Minor",
+            onToggle = { ear.toggleKeyModeReveal() },
+            modifier = Modifier.width(170.dp),
+            contentSizeSp = 15,
+        )
+
+        Spacer(Modifier.height(10.dp))
+
+        // #9: per-bar answering — tap the correct Roman numeral (and the extension
+        // when the level has one). Each bar auto-scores; the question is a point if
+        // all four bars are right.
+        val degreeOptions = ear.challengeDegreeOptions()
+        val extOptions = ear.challengeExtOptions()
+        for (i in 0 until 4) {
+            val verdict = ear.challengeBarCorrect(i)   // null / true / false
+            val barBg = when (verdict) {
+                true  -> MaterialTheme.colorScheme.primaryContainer
+                false -> MaterialTheme.colorScheme.errorContainer
+                null  -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            }
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                colors = CardDefaults.cardColors(containerColor = barBg),
             ) {
-                Text(
-                    "Answer",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(4.dp))
-                if (!ear.challengeRevealed) {
-                    Text(
-                        "tap to reveal",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    val key = NoteSpeller.spell(ear.progKey)
-                    val mode = if (ear.progMode == TrainingMode.Major) "Major" else "Minor"
-                    Text(
-                        "$key  ·  $mode",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for (rc in ear.progResolved) {
-                            Text(
-                                rc.romanLabel,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                Column(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Bar ${i + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.weight(1f))
+                        OutlinedButton(
+                            onClick = { ear.playBarOnce(i) },
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                horizontal = 10.dp, vertical = 2.dp),
+                        ) { Text("▶ Play") }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        for ((deg, roman) in degreeOptions) {
+                            FilterChip(
+                                selected = ear.challengeGuessDegree.getOrNull(i) == deg,
+                                onClick = { ear.guessChallengeDegree(i, deg) },
+                                label = { Text(roman) },
                             )
                         }
                     }
-                    Spacer(Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for (rc in ear.progResolved) {
-                            Text(
-                                rc.symbol,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                            )
+                    if (ear.challengeNeedsExt && extOptions.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("extension",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            for (ext in extOptions) {
+                                FilterChip(
+                                    selected = ear.challengeGuessExt.getOrNull(i) == ext,
+                                    onClick = { ear.guessChallengeExt(i, ext) },
+                                    label = { Text(ext) },
+                                )
+                            }
                         }
+                    }
+                    if (verdict != null) {
+                        Spacer(Modifier.height(4.dp))
+                        val answer = ear.progResolved.getOrNull(i)?.romanLabel ?: ""
+                        Text(
+                            if (verdict) "✔ $answer" else "✘ answer: $answer",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                 }
             }
         }
 
-        Spacer(Modifier.height(14.dp))
-
-        // Right / Wrong (only enabled once revealed)
-        val marked = ear.challengeAnswers.getOrNull(ear.challengeIndex)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { ear.markChallenge(true) },
-                enabled = ear.challengeRevealed && marked == null,
-                modifier = Modifier.weight(1f),
-            ) { Text("✔ Got it") }
-            Button(
-                onClick = { ear.markChallenge(false) },
-                enabled = ear.challengeRevealed && marked == null,
-                modifier = Modifier.weight(1f),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                ),
-            ) { Text("✘ Missed it") }
-        }
-
         Spacer(Modifier.height(10.dp))
 
+        val marked = ear.challengeAnswers.getOrNull(ear.challengeIndex)
         Button(
             onClick = { ear.advanceChallenge() },
             enabled = marked != null,
@@ -683,7 +826,10 @@ private fun ChallengeView(state: AppState, ear: EarTrainingState) {
                     tuning = state.liveTuning,
                     marks = marks,
                     selectedPosition = null,
-                    onTap = { },
+                    onTap = { pos ->
+                        val midi = Fretboard.noteAt(state.liveTuning, pos).midi.value
+                        state.audio.playNote(midi, durationMillis = state.ringSustainMs)
+                    },
                     numFrets = DISPLAY_FRETS,
                     leftHanded = state.leftHanded,
                 )
@@ -721,6 +867,11 @@ private fun ChallengeDoneCard(
                 "$score / $total",
                 fontSize = 64.sp,
                 fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                "bars correct",
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Spacer(Modifier.height(12.dp))

@@ -104,6 +104,21 @@ class AppState(
     var a4Hz by mutableStateOf(440f)
     var ringSustainMs by mutableStateOf(1500)
 
+    /**
+     * #7: Ear-training state is owned by AppState (app-lifetime) rather than by the
+     * EarTrainingScreen composable, so navigating away (e.g. to check yourself on the
+     * fretboard) and back preserves the current progression, reveals, and counters
+     * instead of regenerating a fresh one. Created lazily on first entry.
+     */
+    val earTraining: EarTrainingState by lazy {
+        EarTrainingState(
+            audio = audio,
+            scope = scope,
+            tuningProvider = { liveTuning },
+            sustainProvider = { ringSustainMs },
+        )
+    }
+
     @JvmName("applyA4Hz")
     fun setA4Hz(value: Float) {
         val clamped = value.coerceIn(435f, 445f)
@@ -360,6 +375,20 @@ class AppState(
         loopProgression = loopProgression.toMutableList().also { bars ->
             bars[barIdx] = bar.toMutableList().also { it[slotIdx] = slot }
         }
+    }
+
+    /** #2: Replace the loop with the chords currently shown in the ear-training
+     *  Progression trainer (one chord per bar), normalize voicings, and jump to the
+     *  Looper so the user can keep working with them there. */
+    fun loadProgressionIntoLoop(chordSymbols: List<String>) {
+        val symbols = chordSymbols.filter { it.isNotBlank() }
+        if (symbols.isEmpty()) return
+        loopProgression = symbols.map { listOf(LoopSlot(it)) }
+        loopCurrentBar = 0
+        loopCurrentSlot = 0
+        loopBuildCursor = 0
+        normalizeLoopVoicings()
+        openSheet(Sheet.Loop)
     }
 
     /** Update only the chord-symbol field of a slot, then re-normalize the whole

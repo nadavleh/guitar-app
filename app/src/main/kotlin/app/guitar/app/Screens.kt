@@ -815,7 +815,7 @@ private fun BuildByDegreePanel(state: AppState) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 // Most-useful chord-quality overrides for building a progression.
-                val overrides = listOf("", "m", "7", "maj7", "m7", "m7b5", "dim7", "6", "m6", "9", "13", "sus4", "add9")
+                val overrides = listOf("", "m", "aug", "7", "maj7", "m7", "m7b5", "dim7", "6", "m6", "9", "13", "sus4", "add9")
                 for (sym in overrides) {
                     FilterChip(
                         selected = state.loopBuildOverride == sym,

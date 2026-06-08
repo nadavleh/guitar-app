@@ -44,7 +44,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import app.guitar.audio.AudioEngine
 import app.guitar.audio.AudioTrackEngine
 import app.guitar.theory.ChordLibrary
@@ -280,7 +285,18 @@ private fun StatusBar(state: AppState) {
             .background(MaterialTheme.colorScheme.surface)
             .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
     ) {
-        Text("FretPal", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+        // #10: "Chorect" wordmark. The 'c' carries a strong negative kerning so the
+        // following 't' tucks into it, making the "ct" read like a single 'd' glyph.
+        val wordmark = buildAnnotatedString {
+            append("Chore")
+            withStyle(SpanStyle(letterSpacing = (-0.28).em)) { append("c") }
+            append("t")
+        }
+        Text(
+            wordmark,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.primary,
+        )
         Spacer(Modifier.width(12.dp))
         val summary = "${state.tuningName}${if (state.isEditedTuning) "*" else ""}  ·  " +
             state.liveTuning.openStrings.joinToString(" ") { NoteSpeller.spell(it.pitchClass) }

@@ -17,5 +17,9 @@ data class Timbre(
         val Guitar = Timbre(damping = 0.997, amplitude = 0.6)
         /** Smaller body, nylon/steel strings, brighter ping with quicker decay. */
         val Cavaquinho = Timbre(damping = 0.989, amplitude = 0.55)
+        /** Ear-training chords: full sustain with a bit more level for body. Chord-tone
+         *  clarity now comes from the improved synth (pluck-comb harmonics, rounded
+         *  intonation, low-end blend) rather than from brightening, which thinned the bottom. */
+        val Clarity = Timbre(damping = 0.997, amplitude = 0.62)
     }
 }

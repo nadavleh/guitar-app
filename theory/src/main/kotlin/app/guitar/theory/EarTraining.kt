@@ -26,6 +26,15 @@ data class DegreeInfo(
     val triadQuality: String,    // [ChordQuality.symbol] for triad: "" / "m" / "dim"
     val seventhQuality: String,  // "maj7" / "m7" / "7" / "m7b5"
     val extendedQuality: String, // "maj9" / "m9" / "9" / "m7b5"
+    /**
+     * Allowed *diatonic* extensions for ear-training progression generation:
+     * each pair is (chord-quality symbol parseable by [ChordLibrary], Roman-label
+     * suffix). When non-empty, the Extended level picks one at random from this
+     * set; when empty it falls back to [extendedQuality]. This restriction applies
+     * ONLY to generated ear-training progressions — elsewhere all extensions are
+     * permitted.
+     */
+    val extendedOptions: List<Pair<String, String>> = emptyList(),
 )
 
 /** A 4-bar progression by scale degree. */
@@ -52,13 +61,16 @@ data class ResolvedChord(
 object EarTraining {
 
     val MAJOR_DEGREES: Map<Int, DegreeInfo> = mapOf(
-        1 to DegreeInfo("I",    "",    "maj7", "maj9"),
-        2 to DegreeInfo("ii",   "m",   "m7",   "m9"),
-        3 to DegreeInfo("iii",  "m",   "m7",   "m7"),    // m9 of iii has b9-of-key, gnarly → keep m7
-        4 to DegreeInfo("IV",   "",    "maj7", "maj9"),
-        5 to DegreeInfo("V",    "",    "7",    "9"),
-        6 to DegreeInfo("vi",   "m",   "m7",   "m9"),
-        7 to DegreeInfo("vii°", "dim", "m7b5", "m7b5"),
+        // extendedOptions encode the diatonic extensions allowed per degree:
+        //   I→9,13 · ii→9,11 · iii→11 · IV→9,#11,13 · V→9,11,13 · vi→9,11 · vii°→(11/b13, rarely written)
+        1 to DegreeInfo("I",    "",    "maj7", "maj9", listOf("maj9" to "maj9", "maj13" to "maj13")),
+        2 to DegreeInfo("ii",   "m",   "m7",   "m9",   listOf("m9" to "9", "m11" to "11")),
+        3 to DegreeInfo("iii",  "m",   "m7",   "m7",   listOf("m11" to "11")),   // 11 is the only stable tension on iii
+        4 to DegreeInfo("IV",   "",    "maj7", "maj9", listOf("maj9" to "maj9", "maj7#11" to "maj7#11", "maj13" to "maj13")),
+        5 to DegreeInfo("V",    "",    "7",    "9",    listOf("9" to "9", "11" to "11", "13" to "13")),
+        6 to DegreeInfo("vi",   "m",   "m7",   "m9",   listOf("m9" to "9", "m11" to "11")),
+        // Extended diminished extensions are rarely written; keep vii° at the ø7 sound.
+        7 to DegreeInfo("vii°", "dim", "m7b5", "m7b5", listOf("m7b5" to "7")),
     )
 
     val MINOR_DEGREES: Map<Int, DegreeInfo> = mapOf(
@@ -93,12 +105,25 @@ object EarTraining {
         else -> triadRoman + quality
     }
 
-    /** Resolve a Roman degree to a playable chord symbol + Roman label in the given key. */
-    fun resolve(degree: Int, key: PitchClass, mode: TrainingMode, level: ChordTypeLevel): ResolvedChord {
+    /** Resolve a Roman degree to a playable chord symbol + Roman label in the given key.
+     *  At the Extended level, a degree with a non-empty [DegreeInfo.extendedOptions]
+     *  picks one allowed diatonic extension at random using [rng]. */
+    fun resolve(
+        degree: Int,
+        key: PitchClass,
+        mode: TrainingMode,
+        level: ChordTypeLevel,
+        rng: kotlin.random.Random = kotlin.random.Random.Default,
+    ): ResolvedChord {
         val info = (if (mode == TrainingMode.Major) MAJOR_DEGREES else MINOR_DEGREES)[degree]
             ?: error("invalid degree $degree")
         val root = degreeRoot(key, degree, mode)
         val rootName = NoteSpeller.spell(root)
+        // Extended level with a diatonic allowed-extension set → choose one at random.
+        if (level == ChordTypeLevel.Extended && info.extendedOptions.isNotEmpty()) {
+            val (qual, romanSuffix) = info.extendedOptions[rng.nextInt(info.extendedOptions.size)]
+            return ResolvedChord("$rootName$qual", info.roman + romanSuffix, root)
+        }
         val quality = when (level) {
             ChordTypeLevel.Triads    -> info.triadQuality
             ChordTypeLevel.Sevenths  -> info.seventhQuality
@@ -112,9 +137,15 @@ object EarTraining {
         return ResolvedChord("$rootName$quality", romanLabel, root)
     }
 
-    /** Resolve a full progression in the given key. */
-    fun resolveProgression(p: Progression, key: PitchClass, level: ChordTypeLevel): List<ResolvedChord> =
-        p.degrees.map { resolve(it, key, p.mode, level) }
+    /** Resolve a full progression in the given key. Each bar's Extended extension is
+     *  drawn independently from its degree's allowed diatonic set using [rng]. */
+    fun resolveProgression(
+        p: Progression,
+        key: PitchClass,
+        level: ChordTypeLevel,
+        rng: kotlin.random.Random = kotlin.random.Random.Default,
+    ): List<ResolvedChord> =
+        p.degrees.map { resolve(it, key, p.mode, level, rng) }
 
     // ----- Common progressions ----------------------------------------------------------------
 
