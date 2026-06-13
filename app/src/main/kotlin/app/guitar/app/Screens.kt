@@ -65,18 +65,61 @@ private val COMMON_QUALITY_SYMBOLS = listOf(
 private fun qualityLabel(symbol: String): String =
     if (symbol.isEmpty()) "major" else symbol
 
-// ---------- CHORD SHEET ----------
+// ---------- FRETBOARD SHEET (Chord / Scale / Strum in one) ----------
+
+/**
+ * Single "Fretboard" tool sheet. A segmented selector at the top chooses what the
+ * neck displays — Chord, Scale, or Strum (pick) — and the body shows that mode's
+ * controls. Replaces the former three separate Chord / Scale / Pick entries.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun FretboardSheet(state: AppState) {
+    SheetBody {
+        SheetHeader("Fretboard", state)
+
+        val modes = listOf(DisplayMode.Chord, DisplayMode.Scale, DisplayMode.Pick)
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            modes.forEachIndexed { i, m ->
+                SegmentedButton(
+                    selected = state.displayMode == m,
+                    onClick = { state.displayMode = m },
+                    shape = SegmentedButtonDefaults.itemShape(index = i, count = modes.size),
+                    label = {
+                        Text(when (m) {
+                            DisplayMode.Scale -> "Scale"
+                            DisplayMode.Pick -> "Strum"
+                            else -> "Chord"
+                        })
+                    },
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+
+        when (state.displayMode) {
+            DisplayMode.Scale -> ScaleControls(state)
+            DisplayMode.Pick -> PickControls(state)
+            else -> ChordControls(state)
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = { state.closeSheet() }) { Text("Done") }
+        }
+    }
+}
+
+// ---------- CHORD CONTROLS ----------
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ChordSheet(state: AppState) {
+private fun ChordControls(state: AppState) {
     val parsed = ChordLibrary.parse(state.chordInput)
     val currentRoot = parsed?.first
     val currentQualitySymbol = parsed?.second?.symbol
 
-    SheetBody {
-        SheetHeader("Chord", state)
-
+    Column {
         Text("Root", style = MaterialTheme.typography.labelMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PITCH_CLASS_ROW.forEach { pc ->
@@ -146,25 +189,18 @@ fun ChordSheet(state: AppState) {
         } else {
             Text("(chord not recognized)", color = MaterialTheme.colorScheme.error)
         }
-
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-            TextButton(onClick = { state.closeSheet() }) { Text("Done") }
-        }
     }
 }
 
-// ---------- SCALE SHEET ----------
+// ---------- SCALE CONTROLS ----------
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ScaleSheet(state: AppState) {
+private fun ScaleControls(state: AppState) {
     val scalePc = try { NoteSpeller.parsePitchClass(state.scaleRoot) } catch (_: Exception) { null }
     val scale = ScaleLibrary.scales[state.scaleType]
 
-    SheetBody {
-        SheetHeader("Scale", state)
-
+    Column {
         Text("Root", style = MaterialTheme.typography.labelMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PITCH_CLASS_ROW.forEach { pc ->
@@ -225,23 +261,17 @@ fun ScaleSheet(state: AppState) {
         } else {
             Text("(invalid root or scale)", color = MaterialTheme.colorScheme.error)
         }
-
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-            TextButton(onClick = { state.closeSheet() }) { Text("Done") }
-        }
     }
 }
 
-// ---------- PICK SHEET ----------
+// ---------- STRUM (PICK) CONTROLS ----------
 
 @Composable
-fun PickSheet(state: AppState) {
-    SheetBody {
-        SheetHeader("Pick & strum", state)
+private fun PickControls(state: AppState) {
+    Column {
         Text(
-            "Tap any fret on the neck to add or remove it from your selection. " +
-                "Use the bottom strip to strum or clear.",
+            "Tap any fret on the neck to add or remove it from your selection, " +
+                "then strum or arpeggiate the set.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -252,10 +282,6 @@ fun PickSheet(state: AppState) {
             Button(onClick = { state.strumPicked(arpeggio = false) }, enabled = state.pickedPositions.isNotEmpty()) { Text("Strum") }
             OutlinedButton(onClick = { state.strumPicked(arpeggio = true) }, enabled = state.pickedPositions.isNotEmpty()) { Text("Arpeggio") }
             OutlinedButton(onClick = { state.clearPicked() }, enabled = state.pickedPositions.isNotEmpty()) { Text("Clear") }
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-            TextButton(onClick = { state.closeSheet() }) { Text("Done") }
         }
     }
 }

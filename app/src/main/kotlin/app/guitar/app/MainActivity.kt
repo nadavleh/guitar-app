@@ -267,7 +267,7 @@ fun App(audio: AudioEngine) {
     // Chord / Scale / Pick / Options open as draggable bottom sheets so the neck
     // keeps its full height. Loop / Tuner / Ear / Drums are full-screen routes.
     val sheet = state.currentSheet
-    if (sheet == Sheet.Chord || sheet == Sheet.Scale || sheet == Sheet.Pick || sheet == Sheet.Options) {
+    if (sheet == Sheet.Fretboard || sheet == Sheet.Options) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
         ModalBottomSheet(
             onDismissRequest = { state.closeSheet() },
@@ -275,10 +275,8 @@ fun App(audio: AudioEngine) {
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
             when (sheet) {
-                Sheet.Chord   -> ChordSheet(state)
-                Sheet.Scale   -> ScaleSheet(state)
-                Sheet.Pick    -> PickSheet(state)
-                Sheet.Options -> OptionsSheet(state, customTunings)
+                Sheet.Fretboard -> FretboardSheet(state)
+                Sheet.Options   -> OptionsSheet(state, customTunings)
                 else -> {}
             }
         }
@@ -286,9 +284,7 @@ fun App(audio: AudioEngine) {
 }
 
 private fun sheetLabel(s: Sheet): String = when (s) {
-    Sheet.Chord -> "Chord"
-    Sheet.Scale -> "Scale"
-    Sheet.Pick -> "Pick"
+    Sheet.Fretboard -> "Fretboard"
     Sheet.Loop -> "Loop"
     Sheet.Options -> "Options"
     Sheet.Tuner -> "Tuner"
@@ -298,7 +294,6 @@ private fun sheetLabel(s: Sheet): String = when (s) {
 
 @Composable
 private fun StatusBar(state: AppState) {
-    var menuOpen by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -325,6 +320,8 @@ private fun StatusBar(state: AppState) {
             summary,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
         // Re-open the last-used sheet without going through the menu.
@@ -355,64 +352,10 @@ private fun StatusBar(state: AppState) {
             }
             Spacer(Modifier.width(2.dp))
         }
-        // App-wide quick audio controls (strum spread + ring sustain).
+        // App-wide quick audio controls (strum spread + ring sustain). All tool
+        // navigation now lives in the always-visible left rail, so the old
+        // Ear / Tuner / Menu buttons here were redundant and have been removed.
         AudioQuickButton(state, compact = true)
-        Spacer(Modifier.width(2.dp))
-        // Top-level buttons: Ear-training and Tuner (always visible).
-        TextButton(
-            onClick = { state.openSheet(Sheet.EarTraining) },
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-        ) {
-            Text("Ear", color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.titleSmall)
-        }
-        Spacer(Modifier.width(2.dp))
-        TextButton(
-            onClick = { state.openSheet(Sheet.Tuner) },
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-        ) {
-            Text("Tuner", color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.titleSmall)
-        }
-        Spacer(Modifier.width(2.dp))
-        Box {
-            TextButton(
-                onClick = { menuOpen = true },
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-            ) {
-                Text("Menu  ☰", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
-            }
-            DropdownMenu(
-                expanded = menuOpen,
-                onDismissRequest = { menuOpen = false },
-                modifier = Modifier.background(MaterialTheme.colorScheme.surface),
-            ) {
-                DropdownMenuItem(
-                    text = { Text("♪    Chord") },
-                    onClick = { menuOpen = false; state.openSheet(Sheet.Chord) }
-                )
-                DropdownMenuItem(
-                    text = { Text("♫    Scale") },
-                    onClick = { menuOpen = false; state.openSheet(Sheet.Scale) }
-                )
-                DropdownMenuItem(
-                    text = { Text("✋    Pick & strum") },
-                    onClick = { menuOpen = false; state.openSheet(Sheet.Pick) }
-                )
-                DropdownMenuItem(
-                    text = { Text("⟲    Loop") },
-                    onClick = { menuOpen = false; state.openSheet(Sheet.Loop) }
-                )
-                DropdownMenuItem(
-                    text = { Text("🥁    Drum machine") },
-                    onClick = { menuOpen = false; state.openSheet(Sheet.SambaLooper) }
-                )
-                DropdownMenuItem(
-                    text = { Text("⚙    Options") },
-                    onClick = { menuOpen = false; state.openSheet(Sheet.Options) }
-                )
-            }
-        }
     }
 }
 

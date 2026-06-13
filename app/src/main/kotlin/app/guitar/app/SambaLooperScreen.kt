@@ -146,20 +146,27 @@ private fun InstrumentRow(
         ) {
             var voiceMenu by remember { mutableStateOf(false) }
             Box {
-                Text(
-                    instrument.displayName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    color = if (audible) MaterialTheme.colorScheme.onBackground
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                // Name + ▾ hints the voice popup; the whole row is the tap target.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
                         .pointerInput(instrument) { detectTapGestures(onTap = { voiceMenu = true }) }
                         .padding(vertical = 2.dp),
-                )
-                // Little voice menu: a button per voice; tap to audition (stays open
-                // so you can compare). Tap outside to dismiss.
+                ) {
+                    Text(
+                        instrument.displayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        color = if (audible) MaterialTheme.colorScheme.onBackground
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(" ▾", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                // Voice menu: a button per voice; tap to audition (stays open to
+                // compare). Tap outside to dismiss.
                 DropdownMenu(expanded = voiceMenu, onDismissRequest = { voiceMenu = false }) {
                     Text(
                         "  ${instrument.displayName} voices",
@@ -175,15 +182,12 @@ private fun InstrumentRow(
                     }
                 }
             }
-            Spacer(Modifier.height(3.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ToggleTag("M", on = instrument in samba.muted,
                     onColor = MaterialTheme.colorScheme.error) { samba.toggleMute(instrument) }
                 ToggleTag("S", on = instrument in samba.soloed,
                     onColor = MaterialTheme.colorScheme.primary) { samba.toggleSolo(instrument) }
-                Text("·  tap name",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         // ---- 16 cells (dimmed when the track isn't audible) ----
@@ -205,22 +209,28 @@ private fun InstrumentRow(
     }
 }
 
-/** Small square toggle used for Mute (M) and Solo (S). */
+/** Small square toggle used for Mute (M) and Solo (S). Outlined when off (so the
+ *  letter stays legible), filled with [onColor] when on. */
 @Composable
 private fun ToggleTag(label: String, on: Boolean, onColor: Color, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(5.dp))
-            .background(if (on) onColor else MaterialTheme.colorScheme.surfaceVariant)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (on) onColor else Color.Transparent)
+            .border(
+                width = 1.dp,
+                color = if (on) onColor else MaterialTheme.colorScheme.outline,
+                shape = RoundedCornerShape(6.dp),
+            )
             .pointerInput(on) { detectTapGestures(onTap = { onClick() }) }
-            .padding(horizontal = 8.dp, vertical = 2.dp),
+            .padding(horizontal = 10.dp, vertical = 3.dp),
     ) {
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
             color = if (on) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    else MaterialTheme.colorScheme.onSurface,
         )
     }
 }

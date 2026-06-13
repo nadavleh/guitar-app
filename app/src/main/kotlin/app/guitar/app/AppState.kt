@@ -39,7 +39,7 @@ enum class DisplayMode { None, Chord, Scale, Pick }
 
 /** Which bottom sheet (or full-screen route) is currently open (null = none).
  *  Loop and Tuner are full-screen; the others are bottom sheets. */
-enum class Sheet { Chord, Scale, Pick, Options, Loop, Tuner, EarTraining, SambaLooper }
+enum class Sheet { Fretboard, Options, Loop, Tuner, EarTraining, SambaLooper }
 
 /** All-notes vs single-position view, for chord & scale display. */
 enum class ChordScaleView { AllNotes, Positions }
@@ -365,9 +365,8 @@ class AppState(
         currentSheet = sheet
         lastSheet = sheet
         when (sheet) {
-            Sheet.Chord -> displayMode = DisplayMode.Chord
-            Sheet.Scale -> displayMode = DisplayMode.Scale
-            Sheet.Pick -> displayMode = DisplayMode.Pick
+            // Fretboard tool: keep whatever neck mode was last shown; default to Chord.
+            Sheet.Fretboard -> if (displayMode == DisplayMode.None) displayMode = DisplayMode.Chord
             Sheet.Options -> {} // tunings/options doesn't change what's lit
             Sheet.Loop -> {}    // loop sheet plays its own audio; fretboard view unchanged
             Sheet.Tuner -> {}   // tuner reads the mic; fretboard view unchanged

@@ -122,6 +122,10 @@ fun FretboardView(
         val fretSpacing = fretAreaWidth / numFrets
         val stringSpacing = h / tuning.stringCount
         val firstStringY = stringSpacing / 2
+        // Dots/labels are sized by the SMALLER of string- and fret-spacing so they
+        // stay round and reasonable in any aspect ratio (e.g. a tall portrait neck
+        // has huge string spacing — without this cap the dots would balloon).
+        val unit = minOf(stringSpacing, fretSpacing)
 
         fun mx(x: Float) = if (leftHanded) w - x else x
 
@@ -173,7 +177,7 @@ fun FretboardView(
         // ---------- Inlays (between frets, vertically centered) ----------
         val singleDots = listOf(3, 5, 7, 9, 15, 17, 19, 21)
         val doubleDots = listOf(12, 24)
-        val inlayR = max(3f, stringSpacing * 0.12f)
+        val inlayR = max(3f, unit * 0.12f)
         for (f in singleDots) if (f <= numFrets) {
             val x = mx(openWidth + nutWidth + (f - 0.5f) * fretSpacing)
             drawCircle(GuitarColors.inlay.copy(alpha = 0.6f), radius = inlayR, center = Offset(x, h / 2))
@@ -240,8 +244,8 @@ fun FretboardView(
         }
 
         // ---------- Marks ----------
-        val dotR = stringSpacing * 0.40f
-        val labelSp = (stringSpacing * 0.36f).toSp()
+        val dotR = unit * 0.40f
+        val labelSp = (unit * 0.36f).toSp()
         for ((pos, mark) in marks) {
             if (pos.fret > numFrets) continue
             if (pos.stringIndex >= tuning.stringCount) continue
@@ -336,7 +340,7 @@ fun FretboardView(
             val (cx, cy) = positionToPixel(selectedPosition, w, h, tuning.stringCount, numFrets, leftHanded)
             drawCircle(
                 color = GuitarColors.primary,
-                radius = stringSpacing * 0.48f,
+                radius = unit * 0.48f,
                 center = Offset(cx, cy),
                 style = Stroke(width = 3f)
             )

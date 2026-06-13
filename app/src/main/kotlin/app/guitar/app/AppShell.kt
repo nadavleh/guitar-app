@@ -34,9 +34,7 @@ import androidx.compose.ui.unit.sp
 private data class RailItem(val sheet: Sheet, val glyph: String, val label: String)
 
 private val RAIL_ITEMS = listOf(
-    RailItem(Sheet.Chord, "♪", "Chord"),
-    RailItem(Sheet.Scale, "♫", "Scale"),
-    RailItem(Sheet.Pick, "✋", "Pick"),
+    RailItem(Sheet.Fretboard, "🎸", "Fretboard"),
     RailItem(Sheet.Loop, "⟲", "Loop"),
     RailItem(Sheet.EarTraining, "👂", "Ear"),
     RailItem(Sheet.SambaLooper, "🥁", "Drums"),
@@ -46,12 +44,8 @@ private val RAIL_ITEMS = listOf(
 
 private fun isRailActive(state: AppState, sheet: Sheet): Boolean =
     if (state.currentSheet != null) state.currentSheet == sheet
-    else when (sheet) {
-        Sheet.Chord -> state.displayMode == DisplayMode.Chord
-        Sheet.Scale -> state.displayMode == DisplayMode.Scale
-        Sheet.Pick -> state.displayMode == DisplayMode.Pick
-        else -> false
-    }
+    // On the bare fretboard screen, the Fretboard tool is the active context.
+    else sheet == Sheet.Fretboard && state.displayMode != DisplayMode.None
 
 @Composable
 fun NavRail(state: AppState, modifier: Modifier = Modifier) {
