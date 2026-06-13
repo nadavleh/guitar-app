@@ -25,6 +25,17 @@ android {
         }
     }
 
+    // Name the built APK after the app + version instead of the default
+    // "app-debug.apk" — e.g. Chorect_beta_V1.0.apk. Tracks versionName, so the
+    // next build (1.1, 2.0, …) is named automatically.
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
+                .outputFileName = "Chorect_beta_V${variant.versionName}.apk"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
