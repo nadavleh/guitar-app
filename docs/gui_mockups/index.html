@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FretPal — GUI Redesign Mockups</title>
+<style>
+  :root{
+    --bg:#14110e; --surface:#211b16; --surfaceVar:#2e2620; --surfaceHi:#3a3128;
+    --primary:#4db6ac; --primaryC:#1f3d3a; --onPrimary:#06201d;
+    --root:#e2484d; --scale:#b39ddb; --pick:#ffb74d; --tert:#d7a45a;
+    --on:#ece3d8; --onVar:#a99e90; --outline:#5a4f44;
+    --radius:14px;
+    --font:'Segoe UI',Roboto,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0c0a08;color:var(--on);font-family:var(--font);line-height:1.4}
+  header.page{padding:28px 32px 8px;border-bottom:1px solid #241d17}
+  header.page h1{margin:0 0 4px;font-size:24px;letter-spacing:.5px}
+  header.page h1 span{color:var(--primary)}
+  header.page p{margin:4px 0;color:var(--onVar);max-width:900px;font-size:14px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 4px;font-size:12.5px;color:var(--onVar)}
+  .legend b{color:var(--on)}
+  .sec{padding:26px 32px 8px}
+  .sec h2{font-size:18px;margin:0 0 2px;color:var(--primary)}
+  .sec h2 small{color:var(--onVar);font-weight:400;font-size:13px;margin-left:8px}
+  .sec .why{color:var(--onVar);font-size:13px;margin:6px 0 18px;max-width:980px}
+  .gallery{display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start}
+
+  /* device frames */
+  .device{background:#000;border:7px solid #2b241d;border-radius:26px;padding:8px;box-shadow:0 14px 40px rgba(0,0,0,.55)}
+  .device .screen{background:var(--bg);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .portrait .screen{width:300px;height:640px}
+  .landscape .screen{width:640px;height:300px}
+  .caption{color:var(--onVar);font-size:12px;text-align:center;margin-top:8px}
+  .tag{display:inline-block;background:var(--surfaceVar);color:var(--onVar);border-radius:8px;
+       padding:2px 8px;font-size:11px;margin-left:6px}
+
+  /* shared atoms */
+  .topbar{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface);
+          border-bottom:1px solid #241d17;flex:0 0 auto}
+  .topbar .brand{color:var(--primary);font-weight:700;font-size:14px}
+  .topbar .sub{color:var(--onVar);font-size:10.5px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .iconbtn{width:30px;height:26px;border-radius:8px;background:var(--surfaceVar);display:flex;
+           align-items:center;justify-content:center;font-size:13px;color:var(--on)}
+  .iconbtn.pri{background:var(--primaryC);color:var(--primary)}
+  .pillbtn{padding:4px 12px;border-radius:20px;background:var(--primary);color:var(--onPrimary);
+           font-size:12px;font-weight:600}
+  .pillbtn.ghost{background:transparent;border:1px solid var(--outline);color:var(--on)}
+
+  /* fretboard */
+  .fb{position:relative;background:linear-gradient(180deg,#3b2c1d,#2c2015);flex:1;min-height:0;overflow:hidden}
+  .fb .str{position:absolute;left:26px;right:6px;height:1.5px;background:#c9b89c;opacity:.7}
+  .fb .str.wound{height:2.5px;background:#b98e57}
+  .fb .fret{position:absolute;top:0;bottom:14px;width:1.5px;background:#0000003d}
+  .fb .nut{position:absolute;top:0;bottom:14px;left:24px;width:4px;background:#e7dac4}
+  .fb .dot{position:absolute;width:17px;height:17px;border-radius:50%;transform:translate(-50%,-50%);
+           display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0d0d0d}
+  .fb .dot.r{background:var(--root);color:#fff;box-shadow:0 0 0 2px #ffffff66 inset}
+  .fb .dot.c{background:var(--primary)}
+  .fb .dot.s{background:var(--scale)}
+  .fb .fretnum{position:absolute;bottom:1px;font-size:8px;color:#d8c7a8aa;transform:translateX(-50%)}
+
+  /* dock (the anti-scroll control surface) */
+  .dock{flex:0 0 auto;background:var(--surface);border-top:1px solid #241d17;padding:8px 10px}
+  .dock .row{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+  .dock .row:last-child{margin-bottom:0}
+  .lbl{color:var(--onVar);font-size:10px;width:42px;flex:0 0 auto;text-transform:uppercase;letter-spacing:.4px}
+  .chips{display:flex;gap:5px;overflow:hidden;flex:1}
+  .chip{padding:4px 9px;border-radius:16px;background:var(--surfaceVar);font-size:11px;color:var(--on);
+        white-space:nowrap;border:1px solid transparent}
+  .chip.on{background:var(--primaryC);border-color:var(--primary);color:var(--primary)}
+  .seg{display:flex;border:1px solid var(--outline);border-radius:9px;overflow:hidden}
+  .seg span{padding:4px 10px;font-size:11px;color:var(--onVar)}
+  .seg span.on{background:var(--primary);color:var(--onPrimary);font-weight:600}
+  .slider{flex:1;height:4px;border-radius:3px;background:var(--surfaceVar);position:relative}
+  .slider::after{content:"";position:absolute;left:0;top:0;bottom:0;width:55%;background:var(--primary);border-radius:3px}
+  .slider .knob{position:absolute;left:55%;top:50%;width:12px;height:12px;border-radius:50%;
+                background:var(--primary);transform:translate(-50%,-50%)}
+
+  /* nav rail (landscape concept A) */
+  .rail{flex:0 0 54px;background:var(--surface);border-right:1px solid #241d17;display:flex;
+        flex-direction:column;align-items:center;padding-top:8px;gap:4px}
+  .rail .ri{width:42px;height:40px;border-radius:10px;display:flex;flex-direction:column;align-items:center;
+            justify-content:center;color:var(--onVar);font-size:8px;gap:1px}
+  .rail .ri .g{font-size:16px}
+  .rail .ri.on{background:var(--primaryC);color:var(--primary)}
+
+  /* bottom tab bar (portrait) */
+  .tabbar{flex:0 0 auto;display:flex;background:var(--surface);border-top:1px solid #241d17;padding:4px 2px}
+  .tabbar .tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;color:var(--onVar);font-size:8.5px;padding:3px 0}
+  .tabbar .tb .g{font-size:15px}
+  .tabbar .tb.on{color:var(--primary)}
+
+  /* top tabs (concept B) */
+  .toptabs{display:flex;gap:4px;padding:6px 8px;background:var(--surface);border-bottom:1px solid #241d17;overflow:hidden}
+  .toptabs .tt{padding:5px 11px;border-radius:18px;font-size:11px;color:var(--onVar);background:var(--surfaceVar);white-space:nowrap}
+  .toptabs .tt.on{background:var(--primary);color:var(--onPrimary);font-weight:600}
+
+  /* card grid (concept B) */
+  .cards{flex:1;min-height:0;overflow:hidden;padding:8px;display:grid;gap:8px}
+  .card{background:var(--surface);border:1px solid #2a2219;border-radius:12px;padding:8px}
+  .card h4{margin:0 0 6px;font-size:10px;color:var(--onVar);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+
+  /* drum grid */
+  .drum{flex:1;display:flex;flex-direction:column;gap:4px;padding:8px}
+  .drumrow{display:flex;align-items:center;gap:4px;flex:1}
+  .drumrow .name{width:52px;font-size:9px;color:var(--on)}
+  .cells{display:flex;gap:2px;flex:1}
+  .cell{flex:1;border-radius:3px;background:var(--surfaceVar)}
+  .cell.v0{background:var(--primary)} .cell.v1{background:var(--tert)} .cell.v2{background:var(--scale)}
+  .cell.head{outline:2px solid var(--on)}
+  .gap{width:4px}
+
+  /* ear/loop cards */
+  .slotcard{background:var(--surfaceVar);border-radius:9px;padding:6px 4px;text-align:center;flex:1}
+  .slotcard .b{font-size:8px;color:var(--onVar)}
+  .slotcard .v{font-size:15px;font-weight:700;color:var(--tert)}
+  .slotcard.play{background:var(--primaryC)}
+  .barcard{background:var(--surfaceVar);border-radius:8px;padding:5px;flex:1}
+  .barcard .bn{font-size:8px;color:var(--onVar)}
+  .barcard .ch{font-size:12px;color:var(--on)}
+  .note{color:var(--onVar);font-size:10px;padding:2px 4px}
+</style>
+</head>
+<body>
+<header class="page">
+  <h1><span>FretPal</span> — GUI Redesign Mockups</h1>
+  <p>Goal: kill the scrolling. Today every tool opens a tall modal sheet of stacked sliders &amp; chip-rows, and the
+     app is locked to landscape. These mockups make controls fit on one screen via a <b>fixed control dock</b> +
+     persistent navigation, and they work in <b>both portrait and landscape</b>.</p>
+  <div class="legend">
+    <span><b>●</b> <span style="color:var(--root)">root</span> &nbsp; <b>●</b> <span style="color:var(--primary)">chord tone</span> &nbsp; <b>●</b> <span style="color:var(--scale)">scale tone</span></span>
+    <span><b>Dock</b> = persistent control strip (no modal, no page-scroll)</span>
+    <span><b>Rail / Tab bar</b> = always-visible navigation</span>
+  </div>
+  <p style="color:var(--tert);font-size:13px"><b>Two concepts below.</b> Concept A = "Studio" (nav rail + bottom dock). Concept B = "Deck" (top tabs + responsive cards). Each shown in landscape &amp; portrait. Pick one (or mix) and I'll build it.</p>
+</header>
+
+<!-- =================== CONCEPT A =================== -->
+<section class="sec">
+  <h2>Concept A — “Studio” <small>persistent nav rail (landscape) / bottom tab bar (portrait) + a fixed control dock under the neck</small></h2>
+  <div class="why">The neck always stays visible; the dock under it changes with the active tool. Controls are laid out
+    as compact label→chips rows and segmented toggles that fit in ~3 rows — no scrolling. Quick audio knob (🎚) lives in the top bar everywhere.</div>
+
+  <div class="gallery">
+
+    <!-- A · landscape · main fretboard -->
+    <div>
+      <div class="device landscape"><div class="screen">
+        <div style="display:flex;flex:1;min-height:0">
+          <div class="rail">
+            <div class="ri on"><span class="g">♪</span>Chord</div>
+            <div class="ri"><span class="g">♫</span>Scale</div>
+            <div class="ri"><span class="g">✋</span>Pick</div>
+            <div class="ri"><span class="g">⟲</span>Loop</div>
+            <div class="ri"><span class="g">👂</span>Ear</div>
+            <div class="ri"><span class="g">🥁</span>Drums</div>
+            <div class="ri"><span class="g">🎛</span>Tune</div>
+          </div>
+          <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+            <div class="topbar">
+              <span class="brand">FretPal</span>
+              <span class="sub">Standard · E A D G B e</span>
+              <span class="iconbtn">🎚</span><span class="iconbtn pri">Cmaj7</span>
+            </div>
+            <div class="fb" id="fbA1"></div>
+            <div class="dock">
+              <div class="row"><span class="lbl">Root</span>
+                <div class="chips"><span class="chip">C</span><span class="chip on">C</span><span class="chip">D</span><span class="chip">E</span><span class="chip">F</span><span class="chip">G</span><span class="chip">A</span><span class="chip">B</span></div></div>
+              <div class="row"><span class="lbl">Qual</span>
+                <div class="chips"><span class="chip">maj</span><span class="chip">m</span><span class="chip">7</span><span class="chip on">maj7</span><span class="chip">m7</span><span class="chip">dim</span><span class="chip">sus4</span></div></div>
+              <div class="row"><span class="lbl">View</span>
+                <div class="seg"><span class="on">All notes</span><span>Positions</span></div>
+                <span style="flex:1"></span>
+                <div class="seg"><span class="on">Notes</span><span>Int</span><span>—</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="caption">A · Landscape · <b>Chord</b> — neck + dock, zero scroll <span class="tag">rail nav</span></div>
+    </div>
+
+    <!-- A · landscape · drums -->
+    <div>
+      <div class="device landscape"><div class="screen">
+        <div style="display:flex;flex:1;min-height:0">
+          <div class="rail">
+            <div class="ri"><span class="g">♪</span>Chord</div>
+            <div class="ri"><span class="g">♫</span>Scale</div>
+            <div class="ri"><span class="g">✋</span>Pick</div>
+            <div class="ri"><span class="g">⟲</span>Loop</div>
+            <div class="ri"><span class="g">👂</span>Ear</div>
+            <div class="ri on"><span class="g">🥁</span>Drums</div>
+            <div class="ri"><span class="g">🎛</span>Tune</div>
+          </div>
+          <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+            <div class="topbar"><span class="brand">Drum machine</span><span class="sub">samba · 2 bars</span>
+              <span class="pillbtn">Play ▶</span><span class="iconbtn">🎚</span></div>
+            <div class="drum" id="drumA"></div>
+            <div class="dock"><div class="row"><span class="lbl">BPM</span><div class="slider"><span class="knob"></span></div>
+              <span class="chip">Load samba</span><span class="chip">Clear</span></div></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="caption">A · Landscape · <b>Drum machine</b> — 4×16 step grid fills the stage</div>
+    </div>
+
+    <!-- A · portrait · main -->
+    <div>
+      <div class="device portrait"><div class="screen">
+        <div class="topbar"><span class="brand">FretPal</span><span class="sub">Std · EADGBe</span>
+          <span class="iconbtn">🎚</span><span class="iconbtn pri">Cmaj7</span></div>
+        <div class="fb" id="fbA2"></div>
+        <div class="dock">
+          <div class="row"><span class="lbl">Root</span>
+            <div class="chips"><span class="chip on">C</span><span class="chip">D</span><span class="chip">E</span><span class="chip">F</span><span class="chip">G</span><span class="chip">A</span></div></div>
+          <div class="row"><span class="lbl">Qual</span>
+            <div class="chips"><span class="chip">maj</span><span class="chip on">maj7</span><span class="chip">m7</span><span class="chip">7</span><span class="chip">dim</span></div></div>
+          <div class="row"><span class="lbl">View</span><div class="seg"><span class="on">All</span><span>Pos</span></div>
+            <span style="flex:1"></span><div class="seg"><span class="on">Notes</span><span>Int</span></div></div>
+        </div>
+        <div class="tabbar">
+          <div class="tb on"><span class="g">♪</span>Chord</div>
+          <div class="tb"><span class="g">♫</span>Scale</div>
+          <div class="tb"><span class="g">⟲</span>Loop</div>
+          <div class="tb"><span class="g">👂</span>Ear</div>
+          <div class="tb"><span class="g">🥁</span>Drums</div>
+          <div class="tb"><span class="g">☰</span>More</div>
+        </div>
+      </div></div>
+      <div class="caption">A · Portrait · <b>Chord</b> — neck rotates tall; same dock <span class="tag">bottom tabs</span></div>
+    </div>
+
+    <!-- A · portrait · ear training -->
+    <div>
+      <div class="device portrait"><div class="screen">
+        <div class="topbar"><span class="brand">Ear training</span><span class="sub">Progressions</span><span class="iconbtn">🎚</span></div>
+        <div class="toptabs"><span class="tt on">Progressions</span><span class="tt">Note2Chord</span><span class="tt">Flavor</span></div>
+        <div style="padding:8px;flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
+          <div class="seg" style="align-self:flex-start"><span class="on">Practice</span><span>Challenge</span></div>
+          <div class="card"><h4>Settings</h4>
+            <div class="row" style="display:flex;gap:6px;align-items:center"><span class="lbl">Key</span>
+              <div class="seg"><span class="on">Random</span><span>Fixed</span></div>
+              <div class="seg"><span class="on">Maj</span><span>Min</span></div></div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <div class="barcard"><div class="bn">Bar 1</div><div class="ch">Imaj7</div></div>
+            <div class="barcard"><div class="bn">Bar 2</div><div class="ch">vi7</div></div>
+            <div class="barcard"><div class="bn">Bar 3</div><div class="ch">ii7</div></div>
+            <div class="barcard"><div class="bn">Bar 4</div><div class="ch">V7</div></div>
+          </div>
+          <div class="fb" id="fbA3" style="flex:0 0 110px;border-radius:10px"></div>
+        </div>
+        <div class="dock"><div class="row"><span class="pillbtn">Play ▶</span><span class="chip">Next →</span><span class="chip">→ Looper</span><span style="flex:1"></span><span class="lbl">BPM</span><div class="slider" style="max-width:80px"><span class="knob"></span></div></div></div>
+        <div class="tabbar"><div class="tb"><span class="g">♪</span>Chord</div><div class="tb"><span class="g">♫</span>Scale</div><div class="tb"><span class="g">⟲</span>Loop</div><div class="tb on"><span class="g">👂</span>Ear</div><div class="tb"><span class="g">🥁</span>Drums</div><div class="tb"><span class="g">☰</span>More</div></div>
+      </div></div>
+      <div class="caption">A · Portrait · <b>Ear training</b> — fretboard inline; transport docked</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- =================== CONCEPT B =================== -->
+<section class="sec">
+  <h2>Concept B — “Deck” <small>top scrollable tab strip + a responsive card layout that reflows by orientation</small></h2>
+  <div class="why">Primary tools are a top tab strip (familiar, thumb-far but always visible). Each tool's controls become
+    side-by-side <b>cards</b> instead of one tall stack — in landscape they sit in 2–3 columns; in portrait they wrap to
+    one column but stay compact. Best if you like a more "dashboard" feel and plan to add many tools.</div>
+
+  <div class="gallery">
+
+    <!-- B · landscape · main -->
+    <div>
+      <div class="device landscape"><div class="screen">
+        <div class="toptabs"><span class="tt on">Chord</span><span class="tt">Scale</span><span class="tt">Pick</span><span class="tt">Loop</span><span class="tt">Ear</span><span class="tt">Drums</span><span class="tt">Tuner</span><span class="tt">⚙</span></div>
+        <div style="display:flex;flex:1;min-height:0">
+          <div class="fb" id="fbB1" style="flex:1.6"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:6px;padding:8px;overflow:hidden">
+            <div class="card"><h4>Chord</h4>
+              <div class="chips" style="flex-wrap:wrap"><span class="chip on">C</span><span class="chip">D</span><span class="chip">E</span><span class="chip">G</span><span class="chip">A</span></div>
+              <div class="chips" style="flex-wrap:wrap;margin-top:5px"><span class="chip on">maj7</span><span class="chip">m7</span><span class="chip">7</span><span class="chip">dim</span></div>
+            </div>
+            <div class="card"><h4>Display</h4>
+              <div class="seg"><span class="on">All notes</span><span>Positions</span></div>
+              <div class="seg" style="margin-top:5px"><span class="on">Notes</span><span>Intervals</span><span>—</span></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="caption">B · Landscape · <b>Chord</b> — neck + control cards side by side <span class="tag">top tabs</span></div>
+    </div>
+
+    <!-- B · portrait · main -->
+    <div>
+      <div class="device portrait"><div class="screen">
+        <div class="topbar"><span class="brand">FretPal</span><span class="sub">Std · EADGBe</span><span class="iconbtn">🎚</span></div>
+        <div class="toptabs"><span class="tt on">Chord</span><span class="tt">Scale</span><span class="tt">Pick</span><span class="tt">Loop</span><span class="tt">Ear</span><span class="tt">🥁</span></div>
+        <div class="fb" id="fbB2" style="flex:1.2"></div>
+        <div class="cards" style="grid-template-columns:1fr;flex:0 0 auto">
+          <div class="card"><h4>Chord</h4>
+            <div class="chips" style="flex-wrap:wrap"><span class="chip on">C</span><span class="chip">D</span><span class="chip">E</span><span class="chip">G</span><span class="chip">A</span><span class="chip">B</span></div>
+            <div class="chips" style="flex-wrap:wrap;margin-top:5px"><span class="chip on">maj7</span><span class="chip">m7</span><span class="chip">7</span><span class="chip">dim</span><span class="chip">sus4</span></div></div>
+          <div class="card"><h4>Display</h4><div class="seg"><span class="on">All notes</span><span>Positions</span></div></div>
+        </div>
+      </div></div>
+      <div class="caption">B · Portrait · <b>Chord</b> — cards stack to one column</div>
+    </div>
+
+    <!-- B · landscape · loop -->
+    <div>
+      <div class="device landscape"><div class="screen">
+        <div class="toptabs"><span class="tt">Chord</span><span class="tt">Scale</span><span class="tt">Pick</span><span class="tt on">Loop</span><span class="tt">Ear</span><span class="tt">Drums</span><span class="tt">⚙</span></div>
+        <div style="display:flex;flex:1;min-height:0;padding:8px;gap:8px">
+          <div style="flex:1.3;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;gap:6px;flex:1">
+              <div class="slotcard play"><div class="b">Bar 1</div><div class="v">Dm7</div></div>
+              <div class="slotcard"><div class="b">Bar 2</div><div class="v">G7</div></div>
+              <div class="slotcard"><div class="b">Bar 3</div><div class="v">Cmaj7</div></div>
+              <div class="slotcard"><div class="b">Bar 4</div><div class="v">Cmaj7</div></div>
+            </div>
+            <div class="card"><h4>Build by degree</h4>
+              <div class="chips" style="flex-wrap:wrap"><span class="chip">I</span><span class="chip">ii</span><span class="chip">iii</span><span class="chip">IV</span><span class="chip on">V</span><span class="chip">vi</span><span class="chip">vii°</span></div></div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+            <div class="card"><h4>Transport</h4><div class="row" style="display:flex;gap:6px;align-items:center"><span class="pillbtn">Play ▶</span><span class="lbl">BPM</span><div class="slider"><span class="knob"></span></div></div></div>
+            <div class="fb" id="fbB3" style="flex:1;border-radius:10px"></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="caption">B · Landscape · <b>Loop</b> — bars + degree builder + live neck, all visible</div>
+    </div>
+
+  </div>
+</section>
+
+<section class="sec">
+  <h2>What changes under the hood <small>same theory/audio engine; only the app-module Compose UI is restructured</small></h2>
+  <div class="why">
+    • Unlock orientation (drop <code>sensorLandscape</code> → <code>fullSensor</code>); add a <code>WindowSizeClass</code> branch so the same screens
+      render rail+dock in landscape and tabbar+dock in portrait.<br>
+    • Replace modal <code>ModalBottomSheet</code> tool sheets with an in-place <b>control dock</b> (fixed height, chip-rows + segmented toggles).<br>
+    • Convert tall stacked settings (Ear training, Loop, Options) into compact rows / cards that fit without vertical scroll.<br>
+    • Keep all existing logic (AppState, ear/loop/samba state, theory, audio) — this is a view-layer refactor.
+  </div>
+</section>
+
+<script>
+  // Draw a schematic fretboard into each .fb element.
+  function drawFB(el, opts){
+    const strings = opts.strings || 6;
+    const frets = opts.frets || 7;
+    const w = el.clientWidth, h = el.clientHeight;
+    const left = 26, right = 6;
+    // strings
+    for(let s=0;s<strings;s++){
+      const y = 10 + s*( (h-24)/(strings-1) );
+      const d = document.createElement('div');
+      d.className = 'str' + (s>=strings-3 ? ' wound':'');
+      d.style.top = y+'px';
+      el.appendChild(d);
+    }
+    // frets
+    const span = w-left-right;
+    for(let f=1;f<=frets;f++){
+      const x = left + span*(f/frets);
+      const fr = document.createElement('div'); fr.className='fret'; fr.style.left=x+'px'; el.appendChild(fr);
+      const fn = document.createElement('div'); fn.className='fretnum'; fn.style.left=x+'px';
+      const xmid = left + span*((f-0.5)/frets);
+      fn.style.left = xmid+'px'; fn.textContent = f; el.appendChild(fn);
+    }
+    // dots
+    (opts.dots||[]).forEach(p=>{
+      const x = left + span*((p.f-0.5)/frets);
+      const y = 10 + p.s*((h-24)/(strings-1));
+      const d=document.createElement('div'); d.className='dot '+p.k; d.style.left=x+'px'; d.style.top=y+'px';
+      d.textContent=p.t||''; el.appendChild(d);
+    });
+  }
+  // Cmaj7-ish voicing dots (string 0 = high e at top visually)
+  const chordDots=[{s:5,f:3,k:'c',t:'C'},{s:4,f:2,k:'c',t:'E'},{s:3,f:0,k:'r',t:'C'},
+                   {s:2,f:0,k:'c',t:'G'},{s:1,f:0,k:'c',t:'B'},{s:0,f:0,k:'c',t:'E'}];
+  const scaleDots=[{s:5,f:3,k:'s'},{s:5,f:5,k:'r'},{s:4,f:3,k:'s'},{s:4,f:5,k:'s'},
+                   {s:3,f:2,k:'s'},{s:3,f:4,k:'s'},{s:2,f:2,k:'s'},{s:1,f:3,k:'s'},{s:0,f:5,k:'r'}];
+  window.addEventListener('load',()=>{
+    ['fbA1','fbB1'].forEach(id=>{const e=document.getElementById(id); if(e) drawFB(e,{dots:chordDots});});
+    ['fbA2','fbB2'].forEach(id=>{const e=document.getElementById(id); if(e) drawFB(e,{dots:chordDots});});
+    ['fbA3','fbB3'].forEach(id=>{const e=document.getElementById(id); if(e) drawFB(e,{frets:6,dots:chordDots});});
+
+    // drum grid
+    const drum=document.getElementById('drumA');
+    if(drum){
+      const rows=[['Surdo',[1,null,null,null,0,null,null,null,1,null,null,null,0,null,null,null]],
+                  ['Tamborim',[0,null,null,0,1,null,0,null,0,null,null,0,1,null,0,null]],
+                  ['Pandeiro',[0,1,2,1,0,1,2,1,0,1,2,1,0,1,2,1]],
+                  ['Agogô',[0,null,1,1,null,null,0,null,0,null,1,1,null,null,0,null]]];
+      rows.forEach(([name,cells])=>{
+        const r=document.createElement('div'); r.className='drumrow';
+        const n=document.createElement('div'); n.className='name'; n.textContent=name; r.appendChild(n);
+        const cc=document.createElement('div'); cc.className='cells';
+        cells.forEach((v,i)=>{
+          const c=document.createElement('div'); c.className='cell'+(v!=null?' v'+v:'')+(i===4?' head':'');
+          cc.appendChild(c);
+          if(i%4===3 && i!==15){const g=document.createElement('div'); g.className='gap'; cc.appendChild(g);}
+        });
+        r.appendChild(cc); drum.appendChild(r);
+      });
+    }
+  });
+</script>
+</body>
+</html>

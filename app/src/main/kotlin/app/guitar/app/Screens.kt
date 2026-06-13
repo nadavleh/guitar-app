@@ -75,7 +75,7 @@ fun ChordSheet(state: AppState) {
     val currentQualitySymbol = parsed?.second?.symbol
 
     SheetBody {
-        SheetHeader("Chord")
+        SheetHeader("Chord", state)
 
         Text("Root", style = MaterialTheme.typography.labelMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -163,7 +163,7 @@ fun ScaleSheet(state: AppState) {
     val scale = ScaleLibrary.scales[state.scaleType]
 
     SheetBody {
-        SheetHeader("Scale")
+        SheetHeader("Scale", state)
 
         Text("Root", style = MaterialTheme.typography.labelMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -238,7 +238,7 @@ fun ScaleSheet(state: AppState) {
 @Composable
 fun PickSheet(state: AppState) {
     SheetBody {
-        SheetHeader("Pick & strum")
+        SheetHeader("Pick & strum", state)
         Text(
             "Tap any fret on the neck to add or remove it from your selection. " +
                 "Use the bottom strip to strum or clear.",
@@ -269,7 +269,7 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
     var saveName by remember { mutableStateOf("") }
 
     SheetBody {
-        SheetHeader("Options")
+        SheetHeader("Options", state)
 
         Text("Instrument", style = MaterialTheme.typography.titleSmall)
         Spacer(Modifier.height(6.dp))
@@ -434,6 +434,17 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
+            if (state.strumMs == 0) "Strum spread: struck at once"
+            else "Strum spread: ${state.strumMs} ms",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        androidx.compose.material3.Slider(
+            value = state.strumMs.toFloat(),
+            onValueChange = { state.setStrumMs(it.toInt()) },
+            valueRange = 0f..150f,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
             if (state.strumMs == 0) "Strum: struck at once" else "Strum spread: ${state.strumMs} ms",
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -471,6 +482,8 @@ fun LoopScreen(state: AppState) {
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f))
+            AudioQuickButton(state, compact = true)
+            Spacer(Modifier.width(4.dp))
             if (state.isLooping) {
                 Button(onClick = { state.stopLoop() }) { Text("Stop ⏹") }
             } else {
@@ -904,11 +917,15 @@ private fun SheetBody(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun SheetHeader(title: String) {
-    Text(
-        title.uppercase(),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+private fun SheetHeader(title: String, state: AppState) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            title.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        AudioQuickButton(state)
+    }
     Spacer(Modifier.height(8.dp))
 }

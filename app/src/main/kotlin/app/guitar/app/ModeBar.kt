@@ -38,6 +38,7 @@ fun ActionBarItem(label: String, glyph: String, sheet: Sheet, state: AppState) {
         Sheet.Loop -> false
         Sheet.Tuner -> false
         Sheet.EarTraining -> false
+        Sheet.SambaLooper -> false
     }
     val fg = when {
         isActive -> MaterialTheme.colorScheme.primary

@@ -196,6 +196,11 @@ class AudioTrackEngine(
         }
     }
 
+    override fun playSamples(samples: FloatArray) {
+        if (!running.get() || samples.isEmpty()) return
+        addVoice(samples)
+    }
+
     private fun addVoice(samples: FloatArray) {
         synchronized(voicesLock) {
             voices.add(Voice(samples))
@@ -223,6 +228,7 @@ class AudioTrackEngine(
 
     companion object {
         private const val TAG = "GuitarAudio"
-        private const val MAX_VOICES = 8
+        // Headroom for a 4-instrument percussion loop ringing over guitar plucks.
+        private const val MAX_VOICES = 16
     }
 }

@@ -97,6 +97,8 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                 }
             }
             Spacer(Modifier.width(12.dp))
+            AudioQuickButton(state, compact = true)
+            Spacer(Modifier.width(4.dp))
             OutlinedButton(onClick = { ear.release(); onBack() }) { Text("Back") }
         }
 
@@ -159,7 +161,7 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
                 )
                 androidx.compose.material3.Slider(
                     value = state.strumMs.toFloat(),
-                    onValueChange = { state.strumMs = it.toInt() },
+                    onValueChange = { state.setStrumMs(it.toInt()) },
                     valueRange = 0f..150f,
                 )
             }

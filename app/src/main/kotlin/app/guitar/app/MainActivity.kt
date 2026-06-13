@@ -97,6 +97,7 @@ fun App(audio: AudioEngine) {
     val persistedLabelMode by repo.labelMode.collectAsState(initial = LabelMode.Notes.name)
     val persistedA4 by repo.a4Hz.collectAsState(initial = 440f)
     val persistedSustain by repo.ringSustainMs.collectAsState(initial = 1500)
+    val persistedStrum by repo.strumMs.collectAsState(initial = 30)
     val persistedInstrument by repo.instrument.collectAsState(initial = app.guitar.theory.Instrument.Guitar.name)
 
     LaunchedEffect(savedSelected, customTunings) {
@@ -118,6 +119,7 @@ fun App(audio: AudioEngine) {
     }
     LaunchedEffect(persistedA4) { state.a4Hz = persistedA4 }
     LaunchedEffect(persistedSustain) { state.ringSustainMs = persistedSustain }
+    LaunchedEffect(persistedStrum) { state.strumMs = persistedStrum }
     LaunchedEffect(persistedInstrument) {
         state.instrument = runCatching { app.guitar.theory.Instrument.valueOf(persistedInstrument) }
             .getOrDefault(app.guitar.theory.Instrument.Guitar)
@@ -216,6 +218,8 @@ fun App(audio: AudioEngine) {
             TunerScreen(state, onBack = { state.closeSheet() })
         } else if (state.currentSheet == Sheet.EarTraining) {
             EarTrainingScreen(state, onBack = { state.closeSheet() })
+        } else if (state.currentSheet == Sheet.SambaLooper) {
+            SambaLooperScreen(state, onBack = { state.closeSheet() })
         } else {
             StatusBar(state)
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -245,7 +249,7 @@ fun App(audio: AudioEngine) {
     }
 
     // ---------- Bottom sheet (Chord / Scale / Pick / Options) ----------
-    if (state.currentSheet != null && state.currentSheet != Sheet.Loop && state.currentSheet != Sheet.Tuner && state.currentSheet != Sheet.EarTraining) {
+    if (state.currentSheet != null && state.currentSheet != Sheet.Loop && state.currentSheet != Sheet.Tuner && state.currentSheet != Sheet.EarTraining && state.currentSheet != Sheet.SambaLooper) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
         ModalBottomSheet(
             onDismissRequest = { state.closeSheet() },
@@ -260,6 +264,7 @@ fun App(audio: AudioEngine) {
                 Sheet.Loop        -> {} // handled by full-screen route above
                 Sheet.Tuner       -> {} // handled by full-screen route above
                 Sheet.EarTraining -> {} // handled by full-screen route above
+                Sheet.SambaLooper -> {} // handled by full-screen route above
             }
         }
     }
@@ -273,6 +278,7 @@ private fun sheetLabel(s: Sheet): String = when (s) {
     Sheet.Options -> "Options"
     Sheet.Tuner -> "Tuner"
     Sheet.EarTraining -> "Ear"
+    Sheet.SambaLooper -> "Drums"
 }
 
 @Composable
@@ -334,6 +340,9 @@ private fun StatusBar(state: AppState) {
             }
             Spacer(Modifier.width(2.dp))
         }
+        // App-wide quick audio controls (strum spread + ring sustain).
+        AudioQuickButton(state, compact = true)
+        Spacer(Modifier.width(2.dp))
         // Top-level buttons: Ear-training and Tuner (always visible).
         TextButton(
             onClick = { state.openSheet(Sheet.EarTraining) },
@@ -378,6 +387,10 @@ private fun StatusBar(state: AppState) {
                 DropdownMenuItem(
                     text = { Text("⟲    Loop") },
                     onClick = { menuOpen = false; state.openSheet(Sheet.Loop) }
+                )
+                DropdownMenuItem(
+                    text = { Text("🥁    Drum machine") },
+                    onClick = { menuOpen = false; state.openSheet(Sheet.SambaLooper) }
                 )
                 DropdownMenuItem(
                     text = { Text("⚙    Options") },

@@ -39,7 +39,7 @@ enum class DisplayMode { None, Chord, Scale, Pick }
 
 /** Which bottom sheet (or full-screen route) is currently open (null = none).
  *  Loop and Tuner are full-screen; the others are bottom sheets. */
-enum class Sheet { Chord, Scale, Pick, Options, Loop, Tuner, EarTraining }
+enum class Sheet { Chord, Scale, Pick, Options, Loop, Tuner, EarTraining, SambaLooper }
 
 /** All-notes vs single-position view, for chord & scale display. */
 enum class ChordScaleView { AllNotes, Positions }
@@ -104,8 +104,16 @@ class AppState(
     var a4Hz by mutableStateOf(440f)
     var ringSustainMs by mutableStateOf(1500)
 
-    /** Strum/arpeggio spread in ms between consecutive chord notes. 0 = struck at once. */
+    /** Strum/arpeggio spread in ms between consecutive chord notes. 0 = struck at once.
+     *  Global: used by single-strums, the loop, and ear-training. */
     var strumMs by mutableStateOf(30)
+
+    @JvmName("applyStrumMs")
+    fun setStrumMs(value: Int) {
+        val clamped = value.coerceIn(0, 150)
+        strumMs = clamped
+        scope.launch { repo.setStrumMs(clamped) }
+    }
 
     /**
      * #7: Ear-training state is owned by AppState (app-lifetime) rather than by the
@@ -121,6 +129,12 @@ class AppState(
             sustainProvider = { ringSustainMs },
             strumProvider = { strumMs },
         )
+    }
+
+    /** App-lifetime samba percussion looper (drum-machine tab). Lazily created so
+     *  the pattern you build persists across leaving and returning to the screen. */
+    val sambaLooper: SambaLooperState by lazy {
+        SambaLooperState(audio = audio, scope = scope)
     }
 
     @JvmName("applyA4Hz")
@@ -323,7 +337,7 @@ class AppState(
         if (midis.isNotEmpty()) {
             audio.playChord(
                 midis,
-                strumDelayMillis = if (arpeggio) 120 else 35,
+                strumDelayMillis = if (arpeggio) (strumMs * 4).coerceAtLeast(100) else strumMs,
                 sustainMillis = ringSustainMs,
                 timbre = timbre,
             )
@@ -348,6 +362,7 @@ class AppState(
             Sheet.Loop -> {}    // loop sheet plays its own audio; fretboard view unchanged
             Sheet.Tuner -> {}   // tuner reads the mic; fretboard view unchanged
             Sheet.EarTraining -> {} // ear training plays its own audio
+            Sheet.SambaLooper -> {} // drum machine plays its own audio
         }
     }
 
@@ -530,9 +545,9 @@ class AppState(
                     val midis = shape.notes.mapNotNull { it?.midi?.value }
                     val ordered = if (slot.strum == StrumPattern.Up) midis.asReversed() else midis
                     val strumDelay = when (slot.strum) {
-                        StrumPattern.Down -> 25
-                        StrumPattern.Up -> 25
-                        StrumPattern.Arpeggio -> 100
+                        StrumPattern.Down -> strumMs
+                        StrumPattern.Up -> strumMs
+                        StrumPattern.Arpeggio -> (strumMs * 4).coerceAtLeast(100)
                         StrumPattern.Sustain -> 0
                     }
                     audio.playChord(ordered, strumDelayMillis = strumDelay,

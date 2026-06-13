@@ -79,7 +79,9 @@ fun TunerScreen(state: AppState, onBack: () -> Unit) {
             Text("A4 = ${state.a4Hz.toInt()} Hz",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(8.dp))
+            AudioQuickButton(state, compact = true)
+            Spacer(Modifier.width(8.dp))
             OutlinedButton(onClick = onBack) { Text("Back") }
         }
 

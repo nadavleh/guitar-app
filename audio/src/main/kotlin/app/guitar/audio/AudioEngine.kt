@@ -20,6 +20,14 @@ interface AudioEngine {
      */
     fun playChord(midiNotes: List<Int>, strumDelayMillis: Int = 40, sustainMillis: Int = 2000, timbre: Timbre = Timbre.Guitar)
 
+    /**
+     * Play a pre-synthesized one-shot mono buffer (samples in [-1, 1] at the
+     * engine's sample rate). Mixed polyphonically with everything else, like a
+     * pluck. Used by the percussion looper, which renders its voices once and
+     * replays the cached buffers. No-op if [samples] is empty.
+     */
+    fun playSamples(samples: FloatArray)
+
     /** Stop any currently-playing audio immediately. */
     fun stop()
 
@@ -32,6 +40,7 @@ interface AudioEngine {
             override fun playNote(midiNote: Int, durationMillis: Int, timbre: Timbre) {}
             override fun playFrequency(freqHz: Float, durationMillis: Int, timbre: Timbre) {}
             override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre) {}
+            override fun playSamples(samples: FloatArray) {}
             override fun stop() {}
             override fun close() {}
         }

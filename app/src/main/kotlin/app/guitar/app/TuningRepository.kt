@@ -110,6 +110,18 @@ class TuningRepository(private val context: Context) {
         }
     }
 
+    private val keyStrumMs = intPreferencesKey("strum_ms")
+
+    /** Strum/arpeggio spread in ms between consecutive chord notes (default 30). */
+    val strumMs: Flow<Int> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyStrumMs] ?: 30 }
+
+    suspend fun setStrumMs(value: Int) {
+        context.tuningDataStore.edit { prefs ->
+            prefs[keyStrumMs] = value
+        }
+    }
+
     private val keyInstrument = stringPreferencesKey("instrument")
 
     /** Selected instrument (Guitar / Cavaquinho). Default Guitar. */
