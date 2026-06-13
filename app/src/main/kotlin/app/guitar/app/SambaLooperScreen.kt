@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -23,8 +25,13 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -121,7 +128,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     }
 }
 
-private const val ROW_LABEL_DP = 88
+private const val ROW_LABEL_DP = 118
 
 @Composable
 private fun InstrumentRow(
@@ -130,26 +137,57 @@ private fun InstrumentRow(
     modifier: Modifier = Modifier,
 ) {
     val voices = PercussionVoices.voicesFor(instrument)
+    val audible = samba.isAudible(instrument)
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        // Row label — tap to audition voice 0.
+        // ---- Row label: instrument name (tap → voice popup) + Mute / Solo ----
         Column(
-            modifier = Modifier
-                .width(ROW_LABEL_DP.dp)
-                .fillMaxHeight()
-                .padding(end = 6.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .pointerInput(instrument) {
-                    detectTapGestures(onTap = { samba.preview(instrument, 0) })
-                },
+            modifier = Modifier.width(ROW_LABEL_DP.dp).fillMaxHeight().padding(end = 6.dp),
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(instrument.displayName, style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold, maxLines = 1)
-            Text("${voices.size} voices", style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            var voiceMenu by remember { mutableStateOf(false) }
+            Box {
+                Text(
+                    instrument.displayName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    color = if (audible) MaterialTheme.colorScheme.onBackground
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .pointerInput(instrument) { detectTapGestures(onTap = { voiceMenu = true }) }
+                        .padding(vertical = 2.dp),
+                )
+                // Little voice menu: a button per voice; tap to audition (stays open
+                // so you can compare). Tap outside to dismiss.
+                DropdownMenu(expanded = voiceMenu, onDismissRequest = { voiceMenu = false }) {
+                    Text(
+                        "  ${instrument.displayName} voices",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    )
+                    for (v in voices) {
+                        DropdownMenuItem(
+                            text = { Text("${v.glyph}   ${v.displayName}") },
+                            onClick = { samba.preview(instrument, v.index) },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(3.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                ToggleTag("M", on = instrument in samba.muted,
+                    onColor = MaterialTheme.colorScheme.error) { samba.toggleMute(instrument) }
+                ToggleTag("S", on = instrument in samba.soloed,
+                    onColor = MaterialTheme.colorScheme.primary) { samba.toggleSolo(instrument) }
+                Text("·  tap name",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
-        // 16 cells.
-        Row(modifier = Modifier.weight(1f).fillMaxHeight()) {
+        // ---- 16 cells (dimmed when the track isn't audible) ----
+        Row(modifier = Modifier.weight(1f).fillMaxHeight().alpha(if (audible) 1f else 0.4f)) {
             for (slot in 0 until PERCUSSION_SLOTS) {
                 Cell(
                     samba = samba,
@@ -164,6 +202,26 @@ private fun InstrumentRow(
                 }
             }
         }
+    }
+}
+
+/** Small square toggle used for Mute (M) and Solo (S). */
+@Composable
+private fun ToggleTag(label: String, on: Boolean, onColor: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(5.dp))
+            .background(if (on) onColor else MaterialTheme.colorScheme.surfaceVariant)
+            .pointerInput(on) { detectTapGestures(onTap = { onClick() }) }
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (on) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

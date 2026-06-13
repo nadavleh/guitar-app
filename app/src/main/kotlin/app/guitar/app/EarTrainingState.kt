@@ -202,6 +202,25 @@ class EarTrainingState(
             timbre = Timbre.Clarity)
     }
 
+    private var cadenceJob: Job? = null
+
+    /** Mode-aware cadence label for the progression key: "I–V–I" / "i–V–i". */
+    fun progCadenceLabel(): String = if (progMode == TrainingMode.Major) "I–V–I" else "i–V–i"
+
+    /** #1: play a I-V-I (major) / i-V-i (minor) cadence in the current progression
+     *  key so the user can hear the tonic before identifying the progression. */
+    fun playProgKeyCadence() {
+        cadenceJob?.cancel()
+        val map = if (progMode == TrainingMode.Major) EarTraining.MAJOR_DEGREES else EarTraining.MINOR_DEGREES
+        cadenceJob = scope.launch {
+            for (deg in listOf(1, 5, 1)) {
+                val root = EarTraining.degreeRoot(progKey, deg, progMode)
+                playSymbolOnce(NoteSpeller.spell(root) + (map[deg]?.triadQuality ?: ""), 600)
+                delay(650)
+            }
+        }
+    }
+
     fun toggleBarReveal(idx: Int) {
         progBarRevealed = if (idx in progBarRevealed) progBarRevealed - idx else progBarRevealed + idx
     }
@@ -308,6 +327,30 @@ class EarTrainingState(
                 n2cPlaying = false
             }
         }
+    }
+
+    /** Midis of the current Note2Chord triad's E-shape (or first) voicing. */
+    private fun n2cShapeMidis(): List<Int> {
+        val c = n2cChallenge ?: return emptyList()
+        val parsed = ChordLibrary.parse(c.chordSymbol) ?: return emptyList()
+        val (root, q) = parsed
+        val shapes = ChordShapeGenerator().shapesFor(root, q, tuningProvider(), frets = DISPLAY_FRETS)
+        val shape = shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E }
+            ?: shapes.firstOrNull() ?: return emptyList()
+        return shape.notes.mapNotNull { it?.midi?.value }
+    }
+
+    /** #2: play just the triad (no test note). */
+    fun playN2cChord() {
+        val midis = n2cShapeMidis()
+        if (midis.isNotEmpty()) audio.playChord(midis, strumDelayMillis = 0, sustainMillis = sustainProvider())
+    }
+
+    /** #2: play just the test note (placed above the triad's register). */
+    fun playN2cNote() {
+        val c = n2cChallenge ?: return
+        val midis = n2cShapeMidis().ifEmpty { listOf(60) }
+        audio.playNote(nearestMidiAboveChord(c.testNote, midis), durationMillis = sustainProvider())
     }
 
     /** Pick a MIDI note for the given pitch class that sits above the chord cluster
@@ -572,18 +615,46 @@ class EarTrainingState(
     /** Roman base for the drawn degree (e.g. "IV"/"iv"), for the reveal. */
     fun flavorDegreeRoman(): String = flavorDegreesMap()[flavorDegree]?.roman ?: "$flavorDegree"
 
-    /** Draw a fresh challenge (new random key, diatonic root, allowed flavor),
-     *  play the I-V-I cadence, then sound the chord. */
+    /** Mode-aware cadence label for the flavor key-setter: "I–V–I" / "i–V–i". */
+    fun flavorCadenceLabel(): String = if (flavorMode == TrainingMode.Major) "I–V–I" else "i–V–i"
+
+    /**
+     * Diatonic (degree, quality) candidates for [mode]: for every degree, the
+     * triad / 7th / extended qualities the diatonic scale actually produces.
+     * When [allowed] is non-null, only candidates whose quality the user enabled
+     * are kept — so we never play a non-diatonic flavor (e.g. v-m7 instead of V7).
+     */
+    private fun diatonicFlavorCandidates(
+        mode: TrainingMode,
+        allowed: Set<String>?,
+    ): List<Pair<Int, String>> {
+        val map = if (mode == TrainingMode.Major) EarTraining.MAJOR_DEGREES else EarTraining.MINOR_DEGREES
+        val out = ArrayList<Pair<Int, String>>()
+        for ((deg, info) in map) {
+            val quals = linkedSetOf(info.triadQuality, info.seventhQuality)
+            if (info.extendedOptions.isNotEmpty()) info.extendedOptions.forEach { quals.add(it.first) }
+            else quals.add(info.extendedQuality)
+            for (q in quals) if (allowed == null || q in allowed) out.add(deg to q)
+        }
+        return out
+    }
+
+    /** Draw a fresh challenge (new random key + mode, then a DIATONIC chord whose
+     *  flavor the user enabled), play the cadence, then sound the chord. */
     fun newFlavorChallenge() {
-        val allowed = flavorAllowed.ifEmpty { setOf("") }.toList()
         flavorKey = fixedKey ?: PitchClass(rng.nextInt(12))
         val modes = buildList {
             if (flavorIncludeMajor) add(TrainingMode.Major)
             if (flavorIncludeMinor) add(TrainingMode.Minor)
         }.ifEmpty { listOf(TrainingMode.Major) }
         flavorMode = modes[rng.nextInt(modes.size)]
-        flavorDegree = rng.nextInt(7) + 1
-        flavorQuality = allowed[rng.nextInt(allowed.size)]
+        // Only diatonic chords: pick a (degree, diatonic-quality) the user allowed;
+        // if their palette excludes every diatonic chord, fall back to all diatonic.
+        val candidates = diatonicFlavorCandidates(flavorMode, flavorAllowed)
+            .ifEmpty { diatonicFlavorCandidates(flavorMode, null) }
+        val (deg, qual) = candidates[rng.nextInt(candidates.size)]
+        flavorDegree = deg
+        flavorQuality = qual
         flavorRevealed = false
         flavorGuessDegree = null
         flavorGuessQuality = null
@@ -674,6 +745,8 @@ class EarTrainingState(
         n2cJob = null
         flavorJob?.cancel()
         flavorJob = null
+        cadenceJob?.cancel()
+        cadenceJob = null
     }
 }
 

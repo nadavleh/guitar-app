@@ -20,6 +20,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -34,7 +36,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -175,6 +179,11 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
                 Spacer(Modifier.width(8.dp))
                 OutlinedButton(onClick = { ear.nextProgression() }) { Text("Next progression →") }
                 Spacer(Modifier.width(8.dp))
+                // #1: hear the tonic — plays I-V-I (or i-V-i) in the current key.
+                OutlinedButton(onClick = { ear.playProgKeyCadence() }) {
+                    Text("Hear key ${ear.progCadenceLabel()}")
+                }
+                Spacer(Modifier.width(8.dp))
                 // #2: push the current progression's chords into the Looper.
                 OutlinedButton(onClick = {
                     state.loadProgressionIntoLoop(ear.progResolved.map { it.symbol })
@@ -291,28 +300,26 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
 private fun ProgressionSettings(ear: EarTrainingState) {
     // Settings row: key (random / fixed), mode toggles, chord-type level
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column {
             Text("Key", style = MaterialTheme.typography.labelMedium)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                FilterChip(
-                    selected = ear.fixedKey == null,
-                    onClick = { ear.fixedKey = null },
-                    label = { Text("Random") },
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("Fixed:", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.width(4.dp))
-            }
-            Spacer(Modifier.height(4.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                for (i in 0..11) {
-                    val pc = PitchClass(i)
-                    FilterChip(
-                        selected = ear.fixedKey == pc,
-                        onClick = { ear.fixedKey = pc },
-                        label = { Text(NoteSpeller.spell(pc)) },
+            // Random is the common case, so collapse the 12 fixed keys into a popup.
+            var keyMenu by remember { mutableStateOf(false) }
+            Box {
+                OutlinedButton(onClick = { keyMenu = true }) {
+                    Text((ear.fixedKey?.let { NoteSpeller.spell(it) } ?: "Random") + " ▾")
+                }
+                DropdownMenu(expanded = keyMenu, onDismissRequest = { keyMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Random") },
+                        onClick = { ear.fixedKey = null; keyMenu = false },
                     )
+                    for (i in 0..11) {
+                        val pc = PitchClass(i)
+                        DropdownMenuItem(
+                            text = { Text("Fixed: " + NoteSpeller.spell(pc)) },
+                            onClick = { ear.fixedKey = pc; keyMenu = false },
+                        )
+                    }
                 }
             }
         }
@@ -476,15 +483,21 @@ private fun Note2ChordView(ear: EarTrainingState) {
         )
         Spacer(Modifier.height(10.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(
                 onClick = { ear.playN2c() },
                 enabled = !ear.n2cPlaying,
-            ) { Text(if (ear.n2cPlaying) "Playing…" else "Play challenge ▶") }
+            ) { Text(if (ear.n2cPlaying) "Playing…" else "Play both ▶") }
             OutlinedButton(onClick = {
                 ear.nextN2cChallenge()
                 ear.playN2c()
             }) { Text("Next →") }
+        }
+        Spacer(Modifier.height(8.dp))
+        // #2: audition the chord and the test note independently.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { ear.playN2cChord() }) { Text("♪ Chord") }
+            OutlinedButton(onClick = { ear.playN2cNote() }) { Text("• Note") }
         }
 
         Spacer(Modifier.height(14.dp))
@@ -552,8 +565,9 @@ private fun FlavorView(ear: EarTrainingState) {
             .padding(4.dp),
     ) {
         Text(
-            "Pick which flavors can appear. Tap \"New chord\" — a I–V–I cadence plays to set the " +
-                "key, then a random diatonic chord sounds. Identify its scale degree and flavor.",
+            "Pick which flavors can appear. Tap \"New chord\" — a cadence (I–V–I in major, " +
+                "i–V–i in minor) plays to set the key, then a random diatonic chord sounds. " +
+                "Identify its scale degree and flavor.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -592,7 +606,7 @@ private fun FlavorView(ear: EarTrainingState) {
             OutlinedButton(
                 onClick = { ear.replayFlavorCadence() },
                 enabled = ear.flavorStarted && !ear.flavorPlaying,
-            ) { Text("Replay I–V–I") }
+            ) { Text("Replay ${ear.flavorCadenceLabel()}") }
             Spacer(Modifier.width(8.dp))
             OutlinedButton(onClick = { ear.playFlavorChord() }, enabled = ear.flavorStarted) {
                 Text("Play chord")
@@ -710,8 +724,12 @@ private fun Note2ChordChallengeView(ear: EarTrainingState) {
             TextButton(onClick = { ear.exitN2cChallenge() }) { Text("Quit") }
         }
         Spacer(Modifier.height(8.dp))
-        Button(onClick = { ear.playN2c() }, enabled = !ear.n2cPlaying) {
-            Text(if (ear.n2cPlaying) "Playing…" else "Replay ▶")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = { ear.playN2c() }, enabled = !ear.n2cPlaying) {
+                Text(if (ear.n2cPlaying) "Playing…" else "Replay both ▶")
+            }
+            OutlinedButton(onClick = { ear.playN2cChord() }) { Text("♪ Chord") }
+            OutlinedButton(onClick = { ear.playN2cNote() }) { Text("• Note") }
         }
         Spacer(Modifier.height(12.dp))
         val guess = ear.n2cChGuess
@@ -788,7 +806,7 @@ private fun FlavorChallengeView(ear: EarTrainingState) {
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(onClick = { ear.replayFlavorCadence() }, enabled = !ear.flavorPlaying) {
-                Text("Replay I–V–I")
+                Text("Replay ${ear.flavorCadenceLabel()}")
             }
             Spacer(Modifier.width(8.dp))
             OutlinedButton(onClick = { ear.playFlavorChord() }) { Text("Play chord") }
@@ -941,6 +959,8 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
             } else {
                 Button(onClick = { ear.startLoop() }) { Text("Play progression ▶") }
             }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(onClick = { ear.playProgKeyCadence() }) { Text("Hear key ${ear.progCadenceLabel()}") }
             Spacer(Modifier.width(8.dp))
             OutlinedButton(onClick = { ear.rerollChallengeQuestion() }) { Text("Re-roll progression") }
         }

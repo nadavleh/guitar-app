@@ -40,6 +40,24 @@ class SambaLooperState(
     var currentSlot by mutableStateOf(-1)
         private set
 
+    /** Tracks muted instruments and soloed instruments. Audible = not muted AND
+     *  (no solo active OR this instrument is soloed). */
+    var muted by mutableStateOf<Set<PercussionInstrument>>(emptySet())
+        private set
+    var soloed by mutableStateOf<Set<PercussionInstrument>>(emptySet())
+        private set
+
+    fun toggleMute(inst: PercussionInstrument) {
+        muted = if (inst in muted) muted - inst else muted + inst
+    }
+
+    fun toggleSolo(inst: PercussionInstrument) {
+        soloed = if (inst in soloed) soloed - inst else soloed + inst
+    }
+
+    fun isAudible(inst: PercussionInstrument): Boolean =
+        inst !in muted && (soloed.isEmpty() || inst in soloed)
+
     private var job: Job? = null
     private val synth = PercussionSynth()
     private val cache = HashMap<Pair<PercussionInstrument, Int>, FloatArray>()
@@ -85,6 +103,7 @@ class SambaLooperState(
                     if (!isPlaying) break
                     currentSlot = slot
                     for (inst in PercussionInstrument.entries) {
+                        if (!isAudible(inst)) continue
                         val v = pattern.voiceAt(inst, slot) ?: continue
                         audio.playSamples(buffer(inst, v))
                     }
