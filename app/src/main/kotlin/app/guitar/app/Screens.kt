@@ -486,16 +486,6 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
             onValueChange = { state.setStrumMs(it.toInt()) },
             valueRange = 0f..150f,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            if (state.strumMs == 0) "Strum: struck at once" else "Strum spread: ${state.strumMs} ms",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        androidx.compose.material3.Slider(
-            value = state.strumMs.toFloat(),
-            onValueChange = { state.strumMs = it.toInt() },
-            valueRange = 0f..150f,
-        )
 
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
@@ -521,9 +511,10 @@ fun LoopScreen(state: AppState) {
     ) {
         // ----- Top: title + transport + back -----
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("PROGRESSION LOOP",
+            Text("LOOP",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
                 modifier = Modifier.weight(1f))
             AudioQuickButton(state, compact = true)
             Spacer(Modifier.width(4.dp))
@@ -546,17 +537,19 @@ fun LoopScreen(state: AppState) {
 
         Spacer(Modifier.height(8.dp))
 
-        // ----- Controls row: BPM, slots/bar, bars +/- -----
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("BPM: ${state.bpm}", style = MaterialTheme.typography.bodyMedium)
-                androidx.compose.material3.Slider(
-                    value = state.bpm.toFloat(),
-                    onValueChange = { state.bpm = it.toInt() },
-                    valueRange = 40f..200f,
-                )
-            }
-            Spacer(Modifier.width(16.dp))
+        // ----- Controls: full-width tempo, then slots/bar + bars (wrap) -----
+        Text("Tempo: ${state.bpm} BPM", style = MaterialTheme.typography.bodyMedium)
+        androidx.compose.material3.Slider(
+            value = state.bpm.toFloat(),
+            onValueChange = { state.bpm = it.toInt() },
+            valueRange = 40f..200f,
+        )
+        Spacer(Modifier.height(4.dp))
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Slots/bar", style = MaterialTheme.typography.labelSmall)
                 SingleChoiceSegmentedButtonRow {
@@ -570,7 +563,6 @@ fun LoopScreen(state: AppState) {
                     }
                 }
             }
-            Spacer(Modifier.width(16.dp))
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Bars: ${state.loopProgression.size}", style = MaterialTheme.typography.labelSmall)
                 Row {
@@ -858,21 +850,18 @@ private fun BuildByDegreePanel(state: AppState) {
             Spacer(Modifier.height(6.dp))
 
             // ---- Diatonic level + quality override ----
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text("Diatonic", style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.width(6.dp))
-                SingleChoiceSegmentedButtonRow {
-                    ChordTypeLevel.entries.forEachIndexed { i, lvl ->
-                        SegmentedButton(
-                            selected = state.loopBuildLevel == lvl && state.loopBuildOverride == null,
-                            onClick = {
-                                state.loopBuildLevel = lvl
-                                state.loopBuildOverride = null
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = i, count = ChordTypeLevel.entries.size),
-                            label = { Text(lvl.displayName) },
-                        )
-                    }
+            Text("Diatonic level", style = MaterialTheme.typography.labelMedium)
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                ChordTypeLevel.entries.forEachIndexed { i, lvl ->
+                    SegmentedButton(
+                        selected = state.loopBuildLevel == lvl && state.loopBuildOverride == null,
+                        onClick = {
+                            state.loopBuildLevel = lvl
+                            state.loopBuildOverride = null
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = i, count = ChordTypeLevel.entries.size),
+                        label = { Text(lvl.displayName, maxLines = 1) },
+                    )
                 }
             }
             Spacer(Modifier.height(4.dp))

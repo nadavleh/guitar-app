@@ -74,44 +74,49 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
             .background(MaterialTheme.colorScheme.background)
             .padding(12.dp),
     ) {
-        // Top bar
+        // Title row: title + audio + back. Tabs get their own full-width row below
+        // so nothing is squeezed in a narrow (portrait) column.
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(
                 "EAR TRAINING",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f),
+                maxLines = 1,
             )
-            SingleChoiceSegmentedButtonRow {
-                EarSubMode.entries.forEachIndexed { i, s ->
-                    SegmentedButton(
-                        selected = s == ear.progSubMode,
-                        onClick = { ear.switchTab(s) },
-                        shape = SegmentedButtonDefaults.itemShape(index = i, count = EarSubMode.entries.size),
-                        label = {
-                            Text(
-                                when (s) {
-                                    EarSubMode.Progression -> "Progressions"
-                                    EarSubMode.Note2Chord  -> "Note2Chord"
-                                    EarSubMode.Flavor      -> "Flavor"
-                                }
-                            )
-                        },
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
             AudioQuickButton(state, compact = true)
             Spacer(Modifier.width(4.dp))
             OutlinedButton(onClick = { ear.release(); onBack() }) { Text("Back") }
         }
 
         Spacer(Modifier.height(8.dp))
+        // Sub-mode tabs, full width.
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            EarSubMode.entries.forEachIndexed { i, s ->
+                SegmentedButton(
+                    selected = s == ear.progSubMode,
+                    onClick = { ear.switchTab(s) },
+                    shape = SegmentedButtonDefaults.itemShape(index = i, count = EarSubMode.entries.size),
+                    label = {
+                        Text(
+                            when (s) {
+                                EarSubMode.Progression -> "Progress."
+                                EarSubMode.Note2Chord  -> "Note2Chord"
+                                EarSubMode.Flavor      -> "Flavor"
+                            },
+                            maxLines = 1,
+                        )
+                    },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
 
-        // Practice / Challenge toggle — every tab has both (note #3).
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.padding(bottom = 8.dp)) {
+        // Practice / Challenge toggle — every tab has both. Full width.
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             EarMode.entries.forEachIndexed { i, m ->
                 SegmentedButton(
                     selected = m == ear.earMode,
@@ -150,79 +155,42 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
 
         Spacer(Modifier.height(12.dp))
 
-        // BPM + transport + Generate / Next
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("BPM: ${ear.progBpm}", style = MaterialTheme.typography.bodyMedium)
-                androidx.compose.material3.Slider(
-                    value = ear.progBpm.toFloat(),
-                    onValueChange = { ear.progBpm = it.toInt() },
-                    valueRange = 40f..200f,
-                )
-                Text(
-                    if (state.strumMs == 0) "Strum: struck at once" else "Strum: ${state.strumMs} ms",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                androidx.compose.material3.Slider(
-                    value = state.strumMs.toFloat(),
-                    onValueChange = { state.setStrumMs(it.toInt()) },
-                    valueRange = 0f..150f,
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            if (ear.hasGenerated) {
-                if (ear.isLooping) {
-                    Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
-                } else {
-                    Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
-                }
-                Spacer(Modifier.width(8.dp))
-                OutlinedButton(onClick = { ear.nextProgression() }) { Text("Next progression →") }
-                Spacer(Modifier.width(8.dp))
-                // #1: hear the tonic — plays I-V-I (or i-V-i) in the current key.
-                OutlinedButton(onClick = { ear.playProgKeyCadence() }) {
-                    Text("Hear key ${ear.progCadenceLabel()}")
-                }
-                Spacer(Modifier.width(8.dp))
-                // #2: push the current progression's chords into the Looper.
-                OutlinedButton(onClick = {
-                    state.loadProgressionIntoLoop(ear.progResolved.map { it.symbol })
-                }) { Text("→ Looper") }
-                Spacer(Modifier.width(12.dp))
-                // #11: small counter of how many progressions generated this session.
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "done",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        "${ear.progressionCount}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-        }
+        // Tempo + strum — full-width sliders so labels never get squeezed.
+        TempoStrumSliders(state, ear)
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
 
         if (!ear.hasGenerated) {
             // Initial state: prominent CTA. The user adjusts settings above, then
             // taps this to produce the first progression that honors them.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 24.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Button(onClick = { ear.nextProgression() }) {
-                    Text("Generate progression ▶", style = MaterialTheme.typography.titleMedium)
-                }
-            }
+            Button(
+                onClick = { ear.nextProgression() },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Generate progression ▶", style = MaterialTheme.typography.titleMedium) }
             return@Column
         }
+
+        // Transport + actions — wrap so nothing gets clipped in a narrow column.
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (ear.isLooping) {
+                Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
+            } else {
+                Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
+            }
+            OutlinedButton(onClick = { ear.nextProgression() }) { Text("Next →") }
+            // #1: hear the tonic — plays I-V-I (or i-V-i) in the current key.
+            OutlinedButton(onClick = { ear.playProgKeyCadence() }) { Text("Hear ${ear.progCadenceLabel()}") }
+            // #2: push the current progression's chords into the Looper.
+            OutlinedButton(onClick = {
+                state.loadProgressionIntoLoop(ear.progResolved.map { it.symbol })
+            }) { Text("→ Looper") }
+        }
+
+        Spacer(Modifier.height(16.dp))
 
         // KEY + MODE combined reveal — deliberately small / low-emphasis (the chord
         // labels are the focus; key+mode is a secondary hint).
@@ -295,83 +263,116 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
     }
 }
 
+/** "Random ▾" key picker that collapses the 12 fixed keys into a dropdown. */
+@Composable
+private fun KeyDropdown(ear: EarTrainingState) {
+    var keyMenu by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { keyMenu = true }) {
+            Text((ear.fixedKey?.let { NoteSpeller.spell(it) } ?: "Random") + " ▾")
+        }
+        DropdownMenu(expanded = keyMenu, onDismissRequest = { keyMenu = false }) {
+            DropdownMenuItem(text = { Text("Random") }, onClick = { ear.fixedKey = null; keyMenu = false })
+            for (i in 0..11) {
+                val pc = PitchClass(i)
+                DropdownMenuItem(
+                    text = { Text("Fixed: " + NoteSpeller.spell(pc)) },
+                    onClick = { ear.fixedKey = pc; keyMenu = false },
+                )
+            }
+        }
+    }
+}
+
+/** Full-width BPM + strum sliders, shared by the progression trainer & challenge. */
+@Composable
+private fun TempoStrumSliders(state: AppState, ear: EarTrainingState) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("Tempo: ${ear.progBpm} BPM", style = MaterialTheme.typography.bodyMedium)
+        androidx.compose.material3.Slider(
+            value = ear.progBpm.toFloat(),
+            onValueChange = { ear.progBpm = it.toInt() },
+            valueRange = 40f..200f,
+        )
+        Text(
+            if (state.strumMs == 0) "Strum: struck at once" else "Strum: ${state.strumMs} ms",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        androidx.compose.material3.Slider(
+            value = state.strumMs.toFloat(),
+            onValueChange = { state.setStrumMs(it.toInt()) },
+            valueRange = 0f..150f,
+        )
+    }
+}
+
+/**
+ * Vertically-stacked, full-width settings so nothing gets squeezed in a narrow
+ * (portrait) column — each control owns a full row and segmented controls span
+ * the width instead of wrapping their labels.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProgressionSettings(ear: EarTrainingState) {
-    // Settings row: key (random / fixed), mode toggles, chord-type level
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // Key + which modes are in the pool.
+        Text("Key & modes", style = MaterialTheme.typography.labelMedium)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            KeyDropdown(ear)
+            FilterChip(
+                selected = ear.includeMajor,
+                onClick = { ear.includeMajor = !ear.includeMajor },
+                label = { Text("Major") },
+            )
+            FilterChip(
+                selected = ear.includeMinor,
+                onClick = { ear.includeMinor = !ear.includeMinor },
+                label = { Text("Minor") },
+            )
+        }
+
+        // Chord type — full-width segmented control.
         Column {
-            Text("Key", style = MaterialTheme.typography.labelMedium)
-            // Random is the common case, so collapse the 12 fixed keys into a popup.
-            var keyMenu by remember { mutableStateOf(false) }
-            Box {
-                OutlinedButton(onClick = { keyMenu = true }) {
-                    Text((ear.fixedKey?.let { NoteSpeller.spell(it) } ?: "Random") + " ▾")
-                }
-                DropdownMenu(expanded = keyMenu, onDismissRequest = { keyMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Random") },
-                        onClick = { ear.fixedKey = null; keyMenu = false },
-                    )
-                    for (i in 0..11) {
-                        val pc = PitchClass(i)
-                        DropdownMenuItem(
-                            text = { Text("Fixed: " + NoteSpeller.spell(pc)) },
-                            onClick = { ear.fixedKey = pc; keyMenu = false },
-                        )
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.width(16.dp))
-        Column(horizontalAlignment = Alignment.Start) {
-            Text("Modes", style = MaterialTheme.typography.labelMedium)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Major", style = MaterialTheme.typography.bodySmall)
-                Switch(checked = ear.includeMajor, onCheckedChange = { ear.includeMajor = it })
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Minor", style = MaterialTheme.typography.bodySmall)
-                Switch(checked = ear.includeMinor, onCheckedChange = { ear.includeMinor = it })
-            }
-        }
-        Spacer(Modifier.width(16.dp))
-        Column(horizontalAlignment = Alignment.Start) {
             Text("Chord type", style = MaterialTheme.typography.labelMedium)
-            SingleChoiceSegmentedButtonRow {
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 ChordTypeLevel.entries.forEachIndexed { i, lvl ->
                     SegmentedButton(
                         selected = ear.chordTypeLevel == lvl && !ear.earMixAll,
                         onClick = { ear.chordTypeLevel = lvl; ear.reresolveCurrent() },
                         shape = SegmentedButtonDefaults.itemShape(index = i, count = ChordTypeLevel.entries.size),
-                        label = { Text(lvl.displayName) },
+                        label = { Text(lvl.displayName, maxLines = 1) },
                     )
                 }
             }
         }
-        Spacer(Modifier.width(16.dp))
-        // Voicing style + mix-and-match (notes: shell-only / mix everything).
-        Column(horizontalAlignment = Alignment.Start) {
+
+        // Voicing style + mix-and-match.
+        Column {
             Text("Voicing", style = MaterialTheme.typography.labelMedium)
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(
                     selected = !ear.earShellVoicing && !ear.earMixAll,
-                    onClick = { ear.earShellVoicing = false },
+                    onClick = { ear.earShellVoicing = false; ear.earMixAll = false },
                     label = { Text("Standard") },
                 )
-                Spacer(Modifier.width(4.dp))
                 FilterChip(
                     selected = ear.earShellVoicing && !ear.earMixAll,
-                    onClick = { ear.earShellVoicing = true },
+                    onClick = { ear.earShellVoicing = true; ear.earMixAll = false },
                     label = { Text("Shell") },
                 )
+                FilterChip(
+                    selected = ear.earMixAll,
+                    onClick = { ear.earMixAll = !ear.earMixAll; ear.reresolveCurrent() },
+                    label = { Text("Mix all") },
+                )
             }
-            Spacer(Modifier.height(4.dp))
-            FilterChip(
-                selected = ear.earMixAll,
-                onClick = { ear.earMixAll = !ear.earMixAll; ear.reresolveCurrent() },
-                label = { Text("Mix all") },
-            )
         }
     }
 }
@@ -598,16 +599,18 @@ private fun FlavorView(ear: EarTrainingState) {
 
         Spacer(Modifier.height(10.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Button(onClick = { ear.newFlavorChallenge() }, enabled = !ear.flavorPlaying) {
                 Text(if (ear.flavorPlaying) "Playing…" else "New chord ▶")
             }
-            Spacer(Modifier.width(8.dp))
             OutlinedButton(
                 onClick = { ear.replayFlavorCadence() },
                 enabled = ear.flavorStarted && !ear.flavorPlaying,
             ) { Text("Replay ${ear.flavorCadenceLabel()}") }
-            Spacer(Modifier.width(8.dp))
             OutlinedButton(onClick = { ear.playFlavorChord() }, enabled = ear.flavorStarted) {
                 Text("Play chord")
             }
@@ -724,7 +727,11 @@ private fun Note2ChordChallengeView(ear: EarTrainingState) {
             TextButton(onClick = { ear.exitN2cChallenge() }) { Text("Quit") }
         }
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Button(onClick = { ear.playN2c() }, enabled = !ear.n2cPlaying) {
                 Text(if (ear.n2cPlaying) "Playing…" else "Replay both ▶")
             }
@@ -804,11 +811,14 @@ private fun FlavorChallengeView(ear: EarTrainingState) {
             TextButton(onClick = { ear.exitFlavorChallenge() }) { Text("Quit") }
         }
         Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             OutlinedButton(onClick = { ear.replayFlavorCadence() }, enabled = !ear.flavorPlaying) {
                 Text("Replay ${ear.flavorCadenceLabel()}")
             }
-            Spacer(Modifier.width(8.dp))
             OutlinedButton(onClick = { ear.playFlavorChord() }) { Text("Play chord") }
         }
         Spacer(Modifier.height(12.dp))
@@ -953,16 +963,18 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
 
         Spacer(Modifier.height(8.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             if (ear.isLooping) {
                 Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
             } else {
-                Button(onClick = { ear.startLoop() }) { Text("Play progression ▶") }
+                Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
             }
-            Spacer(Modifier.width(8.dp))
-            OutlinedButton(onClick = { ear.playProgKeyCadence() }) { Text("Hear key ${ear.progCadenceLabel()}") }
-            Spacer(Modifier.width(8.dp))
-            OutlinedButton(onClick = { ear.rerollChallengeQuestion() }) { Text("Re-roll progression") }
+            OutlinedButton(onClick = { ear.playProgKeyCadence() }) { Text("Hear ${ear.progCadenceLabel()}") }
+            OutlinedButton(onClick = { ear.rerollChallengeQuestion() }) { Text("Re-roll") }
         }
 
         Spacer(Modifier.height(8.dp))
