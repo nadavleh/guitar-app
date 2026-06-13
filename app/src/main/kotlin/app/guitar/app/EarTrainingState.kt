@@ -77,10 +77,11 @@ class EarTrainingState(
 
     /** Whether the user wants Major mode in the rotation. */
     var includeMajor by mutableStateOf(true)
-    /** Whether the user wants Minor mode in the rotation. */
-    var includeMinor by mutableStateOf(true)
-    /** Triads vs Sevenths vs Extended. */
-    var chordTypeLevel by mutableStateOf(ChordTypeLevel.Sevenths)
+    /** Whether the user wants Minor mode in the rotation. Default off: the app
+     *  opens in major-triads-only for the simplest starting point. */
+    var includeMinor by mutableStateOf(false)
+    /** Triads vs Sevenths vs Extended. Default Triads (simplest). */
+    var chordTypeLevel by mutableStateOf(ChordTypeLevel.Triads)
     /** Null = random key each round. Non-null = always use this key. */
     var fixedKey by mutableStateOf<PitchClass?>(null)
     /** BPM for progression loop. */

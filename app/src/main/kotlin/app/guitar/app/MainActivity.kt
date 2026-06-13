@@ -95,7 +95,7 @@ fun App(audio: AudioEngine) {
     val savedSelected by state.savedSelectedName.collectAsState(initial = "Standard")
     val persistedLeftHanded by repo.leftHanded.collectAsState(initial = false)
     val persistedVoicingShell by repo.voicingShell.collectAsState(initial = false)
-    val persistedLabelMode by repo.labelMode.collectAsState(initial = LabelMode.Notes.name)
+    val persistedLabelMode by repo.labelMode.collectAsState(initial = LabelMode.Intervals.name)
     val persistedA4 by repo.a4Hz.collectAsState(initial = 440f)
     val persistedSustain by repo.ringSustainMs.collectAsState(initial = 1500)
     val persistedStrum by repo.strumMs.collectAsState(initial = 30)

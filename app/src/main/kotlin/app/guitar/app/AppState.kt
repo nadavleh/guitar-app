@@ -81,7 +81,8 @@ class AppState(
     var scaleFretRange by mutableStateOf(0..DISPLAY_FRETS)
 
     var highlight by mutableStateOf(Highlight.Chord)
-    var labelMode by mutableStateOf(LabelMode.Notes)
+    // Default to interval labels (1, b3, 5…) rather than note names.
+    var labelMode by mutableStateOf(LabelMode.Intervals)
     var selectedPosition by mutableStateOf<FretPosition?>(null)
     var leftHanded by mutableStateOf(false)
 

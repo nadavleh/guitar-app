@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +66,7 @@ import kotlin.math.sin
 fun TunerScreen(state: AppState, onBack: () -> Unit) {
     val tuner = remember(state) { TunerState(a4Provider = { state.a4Hz }) }
     val portrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
+    val customTunings by state.customTunings.collectAsState(initial = emptyMap())
 
     LaunchedEffect(Unit) {
         // Try to start the mic; if it fails (permission missing) capturing stays false
@@ -102,6 +104,14 @@ fun TunerScreen(state: AppState, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Tunings.presetsFor(state.instrument).forEach { (name, t) ->
+                FilterChip(
+                    selected = name == state.tuningName && !state.isEditedTuning,
+                    onClick = { state.selectTuning(name, t) },
+                    label = { Text(name, maxLines = 1) },
+                )
+            }
+            // The user's saved custom tunings, so they can switch to those here too.
+            customTunings.forEach { (name, t) ->
                 FilterChip(
                     selected = name == state.tuningName && !state.isEditedTuning,
                     onClick = { state.selectTuning(name, t) },

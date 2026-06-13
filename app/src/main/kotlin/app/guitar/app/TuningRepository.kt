@@ -78,7 +78,7 @@ class TuningRepository(private val context: Context) {
     private val keyLabelMode = stringPreferencesKey("label_mode")
 
     val labelMode: Flow<String> =
-        context.tuningDataStore.data.map { prefs -> prefs[keyLabelMode] ?: "Notes" }
+        context.tuningDataStore.data.map { prefs -> prefs[keyLabelMode] ?: "Intervals" }
 
     suspend fun setLabelMode(value: String) {
         context.tuningDataStore.edit { prefs ->
