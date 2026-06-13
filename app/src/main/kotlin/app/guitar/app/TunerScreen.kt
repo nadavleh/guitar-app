@@ -4,8 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -24,9 +28,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.content.res.Configuration
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -37,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Canvas
 import app.guitar.theory.NoteSpeller
+import app.guitar.theory.Tunings
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -53,9 +60,11 @@ import kotlin.math.sin
  *   - Bottom: row of buttons for each open-string note of the current tuning.
  *     Tap to hear the reference tone for that string.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TunerScreen(state: AppState, onBack: () -> Unit) {
     val tuner = remember(state) { TunerState(a4Provider = { state.a4Hz }) }
+    val portrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
 
     LaunchedEffect(Unit) {
         // Try to start the mic; if it fails (permission missing) capturing stays false
@@ -85,12 +94,36 @@ fun TunerScreen(state: AppState, onBack: () -> Unit) {
             OutlinedButton(onClick = onBack) { Text("Back") }
         }
 
+        Spacer(Modifier.height(8.dp))
+        // -------- Change tuning on the fly (no need to open Options) --------
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Tunings.presetsFor(state.instrument).forEach { (name, t) ->
+                FilterChip(
+                    selected = name == state.tuningName && !state.isEditedTuning,
+                    onClick = { state.selectTuning(name, t) },
+                    label = { Text(name, maxLines = 1) },
+                )
+            }
+        }
+
         // -------- Dial + note label --------
+        // In portrait the available column is very tall; constrain the dial to a
+        // compact aspect and center it so it isn't a tiny ring floating in space.
         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            if (!tuner.capturing) {
-                MicPermissionPanel(state, tuner)
-            } else {
-                TunerDial(tuner = tuner, state = state)
+            Box(
+                modifier = if (portrait) Modifier.fillMaxWidth().aspectRatio(1.5f)
+                           else Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (!tuner.capturing) {
+                    MicPermissionPanel(state, tuner)
+                } else {
+                    TunerDial(tuner = tuner, state = state)
+                }
             }
         }
 
@@ -176,8 +209,8 @@ private fun TunerDial(tuner: TunerState, state: AppState) {
 private fun DrawScope.drawDial(cents: Float?, ringColor: Color, needleColor: Color, tunedColor: Color) {
     // Place the arc center BELOW the visible area so the quarter ring fills the top.
     val cx = size.width / 2f
-    val cy = size.height * 0.78f
-    val radius = minOf(size.width * 0.42f, size.height * 0.62f)
+    val cy = size.height * 0.74f
+    val radius = minOf(size.width * 0.46f, size.height * 0.62f)
 
     // Quarter-ring arc: 90° sweep centered on north (270° in Canvas conventions).
     drawArc(

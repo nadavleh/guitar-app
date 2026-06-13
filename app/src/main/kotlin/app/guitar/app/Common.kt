@@ -187,7 +187,14 @@ fun SelectedPositionInfo(
     parsedChord: Pair<PitchClass, ChordQuality>?,
 ) {
     if (selected == null) {
-        Text("Tap any spot on the fretboard to inspect it", style = MaterialTheme.typography.bodySmall)
+        // Show the current tuning here too (handy in portrait, where the top status
+        // bar is far from the neck): low → high open-string note names.
+        val tuningNotes = tuning.openStrings.joinToString(" ") { NoteSpeller.spell(it.pitchClass) }
+        Text(
+            "Tuning:  $tuningNotes    ·    tap any spot to inspect",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         return
     }
     if (selected.stringIndex >= tuning.stringCount) return

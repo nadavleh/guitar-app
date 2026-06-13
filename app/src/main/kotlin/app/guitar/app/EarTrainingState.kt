@@ -686,6 +686,28 @@ class EarTrainingState(
 
     fun toggleFlavorReveal() { flavorRevealed = !flavorRevealed }
 
+    /** Audition degree [deg] at the currently-drawn flavor, in the current key —
+     *  lets the user compare candidate degrees (e.g. ii vs iii vs vi) by ear when
+     *  guessing. */
+    fun auditionFlavorDegree(deg: Int) {
+        playSymbolOnce(
+            NoteSpeller.spell(EarTraining.degreeRoot(flavorKey, deg, flavorMode)) + flavorQuality,
+            sustainProvider(),
+        )
+    }
+
+    /** Audition the current degree at quality [qual] — compare flavors by ear. */
+    fun auditionFlavorQuality(qual: String) {
+        playSymbolOnce(NoteSpeller.spell(flavorRootPc()) + qual, sustainProvider())
+    }
+
+    /** Audition degree [deg]'s diatonic chord in the progression key (challenge
+     *  per-bar guessing) so the user can compare candidates. */
+    fun auditionProgDegree(deg: Int) {
+        val level = if (earMixAll) ChordTypeLevel.Sevenths else chordTypeLevel
+        playSymbolOnce(EarTraining.resolve(deg, progKey, progMode, level, rng).symbol, sustainProvider())
+    }
+
     // ---- Flavor Challenge (scored rounds) ----
     val flavorChallengeTotal: Int = 10
     var flavorChActive by mutableStateOf(false)

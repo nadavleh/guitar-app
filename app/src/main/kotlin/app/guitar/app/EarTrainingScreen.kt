@@ -623,23 +623,23 @@ private fun FlavorView(ear: EarTrainingState) {
 
         Spacer(Modifier.height(14.dp))
 
-        Text("Degree", style = MaterialTheme.typography.labelMedium)
+        Text("Degree  (tap to hear & compare)", style = MaterialTheme.typography.labelMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (deg in 1..7) {
                 FilterChip(
                     selected = ear.flavorGuessDegree == deg,
-                    onClick = { ear.flavorGuessDegree = deg },
+                    onClick = { ear.flavorGuessDegree = deg; ear.auditionFlavorDegree(deg) },
                     label = { Text("$deg") },
                 )
             }
         }
         Spacer(Modifier.height(6.dp))
-        Text("Flavor", style = MaterialTheme.typography.labelMedium)
+        Text("Flavor  (tap to hear)", style = MaterialTheme.typography.labelMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (sym in ear.flavorAllowed.toList()) {
                 FilterChip(
                     selected = ear.flavorGuessQuality == sym,
-                    onClick = { ear.flavorGuessQuality = sym },
+                    onClick = { ear.flavorGuessQuality = sym; ear.auditionFlavorQuality(sym) },
                     label = { Text(if (sym.isEmpty()) "maj" else sym) },
                 )
             }
@@ -825,19 +825,19 @@ private fun FlavorChallengeView(ear: EarTrainingState) {
             OutlinedButton(onClick = { ear.playFlavorChord() }) { Text("Play chord") }
         }
         Spacer(Modifier.height(12.dp))
-        Text("Degree", style = MaterialTheme.typography.labelMedium)
+        Text("Degree  (tap to hear & compare)", style = MaterialTheme.typography.labelMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (deg in 1..7) {
                 FilterChip(selected = ear.flavorGuessDegree == deg, enabled = !ear.flavorChAnswered,
-                    onClick = { ear.flavorGuessDegree = deg }, label = { Text("$deg") })
+                    onClick = { ear.flavorGuessDegree = deg; ear.auditionFlavorDegree(deg) }, label = { Text("$deg") })
             }
         }
         Spacer(Modifier.height(6.dp))
-        Text("Flavor", style = MaterialTheme.typography.labelMedium)
+        Text("Flavor  (tap to hear)", style = MaterialTheme.typography.labelMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (sym in ear.flavorAllowed.toList()) {
                 FilterChip(selected = ear.flavorGuessQuality == sym, enabled = !ear.flavorChAnswered,
-                    onClick = { ear.flavorGuessQuality = sym },
+                    onClick = { ear.flavorGuessQuality = sym; ear.auditionFlavorQuality(sym) },
                     label = { Text(if (sym.isEmpty()) "maj" else sym) })
             }
         }
@@ -1039,7 +1039,9 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                         for ((deg, roman) in degreeOptions) {
                             FilterChip(
                                 selected = ear.challengeGuessDegree.getOrNull(i) == deg,
-                                onClick = { ear.guessChallengeDegree(i, deg) },
+                                // Tap also plays that degree's chord in the key so the
+                                // user can compare candidates (e.g. ii vs iii vs vi).
+                                onClick = { ear.guessChallengeDegree(i, deg); ear.auditionProgDegree(deg) },
                                 label = { Text(roman) },
                             )
                         }
