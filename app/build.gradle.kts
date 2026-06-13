@@ -15,8 +15,8 @@ android {
         // Major.minor versioning: first public beta = 1.0. Bump minor (1.1, 1.2…)
         // for feature releases, major (2.0) for breaking redesigns. versionCode is
         // a monotonically increasing integer: 1_00 = v1.0, 1_10 = v1.1, 2_00 = v2.0.
-        versionCode = 100
-        versionName = "1.0"
+        versionCode = 110
+        versionName = "1.1"
     }
 
     buildTypes {

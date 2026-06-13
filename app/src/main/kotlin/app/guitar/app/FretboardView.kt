@@ -2,27 +2,28 @@ package app.guitar.app
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import app.guitar.theory.FretPosition
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.Tuning
@@ -63,6 +64,15 @@ private const val FRET_NUMBER_DP = 18   // extra height below for fret-number ro
  *
  * Tap behaviour: in non-pick modes, tap = play & inspect; in pick mode, tap toggles selection.
  * The selected-position amber ring still appears in all modes for the most recently tapped cell.
+ *
+ * Zoom/pan: the neck is drawn to fill a FIXED viewport (whatever box the caller
+ * gives it) at scale 1 — the whole neck is visible. A pinch gesture scales it
+ * (both axes) between [minScale]=0.5 (whole neck shrinks to half the viewport)
+ * and [maxScale]=stringCount/2 (zoom in until ~2 strings fill the height). A
+ * drag pans the zoomed neck, clamped so it can't be pulled off-screen. The
+ * transform is purely a render-layer effect (graphicsLayer), so tap hit-testing
+ * still uses the Canvas's un-transformed coordinate space — Compose maps pointer
+ * coordinates back through the layer for us, and [pixelToPosition] is unchanged.
  */
 @Composable
 fun FretboardView(
@@ -79,37 +89,72 @@ fun FretboardView(
     playOnTouchDown: Boolean = false,
 ) {
     val measurer = rememberTextMeasurer()
-    val scrollState = rememberScrollState()
 
-    // The neck is rendered at a comfortable fixed width-per-fret and placed in a
-    // horizontal scroller, so the user can swipe left/right to reveal more frets.
-    // The scroller consumes horizontal drags, which is what lets a swipe scroll
-    // instead of triggering a note (combined with the tap-release gesture below).
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val perFret = 72.dp
-        val neckWidth = perFret * numFrets + 100.dp   // + open column + nut
-        val contentWidth = if (neckWidth > maxWidth) neckWidth else maxWidth
+    // Zoom/pan state. scale 1 = whole neck fills the viewport. The neck is drawn
+    // into a fixed-size Canvas and only the render layer is scaled/translated, so
+    // the layout never changes size — the user pinches/drags within a fixed frame.
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+    val minScale = 0.5f                                   // zoom out: neck → half the viewport
+    val maxScale = (tuning.stringCount / 2f).coerceAtLeast(1.5f)  // zoom in: ~2 strings tall
 
-        val tapModifier = Modifier.pointerInput(tuning, numFrets, leftHanded, playOnTouchDown) {
-            val handler: (Offset) -> Unit = { off ->
-                val pos = pixelToPosition(
-                    off, size.width.toFloat(), size.height.toFloat(),
-                    tuning.stringCount, numFrets, leftHanded
-                )
-                if (pos != null) onTap(pos)
-            }
-            if (playOnTouchDown) {
-                detectTapGestures(onPress = { off -> handler(off) })
-            } else {
-                // onTap fires only when the gesture stayed within touch-slop (a real
-                // tap). A horizontal drag is claimed by horizontalScroll and never
-                // becomes a tap, so scrolling the neck won't play anything.
-                detectTapGestures(onTap = handler)
-            }
+    val tapModifier = Modifier.pointerInput(tuning, numFrets, leftHanded, playOnTouchDown) {
+        val handler: (Offset) -> Unit = { off ->
+            val pos = pixelToPosition(
+                off, size.width.toFloat(), size.height.toFloat(),
+                tuning.stringCount, numFrets, leftHanded
+            )
+            if (pos != null) onTap(pos)
         }
+        if (playOnTouchDown) {
+            detectTapGestures(onPress = { off -> handler(off) })
+        } else {
+            // onTap fires only when the gesture stayed within touch-slop (a real
+            // tap). A drag is claimed by the transform gesture below and never
+            // becomes a tap, so panning the neck won't play anything.
+            detectTapGestures(onTap = handler)
+        }
+    }
 
-        Box(modifier = Modifier.fillMaxSize().horizontalScroll(scrollState)) {
-            Canvas(modifier = Modifier.fillMaxHeight().width(contentWidth).then(tapModifier)) {
+    val zoomModifier = Modifier.pointerInput(minScale, maxScale) {
+        detectTransformGestures { centroid, pan, zoom, _ ->
+            val oldScale = scale
+            val newScale = (oldScale * zoom).coerceIn(minScale, maxScale)
+            // Focal-point zoom: keep the content under the pinch centroid fixed
+            // (then apply the finger pan on top). graphicsLayer's origin is the
+            // viewport center c; a content-local point q maps to screen as
+            //   c + (q - c)*scale + offset
+            // Holding q's screen position across the scale change gives:
+            //   newOffset = oldOffset + (q - c)*(oldScale - newScale)
+            // The centroid is reported in the same un-transformed local space as
+            // taps, so it plays the role of q directly.
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            scale = newScale
+            // graphicsLayer center origin: content can travel ±(size*(scale-1)/2)
+            // before an edge reaches the viewport edge. Below scale 1 the neck is
+            // smaller than the viewport, so it stays centered (range collapses).
+            val maxX = max(0f, size.width * (newScale - 1f) / 2f)
+            val maxY = max(0f, size.height * (newScale - 1f) / 2f)
+            offsetX = (offsetX + pan.x + (centroid.x - cx) * (oldScale - newScale)).coerceIn(-maxX, maxX)
+            offsetY = (offsetY + pan.y + (centroid.y - cy) * (oldScale - newScale)).coerceIn(-maxY, maxY)
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize().clipToBounds()) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    translationX = offsetX
+                    translationY = offsetY
+                }
+                .then(zoomModifier)
+                .then(tapModifier)
+        ) {
         val w = size.width
         val totalH = size.height
         // Reserve the bottom strip for fret numbers
@@ -380,9 +425,8 @@ fun FretboardView(
                 h + (numberStripH - openLabel.size.height) / 2f
             )
         )
-            }  // Canvas
-        }      // scrolling Box
-    }          // BoxWithConstraints
+        }  // Canvas
+    }      // viewport Box (fixed; clips the zoomed/panned neck)
 }
 
 private fun positionToPixel(
