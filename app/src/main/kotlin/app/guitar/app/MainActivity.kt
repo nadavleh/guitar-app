@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -205,46 +206,55 @@ fun App(audio: AudioEngine) {
         }
     }
 
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()   // keep content clear of status bar + nav gesture
     ) {
-        if (state.currentSheet == Sheet.Loop) {
-            // Loop takes over the whole screen — it has its own controls and Back button.
-            LoopScreen(state)
-        } else if (state.currentSheet == Sheet.Tuner) {
-            TunerScreen(state, onBack = { state.closeSheet() })
-        } else if (state.currentSheet == Sheet.EarTraining) {
-            EarTrainingScreen(state, onBack = { state.closeSheet() })
-        } else if (state.currentSheet == Sheet.SambaLooper) {
-            SambaLooperScreen(state, onBack = { state.closeSheet() })
-        } else {
-            StatusBar(state)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            // Fretboard fills all remaining vertical space (landscape-locked, so this
-            // is always wider than tall — renders as a horizontal neck).
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp)
-            ) {
-                FretboardView(
-                    tuning = state.liveTuning,
-                    marks = marks,
-                    selectedPosition = state.selectedPosition,
-                    onTap = { pos ->
-                        if (state.displayMode == DisplayMode.Pick) state.togglePick(pos)
-                        else state.tapPosition(pos)
-                    },
-                    numFrets = DISPLAY_FRETS,
-                    leftHanded = state.leftHanded,
-                )
+        // Concept-A persistent navigation rail (milestone 1). Always visible so
+        // the user can jump between tools without the menu.
+        NavRail(state)
+        HorizontalDivider(
+            modifier = Modifier.fillMaxHeight().width(1.dp),
+            color = MaterialTheme.colorScheme.outline,
+        )
+        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            if (state.currentSheet == Sheet.Loop) {
+                // Loop takes over the content area — it has its own controls and Back button.
+                LoopScreen(state)
+            } else if (state.currentSheet == Sheet.Tuner) {
+                TunerScreen(state, onBack = { state.closeSheet() })
+            } else if (state.currentSheet == Sheet.EarTraining) {
+                EarTrainingScreen(state, onBack = { state.closeSheet() })
+            } else if (state.currentSheet == Sheet.SambaLooper) {
+                SambaLooperScreen(state, onBack = { state.closeSheet() })
+            } else {
+                StatusBar(state)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                // Fretboard fills all remaining vertical space (landscape-locked, so this
+                // is always wider than tall — renders as a horizontal neck).
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
+                ) {
+                    FretboardView(
+                        tuning = state.liveTuning,
+                        marks = marks,
+                        selectedPosition = state.selectedPosition,
+                        onTap = { pos ->
+                            if (state.displayMode == DisplayMode.Pick) state.togglePick(pos)
+                            else state.tapPosition(pos)
+                        },
+                        numFrets = DISPLAY_FRETS,
+                        leftHanded = state.leftHanded,
+                    )
+                }
+                SelectedPositionInfo(state.liveTuning, state.selectedPosition, parsedChord)
+                ContextBar(state, chordShapes, scalePositions)
             }
-            SelectedPositionInfo(state.liveTuning, state.selectedPosition, parsedChord)
-            ContextBar(state, chordShapes, scalePositions)
         }
     }
 
