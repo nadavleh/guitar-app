@@ -253,29 +253,24 @@ fun App(audio: AudioEngine) {
                     )
                 }
                 SelectedPositionInfo(state.liveTuning, state.selectedPosition, parsedChord)
-                ContextBar(state, chordShapes, scalePositions)
+                // Concept-A control dock (milestone 2): in-place controls for the
+                // current neck mode, replacing the old Chord/Scale/Pick modal sheets.
+                ControlDock(state, chordShapes, scalePositions)
             }
         }
     }
 
-    // ---------- Bottom sheet (Chord / Scale / Pick / Options) ----------
-    if (state.currentSheet != null && state.currentSheet != Sheet.Loop && state.currentSheet != Sheet.Tuner && state.currentSheet != Sheet.EarTraining && state.currentSheet != Sheet.SambaLooper) {
+    // ---------- Options bottom sheet ----------
+    // Chord / Scale / Pick are now the in-place ControlDock (milestone 2), so only
+    // the settings-heavy Options screen remains a modal sheet.
+    if (state.currentSheet == Sheet.Options) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
         ModalBottomSheet(
             onDismissRequest = { state.closeSheet() },
             sheetState = sheetState,
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
-            when (state.currentSheet!!) {
-                Sheet.Chord   -> ChordSheet(state)
-                Sheet.Scale   -> ScaleSheet(state)
-                Sheet.Pick    -> PickSheet(state)
-                Sheet.Options -> OptionsSheet(state, customTunings)
-                Sheet.Loop        -> {} // handled by full-screen route above
-                Sheet.Tuner       -> {} // handled by full-screen route above
-                Sheet.EarTraining -> {} // handled by full-screen route above
-                Sheet.SambaLooper -> {} // handled by full-screen route above
-            }
+            OptionsSheet(state, customTunings)
         }
     }
 }
