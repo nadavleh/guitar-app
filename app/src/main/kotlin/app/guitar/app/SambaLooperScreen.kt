@@ -63,9 +63,10 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
         // ----- Header -----
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(
-                "DRUM MACHINE · SAMBA",
+                "DRUMS",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
                 modifier = Modifier.weight(1f),
             )
             if (samba.isPlaying) {
@@ -111,9 +112,10 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 Spacer(Modifier.width(ROW_LABEL_DP.dp))
                 Text(
-                    "bar 1: beat 1 · beat 2          bar 2: beat 1 · beat 2",
+                    "bar 1  ·  bar 2   (2/4, sixteenths)",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
         }

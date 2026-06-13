@@ -437,7 +437,7 @@ private fun ChordSlotCard(
         colors = CardDefaults.cardColors(containerColor = bg),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp, horizontal = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -446,19 +446,22 @@ private fun ChordSlotCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(6.dp))
+            // Single line: short "tap" placeholder when hidden so the narrow card
+            // (4-across in portrait) never wraps the text into a column.
             Text(
-                if (hidden) "tap to reveal" else label,
-                fontSize = if (hidden) 14.sp else 30.sp,
+                if (hidden) "tap" else label,
+                fontSize = if (hidden) 13.sp else 26.sp,
                 fontWeight = if (hidden) FontWeight.Normal else FontWeight.SemiBold,
                 color = if (hidden) MaterialTheme.colorScheme.onSurfaceVariant
                         else MaterialTheme.colorScheme.onTertiaryContainer,
+                maxLines = 1,
             )
             Spacer(Modifier.height(6.dp))
             OutlinedButton(
                 onClick = onPlay,
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 10.dp, vertical = 2.dp),
-            ) { Text("▶ Play") }
+                    horizontal = 8.dp, vertical = 2.dp),
+            ) { Text("▶") }
         }
     }
 }
