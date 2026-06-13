@@ -393,6 +393,23 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
+                Text("Play note on touch-down", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Off (default): notes play on tap-release, so swiping the neck to " +
+                        "see more frets won't sound a note. On: notes fire the instant you touch.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = state.tapOnTouchDown,
+                onCheckedChange = { state.setTapOnTouchDown(it) },
+            )
+        }
+
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text("Jazz / shell voicings", style = MaterialTheme.typography.bodyMedium)
                 Text(
                     "Drop the 5th (and root for 7+ chords); favor 2-4 note voicings.",

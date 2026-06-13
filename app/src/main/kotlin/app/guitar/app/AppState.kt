@@ -108,6 +108,16 @@ class AppState(
      *  Global: used by single-strums, the loop, and ear-training. */
     var strumMs by mutableStateOf(30)
 
+    /** Fretboard tap behaviour. false (default) = play on tap-release so a swipe
+     *  scrolls the neck without sounding a note; true = play on touch-down. */
+    var tapOnTouchDown by mutableStateOf(false)
+
+    @JvmName("applyTapOnTouchDown")
+    fun setTapOnTouchDown(value: Boolean) {
+        tapOnTouchDown = value
+        scope.launch { repo.setTapOnTouchDown(value) }
+    }
+
     @JvmName("applyStrumMs")
     fun setStrumMs(value: Int) {
         val clamped = value.coerceIn(0, 150)

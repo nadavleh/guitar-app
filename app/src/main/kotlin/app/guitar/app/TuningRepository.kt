@@ -122,6 +122,17 @@ class TuningRepository(private val context: Context) {
         }
     }
 
+    private val keyTapOnTouchDown = booleanPreferencesKey("tap_on_touch_down")
+
+    /** Whether tapping the fretboard plays on touch-down (true) or tap-release
+     *  (false, default — lets horizontal swipes scroll without sounding a note). */
+    val tapOnTouchDown: Flow<Boolean> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyTapOnTouchDown] ?: false }
+
+    suspend fun setTapOnTouchDown(value: Boolean) {
+        context.tuningDataStore.edit { prefs -> prefs[keyTapOnTouchDown] = value }
+    }
+
     private val keyInstrument = stringPreferencesKey("instrument")
 
     /** Selected instrument (Guitar / Cavaquinho). Default Guitar. */

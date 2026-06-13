@@ -2,7 +2,13 @@ package app.guitar.app
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -16,6 +22,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import app.guitar.theory.FretPosition
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.Tuning
@@ -66,30 +73,43 @@ fun FretboardView(
     numFrets: Int = 12,
     selectedPosition: FretPosition? = null,
     leftHanded: Boolean = false,
+    /** When true, a note fires on touch-DOWN (immediate, but also fires at the
+     *  start of a horizontal swipe). When false (default), the note fires only on
+     *  a clean tap-release, so swiping the neck to scroll never sounds a note. */
+    playOnTouchDown: Boolean = false,
 ) {
     val measurer = rememberTextMeasurer()
-    // Fretboard fills whatever rectangle the parent gives it. With the activity
-    // locked to landscape (see AndroidManifest) the available space is always
-    // wider than tall, so the rendering naturally renders as a horizontal neck.
+    val scrollState = rememberScrollState()
 
-    Canvas(
-        modifier = modifier
-            .fillMaxSize()
-            .pointerInput(tuning, numFrets, leftHanded) {
-                // Fire on touch-down (onPress), NOT on lift (onTap), so the note
-                // sounds as soon as the user's finger meets the string — the way
-                // a real string responds.
-                detectTapGestures(
-                    onPress = { off ->
-                        val pos = pixelToPosition(
-                            off, size.width.toFloat(), size.height.toFloat(),
-                            tuning.stringCount, numFrets, leftHanded
-                        )
-                        if (pos != null) onTap(pos)
-                    }
+    // The neck is rendered at a comfortable fixed width-per-fret and placed in a
+    // horizontal scroller, so the user can swipe left/right to reveal more frets.
+    // The scroller consumes horizontal drags, which is what lets a swipe scroll
+    // instead of triggering a note (combined with the tap-release gesture below).
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val perFret = 72.dp
+        val neckWidth = perFret * numFrets + 100.dp   // + open column + nut
+        val contentWidth = if (neckWidth > maxWidth) neckWidth else maxWidth
+
+        val tapModifier = Modifier.pointerInput(tuning, numFrets, leftHanded, playOnTouchDown) {
+            val handler: (Offset) -> Unit = { off ->
+                val pos = pixelToPosition(
+                    off, size.width.toFloat(), size.height.toFloat(),
+                    tuning.stringCount, numFrets, leftHanded
                 )
+                if (pos != null) onTap(pos)
             }
-    ) {
+            if (playOnTouchDown) {
+                detectTapGestures(onPress = { off -> handler(off) })
+            } else {
+                // onTap fires only when the gesture stayed within touch-slop (a real
+                // tap). A horizontal drag is claimed by horizontalScroll and never
+                // becomes a tap, so scrolling the neck won't play anything.
+                detectTapGestures(onTap = handler)
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxSize().horizontalScroll(scrollState)) {
+            Canvas(modifier = Modifier.fillMaxHeight().width(contentWidth).then(tapModifier)) {
         val w = size.width
         val totalH = size.height
         // Reserve the bottom strip for fret numbers
@@ -356,7 +376,9 @@ fun FretboardView(
                 h + (numberStripH - openLabel.size.height) / 2f
             )
         )
-    }
+            }  // Canvas
+        }      // scrolling Box
+    }          // BoxWithConstraints
 }
 
 private fun positionToPixel(

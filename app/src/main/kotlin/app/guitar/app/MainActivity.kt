@@ -99,6 +99,7 @@ fun App(audio: AudioEngine) {
     val persistedA4 by repo.a4Hz.collectAsState(initial = 440f)
     val persistedSustain by repo.ringSustainMs.collectAsState(initial = 1500)
     val persistedStrum by repo.strumMs.collectAsState(initial = 30)
+    val persistedTapOnTouchDown by repo.tapOnTouchDown.collectAsState(initial = false)
     val persistedInstrument by repo.instrument.collectAsState(initial = app.guitar.theory.Instrument.Guitar.name)
 
     LaunchedEffect(savedSelected, customTunings) {
@@ -121,6 +122,7 @@ fun App(audio: AudioEngine) {
     LaunchedEffect(persistedA4) { state.a4Hz = persistedA4 }
     LaunchedEffect(persistedSustain) { state.ringSustainMs = persistedSustain }
     LaunchedEffect(persistedStrum) { state.strumMs = persistedStrum }
+    LaunchedEffect(persistedTapOnTouchDown) { state.tapOnTouchDown = persistedTapOnTouchDown }
     LaunchedEffect(persistedInstrument) {
         state.instrument = runCatching { app.guitar.theory.Instrument.valueOf(persistedInstrument) }
             .getOrDefault(app.guitar.theory.Instrument.Guitar)
@@ -250,27 +252,35 @@ fun App(audio: AudioEngine) {
                         },
                         numFrets = DISPLAY_FRETS,
                         leftHanded = state.leftHanded,
+                        playOnTouchDown = state.tapOnTouchDown,
                     )
                 }
                 SelectedPositionInfo(state.liveTuning, state.selectedPosition, parsedChord)
-                // Concept-A control dock (milestone 2): in-place controls for the
-                // current neck mode, replacing the old Chord/Scale/Pick modal sheets.
-                ControlDock(state, chordShapes, scalePositions)
+                // Tool controls live in the draggable bottom sheets (opened from the
+                // rail or the menu), so the neck keeps its full height here.
+                ContextBar(state, chordShapes, scalePositions)
             }
         }
     }
 
-    // ---------- Options bottom sheet ----------
-    // Chord / Scale / Pick are now the in-place ControlDock (milestone 2), so only
-    // the settings-heavy Options screen remains a modal sheet.
-    if (state.currentSheet == Sheet.Options) {
+    // ---------- Tool bottom sheets (drag up from the bottom; scrollable) ----------
+    // Chord / Scale / Pick / Options open as draggable bottom sheets so the neck
+    // keeps its full height. Loop / Tuner / Ear / Drums are full-screen routes.
+    val sheet = state.currentSheet
+    if (sheet == Sheet.Chord || sheet == Sheet.Scale || sheet == Sheet.Pick || sheet == Sheet.Options) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
         ModalBottomSheet(
             onDismissRequest = { state.closeSheet() },
             sheetState = sheetState,
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
-            OptionsSheet(state, customTunings)
+            when (sheet) {
+                Sheet.Chord   -> ChordSheet(state)
+                Sheet.Scale   -> ScaleSheet(state)
+                Sheet.Pick    -> PickSheet(state)
+                Sheet.Options -> OptionsSheet(state, customTunings)
+                else -> {}
+            }
         }
     }
 }
