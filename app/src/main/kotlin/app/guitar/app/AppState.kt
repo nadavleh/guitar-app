@@ -49,6 +49,10 @@ class AppState(
     private val repo: TuningRepository,
     val scope: CoroutineScope,
     val audio: AudioEngine,
+    /** Loads a bundled drum one-shot for (instrument, voice), or null to fall back
+     *  to the synth. Supplied by the Activity (needs asset access). */
+    private val drumSampleLoader: (app.guitar.theory.PercussionInstrument, Int) -> FloatArray? =
+        { _, _ -> null },
 ) {
     var instrument by mutableStateOf(Instrument.Guitar)
     var tuningName by mutableStateOf("Standard")
@@ -163,7 +167,7 @@ class AppState(
     /** App-lifetime samba percussion looper (drum-machine tab). Lazily created so
      *  the pattern you build persists across leaving and returning to the screen. */
     val sambaLooper: SambaLooperState by lazy {
-        SambaLooperState(audio = audio, scope = scope, repo = repo)
+        SambaLooperState(audio = audio, scope = scope, repo = repo, sampleLoader = drumSampleLoader)
     }
 
     @JvmName("applyA4Hz")

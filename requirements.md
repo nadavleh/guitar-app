@@ -1,6 +1,6 @@
 # Chorect — Requirements
 
-**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.3.0 (semantic `major.minor.patch`, versionCode 10300).
+**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.3.1 (semantic `major.minor.patch`, versionCode 10301).
 
 **Versioning policy:**
 
@@ -348,7 +348,9 @@ Strum spread and ring sustain are global and shared by single strums, the chord 
 
 ### 8.3 Percussion Playback
 
-A `PercussionSynth` synthesizes samba percussion voices (cached per voice) for the drum machine (§10.8).
+The drum machine (§10.8) plays each samba voice from a **bundled recorded one-shot sample** — WAV assets under `assets/drums/`, decoded to mono 44.1 kHz by a `WavDecoder` (a minimal RIFF/WAVE decoder supporting PCM 8/16/24/32-bit and IEEE-float 32-bit, with multi-channel down-mix and linear resampling). Decoded buffers are cached per voice. When a sample is missing for a given (instrument, voice), the on-device `PercussionSynth` is used as a fallback so every voice always sounds.
+
+> **Note:** The bundled samples are placeholders to be replaced with licensed recordings before public release.
 
 ---
 
@@ -499,7 +501,7 @@ Available app-wide (Options, and a quick-access button on the tool screens):
 
 A samba percussion looper (drum-machine tab): an editable 16-slot pattern with per-track **mute** and **solo**, per-instrument **voice auditioning** (tap a row label to open its voice menu, or tap a cell to cycle and preview), and an adjustable BPM. The pattern persists across leaving and returning to the screen.
 
-**Percussion voices.** Four samba instruments, each offering several distinct synthesized voices (a cell stores which voice, or silence):
+**Percussion voices.** Four samba instruments, each offering several distinct voices (a cell stores which voice, or silence). Each voice plays a **bundled recorded one-shot sample** (WAV under `assets/drums/`, decoded to mono 44.1 kHz via `WavDecoder`), falling back to the on-device `PercussionSynth` if its sample is absent (§8.3). The bundled samples are placeholders to be replaced with licensed recordings before public release.
 
 * **Surdo** (3) — open ringing bass, muted bass, light muted tap.
 * **Tamborim** (3) — high fast-attack clack, muted (choked) clack, light tap.
@@ -602,7 +604,8 @@ The app separates musical logic from the UI via three Gradle modules. The `theor
 
 :audio    (Android audio engine)
   AudioEngine / AudioTrackEngine     (note, chord/strum, frequency, sample playback)
-  Timbre / PercussionSynth
+  Timbre / PercussionSynth           (synth fallback for drum voices)
+  WavDecoder                         (RIFF/WAVE → mono 44.1 kHz, for bundled drum samples)
 
 :app      (Jetpack Compose UI)
   MainActivity / App                 (nav rail + content area + bottom sheets)

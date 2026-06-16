@@ -20,8 +20,9 @@ import kotlinx.coroutines.launch
  * State + scheduler for the samba percussion looper (drum-machine tab).
  *
  * Holds the editable [pattern], transport ([bpm], [isPlaying], [currentSlot]),
- * and a synth-buffer cache. Voices are synthesized once on first use and replayed
- * from the cache, so the per-slot tick just pushes ready buffers into the mixer.
+ * and a per-voice buffer cache. Each voice is loaded once on first use — a bundled
+ * one-shot sample via [sampleLoader], falling back to [PercussionSynth] — then
+ * replayed from the cache, so the per-slot tick just pushes ready buffers into the mixer.
  *
  * App-lifetime (owned by AppState), so leaving the screen and coming back keeps
  * the pattern you built.
@@ -31,6 +32,9 @@ class SambaLooperState(
     private val audio: AudioEngine,
     private val scope: CoroutineScope,
     private val repo: TuningRepository,
+    /** Loads a bundled one-shot sample for (instrument, voice), or null to fall
+     *  back to the built-in synth. Injected so the pure state stays Context-free. */
+    private val sampleLoader: (PercussionInstrument, Int) -> FloatArray? = { _, _ -> null },
 ) {
     var pattern by mutableStateOf(PercussionPattern.SAMBA)
         private set
@@ -64,7 +68,10 @@ class SambaLooperState(
     private val cache = HashMap<Pair<PercussionInstrument, Int>, FloatArray>()
 
     private fun buffer(instrument: PercussionInstrument, voiceIndex: Int): FloatArray =
-        cache.getOrPut(instrument to voiceIndex) { synth.synthesize(instrument, voiceIndex) }
+        cache.getOrPut(instrument to voiceIndex) {
+            // Prefer a bundled sample; fall back to the on-device synth if absent.
+            sampleLoader(instrument, voiceIndex) ?: synth.synthesize(instrument, voiceIndex)
+        }
 
     /** Cycle a cell's voice and, if it became audible, preview the new voice. */
     fun toggleSlot(instrument: PercussionInstrument, slot: Int) {

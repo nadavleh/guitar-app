@@ -2,7 +2,7 @@
 
 This document is the **single source of truth** for the app's look-and-feel and primary interactions. The Compose code in `app/` should match these specs. Update this doc before changing visual code so we don't drift.
 
-Status: **v2 — "Studio"** (app version **1.3.0**) — the architecture is a persistent left **navigation rail** plus a content area that is, by default, the full-height fretboard. Tools open as draggable bottom sheets (Fretboard, Options) or full-screen routes (Loop, Tuner, Ear, Drums). This superseded the earlier v1 "single screen + bottom mode bar" concept; this doc now reflects the as-built v2.
+Status: **v2 — "Studio"** (app version **1.3.1**) — the architecture is a persistent left **navigation rail** plus a content area that is, by default, the full-height fretboard. Tools open as draggable bottom sheets (Fretboard, Options) or full-screen routes (Loop, Tuner, Ear, Drums). This superseded the earlier v1 "single screen + bottom mode bar" concept; this doc now reflects the as-built v2.
 
 ---
 
@@ -397,6 +397,8 @@ Challenge (`AugDimChallengeView`): same palette on the config screen (Start is d
 ## 11. Drums screen (`SambaLooperScreen.kt`)
 
 A full-screen route — a step-sequencer drum machine. The **whole page is vertically scrollable** (`verticalScroll`) so it fits short-height (landscape) layouts.
+
+- **Voice audio**: the drum voices now sound from **bundled recorded one-shot samples** (WAV assets under `assets/drums/<instrument>_<voice>.wav`, decoded once and cached), with the on-device synth as a **fallback** when a sample is absent. The on-screen behavior — cell cycling, the `▾` voice-audition popup, M/S, save/load, pinch/scroll — is **unchanged**.
 
 - **Header (compact, single row for portrait)**: `DRUMS` title, Play/Stop, AudioQuick, `Back`.
 - **BPM** row: label + slider (60–200).

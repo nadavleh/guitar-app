@@ -89,7 +89,17 @@ fun App(audio: AudioEngine) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repo = remember { TuningRepository(context.applicationContext) }
-    val state = remember { AppState(repo, scope, audio) }
+    // Loads bundled drum one-shots from assets/drums/<instrument>_<voice>.wav,
+    // decoded to mono 44.1 kHz; null → SambaLooperState falls back to the synth.
+    val drumSampleLoader = remember(context) {
+        loader@{ inst: app.guitar.theory.PercussionInstrument, voice: Int ->
+            val name = "drums/${inst.name.lowercase()}_$voice.wav"
+            runCatching {
+                context.applicationContext.assets.open(name).use { it.readBytes() }
+            }.getOrNull()?.let { app.guitar.audio.WavDecoder.decode(it) }
+        }
+    }
+    val state = remember { AppState(repo, scope, audio, drumSampleLoader) }
 
     val customTunings by state.customTunings.collectAsState(initial = emptyMap())
     val savedSelected by state.savedSelectedName.collectAsState(initial = "Standard")

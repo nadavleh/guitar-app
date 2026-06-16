@@ -12,7 +12,7 @@
     <img alt="Language: Kotlin" src="https://img.shields.io/badge/language-Kotlin-7F52FF?logo=kotlin&logoColor=white">
     <img alt="UI: Jetpack Compose" src="https://img.shields.io/badge/ui-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white">
     <img alt="minSdk: 26" src="https://img.shields.io/badge/minSdk-26-blue">
-    <img alt="Version: 1.3.0" src="https://img.shields.io/badge/version-1.3.0-blue">
+    <img alt="Version: 1.3.1" src="https://img.shields.io/badge/version-1.3.1-blue">
     <img alt="Tests: 700+ passing" src="https://img.shields.io/badge/tests-700%2B%20passing-brightgreen">
     <img alt="License: TBD" src="https://img.shields.io/badge/license-TBD-lightgrey">
   </p>
@@ -43,7 +43,7 @@ It's built **Android-first** in native Kotlin so the music-theory engine can sta
 
 > Three Gradle modules: `theory` (pure JVM), `audio` (Android lib), `app` (Compose UI). The theory engine carries the bulk of the suite's 700+ tests that run in milliseconds, with zero emulator dependency.
 
-The current release is **version 1.3.0** (versionCode 10300). Versioning is **major.minor.patch**: bump the **minor** (1.2 → 1.3) for new features, the **patch** (1.3.0 → 1.3.1) for bug fixes, and the **major** (2.0.0) for breaking redesigns. Each build is emitted as `Chorect_beta_V<version>.apk` (e.g. `Chorect_beta_V1.3.0.apk`), and previous releases are kept in a `releases/` folder rather than overwritten.
+The current release is **version 1.3.1** (versionCode 10301) — a **patch** that fixes the drum-machine sounds (it now plays bundled one-shot samples rather than pure synthesis; see [Drum machine](#-drum-machine)). Versioning is **major.minor.patch**: bump the **minor** (1.2 → 1.3) for new features, the **patch** (1.3.0 → 1.3.1) for bug fixes, and the **major** (2.0.0) for breaking redesigns. Each build is emitted as `Chorect_beta_V<version>.apk` (e.g. `Chorect_beta_V1.3.1.apk`), and previous releases are kept in a `releases/` folder rather than overwritten.
 
 ---
 
@@ -116,12 +116,14 @@ The diatonic Extended / "Mix all" pool likewise now reaches **6th** and **add9**
 
 A samba/percussion looper tab (step sequencer) with **Surdo, Tamborim, Pandeiro, and Agogô** tracks. Per-track mute/solo, tap-to-cycle per-cell voices, and per-instrument voice auditioning. Designed to play alongside the chord-progression looper as a backing track.
 
-The drum voices are synthesized on the fly (no samples) and were redesigned and expanded:
+As of **1.3.1**, the drum voices play **bundled one-shot WAV samples** — real recorded Latin-percussion hits shipped in `app/src/main/assets/drums/<instrument>_<voice>.wav` and decoded to mono 44.1 kHz on first use by a small [`WavDecoder`](audio/src/main/kotlin/app/guitar/audio/WavDecoder.kt) (it handles PCM 8/16/24/32-bit and 32-bit float, any channel count, and linearly resamples off-rate files). If a sample file is missing, that voice **falls back to the built-in synth** ([`PercussionSynth`](audio/src/main/kotlin/app/guitar/audio/PercussionSynth.kt)) so the drum machine always sounds. The per-instrument voice layout (also reflected by the synth fallback) is:
 
 - **Surdo** (3 voices): an open ringing bass boom, a muted (damped) bass, and a light muted tap.
 - **Tamborim** (3 voices): a high, fast-attack "clack", a muted (choked) clack, and a light tap.
 - **Pandeiro** (5 voices): two low-mid bass notes (open + muted), a slap, and two jingle/platinela shimmers (one slightly higher).
 - **Agogô** (2 voices): a low bell and a high bell.
+
+> ⚠️ The bundled sample files are **placeholders** and must be swapped for properly-licensed samples before any public release.
 
 **Save / load custom beats.** Name and save the beat you've built, then reload it later from the **Load…** menu; the built-in groove is always available as **"stock samba"**. Saved beats persist across launches via DataStore.
 
@@ -183,7 +185,7 @@ From the project root:
 adb shell am start -n app.guitar/app.guitar.app.MainActivity   # launch
 ```
 
-The debug APK is named after the version, e.g. `Chorect_beta_V1.3.0.apk`, and prior releases are archived under `releases/`.
+The debug APK is named after the version, e.g. `Chorect_beta_V1.3.1.apk`, and prior releases are archived under `releases/`.
 
 **On Windows** you can also just double-click `launch-app.bat` — it starts the emulator (with audio) if needed, builds, installs, and launches in one shot.
 
@@ -224,7 +226,8 @@ Chorect/
 │       ├── AudioEngine.kt                     # interface + no-op
 │       ├── AudioTrackEngine.kt                # MODE_STREAM continuous-output mixer
 │       ├── PluckedSynth.kt                    # pure-Kotlin Karplus-Strong DSP
-│       ├── PercussionSynth.kt                 # pure-Kotlin percussion voices
+│       ├── PercussionSynth.kt                 # pure-Kotlin percussion voices (synth fallback)
+│       ├── WavDecoder.kt                       # RIFF/WAVE → mono 44.1 kHz, for bundled drum samples
 │       ├── PitchDetector.kt                   # pure-Kotlin YIN
 │       ├── PitchAnalysis.kt                   # Hz ↔ MIDI ↔ cents under configurable A4
 │       └── MicInput.kt                        # AudioRecord wrapper
@@ -271,7 +274,7 @@ Chorect/
 - **Ear-training progression resolver** — every Roman degree in major and minor resolves to a parseable chord symbol; "ii"+"m7" displays as `ii7` (not `iim7`); harmonic-minor V is used for the cadence; every curated advanced (non-diatonic) progression resolves to playable chords in any key.
 - **Chord inversions** — `Inversions.midis()` voices each inversion (root / 1st / 2nd / 3rd) with the correct bass tone, low→high.
 - **Note2Chord** — labels for every diatonic non-chord-tone in both major and minor; random sampling covers all 12 roots.
-- **Percussion** — pattern cycling / voice selection for the drum machine, the synthesized percussion voices (`PercussionSynth`), and the save/load pattern codec round-trip.
+- **Percussion** — pattern cycling / voice selection for the drum machine, the synthesized percussion voices (`PercussionSynth`), the bundled-sample `WavDecoder` (PCM 8/16/24/32-bit + float, multi-channel averaging, resampling), and the save/load pattern codec round-trip.
 - **Requirements** spec mirror — the tests from `requirements.md` §13 pass.
 
 ---
@@ -299,7 +302,7 @@ Chorect/
 | ✅ | Live chord on the fretboard while the loop plays |
 | ✅ | Adaptive launcher icon (rosewood fretboard slice) |
 | ✅ | Cavaquinho instrument — instrument toggle, DGBe/DGBD tunings, 4-string fretboard, per-instrument timbre |
-| ✅ | Samba drum machine — percussion step-sequencer (Surdo / Tamborim / Pandeiro / Agogô) with redesigned/expanded synth voices, save/load custom beats (+ "stock samba"), always-visible mute/solo, vertical scroll, and 2-finger pinch-zoom/pan |
+| ✅ | Samba drum machine — percussion step-sequencer (Surdo / Tamborim / Pandeiro / Agogô) with bundled one-shot WAV samples (synth fallback), save/load custom beats (+ "stock samba"), always-visible mute/solo, vertical scroll, and 2-finger pinch-zoom/pan |
 | 📅 | Cavaquinho curated chord library |
 | 📅 | Custom-chord favorites |
 | 📅 | iOS port via Kotlin Multiplatform |
