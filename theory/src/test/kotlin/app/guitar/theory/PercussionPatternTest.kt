@@ -93,4 +93,20 @@ class PercussionPatternTest {
         assertEquals(125L, PercussionTiming.slotMs(120))
         assertEquals(2000L, PercussionTiming.loopMs(120))
     }
+
+    @Test fun `zero swing keeps every slot straight`() {
+        for (s in 0 until PERCUSSION_SLOTS) {
+            assertEquals(PercussionTiming.slotMs(120), PercussionTiming.swungSlotMs(s, 120, 0))
+        }
+    }
+
+    @Test fun `swing delays off-16ths but preserves loop length`() {
+        val base = PercussionTiming.slotMs(120) // 125
+        // 100% swing: even→odd pair stretches to 3:1 (≈1.5x then 0.5x of base).
+        assertEquals((base * 1.5).toLong(), PercussionTiming.swungSlotMs(0, 120, 100))
+        assertEquals((base * 0.5).toLong(), PercussionTiming.swungSlotMs(1, 120, 100))
+        // Total loop length is unchanged (within per-slot integer-ms rounding).
+        val total = (0 until PERCUSSION_SLOTS).sumOf { PercussionTiming.swungSlotMs(it, 120, 100) }
+        assertTrue(kotlin.math.abs(total - PercussionTiming.loopMs(120)) <= PERCUSSION_SLOTS.toLong())
+    }
 }

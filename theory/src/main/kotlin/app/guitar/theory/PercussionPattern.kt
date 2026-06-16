@@ -136,4 +136,19 @@ object PercussionTiming {
 
     /** Total loop length in milliseconds. */
     fun loopMs(bpm: Int): Long = slotMs(bpm) * PERCUSSION_SLOTS
+
+    /**
+     * Duration (ms) to wait AFTER [slot] before the next slot, applying a Brazilian
+     * 16th-note swing. [swingPercent] 0 = straight; higher pushes the off-16ths
+     * (the "e" and "a" of every beat — odd slots) progressively later, so each
+     * downbeat→off pair stretches from 1:1 (straight) toward a hemiola/triplet
+     * lilt (≈2:1 around 66%, up to 3:1 at 100%). The loop's total length is
+     * unchanged — only the internal subdivision shifts.
+     */
+    fun swungSlotMs(slot: Int, bpm: Int, swingPercent: Int): Long {
+        val base = slotMs(bpm).toDouble()
+        val frac = (swingPercent.coerceIn(0, 100) / 100.0) * 0.5   // max: off-16ths half a slot late
+        fun delayOf(s: Int) = if (s % 2 == 1) base * frac else 0.0  // odd 16ths arrive late
+        return (base + delayOf(slot + 1) - delayOf(slot)).toLong().coerceAtLeast(1L)
+    }
 }

@@ -4,13 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculateCentroid
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -64,19 +63,22 @@ import kotlin.math.max
  * (silent → voice 1 → … → silent); long-press clears the cell. A tinted column
  * tracks the playhead while looping.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     val samba = state.sambaLooper
     DisposableEffect(Unit) { onDispose { samba.stop() } }
 
-    // Pinch-zoom / drag-pan state for the drum-loop grid (mirrors FretboardView).
-    // scale 1 = grid fits its fixed frame; the transform is a pure render-layer
-    // effect (graphicsLayer), so per-cell tap hit-testing is unaffected.
-    var scale by remember { mutableFloatStateOf(1f) }
+    // Free-transform state for the drum-loop grid. scaleX/scaleY are INDEPENDENT so
+    // a 2-finger pinch can change the aspect ratio (stretch wider or taller) — handy
+    // in portrait where the default grid looks squished. Single-finger drag pans
+    // once zoomed. The transform is a pure render-layer effect (graphicsLayer).
+    var scaleX by remember { mutableFloatStateOf(1f) }
+    var scaleY by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
-    val minScale = 0.5f
-    val maxScale = 3f
+    // Eraser tool: when on, tapping a cell clears it instead of cycling its voice.
+    var eraseMode by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -119,6 +121,18 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             )
         }
 
+        // ----- Swing (Brazilian 16th-note swing; 0 = straight) -----
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(if (samba.swing == 0) "Swing: straight" else "Swing: ${samba.swing}%",
+                style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(140.dp))
+            Slider(
+                value = samba.swing.toFloat(),
+                onValueChange = { samba.swing = it.toInt() },
+                valueRange = 0f..100f,
+                modifier = Modifier.weight(1f),
+            )
+        }
+
         Spacer(Modifier.height(8.dp))
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
@@ -136,33 +150,54 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 .fillMaxWidth()
                 .height(gridHeight)
                 .clipToBounds()
-                // Zoom/pan ONLY on a 2-finger pinch — single-finger drags fall
-                // through to the page's verticalScroll (so the page still scrolls
-                // over the grid) and to the per-cell tap/long-press handlers. The
-                // transform is on the CONTAINER, never on a cell, so cell taps still
-                // hit correctly (Compose maps coords back through the graphicsLayer).
-                .pointerInput(minScale, maxScale) {
+                // Gestures on the CONTAINER (never on a cell, so cell taps still hit):
+                //  • 2 fingers → independent X/Y zoom (changes the aspect ratio) + pan.
+                //  • 1 finger, when zoomed → drag-pan the grid.
+                //  • 1 finger, when NOT zoomed → not consumed, so it falls through to
+                //    the page scroll and to the per-cell tap/long-press handlers.
+                .pointerInput(Unit) {
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
+                        var dragging = false
+                        var totalDrag = 0f
+                        val slop = viewConfiguration.touchSlop
                         do {
                             val event = awaitPointerEvent()
-                            if (event.changes.count { it.pressed } >= 2) {
-                                val zoom = event.calculateZoom()
-                                val pan = event.calculatePan()
-                                val centroid = event.calculateCentroid()
-                                val oldScale = scale
-                                val newScale = (oldScale * zoom).coerceIn(minScale, maxScale)
-                                val cx = size.width / 2f
-                                val cy = size.height / 2f
-                                scale = newScale
-                                val maxX = max(0f, size.width * (newScale - 1f) / 2f)
-                                val maxY = max(0f, size.height * (newScale - 1f) / 2f)
-                                offsetX = (offsetX + pan.x + (centroid.x - cx) * (oldScale - newScale))
-                                    .coerceIn(-maxX, maxX)
-                                offsetY = (offsetY + pan.y + (centroid.y - cy) * (oldScale - newScale))
-                                    .coerceIn(-maxY, maxY)
-                                // Consume so neither the page scroll nor cell taps react to the pinch.
+                            val pressed = event.changes.filter { it.pressed }
+                            if (pressed.size >= 2) {
+                                val a = pressed[0]; val b = pressed[1]
+                                val curDx = kotlin.math.abs(a.position.x - b.position.x)
+                                val curDy = kotlin.math.abs(a.position.y - b.position.y)
+                                val preDx = kotlin.math.abs(a.previousPosition.x - b.previousPosition.x)
+                                val preDy = kotlin.math.abs(a.previousPosition.y - b.previousPosition.y)
+                                val zx = if (preDx > 10f) curDx / preDx else 1f
+                                val zy = if (preDy > 10f) curDy / preDy else 1f
+                                val cenX = (a.position.x + b.position.x) / 2f
+                                val cenY = (a.position.y + b.position.y) / 2f
+                                val panX = cenX - (a.previousPosition.x + b.previousPosition.x) / 2f
+                                val panY = cenY - (a.previousPosition.y + b.previousPosition.y) / 2f
+                                val oldSx = scaleX; val oldSy = scaleY
+                                scaleX = (scaleX * zx).coerceIn(0.4f, 4f)
+                                scaleY = (scaleY * zy).coerceIn(0.4f, 4f)
+                                val mx = max(0f, size.width * (scaleX - 1f) / 2f)
+                                val my = max(0f, size.height * (scaleY - 1f) / 2f)
+                                offsetX = (offsetX + panX + (cenX - size.width / 2f) * (oldSx - scaleX)).coerceIn(-mx, mx)
+                                offsetY = (offsetY + panY + (cenY - size.height / 2f) * (oldSy - scaleY)).coerceIn(-my, my)
                                 event.changes.forEach { it.consume() }
+                                dragging = true
+                            } else if (pressed.size == 1 && (scaleX > 1.001f || scaleY > 1.001f)) {
+                                val ch = pressed[0]
+                                val dx = ch.position.x - ch.previousPosition.x
+                                val dy = ch.position.y - ch.previousPosition.y
+                                totalDrag += kotlin.math.abs(dx) + kotlin.math.abs(dy)
+                                if (dragging || totalDrag > slop) {
+                                    dragging = true
+                                    val mx = max(0f, size.width * (scaleX - 1f) / 2f)
+                                    val my = max(0f, size.height * (scaleY - 1f) / 2f)
+                                    offsetX = (offsetX + dx).coerceIn(-mx, mx)
+                                    offsetY = (offsetY + dy).coerceIn(-my, my)
+                                    ch.consume()
+                                }
                             }
                         } while (event.changes.any { it.pressed })
                     }
@@ -172,8 +207,8 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
+                        this.scaleX = scaleX
+                        this.scaleY = scaleY
                         translationX = offsetX
                         translationY = offsetY
                     },
@@ -182,6 +217,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                     InstrumentRow(
                         samba = samba,
                         instrument = inst,
+                        eraseMode = eraseMode,
                         modifier = Modifier.height(ROW_HEIGHT_DP.dp).fillMaxWidth(),
                     )
                     if (i != PercussionInstrument.entries.lastIndex) {
@@ -209,7 +245,16 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
         var loadMenu by remember { mutableStateOf(false) }
         var saveName by remember { mutableStateOf("") }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            // Eraser: when on, tapping a cell clears it (no need to cycle every voice).
+            if (eraseMode) {
+                Button(onClick = { eraseMode = false }) { Text("Erase ✓") }
+            } else {
+                OutlinedButton(onClick = { eraseMode = true }) { Text("Erase") }
+            }
             OutlinedButton(onClick = { saveName = ""; saveDialog = true }) { Text("Save…") }
             Box {
                 OutlinedButton(onClick = { loadMenu = true }) { Text("Load…") }
@@ -270,6 +315,7 @@ private const val CAPTION_DP = 18      // bar/beat caption strip below the rows
 private fun InstrumentRow(
     samba: SambaLooperState,
     instrument: PercussionInstrument,
+    eraseMode: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val voices = PercussionVoices.voicesFor(instrument)
@@ -333,6 +379,7 @@ private fun InstrumentRow(
                     samba = samba,
                     instrument = instrument,
                     slot = slot,
+                    eraseMode = eraseMode,
                     modifier = Modifier.weight(1f).fillMaxHeight().padding(1.dp),
                 )
                 // Beat separators: thicker gap after every 4th cell; bar gap after 8th.
@@ -376,6 +423,7 @@ private fun Cell(
     samba: SambaLooperState,
     instrument: PercussionInstrument,
     slot: Int,
+    eraseMode: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val voice = samba.pattern.voiceAt(instrument, slot)
@@ -393,9 +441,12 @@ private fun Cell(
             .clip(RoundedCornerShape(4.dp))
             .background(fill)
             .border(if (isPlayhead) 2.dp else 0.dp, border, RoundedCornerShape(4.dp))
-            .pointerInput(instrument, slot) {
+            .pointerInput(instrument, slot, eraseMode) {
                 detectTapGestures(
-                    onTap = { samba.toggleSlot(instrument, slot) },
+                    onTap = {
+                        if (eraseMode) samba.clearCell(instrument, slot)
+                        else samba.toggleSlot(instrument, slot)
+                    },
                     onLongPress = { samba.clearCell(instrument, slot) },
                 )
             },

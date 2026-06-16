@@ -39,6 +39,8 @@ class SambaLooperState(
     var pattern by mutableStateOf(PercussionPattern.SAMBA)
         private set
     var bpm by mutableStateOf(100)
+    /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
+    var swing by mutableStateOf(0)
     var isPlaying by mutableStateOf(false)
         private set
     /** Slot currently sounding (0..15), or -1 when stopped. Drives the playhead. */
@@ -136,7 +138,7 @@ class SambaLooperState(
                         val v = pattern.voiceAt(inst, slot) ?: continue
                         audio.playSamples(buffer(inst, v))
                     }
-                    delay(PercussionTiming.slotMs(bpm))
+                    delay(PercussionTiming.swungSlotMs(slot, bpm, swing))
                 }
             }
         }

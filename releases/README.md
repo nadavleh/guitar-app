@@ -13,6 +13,7 @@ from `versionName` in `app/build.gradle.kts`; copy each new build here.
 
 | Version | Notes |
 |---------|-------|
+| 1.4.0   | Drum machine: Brazilian 16th-note swing slider, an Erase tool (tap-to-clear), 2-finger aspect-ratio (independent X/Y) zoom + drag-pan on the grid, and tighter on-the-beat sample onsets. |
 | 1.3.1   | Drum machine now plays bundled recorded one-shot samples (real Latin-percussion hits) instead of pure synthesis, with synth fallback. Samples are placeholders pending licensing. |
 | 1.3.0   | Drum machine: redesigned/expanded voices (Surdo 3, Tamborim 3, Pandeiro 5, Agogô 2) + save/load custom beats ("stock samba" is the built-in default). |
 | 1.2.0   | Ear training: Inversions & Aug/Dim trainers, advanced (non-diatonic) progression library with explanations, 6th/add9 extensions. Drum machine: scrollable page + 2-finger pinch-zoom, always-visible per-track mute/solo. |

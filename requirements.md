@@ -1,6 +1,6 @@
 # Chorect — Requirements
 
-**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.3.1 (semantic `major.minor.patch`, versionCode 10301).
+**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.4.0 (semantic `major.minor.patch`, versionCode 10400).
 
 **Versioning policy:**
 
@@ -348,7 +348,7 @@ Strum spread and ring sustain are global and shared by single strums, the chord 
 
 ### 8.3 Percussion Playback
 
-The drum machine (§10.8) plays each samba voice from a **bundled recorded one-shot sample** — WAV assets under `assets/drums/`, decoded to mono 44.1 kHz by a `WavDecoder` (a minimal RIFF/WAVE decoder supporting PCM 8/16/24/32-bit and IEEE-float 32-bit, with multi-channel down-mix and linear resampling). Decoded buffers are cached per voice. When a sample is missing for a given (instrument, voice), the on-device `PercussionSynth` is used as a fallback so every voice always sounds.
+The drum machine (§10.8) plays each samba voice from a **bundled recorded one-shot sample** — WAV assets under `assets/drums/`, decoded to mono 44.1 kHz by a `WavDecoder` (a minimal RIFF/WAVE decoder supporting PCM 8/16/24/32-bit and IEEE-float 32-bit, with multi-channel down-mix and linear resampling). Decoded buffers are cached per voice. The bundled samples are **trimmed to a tight onset** (minimal leading silence) so each voice fires on-the-beat rather than lagging. When a sample is missing for a given (instrument, voice), the on-device `PercussionSynth` is used as a fallback so every voice always sounds.
 
 > **Note:** The bundled samples are placeholders to be replaced with licensed recordings before public release.
 
@@ -499,7 +499,11 @@ Available app-wide (Options, and a quick-access button on the tool screens):
 
 ### 10.8 Drum Machine
 
-A samba percussion looper (drum-machine tab): an editable 16-slot pattern with per-track **mute** and **solo**, per-instrument **voice auditioning** (tap a row label to open its voice menu, or tap a cell to cycle and preview), and an adjustable BPM. The pattern persists across leaving and returning to the screen.
+A samba percussion looper (drum-machine tab): an editable 16-slot pattern with per-track **mute** and **solo**, per-instrument **voice auditioning** (tap a row label to open its voice menu, or tap a cell to cycle and preview), an adjustable BPM, and an adjustable **swing**. The pattern persists across leaving and returning to the screen.
+
+**Swing.** A 0–100 % control (default **straight**) applies a Brazilian 16th-note swing: it progressively delays the off-16ths — the "e" and "a" of every beat — toward a triplet/hemiola lilt (≈2:1 around 66 %, up to 3:1 at 100 %), while the **loop length is preserved** (only the internal subdivision shifts; the down-16ths stay on the beat). The pure timing helper (`PercussionTiming.swungSlotMs`) is unit-testable on the JVM.
+
+**Editing tools.** Tapping a cell cycles its voice (silent → voice 1 → … → silent) and previews it; **long-press** clears a cell. An **Erase** tool adds a tap-to-clear toggle: while Erase is on, a single tap clears the cell instead of cycling, so you can wipe several cells without stepping through every voice. (Long-press clear remains available whether or not Erase is on.)
 
 **Percussion voices.** Four samba instruments, each offering several distinct voices (a cell stores which voice, or silence). Each voice plays a **bundled recorded one-shot sample** (WAV under `assets/drums/`, decoded to mono 44.1 kHz via `WavDecoder`), falling back to the on-device `PercussionSynth` if its sample is absent (§8.3). The bundled samples are placeholders to be replaced with licensed recordings before public release.
 
@@ -510,7 +514,7 @@ A samba percussion looper (drum-machine tab): an editable 16-slot pattern with p
 
 **Save / load beats.** The user can **save** the current beat under a name and **load** any saved beat later; the built-in groove is always available as **"stock samba"**. Saved beats persist across sessions (DataStore). A beat can also be cleared (whole row or all rows).
 
-Layout: the screen is a **vertically scrollable page**, and the track grid uses **fixed-height rows** (one per percussion instrument) rather than weight-distributed rows, so each track's name, voice picker, and Mute/Solo toggles are always fully visible — nothing is clipped in short (landscape) viewports. The loop grid itself supports **2-finger pinch-zoom and pan** (a pure render-layer transform, so per-cell tap hit-testing is unaffected); single-finger gestures scroll the page and tap/edit cells.
+Layout: the screen is a **vertically scrollable page**, and the track grid uses **fixed-height rows** (one per percussion instrument) rather than weight-distributed rows, so each track's name, voice picker, and Mute/Solo toggles are always fully visible — nothing is clipped in short (landscape) viewports. The loop grid itself supports a **2-finger free transform** with **independent X and Y zoom** (so a pinch can change the grid's aspect ratio — stretch it wider or taller, useful in portrait where the default grid looks squished) plus 2-finger pan; **single-finger drag pans** once the grid is zoomed. The whole transform is a pure render-layer effect, so per-cell tap hit-testing is unaffected. When not zoomed, single-finger gestures fall through to the page scroll and the per-cell tap/long-press handlers.
 
 ### 10.9 Chord Looper
 

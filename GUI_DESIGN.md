@@ -2,7 +2,7 @@
 
 This document is the **single source of truth** for the app's look-and-feel and primary interactions. The Compose code in `app/` should match these specs. Update this doc before changing visual code so we don't drift.
 
-Status: **v2 — "Studio"** (app version **1.3.1**) — the architecture is a persistent left **navigation rail** plus a content area that is, by default, the full-height fretboard. Tools open as draggable bottom sheets (Fretboard, Options) or full-screen routes (Loop, Tuner, Ear, Drums). This superseded the earlier v1 "single screen + bottom mode bar" concept; this doc now reflects the as-built v2.
+Status: **v2 — "Studio"** (app version **1.4.0**) — the architecture is a persistent left **navigation rail** plus a content area that is, by default, the full-height fretboard. Tools open as draggable bottom sheets (Fretboard, Options) or full-screen routes (Loop, Tuner, Ear, Drums). This superseded the earlier v1 "single screen + bottom mode bar" concept; this doc now reflects the as-built v2.
 
 ---
 
@@ -402,11 +402,16 @@ A full-screen route — a step-sequencer drum machine. The **whole page is verti
 
 - **Header (compact, single row for portrait)**: `DRUMS` title, Play/Stop, AudioQuick, `Back`.
 - **BPM** row: label + slider (60–200).
+- **Swing** row (directly under BPM): label + slider (0–100%). At 0 the label reads `Swing: straight`; above 0 it reads `Swing: N%`. This is Brazilian 16th-note swing — it delays the off-beat sixteenths, leaving the straight grid untouched at 0.
 - **Grid**: one row per `PercussionInstrument`, each row a 16-cell step grid (2 bars of 2/4 in sixteenths), with thicker gaps after every 4th cell and a wider bar gap after the 8th. The grid uses **fixed-height rows** (`ROW_HEIGHT_DP`, not weight) so each track's name, `▾` voice popup, and **M/S** toggles always have room and never get clipped in either orientation.
-  - **Gestures**: a **2-finger pinch zooms/pans** the grid (render-only `graphicsLayer` on the grid container, clamped, focal-point — mirrors `FretboardView`; `minScale 0.5`, `maxScale 3`). A **single-finger drag falls through to the page's vertical scroll** (so the page still scrolls over the grid), and **cell taps still toggle steps** — the pinch consumes its events so it doesn't trigger scroll or taps, and because the transform is on the container (never a cell) tap hit-testing maps back through the layer.
-  - Tapping a cell **cycles through all of that instrument's voices** (silent → v1 → v2 → … → silent); **long-press clears** the cell. Filled cells show the voice glyph; a tinted/bordered column tracks the playhead while looping. Voice counts differ per instrument: **Surdo 3** (open ring `●`, muted bass `◐`, tap `·`), **Tamborim 3** (clack `●`, muted clack `◐`, tap `·`), **Pandeiro 5** (bass open `●`, bass muted `◐`, slap `✦`, jingle `○`, jingle hi `◌`), **Agogô 2** (low bell `▼`, high bell `▲`).
+  - **Gestures** (on the grid container, render-only `graphicsLayer`, so cell taps still hit and tap-testing maps back through the layer):
+    - **2 fingers** → **independent X/Y zoom** + pan. `scaleX` and `scaleY` are decoupled, so a two-finger spread can change the grid's **aspect ratio** (stretch wider or taller) — handy in portrait where the default grid looks squished. Both axes clamp to `0.4`–`4`; pan is focal-point and clamped so the grid can't be pulled off-screen. The pinch consumes its events so it doesn't trigger scroll or taps.
+    - **1 finger, when zoomed** (either axis > 1) → **drag-pans** the grid (clamped).
+    - **1 finger, when not zoomed** → **not consumed**, so it falls through to the page's vertical scroll, and **cell taps still toggle steps**.
+  - Tapping a cell **cycles through all of that instrument's voices** (silent → v1 → v2 → … → silent); **long-press clears** the cell. Filled cells show the voice glyph; a tinted/bordered column tracks the playhead while looping. Voice counts differ per instrument: **Surdo 3** (open ring `●`, muted bass `◐`, tap `·`), **Tamborim 3** (clack `●`, muted clack `◐`, tap `·`), **Pandeiro 5** (bass open `●`, bass muted `◐`, slap `✦`, jingle `○`, jingle hi `◌`), **Agogô 2** (low bell `▼`, high bell `▲`). When **Erase** is on (see Footer) a tap **clears** the cell instead of cycling.
 - **Per-track controls** (left of each row, `ROW_LABEL_DP` wide): the instrument name with a `▾` — **tapping it opens a voice-audition popup** (`DropdownMenu`) listing **each of that instrument's voices** (glyph + name); tapping a voice previews it (popup stays open to compare). Below the name, **M (mute)** and **S (solo)** toggle tags (outlined off, filled on — error-red for mute, amber for solo). Rows that aren't audible (muted, or not soloed when something else is) are dimmed to 40%.
-- **Footer**: `Save…` / `Load…` / `Clear all`.
+- **Footer actions** — a `FlowRow` (so the buttons **wrap** onto a second line on narrow/portrait widths rather than overflowing): `Erase` / `Save…` / `Load…` / `Clear all`.
+  - **Erase** is a toggle: off it's an `OutlinedButton` reading `Erase`; on it's a filled `Button` reading `Erase ✓`, and while on, tapping any cell **clears** it (instead of cycling its voice) — a faster way to wipe cells than long-pressing each. (Long-press still clears regardless of Erase.)
   - **Save…** opens a name dialog (a beat name; names containing `= ; | ,` are rejected) and stores the current grid as a user-saved beat.
   - **Load…** opens a dropdown listing **stock samba** (the built-in preset) followed by every user-saved beat; each saved entry has a trailing `✕` delete affordance. Saved beats **persist** across sessions.
   - **Clear all** empties the grid.
