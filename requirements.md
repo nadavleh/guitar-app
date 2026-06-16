@@ -1,6 +1,13 @@
 # Chorect — Requirements
 
-**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.1 (major.minor versioning; debug APK is named `Chorect_beta_V<version>.apk`, e.g. `Chorect_beta_V1.1.apk`).
+**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.2.0 (semantic `major.minor.patch`).
+
+**Versioning policy:**
+
+* **MINOR** bumps for new features; **PATCH** bumps for bug fixes of existing features (MAJOR is reserved for milestone releases).
+* Prior releases are **never deleted** — every shipped build is kept under `releases/`.
+* The debug APK is named `Chorect_beta_V<version>.apk` (e.g. `Chorect_beta_V1.2.0.apk`), tracking `versionName`.
+* `versionCode = major×10000 + minor×100 + patch` (e.g. 1.2.0 → `10200`).
 
 ## 1. Goal
 
@@ -16,7 +23,7 @@ The app should help the user:
 * Build and audition strummed/arpeggiated selections across strings.
 * Change the tuning of each string (presets + custom, on the fly).
 * Display chords and scales according to the current tuning.
-* Practice by ear (progression / note-over-chord / chord-flavor trainers, with scored challenges).
+* Practice by ear (progression, note-over-chord, chord-flavor, inversion, and augmented-vs-diminished trainers, with scored challenges).
 * Tune the instrument by ear via a mic-driven tuner.
 * Drive practice with a percussion (samba) loop and a chord looper.
 
@@ -48,7 +55,7 @@ The app includes:
 5. Scale display (all-notes and per-position views)
 6. Theory labels: notes, intervals, chord tones
 7. A unified **Strum (pick)** mode: select frets across strings, mute strings, then strum/arpeggiate
-8. **Ear training**: progression, note-over-chord, and chord-flavor trainers, each with Practice and Challenge modes; a persistent progression-challenge high-score table
+8. **Ear training**: five trainers — progression (diatonic + advanced non-diatonic), note-over-chord, chord-flavor, inversions, and augmented-vs-diminished — each with Practice and Challenge modes; a persistent progression-challenge high-score table
 9. **Tuner**: real-time mic pitch detection with adjustable A4 reference and on-the-fly tuning changes
 10. **Chord looper**: a bar/beat progression sequencer with voice-leading and "build by degree"
 11. **Drum machine**: a samba percussion looper with per-track mute/solo
@@ -355,10 +362,10 @@ The app has an internal `theory` module — pure Kotlin, UI-independent, and uni
 * Chord formulas (`ChordLibrary`) and shape generation (`ChordShapeGenerator`, CAGED + shell), with voice-leading (`VoiceLeading.pickMinMovement`) used by the loop and ear trainers
 * Scale formulas (`ScaleLibrary`) and on-neck positions (`ScalePositions`)
 * Tuning calculation (`Tunings`, `Tuning`) and fretboard note calculation (`Fretboard`)
-* Ear-training models: diatonic degree resolution, random progressions, note-over-chord and chord-flavor challenges (`EarTraining`, `N2cChallenge`)
+* Ear-training models: diatonic degree resolution, random diatonic progressions, a curated library of advanced (non-diatonic) named progressions, note-over-chord and chord-flavor challenges, and chord-inversion voicing (`EarTraining`, `N2cChallenge`, `Inversions`)
 * Percussion patterns and voices (`PercussionPattern`, `PercussionVoices`)
 
-Beyond the minimum chord formulas below, the library also defines diatonic extensions used by ear training (maj9, maj13, maj7#11, m9, m11, 11).
+Beyond the minimum chord formulas below, the library also defines extensions and altered qualities used by ear training: diatonic extensions (maj9, maj13, maj7#11, m9, m11, 11), the minor-major 7th (mMaj7, the line-cliché chord), and the augmented-family 7ths (7#5, maj7#5) used by the augmented-vs-diminished trainer. The `Inversions` helper voices any quality's chord tones in a chosen inversion (root / 1st / 2nd / 3rd) and reports the inversion count for a quality — it is pure Kotlin and unit-tested like the rest of the engine.
 
 ### 9.1 Note Representation
 
@@ -454,11 +461,17 @@ The user can save and delete named custom tunings locally (persisted via DataSto
 
 ### 10.6 Ear Training
 
-A full ear-training tool with three sub-modes, each offering **Practice** (free play) and **Challenge** (scored rounds):
+A full ear-training tool with **five** sub-modes, each offering **Practice** (free play) and **Challenge** (scored rounds):
 
-* **Progression** — a 4-bar diatonic Roman-numeral progression loops at a chosen BPM; the user identifies the key/mode and each bar's chord. A I–V–I (or i–V–i) cadence can be auditioned to establish the tonic. Options control which modes (major/minor) and chord-type level (triads / sevenths / extended) appear, a fixed or random key, and standard vs shell voicings (or a "mix all" that randomizes per bar/chord).
+* **Progression** — a 4-bar diatonic Roman-numeral progression loops at a chosen BPM; the user identifies the key/mode and each bar's chord. A I–V–I (or i–V–i) cadence can be auditioned to establish the tonic. Options control which modes (major/minor) and chord-type level (triads / sevenths / extended) appear, a fixed or random key, and standard vs shell voicings (or a "mix all" that randomizes per bar/chord). An **Advanced (non-diatonic)** toggle swaps the diatonic generator for a curated library of ~24 named progressions (see below).
 * **Note2Chord** — a triad plays, then a test note sounds on top; the user names the test note's relationship to the chord.
 * **Flavor** — after a cadence sets the key, one diatonic chord plays; the user identifies its scale degree and quality.
+* **Inversions** — a chord of a chosen quality (maj / min / 7th / extended / sus / dim / aug, or a user-selected mix from a quality palette) plays in a random inversion; the user identifies whether it is root position or 1st / 2nd / 3rd inversion. Tap-to-compare auditioning plays each candidate inversion so the user can A/B them by ear. The number of available inversions follows the quality (3 for triads, 4 for 7th chords).
+* **Aug/Dim** — augmented-vs-diminished discrimination. The base palette is the augmented and diminished triads, with optional 7th / extended forms (dim7, m7♭5, 7♯5, maj7♯5); the user picks which qualities are in the pool, hears a random one, and identifies it (tap-to-compare auditioning of each candidate quality at the current root).
+
+#### Advanced (non-diatonic) progressions
+
+The Progression sub-mode's **Advanced** toggle replaces the diatonic generator with a curated library of ~24 named progressions covering borrowed/modal-interchange chords, secondary dominants, chromatic passing chords, and jazz turnarounds (e.g. *Mixolydian Rocker*, *Andalusian Cadence*, *Tritone Substitution*, *Royal Road*, *Bird Blues Turnaround*). Each progression is modeled **relative to the tonic** (a list of semitone-offset + quality + Roman-label chords) so it transposes to any key, is of variable length, and carries a short **teaching explanation** shown during quizzing. The reveal shows the progression's name, its Roman-numeral line, and the concrete chords in the drawn key. Advanced practice loops the progression in the shared looper; the Advanced **Challenge** is **self-marked** (the chromatic chords make multiple-choice impractical), with the user marking each round right/wrong after revealing.
 
 **Progression Challenge** specifics:
 
@@ -467,6 +480,8 @@ A full ear-training tool with three sub-modes, each offering **Practice** (free 
 * In fixed-Sevenths mode the user gives one combined diatonic-7th answer per bar (e.g. "V7") rather than picking degree and extension separately. Triad and mix modes keep separate pickers.
 * Advancing without answering every bar credits the unanswered bars as correct.
 * A persistent **high-score table** keeps the top results, each with its date and completion time, ranked by score then by fastest time (time breaks ties).
+
+The diatonic **Extended** level and the "mix all" pool include **6th** and **add9** chords alongside the 9th/11th extensions already present, and the same 6/add9 (and 9th/11th) flavors appear in the Flavor trainer's quality palette.
 
 Ear-training state is app-lifetime, so the user can leave to check themselves on the fretboard and return to the same progression, reveals, and counters.
 
@@ -483,6 +498,8 @@ Available app-wide (Options, and a quick-access button on the tool screens):
 ### 10.8 Drum Machine
 
 A samba percussion looper (drum-machine tab): an editable 16-slot pattern with per-track **mute** and **solo**, per-instrument **voice auditioning** (tap a row label or cell to preview), and an adjustable BPM. The pattern persists across leaving and returning to the screen.
+
+Layout: the screen is a **vertically scrollable page**, and the track grid uses **fixed-height rows** (one per percussion instrument) rather than weight-distributed rows, so each track's name, voice picker, and Mute/Solo toggles are always fully visible — nothing is clipped in short (landscape) viewports. The loop grid itself supports **2-finger pinch-zoom and pan** (a pure render-layer transform, so per-cell tap hit-testing is unaffected); single-finger gestures scroll the page and tap/edit cells.
 
 ### 10.9 Chord Looper
 
@@ -571,7 +588,7 @@ The app separates musical logic from the UI via three Gradle modules. The `theor
   ScaleLibrary / Scale / ScalePositions
   Tuning / Tunings / TuningCodec
   Instrument / Fretboard / FretPosition
-  EarTraining / N2cChallenge        (ear-training models)
+  EarTraining / N2cChallenge / Inversions   (ear-training models)
   PercussionPattern / PercussionVoices / PercussionInstrument
 
 :audio    (Android audio engine)
@@ -691,7 +708,7 @@ Phases 1–6 (the original MVP) are complete; phase 7 captures the tools built o
 ### Phase 7: Practice Tools (built on the MVP)
 
 * Strum (pick) mode with per-string muting
-* Ear training (progression / note2chord / flavor; practice + challenge; high scores)
+* Ear training (progression incl. advanced non-diatonic / note2chord / flavor / inversions / aug-dim; practice + challenge; high scores)
 * Mic tuner with on-the-fly tuning and reference tones
 * Chord looper (build-by-degree, voice-leading, strum patterns)
 * Samba drum machine (mute/solo, voice auditioning)

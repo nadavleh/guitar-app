@@ -12,11 +12,13 @@ android {
         applicationId = "app.guitar"
         minSdk = 26
         targetSdk = 34
-        // Major.minor versioning: first public beta = 1.0. Bump minor (1.1, 1.2…)
-        // for feature releases, major (2.0) for breaking redesigns. versionCode is
-        // a monotonically increasing integer: 1_00 = v1.0, 1_10 = v1.1, 2_00 = v2.0.
-        versionCode = 110
-        versionName = "1.1"
+        // major.minor.patch versioning. Bump MINOR for new features, PATCH for
+        // bug fixes of existing features, MAJOR for breaking redesigns. Previous
+        // releases are kept in /releases — never delete them. versionCode is a
+        // monotonically increasing integer: major*10000 + minor*100 + patch
+        // (e.g. 1.2.0 = 10200, 1.2.1 = 10201, 2.0.0 = 20000).
+        versionCode = 10200
+        versionName = "1.2.0"
     }
 
     buildTypes {

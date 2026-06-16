@@ -12,8 +12,8 @@
     <img alt="Language: Kotlin" src="https://img.shields.io/badge/language-Kotlin-7F52FF?logo=kotlin&logoColor=white">
     <img alt="UI: Jetpack Compose" src="https://img.shields.io/badge/ui-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white">
     <img alt="minSdk: 26" src="https://img.shields.io/badge/minSdk-26-blue">
-    <img alt="Version: 1.1" src="https://img.shields.io/badge/version-1.1-blue">
-    <img alt="Tests: 300 passing" src="https://img.shields.io/badge/tests-300%20passing-brightgreen">
+    <img alt="Version: 1.2.0" src="https://img.shields.io/badge/version-1.2.0-blue">
+    <img alt="Tests: 724 passing" src="https://img.shields.io/badge/tests-724%20passing-brightgreen">
     <img alt="License: TBD" src="https://img.shields.io/badge/license-TBD-lightgrey">
   </p>
 </div>
@@ -41,9 +41,9 @@
 
 It's built **Android-first** in native Kotlin so the music-theory engine can stay pure-Kotlin (zero Android dependencies, fast JUnit tests) and the audio path can use the low-latency AAudio route directly. A Kotlin Multiplatform port for iOS is planned — the theory engine ports as-is, only the UI and audio drivers need replacing.
 
-> Three Gradle modules: `theory` (pure JVM), `audio` (Android lib), `app` (Compose UI). The theory engine has 260+ tests that run in milliseconds, with zero emulator dependency.
+> Three Gradle modules: `theory` (pure JVM), `audio` (Android lib), `app` (Compose UI). The theory engine carries the bulk of the suite's 700+ tests that run in milliseconds, with zero emulator dependency.
 
-The current release is **version 1.1** (versionCode 110). Versioning is **major.minor**: bump the minor (1.1, 1.2…) for feature releases and the major (2.0) for breaking redesigns. The debug build is emitted as `Chorect_beta_V<version>.apk` (e.g. `Chorect_beta_V1.1.apk`).
+The current release is **version 1.2.0** (versionCode 10200). Versioning is **major.minor.patch**: bump the **minor** (1.1 → 1.2) for new features, the **patch** (1.2.0 → 1.2.1) for bug fixes, and the **major** (2.0.0) for breaking redesigns. Each build is emitted as `Chorect_beta_V<version>.apk` (e.g. `Chorect_beta_V1.2.0.apk`), and previous releases are kept in a `releases/` folder rather than overwritten.
 
 ---
 
@@ -67,6 +67,7 @@ The neck's three display modes are unified under a single **Fretboard** tool wit
 - **Jazz / shell-voicings mode.** Toggle in Options. Replaces CAGED with the canonical drop-2 dictionary from jazzguitar.be — 4 inversions per `maj7`, `m7`, `7`, `m7b5`, `dim7`, `6`, `m6`, plus the standard A-rooted `9` shape and middle-4-string voicings.
 - **All-notes vs Positions view** — light up every chord tone across the neck, or step through one voicing at a time.
 - **Strummed playback** for every shape — Karplus-Strong plucked-string synthesis through the continuous-output mixer.
+- **Broad quality library.** Beyond the common triads/7ths/extensions, the chord library now also knows `mMaj7` (minor-major 7th), `7#5` (augmented dominant), and `maj7#5` (augmented major 7th) — used by the line-cliché advanced progression and the Aug/Dim ear trainer.
 
 ### 🎵 Scales
 
@@ -100,15 +101,22 @@ The neck's three display modes are unified under a single **Fretboard** tool wit
 
 ### 👂 Ear training
 
-Three sub-modes, each with a **Practice** and a **Challenge** mode:
+**Five** sub-modes, each with a **Practice** and a **Challenge** mode:
 
 - **Progression.** Random 4-bar progressions in any key/mode with reveal-on-tap chord labels and a "Hear I–V–I" key cadence. Practice loops a progression and lets you reveal each bar's Roman label; you can push the current chords into the Looper. The **Challenge** is 15 questions: a dedicated "Hear the degrees" reference palette auditions each diatonic degree in the (hidden) key while the answer chips stay silent; in fixed-7ths mode each bar is answered with a single combined diatonic-7th choice (e.g. "V7") rather than separate degree + extension; you can advance without answering every bar (unanswered bars are credited correct); a persistent **high-score table** keeps the top results with date and completion time, ranked by score then fastest time.
+  - **Advanced (non-diatonic) progressions.** A toggle in this sub-mode swaps the diatonic generator for a curated library of ~24 named special progressions — borrowed chords (modal interchange), secondary dominants, chromatic passing chords, and jazz turnarounds (e.g. Mixolydian Rocker, Andalusian Cadence, Ragtime Circle, Tritone Substitution, Bird/Montgomery turnarounds, Mario Cadence, Royal Road, line clichés). Each is transposable to any key and shown with a short teaching explanation while you quiz, plus a reveal of its name + Roman numerals + concrete chords. (Exotic chords with no playable guitar voicing fall back to a struck block of their chord tones.)
 - **Note2Chord.** A random major or minor triad plays as a block, then a single diatonic non-chord-tone sounds on top ~800 ms later. Identify the test note's extension label (`9`, `11`, `13`, `maj7`, `b7`, …). Chord and test note can be auditioned independently; the Challenge scores a fixed number of rounds.
-- **Flavor.** A cadence (I–V–I / i–V–i) sets the key, then a random diatonic chord sounds; identify its scale degree and flavor. Degree and flavor chips audition for ear comparison; the Challenge scores rounds.
+- **Flavor.** A cadence (I–V–I / i–V–i) sets the key, then a random diatonic chord sounds; identify its scale degree and flavor. Degree and flavor chips audition for ear comparison; the Challenge scores rounds. The flavor palette now includes **6th** and **add9** alongside the previously-covered 9th and 11th extensions.
+- **Inversions.** Plays a chosen chord type — maj / min / 7th / extended / sus / dim / aug, or a mix you select from the palette — in a random inversion. Identify whether you're hearing **root position, 1st, 2nd, or 3rd inversion** (3rd only exists for 7th chords). Tap any inversion to audition and compare by ear; the Challenge scores rounds.
+- **Aug/Dim.** Drills **augmented vs diminished** by ear, with optional 7th / extended forms (`dim7`, `m7b5`, `7#5`, `maj7#5`). Audition each candidate quality at the current root to compare; the Challenge scores rounds.
+
+The diatonic Extended / "Mix all" pool likewise now reaches **6th** and **add9** (the 9th and 11th were already present).
 
 ### 🥁 Drum machine
 
 A samba/percussion looper tab (step sequencer) with **Surdo, Tamborim, Pandeiro, and Agogô** tracks. Per-track mute/solo, tap-to-cycle per-cell voices, and per-instrument voice auditioning. Designed to play alongside the chord-progression looper as a backing track.
+
+The page **scrolls vertically**, and each track's name + Mute/Solo (M/S) toggles sit in a fixed-height row so they stay fully visible in both portrait and landscape (nothing gets clipped on short screens). A **2-finger pinch zooms/pans the loop grid** (focal-point scale 0.5×–3×, clamped pan); a single finger still scrolls the page and taps cells, because the zoom transform is a pure render-layer effect that doesn't disturb per-cell hit-testing.
 
 ### 🎛️ Instruments, tuning + audio
 
@@ -166,7 +174,7 @@ From the project root:
 adb shell am start -n app.guitar/app.guitar.app.MainActivity   # launch
 ```
 
-The debug APK is named after the version, e.g. `Chorect_beta_V1.1.apk`.
+The debug APK is named after the version, e.g. `Chorect_beta_V1.2.0.apk`, and prior releases are archived under `releases/`.
 
 **On Windows** you can also just double-click `launch-app.bat` — it starts the emulator (with audio) if needed, builds, installs, and launches in one shot.
 
@@ -198,7 +206,7 @@ Chorect/
 │       ├── Screens.kt                         # Fretboard (Chord/Scale/Strum) + Options bottom sheets, Loop screen
 │       ├── TunerScreen.kt + TunerState.kt     # mic-driven quarter-ring tuner with on-the-fly tuning
 │       ├── LoopScreen.kt + Loop.kt            # progression looper with per-slot voicing/strum
-│       ├── EarTrainingScreen.kt + EarTrainingState.kt   # Progression / Note2Chord / Flavor, Practice + Challenge
+│       ├── EarTrainingScreen.kt + EarTrainingState.kt   # Progression (+advanced) / Note2Chord / Flavor / Inversions / Aug-Dim, Practice + Challenge
 │       ├── SambaLooperScreen.kt + SambaLooperState.kt   # percussion step-sequencer (drum machine)
 │       └── TuningRepository.kt                # DataStore-backed persistence (incl. challenge high scores)
 │
@@ -223,7 +231,8 @@ Chorect/
 │       ├── JazzShellVoicings.kt               # drop-2 dictionary
 │       ├── VoiceLeading.kt                    # min-movement voicing picker
 │       ├── ScaleLibrary.kt Scale.kt ScalePosition.kt FretboardOverlay.kt
-│       ├── EarTraining.kt                     # Roman-numeral progressions, resolve()
+│       ├── EarTraining.kt                     # Roman-numeral diatonic + curated advanced progressions, resolve()
+│       ├── Inversions.kt                      # inversion voicings for the inversions trainer
 │       ├── Note2Chord.kt                      # ear-training challenge generator
 │       ├── Percussion.kt PercussionPattern.kt # drum-machine model
 │       ├── Fingering.kt NoteSpeller.kt        # display helpers
@@ -244,13 +253,14 @@ Chorect/
 ./gradlew :audio:testDebugUnitTest      # audio DSP + YIN + cents
 ```
 
-**300 tests passing**, zero failures. Highlights:
+**724 tests passing**, zero failures (most live in the pure-JVM `theory` module; a couple of `@TestFactory` methods fan out into many generated cases, so the executed count exceeds the static `@Test` count). Highlights:
 
 - **CAGED templates** — every shape verified against its canonical open-position voicing; every chord root produces 5 distinct ascending positions.
 - **Jazz drop-2 dictionary** — every inversion of `maj7` / `m7` / `7` / `m7b5` / `dim7` / `6` / `m6` confirmed to contain only the correct chord tones.
 - **YIN pitch detector** — locks within ±2 ¢ on A4, low E2, high E4, D3; rejects pure noise and silence; picks the fundamental over a harmonic.
 - **Cents math** — A4=440 maps to MIDI 69 with 0 ¢; custom A4 references shift the grid as expected.
-- **Ear-training progression resolver** — every Roman degree in major and minor resolves to a parseable chord symbol; "ii"+"m7" displays as `ii7` (not `iim7`); harmonic-minor V is used for the cadence.
+- **Ear-training progression resolver** — every Roman degree in major and minor resolves to a parseable chord symbol; "ii"+"m7" displays as `ii7` (not `iim7`); harmonic-minor V is used for the cadence; every curated advanced (non-diatonic) progression resolves to playable chords in any key.
+- **Chord inversions** — `Inversions.midis()` voices each inversion (root / 1st / 2nd / 3rd) with the correct bass tone, low→high.
 - **Note2Chord** — labels for every diatonic non-chord-tone in both major and minor; random sampling covers all 12 roots.
 - **Percussion** — pattern cycling / voice selection for the drum machine.
 - **Requirements** spec mirror — the tests from `requirements.md` §13 pass.
@@ -273,13 +283,14 @@ Chorect/
 | ✅ | Strum (pick) mode + arpeggio + per-string mutes |
 | ✅ | Loop screen — multi-chord-per-bar, per-slot voicing, per-slot strum, build-by-degree |
 | ✅ | Chromatic tuner — YIN, ±50 ¢ quarter-ring dial, A4 reference |
-| ✅ | Ear training — Progression / Note2Chord / Flavor, each with Practice + Challenge |
+| ✅ | Ear training — Progression / Note2Chord / Flavor / Inversions / Aug-Dim, each with Practice + Challenge |
+| ✅ | Advanced (non-diatonic) progression library — ~24 curated borrowed/secondary-dominant/turnaround progressions with teaching notes |
 | ✅ | Progression challenge with high-score table (score + completion time) |
 | ✅ | Voice-leading auto-voicing in Loop + Ear training |
 | ✅ | Live chord on the fretboard while the loop plays |
 | ✅ | Adaptive launcher icon (rosewood fretboard slice) |
 | ✅ | Cavaquinho instrument — instrument toggle, DGBe/DGBD tunings, 4-string fretboard, per-instrument timbre |
-| ✅ | Samba drum machine — percussion step-sequencer (Surdo / Tamborim / Pandeiro / Agogô) with mute/solo |
+| ✅ | Samba drum machine — percussion step-sequencer (Surdo / Tamborim / Pandeiro / Agogô) with always-visible mute/solo, vertical scroll, and 2-finger pinch-zoom/pan |
 | 📅 | Cavaquinho curated chord library |
 | 📅 | Custom-chord favorites |
 | 📅 | iOS port via Kotlin Multiplatform |
@@ -310,7 +321,7 @@ Built around two value classes (`PitchClass` for the 12-tone scale degree, `Midi
 
 For **chord shape generation**, the `ChordShapeGenerator` short-circuits to a canonical voicing dictionary when one exists for the (style, quality, tuning) tuple — `CagedShapes` for Standard mode, `JazzShellVoicings` for Shell mode — and falls back to a brute-force constraint-filtered enumeration otherwise (with a per-instrument max fret span). CAGED templates are encoded as relative fret offsets from the root fret on the shape's primary string, so transposing to any chord root is just a single integer add.
 
-For **ear training**, `EarTraining.resolve()` maps a `(degree, key, mode, chord-type-level)` tuple to a `(chordSymbol, romanLabel)` pair. Diatonic-role tables for major and minor encode the triad / seventh / extended quality at each scale degree; minor mode uses the harmonic-minor V by default so V7→i sounds like the textbook cadence.
+For **ear training**, `EarTraining.resolve()` maps a `(degree, key, mode, chord-type-level)` tuple to a `(chordSymbol, romanLabel)` pair. Diatonic-role tables for major and minor encode the triad / seventh / extended quality at each scale degree; minor mode uses the harmonic-minor V by default so V7→i sounds like the textbook cadence. Beyond the diatonic generator, `ADVANCED_PROGRESSIONS` is a curated list of named non-diatonic progressions — each chord is stored as a `(semitone-above-tonic, quality, Roman-label)` triple so the whole progression transposes to any key with a single add per chord, and `Inversions.midis()` lifts the bottom *k* chord tones an octave to voice the *k*-th inversion for the inversions trainer.
 
 ---
 

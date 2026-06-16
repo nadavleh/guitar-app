@@ -2,7 +2,7 @@
 
 This document is the **single source of truth** for the app's look-and-feel and primary interactions. The Compose code in `app/` should match these specs. Update this doc before changing visual code so we don't drift.
 
-Status: **v2 — "Studio"** — the architecture is a persistent left **navigation rail** plus a content area that is, by default, the full-height fretboard. Tools open as draggable bottom sheets (Fretboard, Options) or full-screen routes (Loop, Tuner, Ear, Drums). This superseded the earlier v1 "single screen + bottom mode bar" concept; this doc now reflects the as-built v2.
+Status: **v2 — "Studio"** (app version **1.2.0**) — the architecture is a persistent left **navigation rail** plus a content area that is, by default, the full-height fretboard. Tools open as draggable bottom sheets (Fretboard, Options) or full-screen routes (Loop, Tuner, Ear, Drums). This superseded the earlier v1 "single screen + bottom mode bar" concept; this doc now reflects the as-built v2.
 
 ---
 
@@ -348,12 +348,16 @@ A full-screen route. Layout (column inside the content area):
 
 ## 10. Ear training screen (`EarTrainingScreen.kt`)
 
-A full-screen route. Header: `EAR TRAINING` + AudioQuick + `Back`. Below it, two stacked **full-width** segmented controls so nothing is squeezed in portrait:
+A full-screen route. Header: `EAR TRAINING` + AudioQuick + `Back`. Below it:
 
-1. **Sub-mode tabs**: `Progress.` (Progression) · `Note2Chord` · `Flavor`.
-2. **Practice / Challenge** toggle (every sub-mode has both).
+1. **Sub-mode selector** — a **wrapping chip row** (`FlowRow` of `FilterChip`s, not a segmented button), because there are now **five** sub-modes that don't fit a single segmented row in portrait: `Progressions` · `Note→Chord` · `Flavor` · `Inversions` · `Aug / Dim`.
+2. **Practice / Challenge** toggle — a full-width segmented control; every sub-mode has both.
 
-The body switches on (sub-mode × mode). Highlights of the **Progression Challenge** (the most elaborate view):
+The body switches on (sub-mode × mode). The **Progressions** sub-mode also shows an **"Advanced (non-diatonic) progressions"** `Switch` above the body (§10.1).
+
+### 10.0 Progressions (diatonic)
+
+Highlights of the **Progression Challenge** (the most elaborate view):
 
 - A challenge is **15 progressions**. Config screen explains the rules + a `Start challenge ▶` button (with the shared `ProgressionSettings`).
 - In-flight: `Question k / 15`, running `Score: N bars`, `Quit`; a transport row (Play/Stop, `Hear <cadence>`, `Re-roll`); a BPM slider; an optional low-emphasis `Key & Mode (hint)` reveal chip.
@@ -363,17 +367,42 @@ The body switches on (sub-mode × mode). Highlights of the **Progression Challen
 - Optional `Show chord on fretboard` switch renders a 220-dp `FretboardView` of the current/last shape.
 - **Score screen** (`ChallengeDoneCard`): big `score / total` bars-correct, duration, a **wrapping per-question dot strip** (15 numbered squares, green/red/outline), and a **High-scores table** — best first, ties broken by faster completion time (`CHALLENGE_SCORE_ORDER`), each row showing rank, `score/total`, time, and date; the current run is **bold + "← you"**. The just-finished run is merged in locally so it shows even before the async DataStore write lands. `Restart` / `Exit`.
 
-Practice (Progression) mode mirrors the transport and settings but reveals answers via `RevealCard`s and adds a `→ Looper` button that pushes the current progression into the Loop tool. Note2Chord and Flavor sub-modes follow the same Practice/Challenge pattern with their own question types.
+Practice (Progression) mode mirrors the transport and settings but reveals answers via `RevealCard`s and adds a `→ Looper` button that pushes the current progression into the Loop tool. Note→Chord and Flavor sub-modes follow the same Practice/Challenge pattern with their own question types.
+
+### 10.1 Progressions — Advanced (non-diatonic)
+
+When the **"Advanced (non-diatonic) progressions"** `Switch` is on (only shown for the Progressions sub-mode), the diatonic generator is swapped for a curated library of borrowed chords, secondary dominants and jazz turnarounds. Both Practice and Challenge share one body (`AdvancedProgressionBody`):
+
+- A **key picker** (`KeyDropdown` — Random or a fixed key) and **Play ▶ / Stop ⏹** + **Next →** transport.
+- A **per-chord ▶ row** — one `OutlinedButton` per chord (labelled `▶ 1`, `▶ 2`, … while hidden, switching to `▶ <Roman>` once revealed).
+- A **reveal card** that, when tapped open, shows the progression **name**, the **Roman-numeral line**, the **chord symbols**, and the **key** (e.g. "in C major").
+- An **always-visible "About this progression"** teaching-note card (secondary-container tint) explaining the harmonic device — shown even while quizzing.
+
+The **Advanced Challenge** runs a fixed number of progressions and is **self-marked**: you reveal, then tap **✔ I got it / ✘ Missed** (both enabled only after revealing), then **Next → / See score →**. It ends on the shared `SimpleDoneCard`.
+
+### 10.2 Inversions
+
+Practice (`InversionsView`): a **"Chord types"** palette (`FilterChip`s over `invPalette` — maj, m, sus2/4, aug, dim, 7, maj7, m7, m7♭5, dim7, 6, m6, 9, …) to enable which qualities can appear; **New chord ▶ / Replay**; a **"Which inversion?"** guess-chip row (`Root position / 1st inversion / 2nd … / 3rd …`, count depends on the chord) where **tapping a chip auditions that inversion** so you can compare; then a **reveal card** (inversion name + root+quality) with a `✔/✘` line once revealed.
+
+Challenge (`InversionsChallengeView`): same palette on the config screen, then scored rounds — `Round k / N`, running `Score`, `Quit`; **Replay ▶**, the same guess chips (disabled after answering), a **Submit** button, the correct/answer line, and **Next → / See score →**. Ends on `SimpleDoneCard`.
+
+### 10.3 Aug / Dim
+
+Practice (`AugDimView`): a **"Chord types"** palette over `augDimPalette` — `Augmented (+)`, `Diminished (°)`, `dim7 (°7)`, `m7♭5 (half-dim ø)`, `7♯5 (aug 7th)`, `maj7♯5` — to enable qualities (default: Augmented + Diminished); **New chord ▶ / Replay**; a **"Which chord?"** guess-chip row (only the *enabled* qualities) where **tapping a chip auditions it**; then a **reveal card** (root + quality + family) with a `✔/✘` line.
+
+Challenge (`AugDimChallengeView`): same palette on the config screen (Start is disabled until at least one quality is enabled), then scored rounds with **Replay ▶**, the guess chips, **Submit**, the answer line, and **Next → / See score →**. Ends on `SimpleDoneCard`.
 
 ---
 
 ## 11. Drums screen (`SambaLooperScreen.kt`)
 
-A full-screen route — a step-sequencer drum machine.
+A full-screen route — a step-sequencer drum machine. The **whole page is vertically scrollable** (`verticalScroll`) so it fits short-height (landscape) layouts.
 
 - **Header (compact, single row for portrait)**: `DRUMS` title, Play/Stop, AudioQuick, `Back`.
 - **BPM** row: label + slider (60–200).
-- **Grid**: one row per `PercussionInstrument`, each row is a 4×16-cell step grid (2 bars of 2/4 in sixteenths), with thicker gaps after every 4th cell and a bar gap mid-row. Tapping a cell cycles its voice (silent → v1 → … → silent); **long-press clears** the cell. Filled cells show the voice glyph; a tinted/bordered column tracks the playhead while looping.
+- **Grid**: one row per `PercussionInstrument`, each row a 16-cell step grid (2 bars of 2/4 in sixteenths), with thicker gaps after every 4th cell and a wider bar gap after the 8th. The grid uses **fixed-height rows** (`ROW_HEIGHT_DP`, not weight) so each track's name, `▾` voice popup, and **M/S** toggles always have room and never get clipped in either orientation.
+  - **Gestures**: a **2-finger pinch zooms/pans** the grid (render-only `graphicsLayer` on the grid container, clamped, focal-point — mirrors `FretboardView`; `minScale 0.5`, `maxScale 3`). A **single-finger drag falls through to the page's vertical scroll** (so the page still scrolls over the grid), and **cell taps still toggle steps** — the pinch consumes its events so it doesn't trigger scroll or taps, and because the transform is on the container (never a cell) tap hit-testing maps back through the layer.
+  - Tapping a cell cycles its voice (silent → v1 → … → silent); **long-press clears** the cell. Filled cells show the voice glyph; a tinted/bordered column tracks the playhead while looping.
 - **Per-track controls** (left of each row, `ROW_LABEL_DP` wide): the instrument name with a `▾` — **tapping it opens a voice-audition popup** (`DropdownMenu`) listing that instrument's voices; tapping a voice previews it (popup stays open to compare). Below the name, **M (mute)** and **S (solo)** toggle tags (outlined off, filled on — error-red for mute, amber for solo). Rows that aren't audible (muted, or not soloed when something else is) are dimmed to 40%.
 - **Footer**: `Load samba` (preset pattern) and `Clear all`.
 
