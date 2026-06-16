@@ -1,18 +1,24 @@
-# Guitar Practice App — MVP Requirements
+# Chorect — Requirements
+
+**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.1 (major.minor versioning; debug APK is named `Chorect_beta_V<version>.apk`, e.g. `Chorect_beta_V1.1.apk`).
 
 ## 1. Goal
 
 Build a mobile app for practicing fretted string instruments.
 
-The MVP should support **guitar only**. Later versions may support cavaquinho, ukulele, mandolin, bass, and other string instruments.
+The app supports two instruments: a 6-string **Guitar** and a 4-string **Cavaquinho**. The theory engine is instrument-generic, so further instruments (ukulele, mandolin, bass, etc.) can be added without rewriting the core logic.
 
 The app should help the user:
 
-* Visualize the guitar fretboard horizontally.
-* Tap/play any note on the neck.
+* Visualize the fretboard as a realistic horizontal neck.
+* Tap/play any note on the neck, with pinch-to-zoom and drag-pan.
 * Search for chords and see possible shapes across the neck.
-* Change the tuning of each string.
+* Build and audition strummed/arpeggiated selections across strings.
+* Change the tuning of each string (presets + custom, on the fly).
 * Display chords and scales according to the current tuning.
+* Practice by ear (progression / note-over-chord / chord-flavor trainers, with scored challenges).
+* Tune the instrument by ear via a mic-driven tuner.
+* Drive practice with a percussion (samba) loop and a chord looper.
 
 The app should prioritize correctness, clarity, and musical usefulness over flashy graphics.
 
@@ -20,45 +26,53 @@ The app should prioritize correctness, clarity, and musical usefulness over flas
 
 ## 2. Target Platform
 
-The app should be designed first for **mobile phones**.
+The app is designed for **mobile phones**.
 
-Initial target:
+Target:
 
-* Android first
-* iOS later if possible
+* Android first (built with native Kotlin + Jetpack Compose; multi-module `theory` / `audio` / `app`)
+* iOS later if possible (the `theory` engine is pure Kotlin so it can be reused via KMP)
 
-The UI should work in both portrait and landscape, but the main fretboard view should be optimized for **horizontal guitar display**.
+The UI works in both portrait and landscape (`screenOrientation="fullSensor"`). The neck is always drawn as a **horizontal guitar display** regardless of device orientation — see §5.1.
 
 ---
 
-## 3. MVP Scope
+## 3. Scope
 
-The MVP should include:
+The app includes:
 
-1. Horizontal interactive guitar fretboard
-2. Note playback
-3. Chord search and chord-shape display
-4. Custom tuning per string
-5. Scale display
-6. Basic theory labels: notes, intervals, chord tones
-7. Preset tunings
+1. Horizontal interactive fretboard with pinch-zoom and drag-pan
+2. Note playback (per-instrument timbre)
+3. Chord search and chord-shape display (CAGED + shell/jazz voicings)
+4. Custom tuning per string, plus preset tunings (on-the-fly switching)
+5. Scale display (all-notes and per-position views)
+6. Theory labels: notes, intervals, chord tones
+7. A unified **Strum (pick)** mode: select frets across strings, mute strings, then strum/arpeggiate
+8. **Ear training**: progression, note-over-chord, and chord-flavor trainers, each with Practice and Challenge modes; a persistent progression-challenge high-score table
+9. **Tuner**: real-time mic pitch detection with adjustable A4 reference and on-the-fly tuning changes
+10. **Chord looper**: a bar/beat progression sequencer with voice-leading and "build by degree"
+11. **Drum machine**: a samba percussion looper with per-track mute/solo
+12. Two instruments: Guitar (6-string) and Cavaquinho (4-string)
 
-The MVP should **not** initially include:
+The app does **not** include (and these remain out of scope):
 
 * Account system
 * Cloud sync
 * Social features
 * Full song library
-* Audio recording
-* Real-time pitch detection
-* Advanced ear training
-* Backing tracks
-
-These can be added later.
+* Audio recording / export
+* Backing tracks (beyond the built-in chord/percussion loopers)
 
 ---
 
 ## 4. Instrument Model
+
+The app ships two instruments, selectable in Options:
+
+* **Guitar** — 6 strings, chord-shape comfort fret-span 4.
+* **Cavaquinho** — 4 strings, chord-shape comfort fret-span 5 (smaller scale length).
+
+Switching instruments resets the tuning to that instrument's default preset (Guitar→Standard, Cavaquinho→DGBe) and persists the choice. The theory engine is generic over string count, so neither 6 nor 4 strings is hard-coded.
 
 ### 4.1 Guitar Defaults
 
@@ -73,9 +87,9 @@ String 2: B3
 String 1: E4
 ```
 
-The guitar should support at least frets 0–24.
+The neck displays **14 frets** (fret 0 = open string). Pitch handling spans MIDI E1–C6, so re-tuned/transposed strings stay representable.
 
-Fret 0 means open string.
+The neck renders the bottom three strings (E/A/D) as wound bronze and the top three (G/B/e) as plain steel; open-string letters appear left of the nut as `E A D G B e`.
 
 ### 4.2 Custom Tuning
 
@@ -99,17 +113,24 @@ Changing the tuning should immediately affect:
 
 ### 4.3 Tuning Presets
 
-The app should include common tuning presets:
+The Options sheet and the Tuner both show only the presets appropriate to the current instrument; switching is immediate (on the fly).
 
-* Standard tuning
-* Drop D
-* DADGAD
-* Open G
-* Open D
-* Half-step down
-* Whole-step down
+**Guitar presets:**
 
-The user should also be able to save a custom tuning.
+* Standard (E A D G B E)
+* Drop D (D A D G B E)
+* DADGAD (D A D G A D)
+* Open G (D G D G B D)
+* Open D (D A D F# A D)
+* Half-step down (Eb Ab Db Gb Bb Eb)
+* Whole-step down (D G C F A D)
+
+**Cavaquinho presets:**
+
+* DGBe (D4 G4 B4 E5 — Portuguese/Madeira standard)
+* DGBD (D4 G4 B4 D5 — Brazilian, re-entrant top string)
+
+The user can also save a custom tuning (named; saved tunings appear under "My tunings" and can be deleted). Tuning name, selection, and instrument persist across launches.
 
 ---
 
@@ -117,27 +138,34 @@ The user should also be able to save a custom tuning.
 
 ### 5.1 Layout
 
-The app should display the guitar neck horizontally.
+The neck is drawn as a realistic horizontal fretboard (wood texture, nut, fret wires, position inlays, fret-number strip).
 
-Preferred orientation:
+Orientation:
 
-* Nut on the left
+* Nut on the left (right in left-handed mode)
 * Higher frets toward the right
-* Low E string at the bottom
-* High E string at the top
+* Lowest-pitch string at the bottom, highest at the top
 
-The user should be able to scroll or zoom if the whole neck does not fit on the screen.
+**Fixed aspect ratio + letterboxing.** The neck is always rendered at a fixed long-horizontal / short-vertical aspect ratio (derived from fret count × string count), centered and letterboxed within its viewport in **both** portrait and landscape. The viewport's own shape never distorts the neck — a tall portrait viewport simply leaves empty space above and below the short horizontal neck.
+
+**Zoom and pan.** Within that fixed frame the user can pinch-to-zoom (focal-point: the content under the pinch centroid stays fixed) and drag to pan, clamped so the neck can't be dragged off-screen:
+
+* Minimum scale 0.5× — the whole neck shrinks to half the viewport.
+* Maximum scale ≈ stringCount/2 — zoom in until roughly two strings fill the height.
+
+The transform is a pure render-layer effect, so tap hit-testing is unaffected by zoom/pan.
 
 ### 5.2 Interactivity
 
-The user should be able to tap any fret/string position.
+The user can tap any fret/string position.
 
-When a position is tapped:
+By default a note fires on **tap-release** (so a horizontal swipe pans the neck without sounding anything); an Options toggle switches this to fire on **touch-down**. In Strum (pick) mode, a tap toggles that position's selection instead of playing it.
 
-* The note should be highlighted.
-* The note name should be shown.
-* The note should play through audio.
-* The app should show the string number and fret number.
+When a position is tapped (non-pick modes):
+
+* The note is highlighted with a ring.
+* The note plays through audio (with the current instrument's timbre, at the current ring-sustain).
+* The app shows the string number, fret number, note name, and — when a chord is loaded — its interval relative to the chord root.
 
 Example:
 
@@ -148,35 +176,31 @@ Note: D
 Interval: optional, depending on current chord/scale context
 ```
 
-### 5.3 Display Modes
+### 5.3 What the neck shows
 
-The fretboard should support several display modes:
+Two orthogonal selections drive the neck. **Display mode** (a Chord / Scale / Strum selector in the Fretboard tool) picks what is lit up; **label mode** picks the text on each dot.
 
-#### Note Name Mode
+#### Label modes
 
-Shows note names:
+* **Intervals** *(default on first open)* — interval names relative to the root: `1, b2, 2, b3, 3, 4, #4/b5, 5, b6, 6, b7, 7`.
+* **Notes** — note names (`C, C#, D, …`).
+* **Empty** — dots only, no text.
 
-```text
-C, C#, D, D#, E, F, F#, G, G#, A, A#, B
-```
+Root dots are drawn distinctly (crimson with a pearl ring); other chord tones, scale tones, and pick selections each have their own color.
 
-The app should eventually support flats too:
+#### Display modes
 
-```text
-Db, Eb, Gb, Ab, Bb
-```
+* **Chord** — highlights the searched chord, either across the whole neck (All notes) or one playable shape at a time (Positions).
+* **Scale** — highlights the searched scale, All notes or per-position.
+* **Strum (pick)** — see §5.4.
 
-#### Interval Mode
+### 5.4 Strum (pick) mode
 
-Shows interval names relative to a selected root:
+A single mode for building an arbitrary voicing by hand:
 
-```text
-1, b2, 2, b3, 3, 4, #4/b5, 5, b6, 6, b7, 7
-```
-
-#### Empty Mode
-
-Shows a clean fretboard with only highlighted chord or scale tones.
+* Tap frets across strings to add/removing them from the selection (shown as amber outline rings).
+* Mute individual whole strings — drawn as a red ✕ at the nut, chord-diagram style. Muting a string clears any picks on it; picking a fret un-mutes that string (the two are mutually exclusive). Muted strings are excluded from the strum.
+* **Strum** (low → high, at the global strum spread) or **Arpeggio** (wider spread) the selection, or **Clear** it.
 
 ---
 
@@ -184,9 +208,9 @@ Shows a clean fretboard with only highlighted chord or scale tones.
 
 ### 6.1 Chord Input
 
-The user should be able to request any common chord.
+The user requests a chord by tapping a **root** chip and a **quality** chip in the Fretboard tool's Chord controls (no free-text parsing required, though the loop's slot editor does accept typed symbols like `Cmaj7`, `Dm7`, `G7`). The quality chips cover at least: major, m, 7, maj7, m7, dim, aug, sus4, sus2, 6, m6, m7b5, dim7, 9, add9, 13.
 
-Examples:
+Examples of supported chords:
 
 ```text
 C
@@ -215,29 +239,19 @@ C, C#, Db, D, D#, Eb, E, F, F#, Gb, G, G#, Ab, A, A#, Bb, B
 
 ### 6.2 Chord Shape Generation
 
-For a requested chord, the app should show multiple possible shapes across the neck.
+For a requested chord, the app shows multiple playable shapes across the neck, generated by a `ChordShapeGenerator` that honors the current tuning, instrument fret-span, and voicing style:
 
-Example request:
+* **Standard** voicings — the five CAGED shapes where canonical templates exist, plus brute-force voicings for qualities without templates (9, 13, …).
+* **Shell / jazz** voicings — drop-2 inversions that drop the 5th (and the root for 7+ chords), favoring 2–4 note voicings. Toggled in Options.
 
-```text
-Chord: Gmaj7
-```
-
-Expected output:
-
-* Shape near open position
-* Shape around 3rd fret
-* Shape around 7th fret
-* Shape around 10th/12th fret if available
-
-Each shape should show:
+Each shape shows:
 
 * Fretted notes
 * Muted strings
 * Open strings
 * Root note
 * Chord tones / intervals
-* Suggested fingering if possible, optional for MVP
+* The CAGED/template shape name and its fret span (used as the shape's label)
 
 ### 6.3 Chord Shape Constraints
 
@@ -257,21 +271,12 @@ Recommended MVP constraints:
 
 ### 6.4 Chord Shape Display
 
-When the user selects a chord, the fretboard should highlight the chord tones.
+When the user selects a chord, the fretboard highlights the chord tones. The Display selector chooses between:
 
-The app should also list chord-shape cards.
+* **All notes** — every occurrence of the chord tones across the 14 frets.
+* **Positions** — one playable shape at a time. A position scroller below the neck steps through the shapes with ◀ / ▶ and shows the shape's chord name, its fret range, and the `index / count` (e.g. `Cmaj7 · frets 2–3 · 2 / 5`).
 
-Each card should show:
-
-```text
-Chord: Cmaj7
-Position: 3rd fret
-Frets: x 3 2 0 0 0
-Notes: x C E G B E
-Intervals: x 1 3 5 7 3
-```
-
-The user should be able to tap a shape and see it highlighted on the full fretboard.
+The selected shape is highlighted directly on the full fretboard.
 
 ---
 
@@ -302,23 +307,18 @@ E blues
 
 ### 7.2 Scale Display
 
-The app should highlight all notes from the selected scale on the fretboard.
+The user picks a root chip and a scale chip. The Display selector chooses between:
 
-The user should be able to choose a position or fret range.
+* **All notes** — every scale tone across the 14 frets.
+* **Positions** — one box/position at a time, generated by `ScalePositions`. A scroller steps through positions with ◀ / ▶, showing the position's anchor note and fret range (e.g. `A minor pentatonic · anchor A · frets 5–8 · 1 / 5`).
 
-Example:
-
-```text
-Root: A
-Scale: Minor pentatonic
-Fret range: 5–8
-```
-
-The app should show:
+The neck shows:
 
 * Root notes distinctly
 * Other scale tones
-* Optional interval labels
+* Interval or note labels per the current label mode
+
+The scale controls also print the scale's notes and interval formula for reference.
 
 ---
 
@@ -326,44 +326,39 @@ The app should show:
 
 ### 8.1 Note Playback
 
-When the user taps a note, the app should play that pitch.
+When the user taps a note, the app plays that pitch through a native `AudioTrackEngine` (synthesized plucked tone). Each instrument has its own timbre (Cavaquinho is brighter with quicker decay). The pitch matches the selected tuning and fret, and notes ring for the user-set **ring sustain** (§10.7).
 
-For MVP, synthetic audio is acceptable.
+The tuner can also play an equal-tempered **reference pitch** for any detected note or open string, computed from the user's A4 reference (§9, Tuner).
 
-Possible implementations:
+### 8.2 Chord / Strum Playback
 
-* Built-in sampler
-* Simple synthesized sine/plucked sound
-* WebAudio-style oscillator if using web technology
-* Native mobile audio engine if using native app framework
+The user can hear a chord shape or a hand-built strum selection played:
 
-The pitch must match the selected tuning and fret.
+* Struck together, or spread low → high by the global **strum spread** setting (0 ms = struck at once).
+* Arpeggiated (a wider spread).
 
-### 8.2 Chord Playback
+Strum spread and ring sustain are global and shared by single strums, the chord looper, and ear-training playback.
 
-Nice-to-have for MVP:
+### 8.3 Percussion Playback
 
-The user can tap a chord shape and hear all notes played:
-
-* Simultaneously as a chord
-* Or arpeggiated from low string to high string
+A `PercussionSynth` synthesizes samba percussion voices (cached per voice) for the drum machine (§10.8).
 
 ---
 
 ## 9. Music Theory Engine
 
-The app needs an internal theory engine.
+The app has an internal `theory` module — pure Kotlin, UI-independent, and unit-tested. It supports:
 
-It should support:
-
-* Note names
-* Enharmonic equivalents
-* MIDI note numbers or equivalent pitch representation
+* Note names and enharmonic equivalents (`NoteSpeller`)
+* MIDI note numbers / pitch-class representation
 * Intervals
-* Chord formulas
-* Scale formulas
-* Tuning calculation
-* Fretboard note calculation
+* Chord formulas (`ChordLibrary`) and shape generation (`ChordShapeGenerator`, CAGED + shell), with voice-leading (`VoiceLeading.pickMinMovement`) used by the loop and ear trainers
+* Scale formulas (`ScaleLibrary`) and on-neck positions (`ScalePositions`)
+* Tuning calculation (`Tunings`, `Tuning`) and fretboard note calculation (`Fretboard`)
+* Ear-training models: diatonic degree resolution, random progressions, note-over-chord and chord-flavor challenges (`EarTraining`, `N2cChallenge`)
+* Percussion patterns and voices (`PercussionPattern`, `PercussionVoices`)
+
+Beyond the minimum chord formulas below, the library also defines diatonic extensions used by ear training (maj9, maj13, maj7#11, m9, m11, 11).
 
 ### 9.1 Note Representation
 
@@ -433,65 +428,81 @@ mixolydian:        1 2 3 4 5 6 b7
 
 ---
 
-## 10. Suggested Extra MVP Features
+## 10. Additional Features
 
-These are recommended because they make the app more useful without making the MVP too large.
+These extend the core fretboard tool and are part of the shipped app.
 
 ### 10.1 Root Highlighting
 
-When displaying a chord or scale, root notes should be visually different from other notes.
-
-Example:
-
-* Root = strong highlight
-* Other chord/scale tones = softer highlight
+When displaying a chord or scale, root notes are drawn distinctly (crimson with a pearl inner ring); other chord/scale tones use softer mode-specific colors.
 
 ### 10.2 Left-Handed Mode
 
-Allow the fretboard orientation to be flipped for left-handed players.
+The fretboard orientation can be flipped for left-handed players (Options toggle; persisted). The nut moves to the right and everything mirrors.
 
-### 10.3 Show/Hide Note Labels
+### 10.3 Note Labels
 
-User can toggle between:
+The label mode (§5.3) toggles dot labels between Notes, Intervals, and Empty (dots only). The default on first open is **Intervals**. The setting persists.
 
-* Show note names
-* Show intervals
-* Show both
-* Show nothing except dots
+### 10.4 Position View
 
-### 10.4 Fret Range Filter
+Rather than a numeric fret-range filter, scales and chords offer a **Positions** view that steps through individual playable shapes/boxes one at a time (§6.4, §7.2), each annotated with its fret range.
 
-For scales and chords, allow the user to limit results to a fret range.
+### 10.5 Saved Tunings
 
-Examples:
+The user can save and delete named custom tunings locally (persisted via DataStore). The selected tuning and instrument also persist across launches.
 
-```text
-Frets 0–5
-Frets 5–9
-Frets 7–12
-```
+### 10.6 Ear Training
 
-### 10.5 Favorite Chords and Tunings
+A full ear-training tool with three sub-modes, each offering **Practice** (free play) and **Challenge** (scored rounds):
 
-User can save:
+* **Progression** — a 4-bar diatonic Roman-numeral progression loops at a chosen BPM; the user identifies the key/mode and each bar's chord. A I–V–I (or i–V–i) cadence can be auditioned to establish the tonic. Options control which modes (major/minor) and chord-type level (triads / sevenths / extended) appear, a fixed or random key, and standard vs shell voicings (or a "mix all" that randomizes per bar/chord).
+* **Note2Chord** — a triad plays, then a test note sounds on top; the user names the test note's relationship to the chord.
+* **Flavor** — after a cadence sets the key, one diatonic chord plays; the user identifies its scale degree and quality.
 
-* Favorite chord shapes
-* Favorite custom tunings
+**Progression Challenge** specifics:
 
-This can be local-only for MVP.
+* 15 questions per session.
+* A dedicated "Hear the degrees" reference palette lets the user audition the diatonic degrees in the (hidden) key; the answer chips themselves are silent.
+* In fixed-Sevenths mode the user gives one combined diatonic-7th answer per bar (e.g. "V7") rather than picking degree and extension separately. Triad and mix modes keep separate pickers.
+* Advancing without answering every bar credits the unanswered bars as correct.
+* A persistent **high-score table** keeps the top results, each with its date and completion time, ranked by score then by fastest time (time breaks ties).
 
-### 10.6 Practice Prompt Mode
+Ear-training state is app-lifetime, so the user can leave to check themselves on the fretboard and return to the same progression, reveals, and counters.
 
-A simple practice mode can randomly ask:
+### 10.7 Global Audio Settings
 
-```text
-Find all C notes
-Play an A minor chord
-Find G major pentatonic in 5th position
-Find all b7 intervals over D7
-```
+Available app-wide (Options, and a quick-access button on the tool screens):
 
-This should be optional for MVP, but the app architecture should allow it later.
+* **Strum spread** — ms between consecutive chord notes (0 = struck at once), shared by single strums, the loop, and ear training.
+* **Ring sustain** — how long tapped/strummed notes ring.
+* **A4 reference** — 435–445 Hz, used by the tuner and reference tones.
+* **Play on touch-down** vs tap-release (§5.2).
+* **Jazz / shell voicings** toggle.
+
+### 10.8 Drum Machine
+
+A samba percussion looper (drum-machine tab): an editable 16-slot pattern with per-track **mute** and **solo**, per-instrument **voice auditioning** (tap a row label or cell to preview), and an adjustable BPM. The pattern persists across leaving and returning to the screen.
+
+### 10.9 Chord Looper
+
+A bar/beat progression sequencer ("Loop"):
+
+* Set tempo, bar count (1–16), and slots-per-bar (1 = whole, 2 = half, 4 = quarter).
+* Edit each slot's chord (typed symbol or via a **Build by degree** panel using key/mode/diatonic-level + optional quality override), its voicing, and its strum pattern (down / up / arpeggio / sustain).
+* Voicings auto-normalize for smooth voice-leading (first chord prefers the E-shape; each subsequent chord minimizes finger movement).
+* While playing, the main fretboard mirrors the sounding chord live, and a Stop control is surfaced in the status bar.
+* An ear-training progression can be loaded straight into the looper.
+
+### 10.10 Tuner
+
+A mic-driven chromatic tuner:
+
+* Detects pitch in real time and shows it on an enlarged quarter-ring dial (±50 ¢) with a pivoting needle and a large note label; turns green when in tune.
+* The A4 reference is adjustable (§10.7).
+* Tuning can be changed on the fly here (presets + custom) without opening Options.
+* Tapping the note label or an open-string reference button plays the equal-tempered reference tone and locks the dial to "spot on" while it rings.
+* Requires the `RECORD_AUDIO` runtime permission, requested on entry; an explainer panel is shown until it is granted.
 
 ---
 
@@ -499,12 +510,25 @@ This should be optional for MVP, but the app architecture should allow it later.
 
 ### 11.1 Instrument
 
+The instrument is modeled as an enum carrying its string count and chord-span comfort; the active tuning is stored separately. The neck displays 14 frets.
+
 ```json
 {
   "name": "Guitar",
   "strings": 6,
-  "frets": 24,
+  "maxFretSpan": 4,
+  "displayFrets": 14,
   "tuning": ["E2", "A2", "D3", "G3", "B3", "E4"]
+}
+```
+
+```json
+{
+  "name": "Cavaquinho",
+  "strings": 4,
+  "maxFretSpan": 5,
+  "displayFrets": 14,
+  "tuning": ["D4", "G4", "B4", "E5"]
 }
 ```
 
@@ -538,46 +562,32 @@ Use `-1` for muted strings.
 
 ## 12. Architecture Requirements
 
-The app should separate musical logic from the UI.
-
-Recommended structure:
+The app separates musical logic from the UI via three Gradle modules. The `theory` module is pure Kotlin with no Android or Compose dependencies, so it is unit-testable in isolation and reusable on other platforms (KMP).
 
 ```text
-src/
-  theory/
-    notes
-    intervals
-    chords
-    scales
-    tuning
-    fretboard
-    chordShapeGenerator
+:theory   (pure Kotlin)
+  Note / Interval / PitchClass / Midi / NoteSpeller
+  ChordLibrary / ChordQuality / ChordShapeGenerator / CagedShape / VoiceLeading
+  ScaleLibrary / Scale / ScalePositions
+  Tuning / Tunings / TuningCodec
+  Instrument / Fretboard / FretPosition
+  EarTraining / N2cChallenge        (ear-training models)
+  PercussionPattern / PercussionVoices / PercussionInstrument
 
-  components/
-    Fretboard
-    String
-    Fret
-    ChordSearch
-    ScaleSearch
-    TuningEditor
-    ShapeCard
+:audio    (Android audio engine)
+  AudioEngine / AudioTrackEngine     (note, chord/strum, frequency, sample playback)
+  Timbre / PercussionSynth
 
-  screens/
-    FretboardScreen
-    ChordScreen
-    ScaleScreen
-    SettingsScreen
-
-  audio/
-    notePlayback
-    chordPlayback
-
-  storage/
-    savedTunings
-    favorites
+:app      (Jetpack Compose UI)
+  MainActivity / App                 (nav rail + content area + bottom sheets)
+  AppState                           (shared app-lifetime state)
+  FretboardView                      (Canvas neck: fixed aspect, zoom/pan)
+  Screens (Fretboard/Options sheets, Loop) / EarTrainingScreen / TunerScreen / SambaLooperScreen
+  EarTrainingState / TunerState / SambaLooperState
+  TuningRepository                   (DataStore persistence: tunings, settings, high scores)
 ```
 
-The theory engine should be testable independently from the UI.
+The theory engine is testable independently from the UI.
 
 ---
 
@@ -600,49 +610,42 @@ Minimum tests:
 
 ## 14. Acceptance Criteria
 
-The MVP is successful when the user can:
+The app satisfies its goals when the user can:
 
-1. Open the app and see a horizontal guitar fretboard.
+1. Open the app and see a horizontal fretboard (in either orientation), and pinch-zoom / drag-pan it.
 2. Tap any fret/string and hear the correct note.
-3. Change the tuning of any string.
-4. Search for a chord such as `Cmaj7`.
-5. See multiple playable Cmaj7 shapes across the neck.
-6. Search for a scale such as `A minor pentatonic`.
+3. Switch instrument (Guitar / Cavaquinho) and change the tuning of any string (preset or custom).
+4. Pick a chord such as `Cmaj7` from the root/quality chips.
+5. See multiple playable Cmaj7 shapes across the neck (standard or shell voicings), stepping through positions.
+6. Pick a scale such as `A minor pentatonic`.
 7. See the scale displayed correctly on the current tuning.
-8. Switch between note-name and interval display.
-9. Save at least one custom tuning locally.
+8. Switch between Notes / Intervals / Empty dot labels (default: Intervals).
+9. Select frets, mute strings, and strum/arpeggiate a hand-built voicing.
+10. Save at least one custom tuning locally.
+11. Run an ear-training challenge and see a persistent high score.
+12. Tune by ear with the mic tuner and play reference tones.
+13. Build and play a chord loop and a percussion loop.
 
 ---
 
-## 15. Future Expansion: Cavaquinho
+## 15. Cavaquinho Support (implemented)
 
-The app should be designed so that cavaquinho support can be added later without rewriting the core logic.
+Cavaquinho support is built. It demonstrates the generic instrument model: the theory engine never assumes 6 strings.
 
-Cavaquinho support will require:
+Implemented:
 
-* 4-string instrument layout
-* Common cavaquinho tunings
-* Different default string names
-* Chord shapes adapted to 4 strings
-* Possibly smaller fretboard range
-* Brazilian chord vocabulary if desired
+* 4-string instrument layout (no wound-bronze strings — all rendered plain).
+* Cavaquinho preset tunings: DGBe (Portuguese) and DGBD (Brazilian, re-entrant).
+* Wider chord-span comfort (fret span 5) than guitar (4).
+* A brighter, quicker-decay timbre.
 
-The theory engine should therefore not assume 6 strings permanently.
-
-Instead, it should support a generic fretted instrument model:
-
-```json
-{
-  "name": "Custom Instrument",
-  "strings": 4,
-  "frets": 19,
-  "tuning": ["D4", "G4", "B4", "D5"]
-}
-```
+Further instruments can be added the same way: extend the `Instrument` enum and add presets to `Tunings`.
 
 ---
 
 ## 16. Implementation Priority
+
+Phases 1–6 (the original MVP) are complete; phase 7 captures the tools built on top.
 
 ### Phase 1: Core Theory Engine
 
@@ -668,36 +671,35 @@ Instead, it should support a generic fretted instrument model:
 
 ### Phase 4: Chords
 
-* Chord search
+* Chord search (root/quality chips)
 * Chord tones
-* Chord shapes
-* Shape cards
+* Chord shapes (CAGED + shell voicings)
+* Position scroller
 
 ### Phase 5: Scales
 
 * Scale search
 * Scale highlighting
-* Fret range filtering
+* Position view
 
 ### Phase 6: Audio
 
 * Tap-to-play note
 * Play chord shape
-* Optional arpeggio mode
+* Arpeggio / strum spread
+
+### Phase 7: Practice Tools (built on the MVP)
+
+* Strum (pick) mode with per-string muting
+* Ear training (progression / note2chord / flavor; practice + challenge; high scores)
+* Mic tuner with on-the-fly tuning and reference tones
+* Chord looper (build-by-degree, voice-leading, strum patterns)
+* Samba drum machine (mute/solo, voice auditioning)
+* Second instrument (Cavaquinho)
+* Pinch-zoom / drag-pan neck; fixed-aspect letterboxed rendering
 
 ---
 
-## 17. Development Instruction for Claude
+## 17. Development Process
 
-Before implementation, Claude should first produce:
-
-1. A proposed technical stack
-2. A simple architecture plan
-3. The data model
-4. The theory engine API
-5. The UI component hierarchy
-6. A list of implementation milestones
-
-Claude should not start coding the full app immediately.
-
-Claude should first confirm the plan and then implement the MVP in small, testable steps.
+The original plan (tech stack, architecture, data model, theory-engine API, UI hierarchy, milestones) was proposed and confirmed before implementation, then built in small, independently testable steps with the theory engine unit-tested in isolation. New work continues to follow this process: confirm the approach, then implement incrementally.
