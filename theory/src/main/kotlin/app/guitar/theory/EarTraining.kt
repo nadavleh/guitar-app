@@ -63,11 +63,11 @@ object EarTraining {
     val MAJOR_DEGREES: Map<Int, DegreeInfo> = mapOf(
         // extendedOptions encode the diatonic extensions allowed per degree:
         //   I→9,13 · ii→9,11 · iii→11 · IV→9,#11,13 · V→9,11,13 · vi→9,11 · vii°→(11/b13, rarely written)
-        1 to DegreeInfo("I",    "",    "maj7", "maj9", listOf("maj9" to "maj9", "maj13" to "maj13")),
-        2 to DegreeInfo("ii",   "m",   "m7",   "m9",   listOf("m9" to "9", "m11" to "11")),
+        1 to DegreeInfo("I",    "",    "maj7", "maj9", listOf("6" to "6", "add9" to "add9", "maj9" to "maj9", "maj13" to "maj13")),
+        2 to DegreeInfo("ii",   "m",   "m7",   "m9",   listOf("m6" to "6", "m9" to "9", "m11" to "11")),
         3 to DegreeInfo("iii",  "m",   "m7",   "m7",   listOf("m11" to "11")),   // 11 is the only stable tension on iii
-        4 to DegreeInfo("IV",   "",    "maj7", "maj9", listOf("maj9" to "maj9", "maj7#11" to "maj7#11", "maj13" to "maj13")),
-        5 to DegreeInfo("V",    "",    "7",    "9",    listOf("9" to "9", "11" to "11", "13" to "13")),
+        4 to DegreeInfo("IV",   "",    "maj7", "maj9", listOf("6" to "6", "add9" to "add9", "maj9" to "maj9", "maj7#11" to "maj7#11", "maj13" to "maj13")),
+        5 to DegreeInfo("V",    "",    "7",    "9",    listOf("6" to "6", "9" to "9", "11" to "11", "13" to "13")),
         6 to DegreeInfo("vi",   "m",   "m7",   "m9",   listOf("m9" to "9", "m11" to "11")),
         // Extended diminished extensions are rarely written; keep vii° at the ø7 sound.
         7 to DegreeInfo("vii°", "dim", "m7b5", "m7b5", listOf("m7b5" to "7")),
@@ -175,4 +175,125 @@ object EarTraining {
         val pool = if (mode == TrainingMode.Major) MAJOR_PROGRESSIONS else MINOR_PROGRESSIONS
         return pool[rng.nextInt(pool.size)]
     }
+
+    // ----- Advanced (non-diatonic) progressions ----------------------------------------------
+
+    /**
+     * One chord of an advanced progression, expressed RELATIVE to the key tonic so
+     * it transposes to any key. Unlike [Progression] (diatonic degree 1..7), this
+     * can name borrowed, secondary-dominant, and chromatic chords.
+     *
+     * @param semitone chord-root offset above the tonic, 0..11
+     * @param quality  a [ChordLibrary] quality symbol ("", "m", "7", "maj7", "dim7", "m7b5", "6", "mMaj7", …)
+     * @param roman    display label, e.g. "bVII", "III7", "V7", "i6", "#IV°7"
+     */
+    data class AdvChord(val semitone: Int, val quality: String, val roman: String)
+
+    /** A named, possibly non-diatonic progression with a teaching note, for the
+     *  "Advanced progressions" ear-training option. Variable length. */
+    data class NamedProgression(
+        val name: String,
+        val explanation: String,
+        /** Whether the key center is heard as major or minor (affects tonic spelling). */
+        val tonicMode: TrainingMode,
+        val chords: List<AdvChord>,
+    ) {
+        /** Roman-numeral line, e.g. "I – bVII – IV". */
+        val romanLine: String get() = chords.joinToString("  –  ") { it.roman }
+
+        /** Realise the progression in [key] as concrete, playable chords. */
+        fun resolve(key: PitchClass): List<ResolvedChord> = chords.map { c ->
+            val root = PitchClass.of(key.value + c.semitone)
+            ResolvedChord(NoteSpeller.spell(root) + c.quality, c.roman, root)
+        }
+    }
+
+    private fun adv(name: String, explanation: String, mode: TrainingMode, vararg chords: AdvChord) =
+        NamedProgression(name, explanation, mode, chords.toList())
+
+    /**
+     * Curated non-diatonic / "special" progressions for advanced practice — borrowed
+     * chords (modal interchange), secondary dominants, chromatic passing chords, and
+     * jazz turnarounds. Each carries a short explanation shown while quizzing.
+     */
+    val ADVANCED_PROGRESSIONS: List<NamedProgression> = listOf(
+        adv("Mixolydian Rocker", "Borrows bVII from the parallel Mixolydian mode for a driving, anthemic classic-rock sound.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(10, "", "bVII"), AdvChord(5, "", "IV")),
+        adv("Bright Lift", "The major II is a borrowed/secondary-dominant chord (V of V) that gives a sudden, hopeful lift.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(2, "", "II"), AdvChord(5, "", "IV"), AdvChord(0, "", "I")),
+        adv("Romantic Climax", "A bright major III then a borrowed minor iv — a dramatic rise melting into melancholy.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(4, "", "III"), AdvChord(5, "", "IV"), AdvChord(5, "m", "iv")),
+        adv("Epic Backstep", "Borrowed bVII and bVI from the parallel minor give a cinematic, heroic backstep.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(10, "", "bVII"), AdvChord(8, "", "bVI"), AdvChord(10, "", "bVII")),
+        adv("Andalusian Cadence", "The flamenco descending tetrachord; the major V (harmonic minor) adds dark, Spanish tension.",
+            TrainingMode.Minor,
+            AdvChord(0, "m", "i"), AdvChord(10, "", "bVII"), AdvChord(8, "", "bVI"), AdvChord(7, "", "V")),
+        adv("Dark Roots", "Uses the natural-minor v (minor, not the usual major V) for a raw, modal folk/blues feel.",
+            TrainingMode.Minor,
+            AdvChord(0, "m", "i"), AdvChord(5, "m", "iv"), AdvChord(7, "m", "v")),
+        adv("Neo-Soul Minor", "Moody natural-minor motion through a minor v, popular in modern R&B and lo-fi.",
+            TrainingMode.Minor,
+            AdvChord(0, "m", "i"), AdvChord(7, "m", "v"), AdvChord(8, "", "bVI"), AdvChord(10, "", "bVII")),
+        adv("Ragtime Circle", "A chain of secondary dominants around the circle of fifths — the bouncing staple of ragtime and stride.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(9, "7", "VI7"), AdvChord(2, "7", "II7"), AdvChord(7, "7", "V7")),
+        adv("Classic Ragtime Turnaround", "I becomes a dominant I7 to tonicise IV, then a borrowed minor iv adds a nostalgic, bluesy turn.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(0, "7", "I7"), AdvChord(5, "", "IV"), AdvChord(5, "m", "iv")),
+        adv("Chromatic Passing Chord", "A #i diminished passing chord connects I to ii7 with a smooth chromatic walking bass.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(1, "dim7", "#I°7"), AdvChord(2, "m7", "ii7"), AdvChord(7, "7", "V7")),
+        adv("Traditional Rag Ending", "A syncopated Scott-Joplin ending: a secondary-dominant III7, a #IV°7 passing chord, then a I–V7–I cadence.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(4, "7", "III7"), AdvChord(5, "", "IV"), AdvChord(6, "dim7", "#IV°7"),
+            AdvChord(0, "", "I/V"), AdvChord(7, "7", "V7"), AdvChord(0, "", "I")),
+        adv("Melancholic Jazz-Rag", "A secondary-dominant III7 leads to a borrowed minor iv and a half-diminished ii — bittersweet and vintage.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(4, "7", "III7"), AdvChord(5, "m", "iv"), AdvChord(2, "m7b5", "ii7b5"), AdvChord(7, "7", "V7")),
+        adv("Broadway Lift", "The secondary-dominant III7 brightens a major-key ii–V cadence — a classic show-tune lift.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(4, "7", "III7"), AdvChord(5, "", "IV"), AdvChord(2, "m7", "ii7"), AdvChord(7, "7", "V7")),
+        adv("Minor-Key Swing", "Starts dark, then a striking secondary-dominant III7 lifts before the ii–V cadence.",
+            TrainingMode.Minor,
+            AdvChord(0, "m", "i"), AdvChord(3, "7", "III7"), AdvChord(5, "m", "iv"), AdvChord(2, "m7", "ii7"), AdvChord(7, "7", "V7")),
+        adv("Extended Pop Ballad", "A secondary-dominant III7 tonicises vi, prolonging tension before the ii–V resolution.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(4, "7", "III7"), AdvChord(9, "m", "vi"), AdvChord(5, "", "IV"), AdvChord(2, "m7", "ii7"), AdvChord(7, "7", "V7")),
+        adv("Tritone Substitution", "The dominant V7 is replaced by bII7 a tritone away — a smooth chromatic slide into the tonic.",
+            TrainingMode.Major,
+            AdvChord(2, "m7", "ii7"), AdvChord(1, "7", "bII7"), AdvChord(0, "maj7", "Imaj7")),
+        adv("Minor Line Cliché", "A stationary minor chord with one inner voice descending chromatically (root–7–b7–6).",
+            TrainingMode.Minor,
+            AdvChord(0, "m", "i"), AdvChord(0, "mMaj7", "i(maj7)"), AdvChord(0, "m7", "i7"), AdvChord(0, "m6", "i6")),
+        adv("Romantic Plaintive", "A major line cliché: the top voice melts down (root–maj7–b7), pulling toward IV.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(0, "maj7", "Imaj7"), AdvChord(0, "7", "I7"), AdvChord(5, "", "IV")),
+        adv("Church Cadence", "A gospel plagal feel with a bluesy bVII descent back to IV.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(5, "", "IV"), AdvChord(0, "", "I"), AdvChord(10, "", "bVII"), AdvChord(5, "", "IV")),
+        adv("Gospel Walk-Up", "A bassline climbing the scale through a #IV°7 diminished chord — a driving gospel walk-up.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(0, "", "I/III"), AdvChord(5, "", "IV"), AdvChord(6, "dim7", "#IV°7"), AdvChord(7, "", "V")),
+        adv("Mario Cadence", "Borrowed bVI and bVII resolve up to a triumphant major I — the classic heroic/video-game cadence.",
+            TrainingMode.Major,
+            AdvChord(8, "", "bVI"), AdvChord(10, "", "bVII"), AdvChord(0, "", "I")),
+        adv("Royal Road", "The backbone of modern J-pop/anime: it loops without ever landing on the home chord.",
+            TrainingMode.Major,
+            AdvChord(5, "", "IV"), AdvChord(7, "", "V"), AdvChord(4, "m", "iii"), AdvChord(9, "m", "vi")),
+        adv("Bird Blues Turnaround", "Charlie Parker's rapid descending turnaround, stacking a passing #IV°7 and a secondary-dominant VI7.",
+            TrainingMode.Major,
+            AdvChord(0, "maj7", "Imaj7"), AdvChord(6, "dim7", "#IV°7"), AdvChord(4, "m7", "iii7"),
+            AdvChord(9, "7", "VI7"), AdvChord(2, "m7", "ii7"), AdvChord(7, "7", "V7")),
+        adv("Montgomery Turnaround", "A highly chromatic Wes-Montgomery turnaround that slides back to the tonic in tritone steps.",
+            TrainingMode.Major,
+            AdvChord(0, "maj7", "Imaj7"), AdvChord(3, "7", "bIII7"), AdvChord(8, "7", "bVI7"), AdvChord(1, "7", "bII7")),
+    )
+
+    /** Pick a random advanced progression. */
+    fun randomAdvanced(rng: kotlin.random.Random): NamedProgression =
+        ADVANCED_PROGRESSIONS[rng.nextInt(ADVANCED_PROGRESSIONS.size)]
 }

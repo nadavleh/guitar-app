@@ -30,6 +30,13 @@ object ChordLibrary {
         "m11"     to ChordQuality("m11",     listOf(Interval.P1, Interval.min3, Interval.min7, Interval.P11)),
         // Dominant 11 omits the 3rd (it clashes with the 11) — the textbook voicing.
         "11"      to ChordQuality("11",      listOf(Interval.P1, Interval.P5, Interval.min7, Interval.P11)),
+        // Minor-major 7th — the "James Bond" chord; used by the minor line-cliché
+        // progression (i – i(maj7) – i7 – i6).
+        "mMaj7"   to ChordQuality("mMaj7",   listOf(Interval.P1, Interval.min3, Interval.P5, Interval.maj7)),
+        // Augmented dominant 7th (7#5): a dominant chord with a raised 5th.
+        "7#5"     to ChordQuality("7#5",     listOf(Interval.P1, Interval.maj3, Interval.min6, Interval.min7)),
+        // Augmented major 7th (maj7#5): a maj7 with a raised 5th.
+        "maj7#5"  to ChordQuality("maj7#5",  listOf(Interval.P1, Interval.maj3, Interval.min6, Interval.maj7)),
     )
 
     fun parse(symbol: String): Pair<PitchClass, ChordQuality>? {

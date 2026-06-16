@@ -108,22 +108,22 @@ class EarTrainingTest {
 
     @Test fun `I extended uses an allowed diatonic extension`() {
         val r = EarTraining.resolve(1, PitchClass.C, TrainingMode.Major, ChordTypeLevel.Extended)
-        assertTrue(r.symbol in setOf("Cmaj9", "Cmaj13"), "unexpected ${r.symbol}")
-        assertTrue(r.romanLabel in setOf("Imaj9", "Imaj13"), "unexpected ${r.romanLabel}")
+        assertTrue(r.symbol in setOf("C6", "Cadd9", "Cmaj9", "Cmaj13"), "unexpected ${r.symbol}")
+        assertTrue(r.romanLabel in setOf("I6", "Iadd9", "Imaj9", "Imaj13"), "unexpected ${r.romanLabel}")
         assertTrue(ChordLibrary.parse(r.symbol) != null, "unparseable ${r.symbol}")
     }
 
     @Test fun `V extended uses an allowed diatonic extension`() {
         val r = EarTraining.resolve(5, PitchClass.C, TrainingMode.Major, ChordTypeLevel.Extended)
-        assertTrue(r.symbol in setOf("G9", "G11", "G13"), "unexpected ${r.symbol}")
-        assertTrue(r.romanLabel in setOf("V9", "V11", "V13"), "unexpected ${r.romanLabel}")
+        assertTrue(r.symbol in setOf("G6", "G9", "G11", "G13"), "unexpected ${r.symbol}")
+        assertTrue(r.romanLabel in setOf("V6", "V9", "V11", "V13"), "unexpected ${r.romanLabel}")
         assertTrue(ChordLibrary.parse(r.symbol) != null, "unparseable ${r.symbol}")
     }
 
     @Test fun `ii extended strips m in roman and stays diatonic`() {
         val r = EarTraining.resolve(2, PitchClass.C, TrainingMode.Major, ChordTypeLevel.Extended)
-        assertTrue(r.symbol in setOf("Dm9", "Dm11"), "unexpected ${r.symbol}")
-        assertTrue(r.romanLabel in setOf("ii9", "ii11"), "unexpected ${r.romanLabel}")
+        assertTrue(r.symbol in setOf("Dm6", "Dm9", "Dm11"), "unexpected ${r.symbol}")
+        assertTrue(r.romanLabel in setOf("ii6", "ii9", "ii11"), "unexpected ${r.romanLabel}")
         assertTrue(ChordLibrary.parse(r.symbol) != null, "unparseable ${r.symbol}")
     }
 

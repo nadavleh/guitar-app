@@ -2,6 +2,11 @@ package app.guitar.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,7 +19,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -26,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,7 +41,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -42,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import app.guitar.theory.PERCUSSION_SLOTS
 import app.guitar.theory.PercussionInstrument
 import app.guitar.theory.PercussionVoices
+import kotlin.math.max
 
 /**
  * Drum-machine / samba-looper screen. A 4-row × 16-cell step grid (2 bars of
@@ -54,10 +65,20 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     val samba = state.sambaLooper
     DisposableEffect(Unit) { onDispose { samba.stop() } }
 
+    // Pinch-zoom / drag-pan state for the drum-loop grid (mirrors FretboardView).
+    // scale 1 = grid fits its fixed frame; the transform is a pure render-layer
+    // effect (graphicsLayer), so per-cell tap hit-testing is unaffected.
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+    val minScale = 0.5f
+    val maxScale = 3f
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(rememberScrollState())
             .padding(12.dp),
     ) {
         // ----- Header -----
@@ -99,24 +120,80 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
         Spacer(Modifier.height(8.dp))
 
         // ----- Grid -----
-        Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            for (inst in PercussionInstrument.entries) {
-                InstrumentRow(
-                    samba = samba,
-                    instrument = inst,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
-                Spacer(Modifier.height(6.dp))
-            }
-            // Beat / bar caption
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Spacer(Modifier.width(ROW_LABEL_DP.dp))
-                Text(
-                    "bar 1  ·  bar 2   (2/4, sixteenths)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
+        // The grid has a FIXED height (not weight) so each of the 4 instrument
+        // rows always has room for its name, the ▾ voice popup, and the M/S
+        // toggles — nothing gets clipped in short-height (landscape) layouts.
+        // 4 rows × ROW_HEIGHT_DP + 3 inter-row spacers + caption row.
+        val gridHeight =
+            (PercussionInstrument.entries.size * ROW_HEIGHT_DP +
+                (PercussionInstrument.entries.size - 1) * 6 + CAPTION_DP).dp
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(gridHeight)
+                .clipToBounds()
+                // Zoom/pan ONLY on a 2-finger pinch — single-finger drags fall
+                // through to the page's verticalScroll (so the page still scrolls
+                // over the grid) and to the per-cell tap/long-press handlers. The
+                // transform is on the CONTAINER, never on a cell, so cell taps still
+                // hit correctly (Compose maps coords back through the graphicsLayer).
+                .pointerInput(minScale, maxScale) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        do {
+                            val event = awaitPointerEvent()
+                            if (event.changes.count { it.pressed } >= 2) {
+                                val zoom = event.calculateZoom()
+                                val pan = event.calculatePan()
+                                val centroid = event.calculateCentroid()
+                                val oldScale = scale
+                                val newScale = (oldScale * zoom).coerceIn(minScale, maxScale)
+                                val cx = size.width / 2f
+                                val cy = size.height / 2f
+                                scale = newScale
+                                val maxX = max(0f, size.width * (newScale - 1f) / 2f)
+                                val maxY = max(0f, size.height * (newScale - 1f) / 2f)
+                                offsetX = (offsetX + pan.x + (centroid.x - cx) * (oldScale - newScale))
+                                    .coerceIn(-maxX, maxX)
+                                offsetY = (offsetY + pan.y + (centroid.y - cy) * (oldScale - newScale))
+                                    .coerceIn(-maxY, maxY)
+                                // Consume so neither the page scroll nor cell taps react to the pinch.
+                                event.changes.forEach { it.consume() }
+                            }
+                        } while (event.changes.any { it.pressed })
+                    }
+                },
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offsetX
+                        translationY = offsetY
+                    },
+            ) {
+                for ((i, inst) in PercussionInstrument.entries.withIndex()) {
+                    InstrumentRow(
+                        samba = samba,
+                        instrument = inst,
+                        modifier = Modifier.height(ROW_HEIGHT_DP.dp).fillMaxWidth(),
+                    )
+                    if (i != PercussionInstrument.entries.lastIndex) {
+                        Spacer(Modifier.height(6.dp))
+                    }
+                }
+                // Beat / bar caption
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.width(ROW_LABEL_DP.dp))
+                    Text(
+                        "bar 1  ·  bar 2   (2/4, sixteenths)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
             }
         }
 
@@ -130,7 +207,9 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     }
 }
 
-private const val ROW_LABEL_DP = 118
+private const val ROW_LABEL_DP = 128
+private const val ROW_HEIGHT_DP = 70   // per-instrument row: name + ▾ + M/S all fit
+private const val CAPTION_DP = 18      // bar/beat caption strip below the rows
 
 @Composable
 private fun InstrumentRow(

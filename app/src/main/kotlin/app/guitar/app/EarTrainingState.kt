@@ -273,7 +273,16 @@ class EarTrainingState(
         val (root, q) = parsed
         val tuning = tuningProvider()
         val shapes = ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
-        if (shapes.isEmpty()) return
+        if (shapes.isEmpty()) {
+            // Fallback for exotic chords with no playable guitar voicing (some
+            // advanced-progression chords): sound the chord tones as a block.
+            currentPlayingShape = null
+            val rootMidi = 52 + root.value
+            val midis = q.intervals.map { rootMidi + it.semitones }
+            audio.playChord(midis, strumDelayMillis = strumProvider(),
+                sustainMillis = (barMs * 0.9).toInt().coerceAtLeast(200), timbre = Timbre.Clarity)
+            return
+        }
         val shape = if (prevPlayedShape == null) {
             shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.first()
         } else {
@@ -288,6 +297,20 @@ class EarTrainingState(
             strumDelayMillis = strumProvider(),
             sustainMillis = (barMs * 0.9).toInt().coerceAtLeast(200),
             timbre = Timbre.Clarity)
+    }
+
+    /** Play the [idx]-th chord of the current progression as a block built directly
+     *  from its chord tones — guarantees any quality (incl. exotic advanced ones)
+     *  sounds, regardless of guitar-voicing availability. */
+    fun playProgChordDirect(idx: Int) {
+        val rc = progResolved.getOrNull(idx) ?: return
+        val (root, q) = ChordLibrary.parse(rc.symbol) ?: return
+        val rootMidi = 52 + root.value
+        val midis = q.intervals.map { rootMidi + it.semitones }
+        scope.launch {
+            audio.playChord(midis, strumDelayMillis = strumProvider(),
+                sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
+        }
     }
 
     // ---------- Note2Chord trainer ----------
@@ -637,8 +660,8 @@ class EarTrainingState(
     /** Palette of chord flavors the user may enable for the random pool. */
     val flavorPalette: List<String> = listOf(
         "", "m", "dim", "aug", "sus2", "sus4",
-        "7", "maj7", "m7", "m7b5",
-        "9", "m9", "maj9", "11", "13",
+        "6", "m6", "7", "maj7", "m7", "m7b5",
+        "add9", "9", "m9", "maj9", "11", "13",
     )
 
     /** Flavors currently enabled (chord-quality symbols). */
@@ -806,6 +829,256 @@ class EarTrainingState(
     }
     fun exitFlavorChallenge() { flavorChActive = false; flavorChIndex = 0; flavorChAnswered = false }
 
+    // ---------- #2 Advanced (non-diatonic) progressions ----------
+
+    /** Whether the Progression sub-mode is showing advanced named progressions. */
+    var advancedMode by mutableStateOf(false)
+    /** The currently-drawn advanced progression (null until generated). */
+    var advProg by mutableStateOf<app.guitar.theory.EarTraining.NamedProgression?>(null)
+        private set
+    /** Whether the advanced answer (name + Roman line + chords) is revealed. */
+    var advRevealed by mutableStateOf(false)
+
+    /** Draw a fresh advanced progression (random named progression + key), load it
+     *  into [progResolved] for the shared looper, and reset the reveal. */
+    fun nextAdvancedProgression() {
+        val np = EarTraining.randomAdvanced(rng)
+        val key = fixedKey ?: PitchClass(rng.nextInt(12))
+        advProg = np
+        progKey = key
+        progMode = np.tonicMode
+        progProgression = null
+        progResolved = np.resolve(key)
+        advRevealed = false
+        hasGenerated = true
+        prevPlayedShape = null
+        if (isLooping) { stopLoop(); startLoop() }
+    }
+
+    fun toggleAdvReveal() { advRevealed = !advRevealed }
+
+    // Advanced challenge: self-marked (chromatic chords make multiple-choice impractical).
+    val advChallengeTotal: Int = 10
+    var advChActive by mutableStateOf(false)
+        private set
+    var advChIndex by mutableStateOf(0)
+        private set
+    var advChScore by mutableStateOf(0)
+        private set
+    var advChMarked by mutableStateOf(false)
+        private set
+
+    fun startAdvChallenge() {
+        advChActive = true; advChIndex = 0; advChScore = 0; advChMarked = false
+        nextAdvancedProgression()
+        startLoop()
+    }
+    fun markAdv(correct: Boolean) {
+        if (!advChActive || advChMarked) return
+        advChMarked = true
+        advRevealed = true
+        if (correct) advChScore++
+    }
+    fun advanceAdvChallenge() {
+        if (!advChActive) return
+        if (advChIndex >= advChallengeTotal - 1) { advChIndex = advChallengeTotal; stopLoop(); return }
+        advChIndex++; advChMarked = false
+        nextAdvancedProgression()
+    }
+    fun exitAdvChallenge() { advChActive = false; advChIndex = 0; stopLoop() }
+
+    // ---------- #3 Inversions trainer ----------
+
+    /** Chord qualities selectable for the inversions trainer. */
+    val invPalette: List<String> = listOf(
+        "", "m", "sus2", "sus4", "aug", "dim",
+        "7", "maj7", "m7", "m7b5", "dim7", "6", "m6", "9", "maj9", "m9",
+    )
+    var invAllowed by mutableStateOf(setOf("", "m", "7"))
+
+    var invRoot by mutableStateOf(PitchClass.C)
+        private set
+    var invQuality by mutableStateOf("")
+        private set
+    var invInversion by mutableStateOf(0)
+        private set
+    var invRevealed by mutableStateOf(false)
+    var invGuess by mutableStateOf<Int?>(null)
+    var invStarted by mutableStateOf(false)
+        private set
+    var invPlaying by mutableStateOf(false)
+        private set
+    private var invJob: Job? = null
+
+    fun toggleInvAllowed(sym: String) {
+        invAllowed = if (sym in invAllowed) invAllowed - sym else invAllowed + sym
+    }
+
+    /** Number of inversions the current chord quality has (3 for triads, 4 for 7ths). */
+    fun invCount(): Int {
+        val q = ChordLibrary.qualities[invQuality] ?: return 3
+        return app.guitar.theory.Inversions.count(q)
+    }
+
+    private fun invMidis(inversion: Int): List<Int> {
+        val q = ChordLibrary.qualities[invQuality] ?: return emptyList()
+        val rootMidi = 52 + invRoot.value   // E3-ish base register
+        return app.guitar.theory.Inversions.midis(rootMidi, q, inversion)
+    }
+
+    /** Draw a new chord (random allowed quality, root, and inversion) and play it. */
+    fun newInversion() {
+        val pool = invAllowed.ifEmpty { setOf("") }.toList()
+        invQuality = pool[rng.nextInt(pool.size)]
+        invRoot = PitchClass(rng.nextInt(12))
+        invInversion = rng.nextInt(invCount())
+        invRevealed = false
+        invGuess = null
+        invStarted = true
+        playInversion()
+    }
+
+    /** Replay the current chord in its (hidden) inversion. */
+    fun playInversion() {
+        val midis = invMidis(invInversion)
+        if (midis.isEmpty()) return
+        invJob?.cancel()
+        invPlaying = true
+        invJob = scope.launch {
+            try {
+                audio.playChord(midis, strumDelayMillis = strumProvider(),
+                    sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
+            } finally { invPlaying = false }
+        }
+    }
+
+    /** Audition inversion [k] of the current chord — lets the user compare by ear. */
+    fun auditionInversion(k: Int) {
+        val midis = invMidis(k)
+        if (midis.isNotEmpty()) {
+            scope.launch {
+                audio.playChord(midis, strumDelayMillis = strumProvider(),
+                    sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
+            }
+        }
+    }
+
+    fun toggleInvReveal() { invRevealed = !invRevealed }
+
+    // Inversions challenge (scored).
+    val invChallengeTotal: Int = 10
+    var invChActive by mutableStateOf(false)
+        private set
+    var invChIndex by mutableStateOf(0)
+        private set
+    var invChScore by mutableStateOf(0)
+        private set
+    var invChAnswered by mutableStateOf(false)
+        private set
+
+    fun startInvChallenge() {
+        invChActive = true; invChIndex = 0; invChScore = 0; invChAnswered = false
+        newInversion()
+    }
+    fun submitInvGuess() {
+        if (!invChActive || invChAnswered) return
+        val g = invGuess ?: return
+        invChAnswered = true; invRevealed = true
+        if (g == invInversion) invChScore++
+    }
+    fun advanceInvChallenge() {
+        if (!invChActive) return
+        if (invChIndex >= invChallengeTotal - 1) { invChIndex = invChallengeTotal; return }
+        invChIndex++; invChAnswered = false; newInversion()
+    }
+    fun exitInvChallenge() { invChActive = false; invChIndex = 0 }
+
+    // ---------- #4 Augmented vs Diminished trainer ----------
+
+    /** Qualities selectable for the aug/dim trainer (triads + their 7th/extended forms). */
+    val augDimPalette: List<String> = listOf("aug", "dim", "dim7", "m7b5", "7#5", "maj7#5")
+    var augDimAllowed by mutableStateOf(setOf("aug", "dim"))
+
+    var adRoot by mutableStateOf(PitchClass.C)
+        private set
+    var adQuality by mutableStateOf("aug")
+        private set
+    var adRevealed by mutableStateOf(false)
+    var adGuess by mutableStateOf<String?>(null)
+    var adStarted by mutableStateOf(false)
+        private set
+    private var adJob: Job? = null
+
+    fun toggleAugDimAllowed(sym: String) {
+        augDimAllowed = if (sym in augDimAllowed) augDimAllowed - sym else augDimAllowed + sym
+    }
+
+    /** True family ("Augmented" / "Diminished") of a quality symbol, for grouping/feedback. */
+    fun augDimFamily(sym: String): String =
+        if (sym.startsWith("aug") || sym == "7#5" || sym == "maj7#5") "Augmented" else "Diminished"
+
+    private fun adMidis(quality: String): List<Int> {
+        val q = ChordLibrary.qualities[quality] ?: return emptyList()
+        val rootMidi = 52 + adRoot.value
+        return q.intervals.map { rootMidi + it.semitones }
+    }
+
+    fun newAugDim() {
+        val pool = augDimAllowed.ifEmpty { setOf("aug", "dim") }.toList()
+        adQuality = pool[rng.nextInt(pool.size)]
+        adRoot = PitchClass(rng.nextInt(12))
+        adRevealed = false; adGuess = null; adStarted = true
+        playAugDim()
+    }
+    fun playAugDim() {
+        val midis = adMidis(adQuality)
+        if (midis.isEmpty()) return
+        adJob?.cancel()
+        adJob = scope.launch {
+            audio.playChord(midis, strumDelayMillis = strumProvider(),
+                sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
+        }
+    }
+    /** Audition quality [sym] at the current root — compare aug vs dim sounds. */
+    fun auditionAugDim(sym: String) {
+        val midis = adMidis(sym)
+        if (midis.isNotEmpty()) {
+            scope.launch {
+                audio.playChord(midis, strumDelayMillis = strumProvider(),
+                    sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
+            }
+        }
+    }
+    fun toggleAugDimReveal() { adRevealed = !adRevealed }
+
+    // Aug/Dim challenge (scored).
+    val augDimChallengeTotal: Int = 10
+    var adChActive by mutableStateOf(false)
+        private set
+    var adChIndex by mutableStateOf(0)
+        private set
+    var adChScore by mutableStateOf(0)
+        private set
+    var adChAnswered by mutableStateOf(false)
+        private set
+
+    fun startAugDimChallenge() {
+        adChActive = true; adChIndex = 0; adChScore = 0; adChAnswered = false
+        newAugDim()
+    }
+    fun submitAugDimGuess() {
+        if (!adChActive || adChAnswered) return
+        val g = adGuess ?: return
+        adChAnswered = true; adRevealed = true
+        if (g == adQuality) adChScore++
+    }
+    fun advanceAugDimChallenge() {
+        if (!adChActive) return
+        if (adChIndex >= augDimChallengeTotal - 1) { adChIndex = augDimChallengeTotal; return }
+        adChIndex++; adChAnswered = false; newAugDim()
+    }
+    fun exitAugDimChallenge() { adChActive = false; adChIndex = 0 }
+
     private suspend fun playCadenceInline() {
         val map = flavorDegreesMap()
         for (deg in listOf(1, 5, 1)) {
@@ -837,10 +1110,14 @@ class EarTrainingState(
         flavorJob = null
         cadenceJob?.cancel()
         cadenceJob = null
+        invJob?.cancel()
+        invJob = null
+        adJob?.cancel()
+        adJob = null
     }
 }
 
-enum class EarSubMode { Progression, Note2Chord, Flavor }
+enum class EarSubMode { Progression, Note2Chord, Flavor, Inversions, AugDim }
 
 /** Within any tab: free Practice or scored Challenge rounds. */
 enum class EarMode { Practice, Challenge }

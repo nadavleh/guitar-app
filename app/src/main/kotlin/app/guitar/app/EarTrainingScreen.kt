@@ -91,19 +91,24 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(8.dp))
-        // Sub-mode tabs, full width.
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            EarSubMode.entries.forEachIndexed { i, s ->
-                SegmentedButton(
+        // Sub-mode tabs — a wrapping chip row (5 sub-modes don't fit a segmented row in portrait).
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            for (s in EarSubMode.entries) {
+                FilterChip(
                     selected = s == ear.progSubMode,
                     onClick = { ear.switchTab(s) },
-                    shape = SegmentedButtonDefaults.itemShape(index = i, count = EarSubMode.entries.size),
                     label = {
                         Text(
                             when (s) {
-                                EarSubMode.Progression -> "Progress."
-                                EarSubMode.Note2Chord  -> "Note2Chord"
+                                EarSubMode.Progression -> "Progressions"
+                                EarSubMode.Note2Chord  -> "Note→Chord"
                                 EarSubMode.Flavor      -> "Flavor"
+                                EarSubMode.Inversions  -> "Inversions"
+                                EarSubMode.AugDim      -> "Aug / Dim"
                             },
                             maxLines = 1,
                         )
@@ -128,16 +133,48 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
             }
         }
 
+        // Progression sub-mode gets an "Advanced (non-diatonic)" toggle that swaps
+        // the diatonic generator for the curated special-progression library.
+        if (ear.progSubMode == EarSubMode.Progression) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Advanced (non-diatonic) progressions",
+                        style = MaterialTheme.typography.bodyMedium)
+                    Text("Borrowed chords, secondary dominants & jazz turnarounds, each with a note.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = ear.advancedMode, onCheckedChange = {
+                    ear.advancedMode = it
+                    ear.stopLoop()
+                })
+            }
+        }
+
         when (ear.progSubMode) {
             EarSubMode.Progression ->
-                if (ear.earMode == EarMode.Challenge) ProgressionChallengeView(state, ear)
-                else ProgressionView(state, ear)
+                if (ear.advancedMode) {
+                    if (ear.earMode == EarMode.Challenge) AdvancedChallengeView(ear)
+                    else AdvancedProgressionView(ear)
+                } else {
+                    if (ear.earMode == EarMode.Challenge) ProgressionChallengeView(state, ear)
+                    else ProgressionView(state, ear)
+                }
             EarSubMode.Note2Chord ->
                 if (ear.earMode == EarMode.Challenge) Note2ChordChallengeView(ear)
                 else Note2ChordView(ear)
             EarSubMode.Flavor ->
                 if (ear.earMode == EarMode.Challenge) FlavorChallengeView(ear)
                 else FlavorView(ear)
+            EarSubMode.Inversions ->
+                if (ear.earMode == EarMode.Challenge) InversionsChallengeView(ear)
+                else InversionsView(ear)
+            EarSubMode.AugDim ->
+                if (ear.earMode == EarMode.Challenge) AugDimChallengeView(ear)
+                else AugDimView(ear)
         }
     }
 }
@@ -1299,3 +1336,421 @@ private fun formatDuration(ms: Long): String {
 private fun formatScoreDate(millis: Long): String =
     java.text.SimpleDateFormat("MMM d, HH:mm", java.util.Locale.getDefault())
         .format(java.util.Date(millis))
+
+// ======================================================================================
+// #2  Advanced (non-diatonic) progressions
+// ======================================================================================
+
+/** Shared body: per-chord play buttons, a reveal card (name + Roman + chords), and
+ *  the always-visible teaching explanation. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AdvancedProgressionBody(ear: EarTrainingState) {
+    val np = ear.advProg ?: return
+    Text("Chords  (tap ▶ to hear each)", style = MaterialTheme.typography.labelMedium)
+    Spacer(Modifier.height(4.dp))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        for (i in ear.progResolved.indices) {
+            OutlinedButton(
+                onClick = { ear.playProgChordDirect(i) },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+            ) { Text(if (ear.advRevealed) "▶ ${ear.progResolved[i].romanLabel}" else "▶ ${i + 1}") }
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { ear.toggleAdvReveal() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (ear.advRevealed) MaterialTheme.colorScheme.tertiaryContainer
+                             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        ),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            Text("Answer", style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(2.dp))
+            if (!ear.advRevealed) {
+                Text("tap to reveal", style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text(np.name, style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                Text(np.romanLine, style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                Text(ear.progResolved.joinToString("   ") { it.symbol },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer)
+                Text("in ${NoteSpeller.spell(ear.progKey)} " +
+                    if (ear.progMode == TrainingMode.Major) "major" else "minor",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer)
+            }
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    // Teaching note — always visible (the user wants the explanation shown while quizzing).
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text("About this progression", style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Spacer(Modifier.height(2.dp))
+            Text(np.explanation, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AdvancedProgressionView(ear: EarTrainingState) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Text("Borrowed chords, secondary dominants and chromatic moves. Pick a key, generate one, " +
+            "try to identify it, then reveal the name, Roman numerals and chords.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Key", style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.width(8.dp))
+            KeyDropdown(ear)
+        }
+        Spacer(Modifier.height(10.dp))
+        if (ear.advProg == null) {
+            Button(onClick = { ear.nextAdvancedProgression() }, modifier = Modifier.fillMaxWidth()) {
+                Text("Generate progression ▶", style = MaterialTheme.typography.titleMedium)
+            }
+            return@Column
+        }
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (ear.isLooping) Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
+            else Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
+            OutlinedButton(onClick = { ear.nextAdvancedProgression() }) { Text("Next →") }
+        }
+        Spacer(Modifier.height(12.dp))
+        AdvancedProgressionBody(ear)
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AdvancedChallengeView(ear: EarTrainingState) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        if (!ear.advChActive) {
+            Text("${ear.advChallengeTotal} advanced progressions in a row. Listen, try to identify each, " +
+                "then reveal and mark yourself. A teaching note is shown for every one.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Key", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(8.dp)); KeyDropdown(ear)
+            }
+            Spacer(Modifier.height(16.dp))
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Button(onClick = { ear.startAdvChallenge() }) { Text("Start challenge ▶") }
+            }
+            return@Column
+        }
+        if (ear.advChIndex >= ear.advChallengeTotal) {
+            SimpleDoneCard(ear.advChScore, ear.advChallengeTotal,
+                onRestart = { ear.startAdvChallenge() }, onExit = { ear.exitAdvChallenge() })
+            return@Column
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Progression ${ear.advChIndex + 1} / ${ear.advChallengeTotal}",
+                style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text("Score: ${ear.advChScore}", style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(8.dp))
+            TextButton(onClick = { ear.exitAdvChallenge() }) { Text("Quit") }
+        }
+        Spacer(Modifier.height(8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (ear.isLooping) Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
+            else Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
+        }
+        Spacer(Modifier.height(12.dp))
+        AdvancedProgressionBody(ear)
+        Spacer(Modifier.height(12.dp))
+        if (!ear.advChMarked) {
+            Text("Reveal the answer, then mark yourself:", style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { ear.markAdv(true) }, enabled = ear.advRevealed) { Text("✔ I got it") }
+                OutlinedButton(onClick = { ear.markAdv(false) }, enabled = ear.advRevealed) { Text("✘ Missed") }
+            }
+        } else {
+            Button(onClick = { ear.advanceAdvChallenge() }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (ear.advChIndex == ear.advChallengeTotal - 1) "See score →" else "Next →")
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+// ======================================================================================
+// #3  Inversions trainer
+// ======================================================================================
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun InversionQualityPalette(ear: EarTrainingState) {
+    Text("Chord types", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        for (sym in ear.invPalette) {
+            FilterChip(
+                selected = sym in ear.invAllowed,
+                onClick = { ear.toggleInvAllowed(sym) },
+                label = { Text(if (sym.isEmpty()) "maj" else sym) },
+            )
+        }
+    }
+}
+
+/** Inversion guess chips (root / 1st / 2nd / 3rd …). Tapping auditions that inversion. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun InversionGuessChips(ear: EarTrainingState, enabled: Boolean) {
+    Text("Which inversion?  (tap to hear & compare)", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        for (k in 0 until ear.invCount()) {
+            FilterChip(
+                selected = ear.invGuess == k,
+                enabled = enabled,
+                onClick = { ear.invGuess = k; ear.auditionInversion(k) },
+                label = { Text(app.guitar.theory.Inversions.name(k)) },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun InversionsView(ear: EarTrainingState) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Text("A chord plays in some inversion (which chord tone is in the bass). Identify it. " +
+            "Pick which chord types can appear below.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
+        InversionQualityPalette(ear)
+        Spacer(Modifier.height(10.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { ear.newInversion() }, enabled = !ear.invPlaying) {
+                Text(if (ear.invPlaying) "Playing…" else "New chord ▶")
+            }
+            OutlinedButton(onClick = { ear.playInversion() }, enabled = ear.invStarted) { Text("Replay") }
+        }
+        if (!ear.invStarted) return@Column
+        Spacer(Modifier.height(14.dp))
+        InversionGuessChips(ear, enabled = true)
+        Spacer(Modifier.height(12.dp))
+        RevealCard(
+            label = "Answer",
+            hidden = !ear.invRevealed,
+            content = app.guitar.theory.Inversions.name(ear.invInversion) + "  ·  " +
+                NoteSpeller.spell(ear.invRoot) + (if (ear.invQuality.isEmpty()) "" else ear.invQuality),
+            onToggle = { ear.toggleInvReveal() },
+            modifier = Modifier.fillMaxWidth(),
+            contentSizeSp = 20,
+        )
+        if (ear.invRevealed && ear.invGuess != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(if (ear.invGuess == ear.invInversion) "✔ correct" else "✘ that was the ${app.guitar.theory.Inversions.name(ear.invGuess!!).lowercase()}",
+                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun InversionsChallengeView(ear: EarTrainingState) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        if (!ear.invChActive) {
+            Text("${ear.invChallengeTotal} rounds. A chord plays in an inversion — identify which. " +
+                "Choose which chord types can appear:",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            InversionQualityPalette(ear)
+            Spacer(Modifier.height(16.dp))
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Button(onClick = { ear.startInvChallenge() }) { Text("Start challenge ▶") }
+            }
+            return@Column
+        }
+        if (ear.invChIndex >= ear.invChallengeTotal) {
+            SimpleDoneCard(ear.invChScore, ear.invChallengeTotal,
+                onRestart = { ear.startInvChallenge() }, onExit = { ear.exitInvChallenge() })
+            return@Column
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Round ${ear.invChIndex + 1} / ${ear.invChallengeTotal}",
+                style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text("Score: ${ear.invChScore}", style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(8.dp)); TextButton(onClick = { ear.exitInvChallenge() }) { Text("Quit") }
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = { ear.playInversion() }) { Text("Replay ▶") }
+        Spacer(Modifier.height(12.dp))
+        InversionGuessChips(ear, enabled = !ear.invChAnswered)
+        Spacer(Modifier.height(10.dp))
+        if (!ear.invChAnswered) {
+            Button(onClick = { ear.submitInvGuess() }, enabled = ear.invGuess != null,
+                modifier = Modifier.fillMaxWidth()) { Text("Submit") }
+        } else {
+            val ok = ear.invGuess == ear.invInversion
+            Text((if (ok) "✔ correct" else "✘ answer: ${app.guitar.theory.Inversions.name(ear.invInversion)}") +
+                "   (${NoteSpeller.spell(ear.invRoot)}${if (ear.invQuality.isEmpty()) "" else ear.invQuality})",
+                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = { ear.advanceInvChallenge() }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (ear.invChIndex == ear.invChallengeTotal - 1) "See score →" else "Next →")
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+// ======================================================================================
+// #4  Augmented vs Diminished trainer
+// ======================================================================================
+
+private fun augDimLabel(sym: String): String = when (sym) {
+    "aug" -> "Augmented (+)"
+    "dim" -> "Diminished (°)"
+    "dim7" -> "dim7 (°7)"
+    "m7b5" -> "m7♭5 (half-dim ø)"
+    "7#5" -> "7♯5 (aug 7th)"
+    "maj7#5" -> "maj7♯5"
+    else -> sym
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AugDimPalette(ear: EarTrainingState) {
+    Text("Chord types", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        for (sym in ear.augDimPalette) {
+            FilterChip(
+                selected = sym in ear.augDimAllowed,
+                onClick = { ear.toggleAugDimAllowed(sym) },
+                label = { Text(augDimLabel(sym)) },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AugDimGuessChips(ear: EarTrainingState, enabled: Boolean) {
+    Text("Which chord?  (tap to hear & compare)", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        for (sym in ear.augDimPalette.filter { it in ear.augDimAllowed }) {
+            FilterChip(
+                selected = ear.adGuess == sym,
+                enabled = enabled,
+                onClick = { ear.adGuess = sym; ear.auditionAugDim(sym) },
+                label = { Text(augDimLabel(sym)) },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AugDimView(ear: EarTrainingState) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Text("Tell augmented from diminished by ear. Enable the qualities you want to drill " +
+            "(add 7th/extended forms below), then identify each chord.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
+        AugDimPalette(ear)
+        Spacer(Modifier.height(10.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { ear.newAugDim() }) { Text("New chord ▶") }
+            OutlinedButton(onClick = { ear.playAugDim() }, enabled = ear.adStarted) { Text("Replay") }
+        }
+        if (!ear.adStarted) return@Column
+        Spacer(Modifier.height(14.dp))
+        AugDimGuessChips(ear, enabled = true)
+        Spacer(Modifier.height(12.dp))
+        RevealCard(
+            label = "Answer",
+            hidden = !ear.adRevealed,
+            content = NoteSpeller.spell(ear.adRoot) + ear.adQuality + "  ·  " + ear.augDimFamily(ear.adQuality),
+            onToggle = { ear.toggleAugDimReveal() },
+            modifier = Modifier.fillMaxWidth(),
+            contentSizeSp = 20,
+        )
+        if (ear.adRevealed && ear.adGuess != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(if (ear.adGuess == ear.adQuality) "✔ correct"
+                 else "✘ it was ${augDimLabel(ear.adQuality)}",
+                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AugDimChallengeView(ear: EarTrainingState) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        if (!ear.adChActive) {
+            Text("${ear.augDimChallengeTotal} rounds. Identify each augmented/diminished chord. " +
+                "Choose which qualities can appear:",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            AugDimPalette(ear)
+            Spacer(Modifier.height(16.dp))
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Button(onClick = { ear.startAugDimChallenge() },
+                    enabled = ear.augDimAllowed.isNotEmpty()) { Text("Start challenge ▶") }
+            }
+            return@Column
+        }
+        if (ear.adChIndex >= ear.augDimChallengeTotal) {
+            SimpleDoneCard(ear.adChScore, ear.augDimChallengeTotal,
+                onRestart = { ear.startAugDimChallenge() }, onExit = { ear.exitAugDimChallenge() })
+            return@Column
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Round ${ear.adChIndex + 1} / ${ear.augDimChallengeTotal}",
+                style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text("Score: ${ear.adChScore}", style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(8.dp)); TextButton(onClick = { ear.exitAugDimChallenge() }) { Text("Quit") }
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = { ear.playAugDim() }) { Text("Replay ▶") }
+        Spacer(Modifier.height(12.dp))
+        AugDimGuessChips(ear, enabled = !ear.adChAnswered)
+        Spacer(Modifier.height(10.dp))
+        if (!ear.adChAnswered) {
+            Button(onClick = { ear.submitAugDimGuess() }, enabled = ear.adGuess != null,
+                modifier = Modifier.fillMaxWidth()) { Text("Submit") }
+        } else {
+            val ok = ear.adGuess == ear.adQuality
+            Text((if (ok) "✔ correct" else "✘ answer: ${augDimLabel(ear.adQuality)}") +
+                "   (${NoteSpeller.spell(ear.adRoot)}${ear.adQuality})",
+                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = { ear.advanceAugDimChallenge() }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (ear.adChIndex == ear.augDimChallengeTotal - 1) "See score →" else "Next →")
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+}
