@@ -35,6 +35,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -938,10 +939,13 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
 
         // ---- done screen (after Q15 advance) ----
         if (ear.challengeIndex >= ear.challengeTotal) {
+            val highScores by state.challengeScores.collectAsState(initial = emptyList())
             ChallengeDoneCard(
                 score = ear.challengeBarScore,
                 total = ear.challengeBarTotal,
+                durationMs = ear.challengeDurationMs,
                 answers = ear.challengeAnswers,
+                highScores = highScores,
                 onRestart = { ear.startChallenge() },
                 onExit = { ear.exitChallenge() },
             )
@@ -1007,10 +1011,34 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
 
         Spacer(Modifier.height(10.dp))
 
-        // #9: per-bar answering — tap the correct Roman numeral (and the extension
-        // when the level has one). Each bar auto-scores; the question is a point if
-        // all four bars are right.
+        // #2: dedicated reference palette — these (and the per-bar ▶ Play) are the
+        // ONLY things that make sound. The answer chips below just select, so you
+        // compare candidates here rather than accidentally hearing your guess.
+        Text("Hear the degrees  (reference — plays in the hidden key)",
+            style = MaterialTheme.typography.labelMedium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            for ((deg, label) in ear.challengeReferenceLabels()) {
+                OutlinedButton(
+                    onClick = { ear.auditionProgDegree(deg) },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 10.dp, vertical = 4.dp),
+                ) { Text("▶ $label") }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        // #9/#3: per-bar answering. In fixed-7ths mode each degree maps to one
+        // diatonic 7th, so a single combined choice ("V7") encodes both degree and
+        // extension; otherwise pick the Roman numeral (plus extension when the
+        // level has one). Each bar auto-scores; selecting never plays a chord.
+        val combined = ear.challengeCombinedMode
         val degreeOptions = ear.challengeDegreeOptions()
+        val combinedOptions = ear.challengeCombinedOptions()
         val extOptions = ear.challengeExtOptions()
         for (i in 0 until 4) {
             val verdict = ear.challengeBarCorrect(i)   // null / true / false
@@ -1035,29 +1063,41 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                         ) { Text("▶ Play") }
                     }
                     Spacer(Modifier.height(4.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        for ((deg, roman) in degreeOptions) {
-                            FilterChip(
-                                selected = ear.challengeGuessDegree.getOrNull(i) == deg,
-                                // Tap also plays that degree's chord in the key so the
-                                // user can compare candidates (e.g. ii vs iii vs vi).
-                                onClick = { ear.guessChallengeDegree(i, deg); ear.auditionProgDegree(deg) },
-                                label = { Text(roman) },
-                            )
-                        }
-                    }
-                    if (ear.challengeNeedsExt && extOptions.isNotEmpty()) {
-                        Spacer(Modifier.height(4.dp))
-                        Text("extension",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (combined) {
+                        // Single combined diatonic-7th choice (sets degree + extension).
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            for (ext in extOptions) {
+                            for ((deg, label) in combinedOptions) {
                                 FilterChip(
-                                    selected = ear.challengeGuessExt.getOrNull(i) == ext,
-                                    onClick = { ear.guessChallengeExt(i, ext) },
-                                    label = { Text(if (ext.isEmpty()) "none" else ext) },
+                                    selected = ear.challengeGuessDegree.getOrNull(i) == deg,
+                                    onClick = { ear.guessChallengeCombined(i, deg) },
+                                    label = { Text(label) },
                                 )
+                            }
+                        }
+                    } else {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            for ((deg, roman) in degreeOptions) {
+                                FilterChip(
+                                    selected = ear.challengeGuessDegree.getOrNull(i) == deg,
+                                    // Selecting no longer plays — use the reference palette above to compare.
+                                    onClick = { ear.guessChallengeDegree(i, deg) },
+                                    label = { Text(roman) },
+                                )
+                            }
+                        }
+                        if (ear.challengeNeedsExt && extOptions.isNotEmpty()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text("extension",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                for (ext in extOptions) {
+                                    FilterChip(
+                                        selected = ear.challengeGuessExt.getOrNull(i) == ext,
+                                        onClick = { ear.guessChallengeExt(i, ext) },
+                                        label = { Text(if (ext.isEmpty()) "none" else ext) },
+                                    )
+                                }
                             }
                         }
                     }
@@ -1076,14 +1116,19 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
 
         Spacer(Modifier.height(10.dp))
 
-        val marked = ear.challengeAnswers.getOrNull(ear.challengeIndex)
+        // #4: always allowed — any bars you haven't answered are credited as correct.
         Button(
             onClick = { ear.advanceChallenge() },
-            enabled = marked != null,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(if (ear.challengeIndex == ear.challengeTotal - 1) "See score →" else "Next question →")
         }
+        Text(
+            "Unanswered bars count as correct.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp),
+        )
 
         Spacer(Modifier.height(12.dp))
 
@@ -1122,11 +1167,14 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChallengeDoneCard(
     score: Int,
     total: Int,
+    durationMs: Long,
     answers: List<Boolean?>,
+    highScores: List<app.guitar.app.ChallengeScore>,
     onRestart: () -> Unit,
     onExit: () -> Unit,
 ) {
@@ -1153,13 +1201,16 @@ private fun ChallengeDoneCard(
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Text(
-                "bars correct",
+                "bars correct  ·  ${formatDuration(durationMs)}",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Spacer(Modifier.height(12.dp))
-            // Per-question dot strip
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Per-question dot strip (wraps so all 15 fit on a narrow screen)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 for ((i, a) in answers.withIndex()) {
                     val color = when (a) {
                         true  -> MaterialTheme.colorScheme.primary
@@ -1179,6 +1230,56 @@ private fun ChallengeDoneCard(
                     }
                 }
             }
+
+            // ---- High-score table (best first; ties broken by faster time) ----
+            // The persisted write is async, so the flow may not include this run on
+            // the first frame — merge it in locally so it always shows immediately.
+            val shown = remember(highScores, score, durationMs) {
+                if (highScores.any { it.score == score && it.durationMs == durationMs }) highScores
+                else (highScores + ChallengeScore(score, total, durationMs, System.currentTimeMillis()))
+                    .sortedWith(CHALLENGE_SCORE_ORDER)
+            }
+            if (shown.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.3f))
+                Spacer(Modifier.height(8.dp))
+                Text("High scores",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Spacer(Modifier.height(4.dp))
+                // Mark the row that matches this run (same score + duration) as "you".
+                var highlighted = false
+                shown.take(5).forEachIndexed { rank, hs ->
+                    val isThisRun = !highlighted && hs.score == score && hs.durationMs == durationMs
+                    if (isThisRun) highlighted = true
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("${rank + 1}.",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isThisRun) FontWeight.Bold else FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.width(24.dp))
+                        Text("${hs.score}/${hs.total}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isThisRun) FontWeight.Bold else FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.width(56.dp))
+                        Text(formatDuration(hs.durationMs),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isThisRun) FontWeight.Bold else FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.width(56.dp))
+                        Text(formatScoreDate(hs.dateMillis) + if (isThisRun) "  ← you" else "",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isThisRun) FontWeight.Bold else FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onRestart) { Text("Restart") }
@@ -1187,3 +1288,14 @@ private fun ChallengeDoneCard(
         }
     }
 }
+
+/** "m:ss" wall-clock duration. */
+private fun formatDuration(ms: Long): String {
+    val totalSec = (ms / 1000).coerceAtLeast(0)
+    return "%d:%02d".format(totalSec / 60, totalSec % 60)
+}
+
+/** Short local date+time for a high-score row, e.g. "Jun 16, 14:32". */
+private fun formatScoreDate(millis: Long): String =
+    java.text.SimpleDateFormat("MMM d, HH:mm", java.util.Locale.getDefault())
+        .format(java.util.Date(millis))

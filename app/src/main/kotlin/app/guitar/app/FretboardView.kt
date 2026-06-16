@@ -4,12 +4,14 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
@@ -65,11 +67,17 @@ private const val FRET_NUMBER_DP = 18   // extra height below for fret-number ro
  * Tap behaviour: in non-pick modes, tap = play & inspect; in pick mode, tap toggles selection.
  * The selected-position amber ring still appears in all modes for the most recently tapped cell.
  *
- * Zoom/pan: the neck is drawn to fill a FIXED viewport (whatever box the caller
- * gives it) at scale 1 — the whole neck is visible. A pinch gesture scales it
- * (both axes) between [minScale]=0.5 (whole neck shrinks to half the viewport)
- * and [maxScale]=stringCount/2 (zoom in until ~2 strings fill the height). A
- * drag pans the zoomed neck, clamped so it can't be pulled off-screen. The
+ * Aspect ratio: the neck is ALWAYS drawn at a fixed long-horizontal /
+ * short-vertical aspect ratio ([neckAspect], from frets × strings), centered in
+ * (and letterboxed within) whatever box the caller gives it. The viewport's own
+ * shape no longer distorts the neck — a tall portrait box just leaves empty
+ * space above/below the short neck; pinch/drag zoom & pan within that frame.
+ *
+ * Zoom/pan: at scale 1 the whole fretboard fits the viewport. A pinch gesture
+ * scales it (uniformly, preserving the aspect ratio) between [minScale]=0.5
+ * (whole neck shrinks to half the viewport) and [maxScale]=stringCount/2 (zoom
+ * in until ~2 strings fill the height). A pinch zooms around the focal point;
+ * a drag pans the zoomed neck, clamped so it can't be pulled off-screen. The
  * transform is purely a render-layer effect (graphicsLayer), so tap hit-testing
  * still uses the Canvas's un-transformed coordinate space — Compose maps pointer
  * coordinates back through the layer for us, and [pixelToPosition] is unchanged.
@@ -87,6 +95,9 @@ fun FretboardView(
      *  start of a horizontal swipe). When false (default), the note fires only on
      *  a clean tap-release, so swiping the neck to scroll never sounds a note. */
     playOnTouchDown: Boolean = false,
+    /** String indices (0 = lowest pitch) marked as muted (X). Drawn as a red ✕ at
+     *  the nut, like a chord diagram, and excluded from any strum. */
+    mutedStrings: Set<Int> = emptySet(),
 ) {
     val measurer = rememberTextMeasurer()
 
@@ -142,10 +153,16 @@ fun FretboardView(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().clipToBounds()) {
+    // Fixed neck proportions: long horizontal, short vertical. Width units =
+    // per-fret(72) × frets + open column + nut(≈100); height units = strings × 42
+    // + the fret-number strip(18). The neck is letterboxed at this ratio inside
+    // the viewport so the box shape never stretches it.
+    val neckAspect = (numFrets * 72f + 100f) / (tuning.stringCount * STRING_DP + FRET_NUMBER_DP).toFloat()
+
+    Box(modifier = modifier.fillMaxSize().clipToBounds(), contentAlignment = Alignment.Center) {
         Canvas(
             modifier = Modifier
-                .fillMaxSize()
+                .aspectRatio(neckAspect)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
@@ -378,6 +395,26 @@ fun FretboardView(
                     y - measured.size.height / 2f
                 )
             )
+        }
+
+        // ---------- Muted-string X (chord-diagram style, over the open column) ----------
+        if (mutedStrings.isNotEmpty()) {
+            val xStyle = TextStyle(
+                color = GuitarColors.rootTone,            // crimson — reads as "don't play"
+                fontSize = (stringSpacing * 0.5f).toSp(),
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+            val mutedX = mx(openWidth * OPEN_MARK_FRAC)    // same column as the fret-0 marks / "0"
+            for (s in mutedStrings) {
+                if (s < 0 || s >= tuning.stringCount) continue
+                val y = firstStringY + (tuning.stringCount - 1 - s) * stringSpacing
+                val measured = measurer.measure(text = "✕", style = xStyle)
+                drawText(
+                    textLayoutResult = measured,
+                    topLeft = Offset(mutedX - measured.size.width / 2f, y - measured.size.height / 2f),
+                )
+            }
         }
 
         // ---------- Selected (tap pulse / inspect) ring ----------

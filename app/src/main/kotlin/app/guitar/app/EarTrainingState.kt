@@ -46,6 +46,10 @@ class EarTrainingState(
     private val sustainProvider: () -> Int,
     /** Returns the current strum spread in ms (0 = struck at once). */
     private val strumProvider: () -> Int = { 30 },
+    /** Called once when a progression challenge finishes, with the final bar score,
+     *  the max possible bar score, and the wall-clock duration in ms. */
+    private val onProgressionChallengeComplete: (score: Int, total: Int, durationMs: Long) -> Unit =
+        { _, _, _ -> },
 ) {
 
     // ---- Voicing / variety options (apply to progression playback & generation) ----
@@ -421,12 +425,20 @@ class EarTrainingState(
      *  Right/Wrong buttons are only enabled after reveal. */
     var challengeRevealed by mutableStateOf(false)
 
+    /** Wall-clock start of the current challenge (for the high-score time tiebreak). */
+    private var challengeStartMs = 0L
+    /** Duration of the just-finished challenge in ms (valid on the score screen). */
+    var challengeDurationMs by mutableStateOf(0L)
+        private set
+
     fun startChallenge() {
         challengeAnswers = List(challengeTotal) { null }
         challengeBarsCorrect = List(challengeTotal) { 0 }
         challengeIndex = 0
         challengeRevealed = false
         challengeActive = true
+        challengeStartMs = System.currentTimeMillis()
+        challengeDurationMs = 0L
         resetChallengeGuesses()
         // Generate the first question's progression honoring current Major/Minor + chord-type settings.
         nextProgression()
@@ -437,13 +449,35 @@ class EarTrainingState(
         challengeAnswers = challengeAnswers.toMutableList().also { it[challengeIndex] = correct }
     }
 
-    /** Advance to the next question. If we were on the last one, exit to the score screen. */
+    /**
+     * Finalize the current question's score. Per the "skip = credit" rule: a bar
+     * counts correct if it was answered correctly OR left completely unanswered
+     * (no degree chosen). A bar with a wrong (or partial) guess counts incorrect.
+     */
+    private fun finalizeCurrentQuestion() {
+        if (!challengeActive || challengeIndex >= challengeTotal) return
+        val degrees = progProgression?.degrees ?: return
+        val correctCount = degrees.indices.count { i ->
+            challengeBarCorrect(i) == true || challengeGuessDegree.getOrNull(i) == null
+        }
+        if (challengeIndex < challengeBarsCorrect.size) {
+            challengeBarsCorrect = challengeBarsCorrect.toMutableList().also { it[challengeIndex] = correctCount }
+        }
+        challengeAnswers = challengeAnswers.toMutableList().also { it[challengeIndex] = (correctCount == degrees.size) }
+    }
+
+    /** Advance to the next question. Always allowed — any unanswered bars in the
+     *  current question are credited as correct. If we were on the last one, score
+     *  the session and hand it to the high-score table, then show the score screen. */
     fun advanceChallenge() {
         if (!challengeActive) return
+        finalizeCurrentQuestion()
         if (challengeIndex >= challengeTotal - 1) {
             // Stay on `challengeActive = true` but `challengeIndex == total` signals "done".
             challengeIndex = challengeTotal
+            challengeDurationMs = System.currentTimeMillis() - challengeStartMs
             stopLoop()
+            onProgressionChallengeComplete(challengeBarScore, challengeBarTotal, challengeDurationMs)
             return
         }
         challengeIndex++
@@ -545,6 +579,39 @@ class EarTrainingState(
         challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = ext }
         maybeAutoMarkChallenge()
     }
+
+    /**
+     * #3: When the level is fixed Sevenths (not mix), each scale degree has exactly
+     * ONE diatonic 7th (ii→ii7, V→V7, etc.), so the user shouldn't pick degree and
+     * extension separately — a single combined choice ("V7") encodes both. (Triads
+     * have no extension; mix mode varies the level per bar, so both keep the
+     * separate degree+extension pickers.)
+     */
+    val challengeCombinedMode: Boolean
+        get() = !earMixAll && chordTypeLevel == ChordTypeLevel.Sevenths
+
+    /** Combined diatonic-7th options for the current mode: (degree, "V7"-style label). */
+    fun challengeCombinedOptions(): List<Pair<Int, String>> =
+        degreesMap().entries.sortedBy { it.key }.map { (deg, info) ->
+            deg to EarTraining.romanLabel(info.roman, info.seventhQuality)
+        }
+
+    /** Pick a combined diatonic-7th answer — sets both the degree and its (forced)
+     *  diatonic extension for [bar], then auto-scores if the question is complete. */
+    fun guessChallengeCombined(bar: Int, degree: Int) {
+        if (!challengeActive) return
+        val info = degreesMap()[degree] ?: return
+        val ext = EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman)
+        challengeGuessDegree = challengeGuessDegree.toMutableList().also { it[bar] = degree }
+        challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = ext }
+        maybeAutoMarkChallenge()
+    }
+
+    /** #2: labels for the dedicated "hear the degrees" reference palette — combined
+     *  7th labels in 7th mode, plain Roman numerals otherwise. Played, in the hidden
+     *  key, via [auditionProgDegree] so the answer chips no longer double as audio. */
+    fun challengeReferenceLabels(): List<Pair<Int, String>> =
+        if (challengeCombinedMode) challengeCombinedOptions() else challengeDegreeOptions()
 
     /** Re-roll the current question's progression and clear its guesses. */
     fun rerollChallengeQuestion() {

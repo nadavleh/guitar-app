@@ -97,6 +97,9 @@ class AppState(
     var chordPositionIndex by mutableStateOf(0)
     var scalePositionIndex by mutableStateOf(0)
     var pickedPositions by mutableStateOf<Set<FretPosition>>(emptySet())
+    /** Strum-mode muted strings (0 = lowest pitch). Shown as a red ✕ at the nut and
+     *  excluded from the strum, like the X strings in a chord diagram. */
+    var mutedStrings by mutableStateOf<Set<Int>>(emptySet())
 
     // Jazz/shell voicing toggle — affects ChordShapeGenerator calls everywhere
     var voicingStyle by mutableStateOf(VoicingStyle.Standard)
@@ -139,7 +142,22 @@ class AppState(
             tuningProvider = { liveTuning },
             sustainProvider = { ringSustainMs },
             strumProvider = { strumMs },
+            onProgressionChallengeComplete = { score, total, durationMs ->
+                recordChallengeScore(score, total, durationMs)
+            },
         )
+    }
+
+    /** Persisted progression-challenge high scores (best first). */
+    val challengeScores get() = repo.challengeScores
+
+    /** Save a finished progression-challenge result to the high-score table. */
+    fun recordChallengeScore(score: Int, total: Int, durationMs: Long) {
+        scope.launch {
+            repo.addChallengeScore(
+                ChallengeScore(score, total, durationMs, System.currentTimeMillis()),
+            )
+        }
     }
 
     /** App-lifetime samba percussion looper (drum-machine tab). Lazily created so
@@ -332,17 +350,31 @@ class AppState(
 
     fun togglePick(pos: FretPosition) {
         if (pos.stringIndex < 0 || pos.stringIndex >= liveTuning.stringCount) return
+        // Picking a fret on a string un-mutes it — the two are mutually exclusive.
+        if (pos.stringIndex in mutedStrings) mutedStrings = mutedStrings - pos.stringIndex
         pickedPositions = if (pos in pickedPositions) pickedPositions - pos else pickedPositions + pos
+    }
+
+    /** Toggle a string's muted (X) state. Muting clears any picks on that string. */
+    fun toggleMutedString(stringIdx: Int) {
+        if (stringIdx < 0 || stringIdx >= liveTuning.stringCount) return
+        mutedStrings = if (stringIdx in mutedStrings) {
+            mutedStrings - stringIdx
+        } else {
+            pickedPositions = pickedPositions.filterNot { it.stringIndex == stringIdx }.toSet()
+            mutedStrings + stringIdx
+        }
     }
 
     fun clearPicked() {
         pickedPositions = emptySet()
+        mutedStrings = emptySet()
     }
 
     fun strumPicked(arpeggio: Boolean = false) {
         if (pickedPositions.isEmpty()) return
         val midis = pickedPositions
-            .filter { it.stringIndex < liveTuning.stringCount }
+            .filter { it.stringIndex < liveTuning.stringCount && it.stringIndex !in mutedStrings }
             .sortedWith(compareBy({ it.stringIndex }, { it.fret }))
             .map { Fretboard.noteAt(liveTuning, it).midi.value }
         if (midis.isNotEmpty()) {

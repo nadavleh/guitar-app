@@ -14,6 +14,25 @@ import kotlinx.coroutines.flow.map
 
 private val Context.tuningDataStore by preferencesDataStore(name = "guitar_prefs")
 
+/**
+ * One progression-challenge result for the high-score table.
+ *
+ * @param score        bars answered correctly (0..[total])
+ * @param total        maximum possible bars (challengeTotal × 4)
+ * @param durationMs   wall-clock time taken to finish the challenge
+ * @param dateMillis   epoch ms when the challenge finished
+ */
+data class ChallengeScore(
+    val score: Int,
+    val total: Int,
+    val durationMs: Long,
+    val dateMillis: Long,
+)
+
+/** Ranking: higher score first; ties broken by the faster (smaller) completion time. */
+val CHALLENGE_SCORE_ORDER: Comparator<ChallengeScore> =
+    compareByDescending<ChallengeScore> { it.score }.thenBy { it.durationMs }
+
 class TuningRepository(private val context: Context) {
     private val keyCustom = stringPreferencesKey("custom_tunings")
     private val keySelected = stringPreferencesKey("selected_tuning")
@@ -144,4 +163,39 @@ class TuningRepository(private val context: Context) {
     suspend fun setInstrument(value: String) {
         context.tuningDataStore.edit { prefs -> prefs[keyInstrument] = value }
     }
+
+    // ---------- Progression-challenge high scores ----------
+
+    private val keyChallengeScores = stringPreferencesKey("challenge_scores")
+    private val maxScoresKept = 10
+
+    /** Top progression-challenge results, best first (score desc, time asc). */
+    val challengeScores: Flow<List<ChallengeScore>> =
+        context.tuningDataStore.data.map { prefs ->
+            decodeScores(prefs[keyChallengeScores] ?: "")
+        }
+
+    /** Insert a result, keep the top [maxScoresKept] by [CHALLENGE_SCORE_ORDER]. */
+    suspend fun addChallengeScore(entry: ChallengeScore) {
+        context.tuningDataStore.edit { prefs ->
+            val current = decodeScores(prefs[keyChallengeScores] ?: "")
+            val updated = (current + entry).sortedWith(CHALLENGE_SCORE_ORDER).take(maxScoresKept)
+            prefs[keyChallengeScores] = encodeScores(updated)
+        }
+    }
+
+    /** Serialize as "score,total,durationMs,dateMillis" rows joined by ';'. */
+    private fun encodeScores(list: List<ChallengeScore>): String =
+        list.joinToString(";") { "${it.score},${it.total},${it.durationMs},${it.dateMillis}" }
+
+    private fun decodeScores(raw: String): List<ChallengeScore> =
+        raw.split(";").mapNotNull { row ->
+            val p = row.split(",")
+            if (p.size != 4) return@mapNotNull null
+            val s = p[0].toIntOrNull() ?: return@mapNotNull null
+            val t = p[1].toIntOrNull() ?: return@mapNotNull null
+            val d = p[2].toLongOrNull() ?: return@mapNotNull null
+            val dt = p[3].toLongOrNull() ?: return@mapNotNull null
+            ChallengeScore(s, t, d, dt)
+        }.sortedWith(CHALLENGE_SCORE_ORDER)
 }

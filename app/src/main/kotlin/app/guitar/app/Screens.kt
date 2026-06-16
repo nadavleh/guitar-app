@@ -271,17 +271,23 @@ private fun PickControls(state: AppState) {
     Column {
         Text(
             "Tap any fret on the neck to add or remove it from your selection, " +
-                "then strum or arpeggiate the set.",
+                "mute whole strings below, then strum or arpeggiate the set.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(8.dp))
-        Text("Picked: ${state.pickedPositions.size}", style = MaterialTheme.typography.bodyMedium)
+        Text("Picked: ${state.pickedPositions.size}" +
+            (if (state.mutedStrings.isNotEmpty()) "   ·   muted: ${state.mutedStrings.size}" else ""),
+            style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(8.dp))
+        Text("Mute strings", style = MaterialTheme.typography.labelMedium)
+        StringMuteRow(state)
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { state.strumPicked(arpeggio = false) }, enabled = state.pickedPositions.isNotEmpty()) { Text("Strum") }
-            OutlinedButton(onClick = { state.strumPicked(arpeggio = true) }, enabled = state.pickedPositions.isNotEmpty()) { Text("Arpeggio") }
-            OutlinedButton(onClick = { state.clearPicked() }, enabled = state.pickedPositions.isNotEmpty()) { Text("Clear") }
+            val canStrum = state.pickedPositions.any { it.stringIndex !in state.mutedStrings }
+            Button(onClick = { state.strumPicked(arpeggio = false) }, enabled = canStrum) { Text("Strum") }
+            OutlinedButton(onClick = { state.strumPicked(arpeggio = true) }, enabled = canStrum) { Text("Arpeggio") }
+            OutlinedButton(onClick = { state.clearPicked() }, enabled = state.pickedPositions.isNotEmpty() || state.mutedStrings.isNotEmpty()) { Text("Clear") }
         }
     }
 }

@@ -253,6 +253,7 @@ fun App(audio: AudioEngine) {
                         numFrets = DISPLAY_FRETS,
                         leftHanded = state.leftHanded,
                         playOnTouchDown = state.tapOnTouchDown,
+                        mutedStrings = if (state.displayMode == DisplayMode.Pick) state.mutedStrings else emptySet(),
                     )
                 }
                 SelectedPositionInfo(state.liveTuning, state.selectedPosition, parsedChord)
@@ -434,22 +435,31 @@ private fun PositionScroller(label: String, onPrev: () -> Unit, onNext: () -> Un
 @Composable
 private fun PickActionBar(state: AppState) {
     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            "Picked: ${state.pickedPositions.size}",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f)
-        )
-        Button(onClick = { state.strumPicked(false) }, enabled = state.pickedPositions.isNotEmpty()) { Text("Strum") }
-        OutlinedButton(onClick = { state.strumPicked(true) }, enabled = state.pickedPositions.isNotEmpty()) { Text("Arp") }
-        OutlinedButton(onClick = { state.clearPicked() }, enabled = state.pickedPositions.isNotEmpty()) { Text("Clear") }
+        // Per-string mute toggles (red ✕ at the nut), then the strum transport.
+        StringMuteRow(state)
+        Spacer(Modifier.height(4.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            val canStrum = state.pickedPositions.any { it.stringIndex !in state.mutedStrings }
+            Text(
+                "Picked: ${state.pickedPositions.size}" +
+                    (if (state.mutedStrings.isNotEmpty()) "  ·  muted: ${state.mutedStrings.size}" else ""),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Button(onClick = { state.strumPicked(false) }, enabled = canStrum) { Text("Strum") }
+            OutlinedButton(onClick = { state.strumPicked(true) }, enabled = canStrum) { Text("Arp") }
+            OutlinedButton(onClick = { state.clearPicked() }, enabled = state.pickedPositions.isNotEmpty() || state.mutedStrings.isNotEmpty()) { Text("Clear") }
+        }
     }
 }
 

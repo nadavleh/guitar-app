@@ -1,11 +1,15 @@
 package app.guitar.app
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -117,6 +121,32 @@ fun pickedMarks(state: AppState): Map<FretPosition, FretMark> {
         )
     }
     return result
+}
+
+/**
+ * Per-string mute toggles for Strum (pick) mode. Each chip is one string, labeled
+ * by its open-note name (high → low, as seen looking at the neck); tapping toggles
+ * a red ✕ mute that excludes the string from the strum. Shared by the Strum sheet
+ * and the on-screen strum action bar.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun StringMuteRow(state: AppState) {
+    val tuning = state.liveTuning
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        for (s in tuning.stringCount - 1 downTo 0) {
+            val name = NoteSpeller.spell(tuning.openStrings[s].pitchClass)
+            val muted = s in state.mutedStrings
+            FilterChip(
+                selected = muted,
+                onClick = { state.toggleMutedString(s) },
+                label = { Text(if (muted) "✕ $name" else name) },
+            )
+        }
+    }
 }
 
 fun shapeMarks(
