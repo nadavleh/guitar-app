@@ -17,18 +17,25 @@ import kotlin.random.Random
 class PercussionSynth(val sampleRate: Int = 44100) {
 
     fun synthesize(instrument: PercussionInstrument, voiceIndex: Int): FloatArray = when (instrument) {
+        // Surdo: 0 ringing bass, 1 muted bass, 2 light muted tap.
         PercussionInstrument.Surdo -> when (voiceIndex) {
             0 -> surdo(open = true)
-            else -> surdo(open = false)
+            1 -> surdo(open = false)
+            else -> tonedTap(freq = 165.0, durSec = 0.055, decay = 75.0, amp = 0.30)
         }
+        // Tamborim: 0 high clack, 1 muted clack, 2 light tap.
         PercussionInstrument.Tamborim -> when (voiceIndex) {
-            0 -> tamborim(muted = false)
-            else -> tamborim(muted = true)
+            0 -> tamborimClack(muted = false)
+            1 -> tamborimClack(muted = true)
+            else -> noiseDrum(durSec = 0.05, decay = 95.0, lpAlpha = 0.30, hp = true, amp = 0.30)
         }
+        // Pandeiro: 0 open bass, 1 muted bass (low-mid), 2 slap, 3 jingle, 4 jingle hi.
         PercussionInstrument.Pandeiro -> when (voiceIndex) {
-            0 -> noiseDrum(durSec = 0.10, decay = 45.0, lpAlpha = 0.06, hp = false, amp = 0.75) // low slap
-            1 -> noiseDrum(durSec = 0.14, decay = 30.0, lpAlpha = 0.30, hp = false, amp = 0.65) // high open
-            else -> noiseDrum(durSec = 0.04, decay = 120.0, lpAlpha = 0.20, hp = false, amp = 0.45) // mute tap
+            0 -> tonedTap(freq = 150.0, durSec = 0.22, decay = 13.0, amp = 0.62) // open bass
+            1 -> tonedTap(freq = 155.0, durSec = 0.08, decay = 42.0, amp = 0.55) // muted bass
+            2 -> noiseDrum(durSec = 0.08, decay = 60.0, lpAlpha = 0.50, hp = true, amp = 0.72) // slap
+            3 -> jingle(hi = false)
+            else -> jingle(hi = true)
         }
         PercussionInstrument.Agogo -> when (voiceIndex) {
             0 -> bell(freq = 590.0)
@@ -40,9 +47,9 @@ class PercussionSynth(val sampleRate: Int = 44100) {
 
     /** Low boom: fundamental sine + a noisy strike transient, exponential decay. */
     private fun surdo(open: Boolean): FloatArray {
-        val durSec = if (open) 0.45 else 0.10
-        val decay = if (open) 7.0 else 38.0
-        val freq = 68.0
+        val durSec = if (open) 0.50 else 0.12
+        val decay = if (open) 6.0 else 34.0
+        val freq = if (open) 62.0 else 66.0
         val n = (sampleRate * durSec).toInt().coerceAtLeast(1)
         val out = FloatArray(n)
         val rng = Random(101)
@@ -56,11 +63,67 @@ class PercussionSynth(val sampleRate: Int = 44100) {
         return fadeOut(out)
     }
 
-    /** Bright dry crack: high-passed noise burst. */
-    private fun tamborim(muted: Boolean): FloatArray {
-        val durSec = if (muted) 0.05 else 0.11
-        val decay = if (muted) 110.0 else 55.0
-        return noiseDrum(durSec, decay, lpAlpha = 0.45, hp = true, amp = if (muted) 0.5 else 0.7)
+    /**
+     * Pitched membrane hit (tom-like): a fundamental + 2nd partial with a short
+     * noisy attack. Used for the low-mid pandeiro bass notes and the surdo tap.
+     */
+    private fun tonedTap(freq: Double, durSec: Double, decay: Double, amp: Double): FloatArray {
+        val n = (sampleRate * durSec).toInt().coerceAtLeast(1)
+        val out = FloatArray(n)
+        val rng = Random(404)
+        for (i in 0 until n) {
+            val t = i.toDouble() / sampleRate
+            val e = exp(-decay * t)
+            val body = sin(2 * PI * freq * t) + 0.5 * sin(2 * PI * freq * 2 * t)
+            val transient = if (t < 0.005) (rng.nextDouble() * 2 - 1) * exp(-t * 500) else 0.0
+            out[i] = ((body * 0.6 + transient * 0.5) * e * amp).toFloat()
+        }
+        return fadeOut(out)
+    }
+
+    /** High, fast-attack tamborim "clack": bright high-passed noise + a short high tone. */
+    private fun tamborimClack(muted: Boolean): FloatArray {
+        val durSec = if (muted) 0.045 else 0.09
+        val decay = if (muted) 130.0 else 70.0
+        val amp = if (muted) 0.5 else 0.78
+        val n = (sampleRate * durSec).toInt().coerceAtLeast(1)
+        val out = FloatArray(n)
+        val rng = Random(202)
+        var lp = 0.0
+        for (i in 0 until n) {
+            val t = i.toDouble() / sampleRate
+            val white = rng.nextDouble() * 2 - 1
+            lp += 0.6 * (white - lp)
+            val hpNoise = white - lp
+            val tone = sin(2 * PI * 1500.0 * t) * exp(-t * 220)   // brief high "clak" pitch
+            val e = exp(-decay * t)
+            out[i] = ((hpNoise * 0.7 + tone * 0.28) * e * amp).toFloat()
+        }
+        return fadeOut(out)
+    }
+
+    /** Pandeiro jingles (platinelas): bright high-passed noise + inharmonic high
+     *  partials that shimmer and ring. [hi] makes a slightly higher, shorter version. */
+    private fun jingle(hi: Boolean): FloatArray {
+        val durSec = if (hi) 0.16 else 0.20
+        val decay = if (hi) 26.0 else 20.0
+        val base = if (hi) 3400.0 else 2700.0
+        val n = (sampleRate * durSec).toInt().coerceAtLeast(1)
+        val out = FloatArray(n)
+        val rng = Random(303)
+        var lp = 0.0
+        for (i in 0 until n) {
+            val t = i.toDouble() / sampleRate
+            val white = rng.nextDouble() * 2 - 1
+            lp += 0.7 * (white - lp)
+            val hpNoise = white - lp
+            val metal = sin(2 * PI * base * t) +
+                0.6 * sin(2 * PI * base * 1.51 * t) +
+                0.4 * sin(2 * PI * base * 2.31 * t)
+            val e = exp(-decay * t)
+            out[i] = ((hpNoise * 0.5 + metal * 0.16) * e * 0.5).toFloat()
+        }
+        return fadeOut(out)
     }
 
     /** Two tuned bells: pure-ish sine with a soft envelope and a faint 2nd partial. */

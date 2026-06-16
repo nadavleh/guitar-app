@@ -1,6 +1,6 @@
 # Chorect — Requirements
 
-**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.2.0 (semantic `major.minor.patch`).
+**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.3.0 (semantic `major.minor.patch`, versionCode 10300).
 
 **Versioning policy:**
 
@@ -497,7 +497,16 @@ Available app-wide (Options, and a quick-access button on the tool screens):
 
 ### 10.8 Drum Machine
 
-A samba percussion looper (drum-machine tab): an editable 16-slot pattern with per-track **mute** and **solo**, per-instrument **voice auditioning** (tap a row label or cell to preview), and an adjustable BPM. The pattern persists across leaving and returning to the screen.
+A samba percussion looper (drum-machine tab): an editable 16-slot pattern with per-track **mute** and **solo**, per-instrument **voice auditioning** (tap a row label to open its voice menu, or tap a cell to cycle and preview), and an adjustable BPM. The pattern persists across leaving and returning to the screen.
+
+**Percussion voices.** Four samba instruments, each offering several distinct synthesized voices (a cell stores which voice, or silence):
+
+* **Surdo** (3) — open ringing bass, muted bass, light muted tap.
+* **Tamborim** (3) — high fast-attack clack, muted (choked) clack, light tap.
+* **Pandeiro** (5) — two low-mid bass notes (open + muted), a slap, and two jingle/platinela shimmers (one slightly higher).
+* **Agogô** (2) — low bell, high bell.
+
+**Save / load beats.** The user can **save** the current beat under a name and **load** any saved beat later; the built-in groove is always available as **"stock samba"**. Saved beats persist across sessions (DataStore). A beat can also be cleared (whole row or all rows).
 
 Layout: the screen is a **vertically scrollable page**, and the track grid uses **fixed-height rows** (one per percussion instrument) rather than weight-distributed rows, so each track's name, voice picker, and Mute/Solo toggles are always fully visible — nothing is clipped in short (landscape) viewports. The loop grid itself supports **2-finger pinch-zoom and pan** (a pure render-layer transform, so per-cell tap hit-testing is unaffected); single-finger gestures scroll the page and tap/edit cells.
 

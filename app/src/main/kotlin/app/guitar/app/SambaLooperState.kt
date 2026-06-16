@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 class SambaLooperState(
     private val audio: AudioEngine,
     private val scope: CoroutineScope,
+    private val repo: TuningRepository,
 ) {
     var pattern by mutableStateOf(PercussionPattern.SAMBA)
         private set
@@ -90,8 +91,29 @@ class SambaLooperState(
         pattern = PercussionPattern.empty()
     }
 
+    /** Load the built-in "stock samba" groove. */
     fun loadSamba() {
         pattern = PercussionPattern.SAMBA
+    }
+
+    // ---- Save / load user beats ----
+
+    /** User-saved beats, by name (observe in the UI). */
+    val savedPatterns get() = repo.drumPatterns
+
+    /** Save the current pattern under [name]. */
+    fun saveCurrent(name: String) {
+        val snapshot = pattern
+        scope.launch { repo.saveDrumPattern(name, snapshot) }
+    }
+
+    /** Replace the editable pattern with a saved/loaded one. */
+    fun loadPattern(p: PercussionPattern) {
+        pattern = p
+    }
+
+    fun deleteSaved(name: String) {
+        scope.launch { repo.deleteDrumPattern(name) }
     }
 
     fun start() {

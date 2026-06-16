@@ -22,16 +22,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -199,10 +203,61 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
 
         Spacer(Modifier.height(8.dp))
 
-        // ----- Footer actions -----
+        // ----- Footer actions: Save / Load / Clear -----
+        val saved by samba.savedPatterns.collectAsState(initial = emptyMap())
+        var saveDialog by remember { mutableStateOf(false) }
+        var loadMenu by remember { mutableStateOf(false) }
+        var saveName by remember { mutableStateOf("") }
+
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { samba.loadSamba() }) { Text("Load samba") }
+            OutlinedButton(onClick = { saveName = ""; saveDialog = true }) { Text("Save…") }
+            Box {
+                OutlinedButton(onClick = { loadMenu = true }) { Text("Load…") }
+                DropdownMenu(expanded = loadMenu, onDismissRequest = { loadMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("stock samba") },
+                        onClick = { samba.loadSamba(); loadMenu = false },
+                    )
+                    if (saved.isNotEmpty()) HorizontalDivider()
+                    for ((name, pat) in saved) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(name, modifier = Modifier.weight(1f))
+                                    TextButton(onClick = { samba.deleteSaved(name) }) { Text("✕") }
+                                }
+                            },
+                            onClick = { samba.loadPattern(pat); loadMenu = false },
+                        )
+                    }
+                    if (saved.isEmpty()) {
+                        DropdownMenuItem(text = { Text("(no saved beats yet)") }, enabled = false, onClick = {})
+                    }
+                }
+            }
             OutlinedButton(onClick = { samba.clearAll() }) { Text("Clear all") }
+        }
+
+        if (saveDialog) {
+            AlertDialog(
+                onDismissRequest = { saveDialog = false },
+                title = { Text("Save beat") },
+                text = {
+                    OutlinedTextField(
+                        value = saveName,
+                        onValueChange = { saveName = it },
+                        label = { Text("Beat name") },
+                        singleLine = true,
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = saveName.trim().isNotEmpty() && saveName.none { it in "=;|," },
+                        onClick = { samba.saveCurrent(saveName.trim()); saveDialog = false },
+                    ) { Text("Save") }
+                },
+                dismissButton = { TextButton(onClick = { saveDialog = false }) { Text("Cancel") } },
+            )
         }
     }
 }

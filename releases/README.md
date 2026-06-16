@@ -13,4 +13,5 @@ from `versionName` in `app/build.gradle.kts`; copy each new build here.
 
 | Version | Notes |
 |---------|-------|
+| 1.3.0   | Drum machine: redesigned/expanded voices (Surdo 3, Tamborim 3, Pandeiro 5, Agogô 2) + save/load custom beats ("stock samba" is the built-in default). |
 | 1.2.0   | Ear training: Inversions & Aug/Dim trainers, advanced (non-diatonic) progression library with explanations, 6th/add9 extensions. Drum machine: scrollable page + 2-finger pinch-zoom, always-visible per-track mute/solo. |

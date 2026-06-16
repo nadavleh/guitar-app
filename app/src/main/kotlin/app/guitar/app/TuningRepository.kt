@@ -198,4 +198,46 @@ class TuningRepository(private val context: Context) {
             val dt = p[3].toLongOrNull() ?: return@mapNotNull null
             ChallengeScore(s, t, d, dt)
         }.sortedWith(CHALLENGE_SCORE_ORDER)
+
+    // ---------- Saved drum-machine beats ----------
+
+    private val keyDrumPatterns = stringPreferencesKey("drum_patterns")
+
+    /** User-saved drum patterns, by name (insertion order preserved). */
+    val drumPatterns: Flow<Map<String, app.guitar.theory.PercussionPattern>> =
+        context.tuningDataStore.data.map { prefs -> decodeDrumMap(prefs[keyDrumPatterns] ?: "") }
+
+    /** Save/overwrite a beat under [name]. Names with reserved chars are rejected. */
+    suspend fun saveDrumPattern(name: String, pattern: app.guitar.theory.PercussionPattern) {
+        val clean = name.trim()
+        if (clean.isEmpty() || clean.any { it in "=;|," }) return
+        context.tuningDataStore.edit { prefs ->
+            val current = decodeDrumMap(prefs[keyDrumPatterns] ?: "")
+            val updated = LinkedHashMap(current).apply { put(clean, pattern) }
+            prefs[keyDrumPatterns] = encodeDrumMap(updated)
+        }
+    }
+
+    suspend fun deleteDrumPattern(name: String) {
+        context.tuningDataStore.edit { prefs ->
+            val current = decodeDrumMap(prefs[keyDrumPatterns] ?: "")
+            prefs[keyDrumPatterns] = encodeDrumMap(LinkedHashMap(current).apply { remove(name) })
+        }
+    }
+
+    /** Entries "name=<encodedPattern>" joined by ';'. */
+    private fun encodeDrumMap(map: Map<String, app.guitar.theory.PercussionPattern>): String =
+        map.entries.joinToString(";") { (n, p) -> "$n=${p.encode()}" }
+
+    private fun decodeDrumMap(raw: String): Map<String, app.guitar.theory.PercussionPattern> {
+        val out = LinkedHashMap<String, app.guitar.theory.PercussionPattern>()
+        for (entry in raw.split(";")) {
+            val eq = entry.indexOf('=')
+            if (eq <= 0) continue
+            val name = entry.substring(0, eq)
+            val pattern = app.guitar.theory.PercussionPattern.decode(entry.substring(eq + 1)) ?: continue
+            out[name] = pattern
+        }
+        return out
+    }
 }

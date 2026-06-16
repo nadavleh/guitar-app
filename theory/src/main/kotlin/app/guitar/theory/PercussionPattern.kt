@@ -57,32 +57,60 @@ data class PercussionPattern(
 
     fun isEmpty(): Boolean = grid.values.all { row -> row.all { it == null } }
 
+    /**
+     * Serialize to a compact string for persistence: one row per instrument (in
+     * enum order), cells comma-separated, silent = "-", rows joined by "|".
+     * e.g. "1,-,-,...|0,...|...|...". Round-trips via [decode].
+     */
+    fun encode(): String =
+        PercussionInstrument.entries.joinToString("|") { inst ->
+            grid.getValue(inst).joinToString(",") { it?.toString() ?: "-" }
+        }
+
     companion object {
         fun empty(): PercussionPattern = PercussionPattern(
             PercussionInstrument.entries.associateWith { List(PERCUSSION_SLOTS) { null } }
         )
 
+        /** Parse a string produced by [encode]; null if malformed or out of range. */
+        fun decode(s: String): PercussionPattern? {
+            val rows = s.split("|")
+            if (rows.size != PercussionInstrument.entries.size) return null
+            val grid = HashMap<PercussionInstrument, List<Int?>>()
+            for ((idx, inst) in PercussionInstrument.entries.withIndex()) {
+                val cells = rows[idx].split(",")
+                if (cells.size != PERCUSSION_SLOTS) return null
+                val row = cells.map { c -> if (c == "-") null else c.toIntOrNull() ?: return null }
+                if (row.any { it != null && it !in 0 until PercussionVoices.voiceCount(inst) }) return null
+                grid[inst] = row
+            }
+            return runCatching { PercussionPattern(grid) }.getOrNull()
+        }
+
         /**
-         * A basic samba groove over 2 bars of 2/4.
-         *  - Surdo: muffled on each bar downbeat (0, 8), open accent on the "2" (4, 12).
-         *  - Tamborim: the teleco-teco — a syncopated open ostinato.
-         *  - Pandeiro: continuous sixteenths, low/high/mute/high repeating.
+         * The built-in "stock samba" groove over 2 bars of 2/4.
+         *  - Surdo: muted bass on each bar downbeat (0, 8), ringing accent on the "2" (4, 12).
+         *  - Tamborim: the teleco-teco — a syncopated clack ostinato with choked mutes.
+         *  - Pandeiro: continuous sixteenths — bass / jingle / slap / jingle-hi.
          *  - Agogô: low/high alternating bell figure.
          */
         val SAMBA: PercussionPattern = run {
+            // Surdo voices: 0 open(ring), 1 muted bass, 2 tap.
             val surdo = arrayOfNulls<Int>(PERCUSSION_SLOTS).also {
                 it[0] = 1; it[4] = 0; it[8] = 1; it[12] = 0
             }.toList()
+            // Tamborim voices: 0 clack, 1 muted clack, 2 tap.
             val tamborim = arrayOfNulls<Int>(PERCUSSION_SLOTS).also {
-                // open hits with a couple of mutes for the choke feel
                 it[0] = 0; it[3] = 0; it[4] = 1; it[6] = 0
                 it[8] = 0; it[11] = 0; it[12] = 1; it[14] = 0
             }.toList()
+            // Pandeiro voices: 0 bass(open), 1 bass(muted), 2 slap, 3 jingle, 4 jingle hi.
             val pandeiro = (0 until PERCUSSION_SLOTS).map { i ->
                 when (i % 4) {
-                    0 -> 0   // low (slap)
-                    2 -> 2   // mute (tap)
-                    else -> 1 // high (open)
+                    0 -> 0   // bass (open) on the beat
+                    1 -> 3   // jingle
+                    2 -> 2   // slap
+                    else -> 4 // jingle hi
                 }
             }
             val agogo = arrayOfNulls<Int>(PERCUSSION_SLOTS).also {

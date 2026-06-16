@@ -17,7 +17,7 @@ class PercussionPatternTest {
 
     @Test fun `cycling a 2-voice instrument goes null to 0 to 1 to null`() {
         var p = PercussionPattern.empty()
-        val inst = PercussionInstrument.Surdo  // 2 voices
+        val inst = PercussionInstrument.Agogo  // 2 voices
         assertNull(p.voiceAt(inst, 0))
         p = p.cycled(inst, 0); assertEquals(0, p.voiceAt(inst, 0))
         p = p.cycled(inst, 0); assertEquals(1, p.voiceAt(inst, 0))
@@ -26,11 +26,36 @@ class PercussionPatternTest {
 
     @Test fun `cycling a 3-voice instrument goes null to 0 to 1 to 2 to null`() {
         var p = PercussionPattern.empty()
-        val inst = PercussionInstrument.Pandeiro  // 3 voices
+        val inst = PercussionInstrument.Surdo  // 3 voices
         p = p.cycled(inst, 5); assertEquals(0, p.voiceAt(inst, 5))
         p = p.cycled(inst, 5); assertEquals(1, p.voiceAt(inst, 5))
         p = p.cycled(inst, 5); assertEquals(2, p.voiceAt(inst, 5))
         p = p.cycled(inst, 5); assertNull(p.voiceAt(inst, 5))
+    }
+
+    @Test fun `cycling the 5-voice pandeiro wraps after voice 4`() {
+        var p = PercussionPattern.empty()
+        val inst = PercussionInstrument.Pandeiro  // 5 voices
+        for (expected in 0..4) {
+            p = p.cycled(inst, 9); assertEquals(expected, p.voiceAt(inst, 9))
+        }
+        p = p.cycled(inst, 9); assertNull(p.voiceAt(inst, 9))
+    }
+
+    @Test fun `pattern encodes and decodes round-trip`() {
+        val p = PercussionPattern.SAMBA
+        val decoded = PercussionPattern.decode(p.encode())
+        assertEquals(p, decoded)
+        // Empty round-trips too.
+        assertEquals(PercussionPattern.empty(), PercussionPattern.decode(PercussionPattern.empty().encode()))
+    }
+
+    @Test fun `decode rejects malformed or out-of-range input`() {
+        assertNull(PercussionPattern.decode("garbage"))
+        assertNull(PercussionPattern.decode(""))
+        // A surdo cell of 9 is out of range (surdo has 3 voices).
+        val bad = PercussionPattern.SAMBA.encode().replaceFirst("1", "9")
+        assertNull(PercussionPattern.decode(bad))
     }
 
     @Test fun `cycling one cell does not disturb the others`() {

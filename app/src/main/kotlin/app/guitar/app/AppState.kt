@@ -163,7 +163,7 @@ class AppState(
     /** App-lifetime samba percussion looper (drum-machine tab). Lazily created so
      *  the pattern you build persists across leaving and returning to the screen. */
     val sambaLooper: SambaLooperState by lazy {
-        SambaLooperState(audio = audio, scope = scope)
+        SambaLooperState(audio = audio, scope = scope, repo = repo)
     }
 
     @JvmName("applyA4Hz")
