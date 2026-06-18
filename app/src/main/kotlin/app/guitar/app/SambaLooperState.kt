@@ -65,6 +65,20 @@ class SambaLooperState(
     fun isAudible(inst: PercussionInstrument): Boolean =
         inst !in muted && (soloed.isEmpty() || inst in soloed)
 
+    /** Per-instrument playback volume, 0f..1f (1 = full). Applied as a gain at
+     *  mix time so the cached one-shot buffers are never mutated. App-lifetime,
+     *  so the mix you dial in survives leaving and returning to the screen. */
+    var volumes by mutableStateOf(
+        PercussionInstrument.entries.associateWith { 1f },
+    )
+        private set
+
+    fun volumeOf(inst: PercussionInstrument): Float = volumes[inst] ?: 1f
+
+    fun setVolume(inst: PercussionInstrument, value: Float) {
+        volumes = volumes + (inst to value.coerceIn(0f, 1f))
+    }
+
     private var job: Job? = null
     private val synth = PercussionSynth()
     private val cache = HashMap<Pair<PercussionInstrument, Int>, FloatArray>()
@@ -79,12 +93,12 @@ class SambaLooperState(
     fun toggleSlot(instrument: PercussionInstrument, slot: Int) {
         pattern = pattern.cycled(instrument, slot)
         val v = pattern.voiceAt(instrument, slot)
-        if (v != null && !isPlaying) audio.playSamples(buffer(instrument, v))
+        if (v != null && !isPlaying) audio.playSamples(buffer(instrument, v), volumeOf(instrument))
     }
 
     /** Audition a single voice (used by the row-label tap). */
     fun preview(instrument: PercussionInstrument, voiceIndex: Int) {
-        audio.playSamples(buffer(instrument, voiceIndex))
+        audio.playSamples(buffer(instrument, voiceIndex), volumeOf(instrument))
     }
 
     /** Clear a single cell (long-press) without cycling through the voices. */
@@ -136,7 +150,7 @@ class SambaLooperState(
                     for (inst in PercussionInstrument.entries) {
                         if (!isAudible(inst)) continue
                         val v = pattern.voiceAt(inst, slot) ?: continue
-                        audio.playSamples(buffer(inst, v))
+                        audio.playSamples(buffer(inst, v), volumeOf(inst))
                     }
                     delay(PercussionTiming.swungSlotMs(slot, bpm, swing))
                 }

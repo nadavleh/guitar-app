@@ -91,46 +91,17 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(8.dp))
-        // Sub-mode tabs — a wrapping chip row (5 sub-modes don't fit a segmented row in portrait).
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+        // Compact selectors (tasks #1/#2): the sub-mode and the Practice/Challenge
+        // mode are side-by-side dropdowns instead of a wrapping 5-chip grid plus a
+        // full-width segmented bar, so the fixed header no longer eats the screen
+        // and leaves the scrollable body the room it needs.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         ) {
-            for (s in EarSubMode.entries) {
-                FilterChip(
-                    selected = s == ear.progSubMode,
-                    onClick = { ear.switchTab(s) },
-                    label = {
-                        Text(
-                            when (s) {
-                                EarSubMode.Progression -> "Progressions"
-                                EarSubMode.Note2Chord  -> "Note→Chord"
-                                EarSubMode.Flavor      -> "Flavor"
-                                EarSubMode.Inversions  -> "Inversions"
-                                EarSubMode.AugDim      -> "Aug / Dim"
-                            },
-                            maxLines = 1,
-                        )
-                    },
-                )
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-        HorizontalDivider()
-        Spacer(Modifier.height(8.dp))
-
-        // Practice / Challenge toggle — every tab has both. Full width.
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-            EarMode.entries.forEachIndexed { i, m ->
-                SegmentedButton(
-                    selected = m == ear.earMode,
-                    onClick = { ear.earMode = m },
-                    shape = SegmentedButtonDefaults.itemShape(index = i, count = EarMode.entries.size),
-                    label = { Text(if (m == EarMode.Practice) "Practice" else "Challenge") },
-                )
-            }
+            SubModeDropdown(ear, modifier = Modifier.weight(1f))
+            ModeDropdown(ear, modifier = Modifier.weight(1f))
         }
 
         // Progression sub-mode gets an "Advanced (non-diatonic)" toggle that swaps
@@ -175,6 +146,52 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
             EarSubMode.AugDim ->
                 if (ear.earMode == EarMode.Challenge) AugDimChallengeView(ear)
                 else AugDimView(ear)
+        }
+    }
+}
+
+private fun subModeLabel(s: EarSubMode): String = when (s) {
+    EarSubMode.Progression -> "Progressions"
+    EarSubMode.Note2Chord  -> "Note→Chord"
+    EarSubMode.Flavor      -> "Flavor"
+    EarSubMode.Inversions  -> "Inversions"
+    EarSubMode.AugDim      -> "Aug / Dim"
+}
+
+/** Compact sub-mode picker (task #1/#2) — replaces the 5-chip wrapping grid. */
+@Composable
+private fun SubModeDropdown(ear: EarTrainingState, modifier: Modifier = Modifier) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(subModeLabel(ear.progSubMode) + "  ▾", maxLines = 1)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            for (s in EarSubMode.entries) {
+                DropdownMenuItem(
+                    text = { Text(subModeLabel(s)) },
+                    onClick = { ear.switchTab(s); open = false },
+                )
+            }
+        }
+    }
+}
+
+/** Compact Practice/Challenge picker (task #1) — replaces the full-width segmented bar. */
+@Composable
+private fun ModeDropdown(ear: EarTrainingState, modifier: Modifier = Modifier) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+            Text((if (ear.earMode == EarMode.Practice) "Practice" else "Challenge") + "  ▾", maxLines = 1)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            for (m in EarMode.entries) {
+                DropdownMenuItem(
+                    text = { Text(if (m == EarMode.Practice) "Practice" else "Challenge") },
+                    onClick = { ear.earMode = m; open = false },
+                )
+            }
         }
     }
 }
@@ -764,7 +781,8 @@ private fun Note2ChordChallengeView(ear: EarTrainingState) {
                 style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             Text("Score: ${ear.n2cChScore}", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(4.dp))
+            TextButton(onClick = { ear.startN2cChallenge() }) { Text("Restart") }
             TextButton(onClick = { ear.exitN2cChallenge() }) { Text("Quit") }
         }
         Spacer(Modifier.height(8.dp))
@@ -848,7 +866,8 @@ private fun FlavorChallengeView(ear: EarTrainingState) {
                 style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             Text("Score: ${ear.flavorChScore}", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(4.dp))
+            TextButton(onClick = { ear.startFlavorChallenge() }) { Text("Restart") }
             TextButton(onClick = { ear.exitFlavorChallenge() }) { Text("Quit") }
         }
         Spacer(Modifier.height(8.dp))
@@ -1001,7 +1020,8 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(4.dp))
+            TextButton(onClick = { ear.startChallenge() }) { Text("Restart") }
             TextButton(onClick = { ear.exitChallenge() }) { Text("Quit") }
         }
 
@@ -1470,7 +1490,8 @@ private fun AdvancedChallengeView(ear: EarTrainingState) {
                 style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             Text("Score: ${ear.advChScore}", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(4.dp))
+            TextButton(onClick = { ear.startAdvChallenge() }) { Text("Restart") }
             TextButton(onClick = { ear.exitAdvChallenge() }) { Text("Quit") }
         }
         Spacer(Modifier.height(8.dp))
@@ -1597,7 +1618,9 @@ private fun InversionsChallengeView(ear: EarTrainingState) {
                 style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             Text("Score: ${ear.invChScore}", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(8.dp)); TextButton(onClick = { ear.exitInvChallenge() }) { Text("Quit") }
+            Spacer(Modifier.width(4.dp))
+            TextButton(onClick = { ear.startInvChallenge() }) { Text("Restart") }
+            TextButton(onClick = { ear.exitInvChallenge() }) { Text("Quit") }
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = { ear.playInversion() }) { Text("Replay ▶") }
@@ -1730,7 +1753,9 @@ private fun AugDimChallengeView(ear: EarTrainingState) {
                 style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             Text("Score: ${ear.adChScore}", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(8.dp)); TextButton(onClick = { ear.exitAugDimChallenge() }) { Text("Quit") }
+            Spacer(Modifier.width(4.dp))
+            TextButton(onClick = { ear.startAugDimChallenge() }) { Text("Restart") }
+            TextButton(onClick = { ear.exitAugDimChallenge() }) { Text("Quit") }
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = { ear.playAugDim() }) { Text("Replay ▶") }

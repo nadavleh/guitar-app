@@ -2,7 +2,7 @@
 
 This document is the **single source of truth** for the app's look-and-feel and primary interactions. The Compose code in `app/` should match these specs. Update this doc before changing visual code so we don't drift.
 
-Status: **v2 — "Studio"** (app version **1.4.0**) — the architecture is a persistent left **navigation rail** plus a content area that is, by default, the full-height fretboard. Tools open as draggable bottom sheets (Fretboard, Options) or full-screen routes (Loop, Tuner, Ear, Drums). This superseded the earlier v1 "single screen + bottom mode bar" concept; this doc now reflects the as-built v2.
+Status: **v2 — "Studio"** (app version **1.5.0**) — the architecture is a persistent left **navigation rail** plus a content area that is, by default, the full-height fretboard. Tools open as draggable bottom sheets (Fretboard, Options) or full-screen routes (Loop, Tuner, Ear, Drums). This superseded the earlier v1 "single screen + bottom mode bar" concept; this doc now reflects the as-built v2.
 
 ---
 
@@ -95,12 +95,14 @@ Aspirational (not yet implemented): tap-pulse spring, staggered tuning-change cr
 Fills the content area to the right of the rail (on the bare fretboard screen, the whole area below the status bar). Horizontal orientation. Implemented as a single `Canvas` draw, `FretboardView.kt`.
 
 - **`DISPLAY_FRETS` = 14 frets** drawn (frets 1–14, plus the open-string column). There is **no horizontal scroll** and no 24-fret extension — the whole 14-fret neck is always present; the user reaches detail by zooming/panning instead.
-- **Fixed aspect ratio, letterboxed.** The neck is *always* drawn at a fixed long-horizontal / short-vertical aspect ratio (`neckAspect`, computed from `numFrets × 72 + 100` width units over `stringCount × 42 + 18` height units). It is centered and letterboxed inside whatever box the caller gives it, so the viewport's shape never stretches it. In a tall portrait viewport the short neck simply has empty space above and below it; in landscape it fills more of the width. This holds in **both orientations** (the app runs in `fullSensor`, not locked to landscape).
+- **Empty on launch.** With no tool yet used, the neck renders with **nothing lit** — no chord, scale, or picked notes. Notes light up only once the user opens the Fretboard tool and selects a chord/scale/strum.
+- **Fixed aspect ratio, letterboxed.** The neck is *always* drawn at a fixed long-horizontal / short-vertical aspect ratio (`neckAspect`, computed from `numFrets × 72 + 100` width units over `stringCount × 42 + 18` height units). It is centered and letterboxed inside whatever box the caller gives it, so the viewport's shape never stretches it. In a tall portrait viewport the short neck simply has empty space above and below it; in landscape it fills more of the width. This holds in **both orientations** (the app runs in `fullSensor`, not locked to landscape). In **portrait** the view **starts zoomed in on the first frets** at a larger size, so the neck doesn't open as a tiny letterboxed sliver.
 - **Pinch-to-zoom + drag-pan**, within that fixed frame, via `detectTransformGestures` on a render-only `graphicsLayer` (layout size never changes):
   - **scale 1** = the whole neck exactly fits the viewport.
   - **minScale 0.5** = neck shrinks to half the viewport (zoom out).
   - **maxScale ≈ stringCount / 2** (≥ 1.5) = zoom in until ~2 strings fill the height.
   - Pinch is **focal-point** (content under the centroid stays put); drag pans, clamped so the neck can't be pulled off-screen.
+  - The gesture detector covers the **whole box allotted to the fretboard** — including the empty letterbox margins above/below the neck — so pinch and drag work anywhere in the area, not only on the thin neck.
   - Because the transform is render-only, tap hit-testing still uses the un-transformed Canvas coordinates — Compose maps pointer coords back through the layer.
 - **Strings ordered low-to-high from bottom to top**:
   - Row 0 (bottom)  = string 6 = lowest pitch (string index 0)
@@ -350,8 +352,7 @@ A full-screen route. Layout (column inside the content area):
 
 A full-screen route. Header: `EAR TRAINING` + AudioQuick + `Back`. Below it:
 
-1. **Sub-mode selector** — a **wrapping chip row** (`FlowRow` of `FilterChip`s, not a segmented button), because there are now **five** sub-modes that don't fit a single segmented row in portrait: `Progressions` · `Note→Chord` · `Flavor` · `Inversions` · `Aug / Dim`.
-2. **Practice / Challenge** toggle — a full-width segmented control; every sub-mode has both.
+1. **Sub-mode + mode selectors** — two **compact side-by-side dropdowns** (`DropdownMenu`s): the **sub-mode** dropdown (`Progressions` · `Note→Chord` · `Flavor` · `Inversions` · `Aug / Dim`) and the **Practice / Challenge** dropdown. This replaced the earlier wrapping 5-`FilterChip` row plus the full-width Practice/Challenge segmented bar: the two-dropdown header is much shorter, so the header no longer dominates the screen and the freed vertical space goes to the scrollable body. Every sub-mode still has both Practice and Challenge.
 
 The body switches on (sub-mode × mode). The **Progressions** sub-mode also shows an **"Advanced (non-diatonic) progressions"** `Switch` above the body (§10.1).
 
@@ -360,7 +361,7 @@ The body switches on (sub-mode × mode). The **Progressions** sub-mode also show
 Highlights of the **Progression Challenge** (the most elaborate view):
 
 - A challenge is **15 progressions**. Config screen explains the rules + a `Start challenge ▶` button (with the shared `ProgressionSettings`).
-- In-flight: `Question k / 15`, running `Score: N bars`, `Quit`; a transport row (Play/Stop, `Hear <cadence>`, `Re-roll`); a BPM slider; an optional low-emphasis `Key & Mode (hint)` reveal chip.
+- In-flight: `Question k / 15`, running `Score: N bars`, `Restart`, `Quit`; a transport row (Play/Stop, `Hear <cadence>`, `Re-roll`); a BPM slider; an optional low-emphasis `Key & Mode (hint)` reveal chip. (The `Restart` action restarts the run from question 1 without finishing it; it sits next to `Quit` in **every** sub-mode's challenge header, not just Progressions.)
 - **"Hear the degrees"** reference palette — a FlowRow of `▶ <label>` buttons that audition each diatonic degree *in the hidden key*. These plus the per-bar `▶ Play` are the **only** things that make sound; selecting an answer never plays a chord (so you compare candidates deliberately).
 - **Per-bar answer cards** (4 bars): each card has a `▶ Play`, then the answer chips. In **fixed-7ths (combined) mode** a single combined diatonic-7th choice (e.g. `V7`) encodes both degree and extension; otherwise you pick the Roman numeral plus, when the level has one, a separate `extension` chip row. Each bar **auto-scores** on selection — the card turns green/red and reveals `✔/✘ answer`.
 - **"Next question → / See score →"** is **always enabled**; any bar left unanswered is **credited as correct** (caption: "Unanswered bars count as correct.").
@@ -384,13 +385,13 @@ The **Advanced Challenge** runs a fixed number of progressions and is **self-mar
 
 Practice (`InversionsView`): a **"Chord types"** palette (`FilterChip`s over `invPalette` — maj, m, sus2/4, aug, dim, 7, maj7, m7, m7♭5, dim7, 6, m6, 9, …) to enable which qualities can appear; **New chord ▶ / Replay**; a **"Which inversion?"** guess-chip row (`Root position / 1st inversion / 2nd … / 3rd …`, count depends on the chord) where **tapping a chip auditions that inversion** so you can compare; then a **reveal card** (inversion name + root+quality) with a `✔/✘` line once revealed.
 
-Challenge (`InversionsChallengeView`): same palette on the config screen, then scored rounds — `Round k / N`, running `Score`, `Quit`; **Replay ▶**, the same guess chips (disabled after answering), a **Submit** button, the correct/answer line, and **Next → / See score →**. Ends on `SimpleDoneCard`.
+Challenge (`InversionsChallengeView`): same palette on the config screen, then scored rounds — `Round k / N`, running `Score`, `Restart`, `Quit`; **Replay ▶**, the same guess chips (disabled after answering), a **Submit** button, the correct/answer line, and **Next → / See score →**. Ends on `SimpleDoneCard`.
 
 ### 10.3 Aug / Dim
 
 Practice (`AugDimView`): a **"Chord types"** palette over `augDimPalette` — `Augmented (+)`, `Diminished (°)`, `dim7 (°7)`, `m7♭5 (half-dim ø)`, `7♯5 (aug 7th)`, `maj7♯5` — to enable qualities (default: Augmented + Diminished); **New chord ▶ / Replay**; a **"Which chord?"** guess-chip row (only the *enabled* qualities) where **tapping a chip auditions it**; then a **reveal card** (root + quality + family) with a `✔/✘` line.
 
-Challenge (`AugDimChallengeView`): same palette on the config screen (Start is disabled until at least one quality is enabled), then scored rounds with **Replay ▶**, the guess chips, **Submit**, the answer line, and **Next → / See score →**. Ends on `SimpleDoneCard`.
+Challenge (`AugDimChallengeView`): same palette on the config screen (Start is disabled until at least one quality is enabled), then scored rounds (`Restart` / `Quit` in the header) with **Replay ▶**, the guess chips, **Submit**, the answer line, and **Next → / See score →**. Ends on `SimpleDoneCard`.
 
 ---
 
@@ -409,7 +410,7 @@ A full-screen route — a step-sequencer drum machine. The **whole page is verti
     - **1 finger, when zoomed** (either axis > 1) → **drag-pans** the grid (clamped).
     - **1 finger, when not zoomed** → **not consumed**, so it falls through to the page's vertical scroll, and **cell taps still toggle steps**.
   - Tapping a cell **cycles through all of that instrument's voices** (silent → v1 → v2 → … → silent); **long-press clears** the cell. Filled cells show the voice glyph; a tinted/bordered column tracks the playhead while looping. Voice counts differ per instrument: **Surdo 3** (open ring `●`, muted bass `◐`, tap `·`), **Tamborim 3** (clack `●`, muted clack `◐`, tap `·`), **Pandeiro 5** (bass open `●`, bass muted `◐`, slap `✦`, jingle `○`, jingle hi `◌`), **Agogô 2** (low bell `▼`, high bell `▲`). When **Erase** is on (see Footer) a tap **clears** the cell instead of cycling.
-- **Per-track controls** (left of each row, `ROW_LABEL_DP` wide): the instrument name with a `▾` — **tapping it opens a voice-audition popup** (`DropdownMenu`) listing **each of that instrument's voices** (glyph + name); tapping a voice previews it (popup stays open to compare). Below the name, **M (mute)** and **S (solo)** toggle tags (outlined off, filled on — error-red for mute, amber for solo). Rows that aren't audible (muted, or not soloed when something else is) are dimmed to 40%.
+- **Per-track controls** (left of each row, `ROW_LABEL_DP` wide): the instrument name with a `▾` — **tapping it opens a voice-audition popup** (`DropdownMenu`) listing **each of that instrument's voices** (glyph + name); tapping a voice previews it (popup stays open to compare). The popup also holds a per-instrument **volume slider** (0–100 %), applied as a per-voice gain at mix time. Below the name, **M (mute)** and **S (solo)** toggle tags (outlined off, filled on — error-red for mute, amber for solo). Rows that aren't audible (muted, or not soloed when something else is) are dimmed to 40%.
 - **Footer actions** — a `FlowRow` (so the buttons **wrap** onto a second line on narrow/portrait widths rather than overflowing): `Erase` / `Save…` / `Load…` / `Clear all`.
   - **Erase** is a toggle: off it's an `OutlinedButton` reading `Erase`; on it's a filled `Button` reading `Erase ✓`, and while on, tapping any cell **clears** it (instead of cycling its voice) — a faster way to wipe cells than long-pressing each. (Long-press still clears regardless of Erase.)
   - **Save…** opens a name dialog (a beat name; names containing `= ; | ,` are rejected) and stores the current grid as a user-saved beat.

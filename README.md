@@ -12,7 +12,7 @@
     <img alt="Language: Kotlin" src="https://img.shields.io/badge/language-Kotlin-7F52FF?logo=kotlin&logoColor=white">
     <img alt="UI: Jetpack Compose" src="https://img.shields.io/badge/ui-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white">
     <img alt="minSdk: 26" src="https://img.shields.io/badge/minSdk-26-blue">
-    <img alt="Version: 1.4.0" src="https://img.shields.io/badge/version-1.4.0-blue">
+    <img alt="Version: 1.5.0" src="https://img.shields.io/badge/version-1.5.0-blue">
     <img alt="Tests: 700+ passing" src="https://img.shields.io/badge/tests-700%2B%20passing-brightgreen">
     <img alt="License: TBD" src="https://img.shields.io/badge/license-TBD-lightgrey">
   </p>
@@ -43,7 +43,7 @@ It's built **Android-first** in native Kotlin so the music-theory engine can sta
 
 > Three Gradle modules: `theory` (pure JVM), `audio` (Android lib), `app` (Compose UI). The theory engine carries the bulk of the suite's 700+ tests that run in milliseconds, with zero emulator dependency.
 
-The current release is **version 1.4.0** (versionCode 10400) — a **minor** bump that adds drum-machine features (a Brazilian 16th-note swing control, an erase tool, and aspect-ratio grid zoom; see [Drum machine](#-drum-machine)). Versioning is **major.minor.patch**: bump the **minor** (1.3 → 1.4) for new features, the **patch** (1.4.0 → 1.4.1) for bug fixes, and the **major** (2.0.0) for breaking redesigns. Each build is emitted as `Chorect_beta_V<version>.apk` (e.g. `Chorect_beta_V1.4.0.apk`), and previous releases are kept in a `releases/` folder rather than overwritten.
+The current release is **version 1.5.0** (versionCode 10500) — a **minor** bump of UI/UX polish: the ear-training header is now two compact dropdowns (freeing vertical space for the scrollable body), every ear-training challenge gains a **Restart** action, each drum instrument gets an **individual volume slider**, and the fretboard now **starts empty** and (in portrait) **zoomed in on the first frets** with pinch/drag working across the whole allotted area. Versioning is **major.minor.patch**: bump the **minor** (1.4 → 1.5) for new features, the **patch** (1.5.0 → 1.5.1) for bug fixes, and the **major** (2.0.0) for breaking redesigns. Each build is emitted as `Chorect_beta_V<version>.apk` (e.g. `Chorect_beta_V1.5.0.apk`), and previous releases are kept in a `releases/` folder rather than overwritten.
 
 ---
 
@@ -52,8 +52,9 @@ The current release is **version 1.4.0** (versionCode 10400) — a **minor** bum
 ### 🎸 Fretboard
 
 - **Live, tappable fretboard.** Every position is computed from the current tuning. Tap any fret to hear the note (~20-40 ms tap-to-sound on real hardware) and see its interval relative to the current chord or scale root.
-- **Fixed-proportion neck, any orientation.** The neck is always drawn at a fixed long-horizontal / short-vertical aspect ratio, centered and letterboxed inside its viewport — the box shape never stretches the neck. The app runs in **both portrait and landscape**; a tall portrait box just leaves empty space above and below the short neck.
-- **Pinch-to-zoom + drag-to-pan.** Pinch (focal-point) to scale the neck between 0.5× (whole neck shrinks to half the viewport) and ~stringCount/2 (zoom in until ~2 strings fill the height); drag to pan the zoomed neck, clamped so it can't be pulled off-screen.
+- **Starts empty.** On launch the neck shows **nothing lit** — no chord, scale, or notes — until you open the Fretboard tool and pick something.
+- **Fixed-proportion neck, any orientation.** The neck is always drawn at a fixed long-horizontal / short-vertical aspect ratio, centered and letterboxed inside its viewport — the box shape never stretches the neck. The app runs in **both portrait and landscape**; a tall portrait box just leaves empty space above and below the short neck. In **portrait** the neck now **starts zoomed in on the first frets** at a larger size, rather than letterboxing down to a tiny sliver.
+- **Pinch-to-zoom + drag-to-pan.** Pinch (focal-point) to scale the neck between 0.5× (whole neck shrinks to half the viewport) and ~stringCount/2 (zoom in until ~2 strings fill the height); drag to pan the zoomed neck, clamped so it can't be pulled off-screen. Pinch and drag work across the **whole area allotted to the fretboard** — including the empty letterbox margins above and below the neck — not just on the thin neck itself.
 - **Tap-on-release by default.** A clean tap plays the note on release, so swiping the neck to pan never sounds a note. An Options toggle switches to play-on-touch-down if you prefer the immediate response.
 - **Realistic strings.** On guitar, wound bass strings get a thicker bronze stroke; plain treble strings render lighter. Cavaquinho renders all four strings plain.
 - **Left-handed mode.** Mirrors the whole fretboard and the tap mapping.
@@ -101,7 +102,7 @@ The neck's three display modes are unified under a single **Fretboard** tool wit
 
 ### 👂 Ear training
 
-**Five** sub-modes, each with a **Practice** and a **Challenge** mode:
+**Five** sub-modes, each with a **Practice** and a **Challenge** mode. The sub-mode picker (Progressions / Note→Chord / Flavor / Inversions / Aug-Dim) and the Practice/Challenge picker are now two compact side-by-side **dropdowns** rather than a wrapping 5-chip grid plus a full-width segmented bar, so the header no longer dominates the screen and the scrollable body gets the freed vertical space. Every **Challenge** also has a **Restart** action in its in-flight header (next to Quit) so you can restart a run mid-way without finishing it.
 
 - **Progression.** Random 4-bar progressions in any key/mode with reveal-on-tap chord labels and a "Hear I–V–I" key cadence. Practice loops a progression and lets you reveal each bar's Roman label; you can push the current chords into the Looper. The **Challenge** is 15 questions: a dedicated "Hear the degrees" reference palette auditions each diatonic degree in the (hidden) key while the answer chips stay silent; in fixed-7ths mode each bar is answered with a single combined diatonic-7th choice (e.g. "V7") rather than separate degree + extension; you can advance without answering every bar (unanswered bars are credited correct); a persistent **high-score table** keeps the top results with date and completion time, ranked by score then fastest time.
   - **Advanced (non-diatonic) progressions.** A toggle in this sub-mode swaps the diatonic generator for a curated library of ~24 named special progressions — borrowed chords (modal interchange), secondary dominants, chromatic passing chords, and jazz turnarounds (e.g. Mixolydian Rocker, Andalusian Cadence, Ragtime Circle, Tritone Substitution, Bird/Montgomery turnarounds, Mario Cadence, Royal Road, line clichés). Each is transposable to any key and shown with a short teaching explanation while you quiz, plus a reveal of its name + Roman numerals + concrete chords. (Exotic chords with no playable guitar voicing fall back to a struck block of their chord tones.)
@@ -114,7 +115,7 @@ The diatonic Extended / "Mix all" pool likewise now reaches **6th** and **add9**
 
 ### 🥁 Drum machine
 
-A samba/percussion looper tab (step sequencer) with **Surdo, Tamborim, Pandeiro, and Agogô** tracks. Per-track mute/solo, tap-to-cycle per-cell voices, and per-instrument voice auditioning. Designed to play alongside the chord-progression looper as a backing track.
+A samba/percussion looper tab (step sequencer) with **Surdo, Tamborim, Pandeiro, and Agogô** tracks. Per-track mute/solo, tap-to-cycle per-cell voices, and per-instrument voice auditioning. Each instrument also has its own **volume slider** (0–100 %), inside that instrument's voice popup (tap the instrument name to open it) and applied as a per-voice gain at mix time. Designed to play alongside the chord-progression looper as a backing track.
 
 As of **1.3.1**, the drum voices play **bundled one-shot WAV samples** — real recorded Latin-percussion hits shipped in `app/src/main/assets/drums/<instrument>_<voice>.wav` and decoded to mono 44.1 kHz on first use by a small [`WavDecoder`](audio/src/main/kotlin/app/guitar/audio/WavDecoder.kt) (it handles PCM 8/16/24/32-bit and 32-bit float, any channel count, and linearly resamples off-rate files). As of **1.4.0** the samples are re-trimmed to a tight onset so each hit lands squarely on the beat (fixing a slight perceived lateness). If a sample file is missing, that voice **falls back to the built-in synth** ([`PercussionSynth`](audio/src/main/kotlin/app/guitar/audio/PercussionSynth.kt)) so the drum machine always sounds. The per-instrument voice layout (also reflected by the synth fallback) is:
 
@@ -189,7 +190,7 @@ From the project root:
 adb shell am start -n app.guitar/app.guitar.app.MainActivity   # launch
 ```
 
-The debug APK is named after the version, e.g. `Chorect_beta_V1.4.0.apk`, and prior releases are archived under `releases/`.
+The debug APK is named after the version, e.g. `Chorect_beta_V1.5.0.apk`, and prior releases are archived under `releases/`.
 
 **On Windows** you can also just double-click `launch-app.bat` — it starts the emulator (with audio) if needed, builds, installs, and launches in one shot.
 
@@ -306,7 +307,8 @@ Chorect/
 | ✅ | Live chord on the fretboard while the loop plays |
 | ✅ | Adaptive launcher icon (rosewood fretboard slice) |
 | ✅ | Cavaquinho instrument — instrument toggle, DGBe/DGBD tunings, 4-string fretboard, per-instrument timbre |
-| ✅ | Samba drum machine — percussion step-sequencer (Surdo / Tamborim / Pandeiro / Agogô) with bundled one-shot WAV samples (synth fallback), save/load custom beats (+ "stock samba"), always-visible mute/solo, vertical scroll, Brazilian 16th-note swing, erase tool, and 2-finger aspect-ratio zoom + drag-pan |
+| ✅ | Samba drum machine — percussion step-sequencer (Surdo / Tamborim / Pandeiro / Agogô) with bundled one-shot WAV samples (synth fallback), save/load custom beats (+ "stock samba"), always-visible mute/solo, vertical scroll, Brazilian 16th-note swing, erase tool, per-instrument volume slider, and 2-finger aspect-ratio zoom + drag-pan |
+| ✅ | UI polish (1.5.0) — ear-training dropdown header + challenge Restart, fretboard starts empty + portrait first-fret zoom with full-area pinch/drag |
 | 📅 | Cavaquinho curated chord library |
 | 📅 | Custom-chord favorites |
 | 📅 | iOS port via Kotlin Multiplatform |

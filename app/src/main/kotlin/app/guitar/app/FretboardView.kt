@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -101,15 +103,13 @@ fun FretboardView(
 ) {
     val measurer = rememberTextMeasurer()
 
-    // Zoom/pan state. scale 1 = whole neck fills the viewport. The neck is drawn
-    // into a fixed-size Canvas and only the render layer is scaled/translated, so
-    // the layout never changes size — the user pinches/drags within a fixed frame.
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
     val minScale = 0.5f                                   // zoom out: neck → half the viewport
     val maxScale = (tuning.stringCount / 2f).coerceAtLeast(1.5f)  // zoom in: ~2 strings tall
 
+    // Tap-to-play / inspect. Stays on the Canvas so hit-testing uses the neck's
+    // un-transformed coordinate space (Compose maps pointer coords back through
+    // the graphicsLayer for us). A drag is claimed by the transform gesture and
+    // never becomes a tap, so panning the neck won't sound a note.
     val tapModifier = Modifier.pointerInput(tuning, numFrets, leftHanded, playOnTouchDown) {
         val handler: (Offset) -> Unit = { off ->
             val pos = pixelToPosition(
@@ -121,35 +121,7 @@ fun FretboardView(
         if (playOnTouchDown) {
             detectTapGestures(onPress = { off -> handler(off) })
         } else {
-            // onTap fires only when the gesture stayed within touch-slop (a real
-            // tap). A drag is claimed by the transform gesture below and never
-            // becomes a tap, so panning the neck won't play anything.
             detectTapGestures(onTap = handler)
-        }
-    }
-
-    val zoomModifier = Modifier.pointerInput(minScale, maxScale) {
-        detectTransformGestures { centroid, pan, zoom, _ ->
-            val oldScale = scale
-            val newScale = (oldScale * zoom).coerceIn(minScale, maxScale)
-            // Focal-point zoom: keep the content under the pinch centroid fixed
-            // (then apply the finger pan on top). graphicsLayer's origin is the
-            // viewport center c; a content-local point q maps to screen as
-            //   c + (q - c)*scale + offset
-            // Holding q's screen position across the scale change gives:
-            //   newOffset = oldOffset + (q - c)*(oldScale - newScale)
-            // The centroid is reported in the same un-transformed local space as
-            // taps, so it plays the role of q directly.
-            val cx = size.width / 2f
-            val cy = size.height / 2f
-            scale = newScale
-            // graphicsLayer center origin: content can travel ±(size*(scale-1)/2)
-            // before an edge reaches the viewport edge. Below scale 1 the neck is
-            // smaller than the viewport, so it stays centered (range collapses).
-            val maxX = max(0f, size.width * (newScale - 1f) / 2f)
-            val maxY = max(0f, size.height * (newScale - 1f) / 2f)
-            offsetX = (offsetX + pan.x + (centroid.x - cx) * (oldScale - newScale)).coerceIn(-maxX, maxX)
-            offsetY = (offsetY + pan.y + (centroid.y - cy) * (oldScale - newScale)).coerceIn(-maxY, maxY)
         }
     }
 
@@ -159,7 +131,59 @@ fun FretboardView(
     // the viewport so the box shape never stretches it.
     val neckAspect = (numFrets * 72f + 100f) / (tuning.stringCount * STRING_DP + FRET_NUMBER_DP).toFloat()
 
-    Box(modifier = modifier.fillMaxSize().clipToBounds(), contentAlignment = Alignment.Center) {
+    BoxWithConstraints(
+        modifier = modifier.fillMaxSize().clipToBounds(),
+        contentAlignment = Alignment.Center,
+    ) {
+        val density = LocalDensity.current
+        val boxWpx = with(density) { maxWidth.toPx() }
+        val boxHpx = with(density) { maxHeight.toPx() }
+        // The neck Canvas is letterboxed to neckAspect inside the box; compute its
+        // actual pixel size so pan-clamping uses the NECK's extent, not the box's.
+        val canvasWpx: Float
+        val canvasHpx: Float
+        if (boxWpx / boxHpx > neckAspect) {
+            canvasHpx = boxHpx; canvasWpx = boxHpx * neckAspect   // height-constrained (landscape)
+        } else {
+            canvasWpx = boxWpx; canvasHpx = boxWpx / neckAspect   // width-constrained (portrait)
+        }
+        // Portrait = taller than wide. There the wide neck letterboxes down to a
+        // thin sliver, so start zoomed in on the first frets (task #6) rather than
+        // tiny. offsetX = +maxX left-aligns it (nut + low frets in view).
+        val portrait = boxHpx > boxWpx
+        val initialScale = if (portrait) minOf(maxScale, 2.2f) else 1f
+
+        // Zoom/pan state, keyed on `portrait` so a rotation re-frames sensibly.
+        var scale by remember(portrait) { mutableFloatStateOf(initialScale) }
+        var offsetX by remember(portrait) {
+            mutableFloatStateOf(if (portrait) canvasWpx * (initialScale - 1f) / 2f else 0f)
+        }
+        var offsetY by remember(portrait) { mutableFloatStateOf(0f) }
+
+        // Pinch/drag over the WHOLE allotted area — including the empty letterbox
+        // margins above/below the short neck — so the user need not pinch precisely
+        // on the thin neck (task #6). This Box fills the area and is the gesture
+        // parent of the centered Canvas; graphicsLayer's origin is the box center,
+        // which coincides with the centered neck's center, so the focal math and
+        // pixel translations line up even though the gesture sees the larger box.
+        val zoomModifier = Modifier.pointerInput(minScale, maxScale, canvasWpx, canvasHpx) {
+            detectTransformGestures { centroid, pan, zoom, _ ->
+                val oldScale = scale
+                val newScale = (oldScale * zoom).coerceIn(minScale, maxScale)
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+                scale = newScale
+                val maxX = max(0f, canvasWpx * (newScale - 1f) / 2f)
+                val maxY = max(0f, canvasHpx * (newScale - 1f) / 2f)
+                offsetX = (offsetX + pan.x + (centroid.x - cx) * (oldScale - newScale)).coerceIn(-maxX, maxX)
+                offsetY = (offsetY + pan.y + (centroid.y - cy) * (oldScale - newScale)).coerceIn(-maxY, maxY)
+            }
+        }
+
+      Box(
+        modifier = Modifier.matchParentSize().then(zoomModifier),
+        contentAlignment = Alignment.Center,
+      ) {
         Canvas(
             modifier = Modifier
                 .aspectRatio(neckAspect)
@@ -169,7 +193,6 @@ fun FretboardView(
                     translationX = offsetX
                     translationY = offsetY
                 }
-                .then(zoomModifier)
                 .then(tapModifier)
         ) {
         val w = size.width
@@ -463,7 +486,8 @@ fun FretboardView(
             )
         )
         }  // Canvas
-    }      // viewport Box (fixed; clips the zoomed/panned neck)
+      }    // gesture Box (full area; catches pinch/drag over the letterbox too)
+    }      // viewport BoxWithConstraints (fixed; clips the zoomed/panned neck)
 }
 
 private fun positionToPixel(

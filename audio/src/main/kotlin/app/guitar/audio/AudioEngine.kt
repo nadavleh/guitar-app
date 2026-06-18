@@ -25,8 +25,11 @@ interface AudioEngine {
      * engine's sample rate). Mixed polyphonically with everything else, like a
      * pluck. Used by the percussion looper, which renders its voices once and
      * replays the cached buffers. No-op if [samples] is empty.
+     *
+     * [gain] scales the buffer's amplitude at mix time (1f = unchanged), so a
+     * per-instrument volume can be applied without mutating the cached buffer.
      */
-    fun playSamples(samples: FloatArray)
+    fun playSamples(samples: FloatArray, gain: Float = 1f)
 
     /** Stop any currently-playing audio immediately. */
     fun stop()
@@ -40,7 +43,7 @@ interface AudioEngine {
             override fun playNote(midiNote: Int, durationMillis: Int, timbre: Timbre) {}
             override fun playFrequency(freqHz: Float, durationMillis: Int, timbre: Timbre) {}
             override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre) {}
-            override fun playSamples(samples: FloatArray) {}
+            override fun playSamples(samples: FloatArray, gain: Float) {}
             override fun stop() {}
             override fun close() {}
         }

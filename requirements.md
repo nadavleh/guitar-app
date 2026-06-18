@@ -1,6 +1,6 @@
 # Chorect — Requirements
 
-**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.4.0 (semantic `major.minor.patch`, versionCode 10400).
+**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.5.0 (semantic `major.minor.patch`, versionCode 10500).
 
 **Versioning policy:**
 
@@ -153,14 +153,16 @@ Orientation:
 * Higher frets toward the right
 * Lowest-pitch string at the bottom, highest at the top
 
-**Fixed aspect ratio + letterboxing.** The neck is always rendered at a fixed long-horizontal / short-vertical aspect ratio (derived from fret count × string count), centered and letterboxed within its viewport in **both** portrait and landscape. The viewport's own shape never distorts the neck — a tall portrait viewport simply leaves empty space above and below the short horizontal neck.
+**Empty on launch.** On first launch the neck shows nothing lit — no chord, scale, or notes — until the user opens the Fretboard tool and selects something.
+
+**Fixed aspect ratio + letterboxing.** The neck is always rendered at a fixed long-horizontal / short-vertical aspect ratio (derived from fret count × string count), centered and letterboxed within its viewport in **both** portrait and landscape. The viewport's own shape never distorts the neck — a tall portrait viewport simply leaves empty space above and below the short horizontal neck. In **portrait** the neck starts zoomed in on the first frets at a larger size (rather than letterboxing down to a tiny sliver).
 
 **Zoom and pan.** Within that fixed frame the user can pinch-to-zoom (focal-point: the content under the pinch centroid stays fixed) and drag to pan, clamped so the neck can't be dragged off-screen:
 
 * Minimum scale 0.5× — the whole neck shrinks to half the viewport.
 * Maximum scale ≈ stringCount/2 — zoom in until roughly two strings fill the height.
 
-The transform is a pure render-layer effect, so tap hit-testing is unaffected by zoom/pan.
+Pinch and drag are handled across the **whole area allotted to the fretboard** (including the empty letterbox margins above/below the neck), not only on the neck itself. The transform is a pure render-layer effect, so tap hit-testing is unaffected by zoom/pan.
 
 ### 5.2 Interactivity
 
@@ -463,7 +465,7 @@ The user can save and delete named custom tunings locally (persisted via DataSto
 
 ### 10.6 Ear Training
 
-A full ear-training tool with **five** sub-modes, each offering **Practice** (free play) and **Challenge** (scored rounds):
+A full ear-training tool with **five** sub-modes, each offering **Practice** (free play) and **Challenge** (scored rounds). The sub-mode selector and the Practice/Challenge selector are presented as two compact side-by-side **dropdowns** (rather than a wrapping chip grid plus a full-width segmented bar), keeping the header small so the scrollable body has room. Every Challenge exposes a **Restart** action in its in-flight header (next to Quit) to restart the run mid-way without finishing it.
 
 * **Progression** — a 4-bar diatonic Roman-numeral progression loops at a chosen BPM; the user identifies the key/mode and each bar's chord. A I–V–I (or i–V–i) cadence can be auditioned to establish the tonic. Options control which modes (major/minor) and chord-type level (triads / sevenths / extended) appear, a fixed or random key, and standard vs shell voicings (or a "mix all" that randomizes per bar/chord). An **Advanced (non-diatonic)** toggle swaps the diatonic generator for a curated library of ~24 named progressions (see below).
 * **Note2Chord** — a triad plays, then a test note sounds on top; the user names the test note's relationship to the chord.
@@ -499,7 +501,7 @@ Available app-wide (Options, and a quick-access button on the tool screens):
 
 ### 10.8 Drum Machine
 
-A samba percussion looper (drum-machine tab): an editable 16-slot pattern with per-track **mute** and **solo**, per-instrument **voice auditioning** (tap a row label to open its voice menu, or tap a cell to cycle and preview), an adjustable BPM, and an adjustable **swing**. The pattern persists across leaving and returning to the screen.
+A samba percussion looper (drum-machine tab): an editable 16-slot pattern with per-track **mute** and **solo**, per-instrument **voice auditioning** (tap a row label to open its voice menu, or tap a cell to cycle and preview), an adjustable BPM, and an adjustable **swing**. Each instrument also has an **individual volume slider** (0–100 %), located inside that instrument's voice popup and applied as a per-voice gain at mix time. The pattern persists across leaving and returning to the screen.
 
 **Swing.** A 0–100 % control (default **straight**) applies a Brazilian 16th-note swing: it progressively delays the off-16ths — the "e" and "a" of every beat — toward a triplet/hemiola lilt (≈2:1 around 66 %, up to 3:1 at 100 %), while the **loop length is preserved** (only the internal subdivision shifts; the down-16ths stay on the beat). The pure timing helper (`PercussionTiming.swungSlotMs`) is unit-testable on the JVM.
 

@@ -350,6 +350,22 @@ private fun InstrumentRow(
                 // Voice menu: a button per voice; tap to audition (stays open to
                 // compare). Tap outside to dismiss.
                 DropdownMenu(expanded = voiceMenu, onDismissRequest = { voiceMenu = false }) {
+                    // Per-instrument volume (task #4). Lives in the voice popup so
+                    // the dense step-grid stays uncluttered.
+                    Column(modifier = Modifier.width(240.dp).padding(horizontal = 12.dp, vertical = 4.dp)) {
+                        val vol = samba.volumeOf(instrument)
+                        Text(
+                            "Volume: ${(vol * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Slider(
+                            value = vol,
+                            onValueChange = { samba.setVolume(instrument, it) },
+                            valueRange = 0f..1f,
+                        )
+                    }
+                    HorizontalDivider()
                     Text(
                         "  ${instrument.displayName} voices",
                         style = MaterialTheme.typography.labelSmall,

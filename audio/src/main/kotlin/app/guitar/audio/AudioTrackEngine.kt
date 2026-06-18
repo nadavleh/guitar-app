@@ -66,7 +66,7 @@ class AudioTrackEngine(
             }
         }
 
-    private class Voice(val samples: FloatArray, @Volatile var pos: Int = 0)
+    private class Voice(val samples: FloatArray, val gain: Float = 1f, @Volatile var pos: Int = 0)
 
     private val voicesLock = Any()
     private val voices = ArrayList<Voice>()
@@ -114,7 +114,7 @@ class AudioTrackEngine(
                     while (iter.hasNext()) {
                         val v = iter.next()
                         if (v.pos < v.samples.size) {
-                            sample += v.samples[v.pos]
+                            sample += v.samples[v.pos] * v.gain
                             v.pos++
                         } else {
                             iter.remove()
@@ -196,14 +196,14 @@ class AudioTrackEngine(
         }
     }
 
-    override fun playSamples(samples: FloatArray) {
-        if (!running.get() || samples.isEmpty()) return
-        addVoice(samples)
+    override fun playSamples(samples: FloatArray, gain: Float) {
+        if (!running.get() || samples.isEmpty() || gain <= 0f) return
+        addVoice(samples, gain)
     }
 
-    private fun addVoice(samples: FloatArray) {
+    private fun addVoice(samples: FloatArray, gain: Float = 1f) {
         synchronized(voicesLock) {
-            voices.add(Voice(samples))
+            voices.add(Voice(samples, gain))
             // Cap concurrent voices; oldest dropped first.
             while (voices.size > MAX_VOICES) voices.removeAt(0)
         }

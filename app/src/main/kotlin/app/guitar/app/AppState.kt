@@ -90,8 +90,11 @@ class AppState(
     var selectedPosition by mutableStateOf<FretPosition?>(null)
     var leftHanded by mutableStateOf(false)
 
-    // v1 GUI state
-    var displayMode by mutableStateOf(DisplayMode.Chord)
+    // v1 GUI state.
+    // Start with NOTHING lit on the neck (task #5): the user wants a clean
+    // fretboard on launch. Opening the Fretboard tool flips this to Chord (see
+    // openSheet), so picking a chord/scale still lights the neck as before.
+    var displayMode by mutableStateOf(DisplayMode.None)
     var currentSheet by mutableStateOf<Sheet?>(null)
     /** The last sheet the user explicitly opened. Used by the bottom drag-up affordance
      *  so the user can re-open the same sheet without going through the menu again. */
