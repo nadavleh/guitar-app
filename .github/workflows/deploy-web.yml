@@ -1,0 +1,50 @@
+# Deploys the chorect-web app to GitHub Pages — for FREE static hosting.
+#
+# This is MANUAL-ONLY (workflow_dispatch): it never runs on its own, so nothing
+# is published until you deliberately trigger it. To go live:
+#   1. On GitHub: Settings → Pages → "Build and deployment" → Source = GitHub Actions.
+#   2. Actions tab → "Deploy web to GitHub Pages" → "Run workflow".
+# The site then lives at  https://<user>.github.io/<repo>/  (e.g.
+# https://nadavleh.github.io/guitar-app/). The --base flag below must match the
+# repo name so asset URLs resolve under that sub-path.
+name: Deploy web to GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chorect-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      # Repo is served at /<repo>/ on project Pages, so build with that base.
+      - run: npx vite build --base=/${{ github.event.repository.name }}/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: chorect-web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

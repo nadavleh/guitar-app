@@ -1,6 +1,6 @@
 # Chorect — Requirements
 
-**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.5.0 (semantic `major.minor.patch`, versionCode 10500).
+**App name:** Chorect &nbsp;·&nbsp; **Version:** 1.6.0 (semantic `major.minor.patch`, versionCode 10600).
 
 **Versioning policy:**
 
@@ -480,10 +480,13 @@ The Progression sub-mode's **Advanced** toggle replaces the diatonic generator w
 **Progression Challenge** specifics:
 
 * 15 questions per session.
-* A dedicated "Hear the degrees" reference palette lets the user audition the diatonic degrees in the (hidden) key; the answer chips themselves are silent.
-* In fixed-Sevenths mode the user gives one combined diatonic-7th answer per bar (e.g. "V7") rather than picking degree and extension separately. Triad and mix modes keep separate pickers.
+* **Degree-keyboard answering (default).** Each bar of the progression is a square the user taps to open a degree **keyboard**: a row of scale-degree keys with a Major/Minor **shift** that relabels the same seven shared diatonic chords. Because the major and minor labels point at the same shared chords, relative-major/minor answers (e.g. major I–IV–V vs minor III–VI–VII) are accepted as **equivalent**. An extensions row is shown only when the level uses 7ths/extensions; triads get a simplified keyboard. (This replaced inline answer chips.)
+* A dedicated "Hear the degrees" reference palette lets the user audition the diatonic degrees in the (hidden) key. The reference buttons show **plain numbers** (1..7 / positional) rather than Roman numerals, so auditioning a degree does not reveal whether the key is major or minor; the answer keys themselves are silent.
+* **Per-question history with Prev/Next.** The challenge keeps a per-question history; **Prev / Next** are pinned at the **top** of the challenge (previously only a bottom "Next" existed). "← Prev" returns to an earlier question and restores its saved answers, so an accidental "Next" is recoverable.
 * Advancing without answering every bar credits the unanswered bars as correct.
 * A persistent **high-score table** keeps the top results, each with its date and completion time, ranked by score then by fastest time (time breaks ties).
+
+In the **Advanced (non-diatonic)** progressions, the per-chord play (audition) buttons likewise show **plain numbers** (positional) instead of Roman numerals, so auditioning a chord does not leak the key's quality.
 
 The diatonic **Extended** level and the "mix all" pool include **6th** and **add9** chords alongside the 9th/11th extensions already present, and the same 6/add9 (and 9th/11th) flavors appear in the Flavor trainer's quality palette.
 
@@ -501,7 +504,11 @@ Available app-wide (Options, and a quick-access button on the tool screens):
 
 ### 10.8 Drum Machine
 
-A samba percussion looper (drum-machine tab): an editable 16-slot pattern with per-track **mute** and **solo**, per-instrument **voice auditioning** (tap a row label to open its voice menu, or tap a cell to cycle and preview), an adjustable BPM, and an adjustable **swing**. Each instrument also has an **individual volume slider** (0–100 %), located inside that instrument's voice popup and applied as a per-voice gain at mix time. The pattern persists across leaving and returning to the screen.
+A samba percussion looper (drum-machine tab): an editable step pattern with per-track **mute** and **solo**, per-instrument **voice auditioning** (tap a row label to open its voice menu, or tap a cell to cycle and preview), an adjustable BPM, and an adjustable **swing**. Each instrument also has an **individual volume slider** (0–100 %), located inside that instrument's voice popup and applied as a per-voice gain at mix time. The pattern persists across leaving and returning to the screen.
+
+**Configurable meter.** The loop's **number of bars** (a bars stepper), **time signature** (e.g. 2/4, 3/4, 4/4, 6/8…), and **division** (1/4, 1/8, 1/16, 1/32) are user-selectable via the stepper and two dropdowns. The default is **2 bars of 2/4 in sixteenths (16 slots)**. The step grid, the beat/bar separators, and the caption all adapt to the chosen meter, and playback timing is **division-aware**.
+
+**Loop translate / shift.** A control rotates the entire loop by ±n slots with wrap-around: **◀ / ▶** shift by one slot, or the user types an amount and presses **Go** to shift by that many slots.
 
 **Swing.** A 0–100 % control (default **straight**) applies a Brazilian 16th-note swing: it progressively delays the off-16ths — the "e" and "a" of every beat — toward a triplet/hemiola lilt (≈2:1 around 66 %, up to 3:1 at 100 %), while the **loop length is preserved** (only the internal subdivision shifts; the down-16ths stay on the beat). The pure timing helper (`PercussionTiming.swungSlotMs`) is unit-testable on the JVM.
 
