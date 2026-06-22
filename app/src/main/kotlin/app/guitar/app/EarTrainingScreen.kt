@@ -1,6 +1,7 @@
 package app.guitar.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -1025,6 +1026,27 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
             TextButton(onClick = { ear.exitChallenge() }) { Text("Quit") }
         }
 
+        Spacer(Modifier.height(6.dp))
+
+        // #4/#5: question navigation pinned up top, so an accidental "Next" can be
+        // undone (← Prev restores that question's saved answers) and you can advance
+        // without scrolling to the bottom button.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedButton(
+                onClick = { ear.previousChallengeQuestion() },
+                enabled = ear.canGoPrevChallenge,
+                modifier = Modifier.weight(1f),
+            ) { Text("← Prev") }
+            Button(
+                onClick = { ear.advanceChallenge() },
+                modifier = Modifier.weight(1f),
+            ) { Text(if (ear.challengeIndex == ear.challengeTotal - 1) "See score →" else "Next →") }
+        }
+
         Spacer(Modifier.height(8.dp))
 
         FlowRow(
@@ -1089,86 +1111,33 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
 
         Spacer(Modifier.height(10.dp))
 
-        // #9/#3: per-bar answering. In fixed-7ths mode each degree maps to one
-        // diatonic 7th, so a single combined choice ("V7") encodes both degree and
-        // extension; otherwise pick the Roman numeral (plus extension when the
-        // level has one). Each bar auto-scores; selecting never plays a chord.
-        val combined = ear.challengeCombinedMode
-        val degreeOptions = ear.challengeDegreeOptions()
-        val combinedOptions = ear.challengeCombinedOptions()
-        val extOptions = ear.challengeExtOptions()
-        for (i in 0 until 4) {
-            val verdict = ear.challengeBarCorrect(i)   // null / true / false
-            val barBg = when (verdict) {
-                true  -> MaterialTheme.colorScheme.primaryContainer
-                false -> MaterialTheme.colorScheme.errorContainer
-                null  -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        // #6: degree-keyboard answering. Each bar is a square the user fills by
+        // tapping it and choosing from a degree "keyboard" (Major/Minor shift, plus
+        // an extensions row when the level uses them). The per-bar ▶ Play and the
+        // reference palette above are the only things that sound; selecting is silent.
+        Text("Fill each bar  (tap a square to choose its chord)",
+            style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.height(6.dp))
+        var keyboardBar by remember { mutableStateOf<Int?>(null) }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            for (i in 0 until 4) {
+                val verdict = ear.challengeBarCorrect(i)
+                BarSquare(
+                    barNumber = i + 1,
+                    label = ear.challengeGuessLabel.getOrNull(i),
+                    verdict = verdict,
+                    answer = if (verdict != null) ear.progResolved.getOrNull(i)?.romanLabel else null,
+                    onTap = { keyboardBar = i },
+                    onPlay = { ear.playBarOnce(i) },
+                    modifier = Modifier.weight(1f),
+                )
             }
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                colors = CardDefaults.cardColors(containerColor = barBg),
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Bar ${i + 1}",
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.weight(1f))
-                        OutlinedButton(
-                            onClick = { ear.playBarOnce(i) },
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                horizontal = 10.dp, vertical = 2.dp),
-                        ) { Text("▶ Play") }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    if (combined) {
-                        // Single combined diatonic-7th choice (sets degree + extension).
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            for ((deg, label) in combinedOptions) {
-                                FilterChip(
-                                    selected = ear.challengeGuessDegree.getOrNull(i) == deg,
-                                    onClick = { ear.guessChallengeCombined(i, deg) },
-                                    label = { Text(label) },
-                                )
-                            }
-                        }
-                    } else {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            for ((deg, roman) in degreeOptions) {
-                                FilterChip(
-                                    selected = ear.challengeGuessDegree.getOrNull(i) == deg,
-                                    // Selecting no longer plays — use the reference palette above to compare.
-                                    onClick = { ear.guessChallengeDegree(i, deg) },
-                                    label = { Text(roman) },
-                                )
-                            }
-                        }
-                        if (ear.challengeNeedsExt && extOptions.isNotEmpty()) {
-                            Spacer(Modifier.height(4.dp))
-                            Text("extension",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                for (ext in extOptions) {
-                                    FilterChip(
-                                        selected = ear.challengeGuessExt.getOrNull(i) == ext,
-                                        onClick = { ear.guessChallengeExt(i, ext) },
-                                        label = { Text(if (ext.isEmpty()) "none" else ext) },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    if (verdict != null) {
-                        Spacer(Modifier.height(4.dp))
-                        val answer = ear.progResolved.getOrNull(i)?.romanLabel ?: ""
-                        Text(
-                            if (verdict) "✔ $answer" else "✘ answer: $answer",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-            }
+        }
+        keyboardBar?.let { bar ->
+            DegreeKeyboardDialog(ear = ear, bar = bar, onDismiss = { keyboardBar = null })
         }
 
         Spacer(Modifier.height(10.dp))
@@ -1222,6 +1191,154 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         }
         Spacer(Modifier.height(20.dp))
     }
+}
+
+/** #6: one bar's answer square — a tappable tile that opens the degree keyboard,
+ *  showing the chosen chord label (or "?" when empty) plus a ▶ to hear the bar. */
+@Composable
+private fun BarSquare(
+    barNumber: Int,
+    label: String?,
+    verdict: Boolean?,
+    answer: String?,
+    onTap: () -> Unit,
+    onPlay: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val border = when (verdict) {
+        true  -> MaterialTheme.colorScheme.primary
+        false -> MaterialTheme.colorScheme.error
+        null  -> MaterialTheme.colorScheme.outline
+    }
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("Bar $barNumber", style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(2.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    if (label == null) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    else MaterialTheme.colorScheme.surfaceVariant,
+                )
+                .border(2.dp, border, RoundedCornerShape(8.dp))
+                .clickable { onTap() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                label ?: "?",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                color = if (label == null) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Spacer(Modifier.height(2.dp))
+        OutlinedButton(
+            onClick = onPlay,
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+        ) { Text("▶") }
+        if (verdict != null) {
+            Text(
+                if (verdict) "✔" else "✘ ${answer ?: ""}",
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                color = if (verdict) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+/** #6: the answer "keyboard" popup for one bar. Degree keys (with a Major/Minor
+ *  shift that relabels the same shared chords) and, when the level uses them, an
+ *  extensions row. Triads / fixed-7ths commit on the degree tap; extended/mix mode
+ *  waits for an extension then OK. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DegreeKeyboardDialog(ear: EarTrainingState, bar: Int, onDismiss: () -> Unit) {
+    var pickedDeg by remember(bar) { mutableStateOf<Int?>(null) }     // relative-major degree
+    var pickedRoman by remember(bar) { mutableStateOf<String?>(null) }
+    var pickedExt by remember(bar) { mutableStateOf<String?>(null) }
+    val needsExt = ear.challengeNeedsExt && !ear.challengeCombinedMode
+    val extOptions = ear.challengeExtOptions()
+
+    fun commit() {
+        val deg = pickedDeg ?: return
+        ear.guessChallengeKeyboard(bar, deg, pickedRoman ?: deg.toString(), if (needsExt) pickedExt else null)
+        onDismiss()
+    }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Bar ${bar + 1}") },
+        text = {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Numerals", style = MaterialTheme.typography.labelMedium)
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(
+                        selected = !ear.keyboardMinor,
+                        onClick = { if (ear.keyboardMinor) ear.toggleKeyboardShift() },
+                        label = { Text("Major") },
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    FilterChip(
+                        selected = ear.keyboardMinor,
+                        onClick = { if (!ear.keyboardMinor) ear.toggleKeyboardShift() },
+                        label = { Text("⇧ Minor") },
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text("Degree", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    for ((majDeg, roman) in ear.keyboardKeys()) {
+                        FilterChip(
+                            selected = pickedDeg == majDeg,
+                            onClick = {
+                                pickedDeg = majDeg; pickedRoman = roman
+                                if (!needsExt) commit()
+                            },
+                            label = { Text(roman) },
+                        )
+                    }
+                }
+                if (needsExt && extOptions.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text("Extension", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        for (ext in extOptions) {
+                            FilterChip(
+                                selected = pickedExt == ext,
+                                onClick = { pickedExt = ext },
+                                label = { Text(if (ext.isEmpty()) "triad" else ext) },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (needsExt) {
+                TextButton(onClick = { commit() }, enabled = pickedDeg != null) { Text("OK") }
+            } else {
+                TextButton(onClick = onDismiss) { Text("Close") }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { ear.clearChallengeBar(bar); onDismiss() }) { Text("Clear") }
+        },
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -1374,7 +1491,11 @@ private fun AdvancedProgressionBody(ear: EarTrainingState) {
             OutlinedButton(
                 onClick = { ear.playProgChordDirect(i) },
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-            ) { Text(if (ear.advRevealed) "▶ ${ear.progResolved[i].romanLabel}" else "▶ ${i + 1}") }
+            ) {
+                // #3: always a plain number — never reveal quality (major/minor/7th/♯)
+                // on the play button; the reveal card below shows the answer.
+                Text("▶ ${i + 1}")
+            }
         }
     }
     Spacer(Modifier.height(10.dp))

@@ -462,9 +462,11 @@ class EarTrainingState(
         challengeActive = true
         challengeStartMs = System.currentTimeMillis()
         challengeDurationMs = 0L
-        resetChallengeGuesses()
-        // Generate the first question's progression honoring current Major/Minor + chord-type settings.
-        nextProgression()
+        // Fresh question history; generate the first question honoring current settings.
+        challengeLog.clear()
+        val q = freshChallengeQuestion()
+        challengeLog.add(q)
+        applyChallengeQuestion(q)
     }
 
     fun markChallenge(correct: Boolean) {
@@ -494,6 +496,7 @@ class EarTrainingState(
      *  the session and hand it to the high-score table, then show the score screen. */
     fun advanceChallenge() {
         if (!challengeActive) return
+        saveChallengeGuesses()
         finalizeCurrentQuestion()
         if (challengeIndex >= challengeTotal - 1) {
             // Stay on `challengeActive = true` but `challengeIndex == total` signals "done".
@@ -503,10 +506,17 @@ class EarTrainingState(
             onProgressionChallengeComplete(challengeBarScore, challengeBarTotal, challengeDurationMs)
             return
         }
-        challengeIndex++
-        challengeRevealed = false
-        resetChallengeGuesses()
-        nextProgression()
+        val next = challengeIndex + 1
+        if (next < challengeLog.size) {
+            // Revisiting a question we've already seen — restore it (and its answers).
+            challengeIndex = next
+            applyChallengeQuestion(challengeLog[next])
+        } else {
+            val q = freshChallengeQuestion()
+            challengeLog.add(q)
+            challengeIndex = next
+            applyChallengeQuestion(q)
+        }
     }
 
     fun exitChallenge() {
@@ -531,10 +541,86 @@ class EarTrainingState(
     /** Per-bar extension-label guesses; null = unanswered. */
     var challengeGuessExt by mutableStateOf<List<String?>>(List(4) { null })
         private set
+    /** #6: per-bar display label of the user's keyboard answer (e.g. "V7", "iv"),
+     *  in whatever Roman system they entered it; null = the bar's square is empty. */
+    var challengeGuessLabel by mutableStateOf<List<String?>>(List(4) { null })
+        private set
+
+    /** #6: answer-keyboard "shift" state — false shows the MAJOR Roman row
+     *  (I ii iii IV V vi vii°), true shows the MINOR row (i ii° III iv v VI VII).
+     *  Both rows label the same seven shared diatonic chords; see
+     *  [EarTraining.majorRelativeDegree]. */
+    var keyboardMinor by mutableStateOf(false)
 
     private fun resetChallengeGuesses() {
         challengeGuessDegree = List(4) { null }
         challengeGuessExt = List(4) { null }
+        challengeGuessLabel = List(4) { null }
+    }
+
+    // ---- #4/#5: question history so the user can step back and forward ----
+
+    /** One challenge question: the generated progression + the user's saved guesses. */
+    private class QState(
+        val key: PitchClass,
+        val mode: TrainingMode,
+        val prog: Progression,
+        val resolved: List<ResolvedChord>,
+        var guessDeg: List<Int?>,
+        var guessExt: List<String?>,
+        var guessLabel: List<String?>,
+    )
+
+    private val challengeLog = ArrayList<QState>()
+
+    private fun freshChallengeQuestion(): QState {
+        val candidates = buildList {
+            if (includeMajor) add(TrainingMode.Major)
+            if (includeMinor) add(TrainingMode.Minor)
+        }.ifEmpty { listOf(TrainingMode.Major) }
+        val mode = candidates[rng.nextInt(candidates.size)]
+        val key = fixedKey ?: PitchClass(rng.nextInt(12))
+        val prog = EarTraining.randomProgression(mode, rng)
+        return QState(key, mode, prog, resolveCurrent(prog, key),
+            List(4) { null }, List(4) { null }, List(4) { null })
+    }
+
+    /** Make [q] the live question (prog* + guesses), resetting reveals. */
+    private fun applyChallengeQuestion(q: QState) {
+        progKey = q.key
+        progMode = q.mode
+        progProgression = q.prog
+        progResolved = q.resolved
+        challengeGuessDegree = q.guessDeg
+        challengeGuessExt = q.guessExt
+        challengeGuessLabel = q.guessLabel
+        progBarRevealed = emptySet()
+        keyRevealed = false
+        modeRevealed = false
+        currentBar = 0
+        challengeRevealed = false
+        if (isLooping) { stopLoop(); startLoop() }
+    }
+
+    /** Persist the live guesses back into the log for the current index. */
+    private fun saveChallengeGuesses() {
+        challengeLog.getOrNull(challengeIndex)?.let {
+            it.guessDeg = challengeGuessDegree
+            it.guessExt = challengeGuessExt
+            it.guessLabel = challengeGuessLabel
+        }
+    }
+
+    /** True when stepping back to an earlier question is possible. */
+    val canGoPrevChallenge: Boolean get() = challengeActive && challengeIndex in 1 until challengeTotal
+
+    /** #4/#5: step back to the previous question, restoring its saved answers. */
+    fun previousChallengeQuestion() {
+        if (!canGoPrevChallenge) return
+        saveChallengeGuesses()
+        finalizeCurrentQuestion()
+        challengeIndex--
+        applyChallengeQuestion(challengeLog[challengeIndex])
     }
 
     /** Whether the challenge should ask for an extension (mix mode always does, since
@@ -630,16 +716,75 @@ class EarTrainingState(
         maybeAutoMarkChallenge()
     }
 
-    /** #2: labels for the dedicated "hear the degrees" reference palette — combined
-     *  7th labels in 7th mode, plain Roman numerals otherwise. Played, in the hidden
-     *  key, via [auditionProgDegree] so the answer chips no longer double as audio. */
+    /** #3: labels for the dedicated "hear the degrees" reference palette — PLAIN
+     *  Arabic numbers 1..7, never Roman numerals / qualities, so hearing a degree
+     *  doesn't visually give away whether the key is major or minor (that's for the
+     *  user to identify). Played, in the hidden key, via [auditionProgDegree]. */
     fun challengeReferenceLabels(): List<Pair<Int, String>> =
-        if (challengeCombinedMode) challengeCombinedOptions() else challengeDegreeOptions()
+        degreesMap().keys.sorted().map { it to it.toString() }
 
     /** Re-roll the current question's progression and clear its guesses. */
     fun rerollChallengeQuestion() {
-        resetChallengeGuesses()
-        nextProgression()
+        if (!challengeActive) { resetChallengeGuesses(); nextProgression(); return }
+        val q = freshChallengeQuestion()
+        if (challengeIndex in challengeLog.indices) challengeLog[challengeIndex] = q
+        else challengeLog.add(q)
+        applyChallengeQuestion(q)
+    }
+
+    // ---- #6: degree-keyboard answering ----
+
+    /** Roman labels for the 7 keyboard keys in the currently-shown system, paired
+     *  with the relative-major degree (1..7) each key represents. The minor row's
+     *  keys map to the SAME shared chords as the major row (see
+     *  [EarTraining.majorRelativeDegree]); both are accepted as equivalent. */
+    fun keyboardKeys(): List<Pair<Int, String>> {
+        val map = if (keyboardMinor) EarTraining.MINOR_DEGREES else EarTraining.MAJOR_DEGREES
+        val mode = if (keyboardMinor) TrainingMode.Minor else TrainingMode.Major
+        return (1..7).map { pos ->
+            EarTraining.majorRelativeDegree(pos, mode) to (map[pos]?.roman ?: pos.toString())
+        }
+    }
+
+    fun toggleKeyboardShift() { keyboardMinor = !keyboardMinor }
+
+    /**
+     * Commit a keyboard answer for [bar]: [majorRelativeDegree] is the relative-major
+     * degree the tapped key stands for (so a major-row and the equivalent minor-row
+     * key produce the same answer). The degree is converted into the actual key's
+     * mode for scoring, so identifying I–IV–V or its minor III–VI–VII both score.
+     * [roman] is the tapped key's label in the user's chosen system (used to build
+     * the square's display). [ext] is the chosen extension suffix when the level
+     * needs one (ignored for triads; forced to the diatonic 7th in fixed-7ths mode).
+     */
+    fun guessChallengeKeyboard(bar: Int, majorRelativeDegree: Int, roman: String, ext: String?) {
+        if (!challengeActive || bar !in 0..3) return
+        val deg = EarTraining.degreeFromMajorRelative(majorRelativeDegree, progMode)
+        challengeGuessDegree = challengeGuessDegree.toMutableList().also { it[bar] = deg }
+        val extSuffix: String = when {
+            challengeCombinedMode -> {
+                val info = degreesMap()[deg]
+                val e = if (info != null)
+                    EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman) else ""
+                challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = e }
+                e
+            }
+            challengeNeedsExt -> {
+                challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = ext ?: "" }
+                ext ?: ""
+            }
+            else -> ""
+        }
+        challengeGuessLabel = challengeGuessLabel.toMutableList().also { it[bar] = roman + extSuffix }
+        maybeAutoMarkChallenge()
+    }
+
+    /** Clear bar [bar]'s keyboard answer (empties its square). */
+    fun clearChallengeBar(bar: Int) {
+        if (bar !in 0..3) return
+        challengeGuessDegree = challengeGuessDegree.toMutableList().also { it[bar] = null }
+        challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = null }
+        challengeGuessLabel = challengeGuessLabel.toMutableList().also { it[bar] = null }
     }
 
     /** Once every bar is fully answered, auto-score the question (all bars right = a point). */

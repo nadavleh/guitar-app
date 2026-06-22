@@ -105,6 +105,20 @@ object EarTraining {
         else -> triadRoman + quality
     }
 
+    /**
+     * Map a scale degree in [mode] to its *relative-major* degree (1..7). A major
+     * key and its relative minor share the same seven diatonic chords, just numbered
+     * from a different tonic: the relative minor sits on the major key's 6th degree,
+     * so minor 1↔major 6, minor 3↔major 1, minor 5↔major 3, etc. This is what makes
+     * a major I–IV–V read as a minor III–VI–VII (the same three chords).
+     */
+    fun majorRelativeDegree(degree: Int, mode: TrainingMode): Int =
+        if (mode == TrainingMode.Major) degree else ((degree + 4) % 7) + 1
+
+    /** Inverse of [majorRelativeDegree]: a relative-major degree back into [mode]. */
+    fun degreeFromMajorRelative(majorRelative: Int, mode: TrainingMode): Int =
+        if (mode == TrainingMode.Major) majorRelative else ((majorRelative + 1) % 7) + 1
+
     /** Resolve a Roman degree to a playable chord symbol + Roman label in the given key.
      *  At the Extended level, a degree with a non-empty [DegreeInfo.extendedOptions]
      *  picks one allowed diatonic extension at random using [rng]. */

@@ -6,6 +6,37 @@ import kotlin.test.assertTrue
 
 class EarTrainingTest {
 
+    // ----- relative major/minor degree equivalence (#6 answer keyboard) -----
+
+    @Test fun `major and relative-minor degrees map to the same shared chords`() {
+        // The user's example: major 1-4-5 reads as minor 3-6-7.
+        assertEquals(1, EarTraining.majorRelativeDegree(3, TrainingMode.Minor))
+        assertEquals(4, EarTraining.majorRelativeDegree(6, TrainingMode.Minor))
+        assertEquals(5, EarTraining.majorRelativeDegree(7, TrainingMode.Minor))
+        // minor i sits on the major key's 6th degree.
+        assertEquals(6, EarTraining.majorRelativeDegree(1, TrainingMode.Minor))
+        // Major mode is the identity.
+        for (d in 1..7) assertEquals(d, EarTraining.majorRelativeDegree(d, TrainingMode.Major))
+    }
+
+    @Test fun `degreeFromMajorRelative inverts majorRelativeDegree`() {
+        for (mode in TrainingMode.entries) {
+            for (d in 1..7) {
+                val rel = EarTraining.majorRelativeDegree(d, mode)
+                assertEquals(d, EarTraining.degreeFromMajorRelative(rel, mode))
+            }
+        }
+    }
+
+    @Test fun `equivalent-degree roots resolve to the same pitch class`() {
+        // A minor i (A) and C major vi (A) are the same chord; their relative-major
+        // degree is 6, and resolving it in either parent key lands on A.
+        val cMajVi = EarTraining.degreeRoot(PitchClass.C, 6, TrainingMode.Major)
+        val aMinI = EarTraining.degreeRoot(PitchClass.A, 1, TrainingMode.Minor)
+        assertEquals(cMajVi, aMinI)
+        assertEquals(6, EarTraining.majorRelativeDegree(1, TrainingMode.Minor))
+    }
+
     // ----- degreeRoot -----
 
     @Test fun `I in C major is C`() {
