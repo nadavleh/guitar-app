@@ -50,6 +50,55 @@ class PercussionPatternTest {
         assertEquals(PercussionPattern.empty(), PercussionPattern.decode(PercussionPattern.empty().encode()))
     }
 
+    @Test fun `non-default meter round-trips through encode-decode`() {
+        val meter = PercussionMeter(bars = 4, beatsPerBar = 3, beatUnit = 4, division = 8)
+        var p = PercussionPattern.empty(meter)
+        p = p.cycled(PercussionInstrument.Surdo, 0).cycled(PercussionInstrument.Agogo, meter.totalSlots - 1)
+        assertEquals(meter.totalSlots, p.slots)
+        assertEquals(p, PercussionPattern.decode(p.encode()))
+    }
+
+    @Test fun `meter derives slot counts`() {
+        val m = PercussionMeter(bars = 2, beatsPerBar = 2, beatUnit = 4, division = 16)
+        assertEquals(4, m.slotsPerBeat)
+        assertEquals(8, m.slotsPerBar)
+        assertEquals(16, m.totalSlots)
+        assertEquals(PERCUSSION_SLOTS, m.totalSlots)
+    }
+
+    @Test fun `withMeter preserves cells by index and resizes`() {
+        val small = PercussionPattern.empty().cycled(PercussionInstrument.Surdo, 0)
+        val big = small.withMeter(PercussionMeter(bars = 4))   // 32 slots
+        assertEquals(32, big.slots)
+        assertEquals(0, big.voiceAt(PercussionInstrument.Surdo, 0))   // preserved
+        assertNull(big.voiceAt(PercussionInstrument.Surdo, 16))       // new slot, silent
+        // Shrinking back drops the extra slots.
+        val backToSmall = big.withMeter(PercussionMeter())
+        assertEquals(16, backToSmall.slots)
+        assertEquals(0, backToSmall.voiceAt(PercussionInstrument.Surdo, 0))
+    }
+
+    @Test fun `translate rotates with wrap-around and is reversible`() {
+        val p = PercussionPattern.SAMBA
+        // A full-loop shift is the identity.
+        assertEquals(p, p.translated(p.slots))
+        assertEquals(p, p.translated(0))
+        // Shifting +3 then -3 returns the original.
+        assertEquals(p, p.translated(3).translated(-3))
+        // The cell that was at slot 0 lands at slot 3 after +3.
+        assertEquals(p.voiceAt(PercussionInstrument.Surdo, 0),
+            p.translated(3).voiceAt(PercussionInstrument.Surdo, 3))
+        // Negative wraps around the end.
+        assertEquals(p.voiceAt(PercussionInstrument.Surdo, 0),
+            p.translated(-1).voiceAt(PercussionInstrument.Surdo, p.slots - 1))
+    }
+
+    @Test fun `slotMs scales with division`() {
+        assertEquals(250L, PercussionTiming.slotMs(120, 8))   // eighth note at 120 = 250 ms
+        assertEquals(125L, PercussionTiming.slotMs(120, 16))
+        assertEquals(500L, PercussionTiming.slotMs(120, 4))
+    }
+
     @Test fun `decode rejects malformed or out-of-range input`() {
         assertNull(PercussionPattern.decode("garbage"))
         assertNull(PercussionPattern.decode(""))

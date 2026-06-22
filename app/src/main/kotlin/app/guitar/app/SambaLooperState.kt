@@ -6,8 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.guitar.audio.AudioEngine
 import app.guitar.audio.PercussionSynth
-import app.guitar.theory.PERCUSSION_SLOTS
 import app.guitar.theory.PercussionInstrument
+import app.guitar.theory.PercussionMeter
 import app.guitar.theory.PercussionPattern
 import app.guitar.theory.PercussionTiming
 import app.guitar.theory.PercussionVoices
@@ -111,12 +111,46 @@ class SambaLooperState(
     }
 
     fun clearAll() {
-        pattern = PercussionPattern.empty()
+        pattern = PercussionPattern.empty(pattern.meter)
     }
 
     /** Load the built-in "stock samba" groove. */
     fun loadSamba() {
         pattern = PercussionPattern.SAMBA
+    }
+
+    // ---- Meter (bars / time signature / division) ----
+
+    val meter get() = pattern.meter
+
+    /** Re-fit the current pattern onto [newMeter] (cells preserved by slot index). */
+    fun setMeter(newMeter: PercussionMeter) {
+        pattern = pattern.withMeter(newMeter)
+    }
+
+    fun setBars(bars: Int) =
+        setMeter(meter.copy(bars = bars.coerceIn(1, 8)))
+
+    /** Set the time signature. If the new beat unit can't host the current
+     *  division (division must be a multiple of beatUnit), bump the division up to
+     *  the beat unit so the meter stays valid. */
+    fun setTimeSignature(beatsPerBar: Int, beatUnit: Int) {
+        val beats = beatsPerBar.coerceIn(1, 12)
+        val unit = if (beatUnit in PercussionMeter.BEAT_UNITS) beatUnit else 4
+        val div = if (meter.division % unit == 0) meter.division
+                  else PercussionMeter.DIVISIONS.first { it % unit == 0 && it >= unit }
+        setMeter(meter.copy(beatsPerBar = beats, beatUnit = unit, division = div))
+    }
+
+    fun setDivision(division: Int) {
+        if (division !in PercussionMeter.DIVISIONS) return
+        if (division % meter.beatUnit != 0) return
+        setMeter(meter.copy(division = division))
+    }
+
+    /** Translate (rotate) the whole loop by [n] slots with wrap-around. */
+    fun translate(n: Int) {
+        pattern = pattern.translated(n)
     }
 
     // ---- Save / load user beats ----
@@ -144,15 +178,17 @@ class SambaLooperState(
         isPlaying = true
         job = scope.launch {
             while (isPlaying) {
-                for (slot in 0 until PERCUSSION_SLOTS) {
+                val snapshot = pattern        // re-read each bar so meter edits take effect
+                val division = snapshot.meter.division
+                for (slot in 0 until snapshot.slots) {
                     if (!isPlaying) break
                     currentSlot = slot
                     for (inst in PercussionInstrument.entries) {
                         if (!isAudible(inst)) continue
-                        val v = pattern.voiceAt(inst, slot) ?: continue
+                        val v = snapshot.voiceAt(inst, slot) ?: continue
                         audio.playSamples(buffer(inst, v), volumeOf(inst))
                     }
-                    delay(PercussionTiming.swungSlotMs(slot, bpm, swing))
+                    delay(PercussionTiming.swungSlotMs(slot, bpm, swing, division))
                 }
             }
         }

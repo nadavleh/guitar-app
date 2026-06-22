@@ -52,8 +52,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.guitar.theory.PERCUSSION_SLOTS
 import app.guitar.theory.PercussionInstrument
+import app.guitar.theory.PercussionMeter
 import app.guitar.theory.PercussionVoices
 import kotlin.math.max
 
@@ -132,6 +132,10 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 modifier = Modifier.weight(1f),
             )
         }
+
+        Spacer(Modifier.height(8.dp))
+        // ----- Loop setup: bars / time signature / division + translate (#1, #2) -----
+        LoopSetupControls(samba)
 
         Spacer(Modifier.height(8.dp))
         HorizontalDivider()
@@ -228,7 +232,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Spacer(Modifier.width(ROW_LABEL_DP.dp))
                     Text(
-                        "bar 1  ·  bar 2   (2/4, sixteenths)",
+                        samba.meter.describe(),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -311,6 +315,96 @@ private const val ROW_LABEL_DP = 128
 private const val ROW_HEIGHT_DP = 70   // per-instrument row: name + ▾ + M/S all fit
 private const val CAPTION_DP = 18      // bar/beat caption strip below the rows
 
+private val STEP_PAD = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+
+/** Bars / time-signature / division pickers plus the loop-translate control. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LoopSetupControls(samba: SambaLooperState) {
+    val meter = samba.meter
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        // Bars stepper
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Bars", style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.width(4.dp))
+            OutlinedButton(onClick = { samba.setBars(meter.bars - 1) }, enabled = meter.bars > 1,
+                contentPadding = STEP_PAD) { Text("−") }
+            Text(" ${meter.bars} ", style = MaterialTheme.typography.bodyMedium)
+            OutlinedButton(onClick = { samba.setBars(meter.bars + 1) }, enabled = meter.bars < 8,
+                contentPadding = STEP_PAD) { Text("+") }
+        }
+        // Time signature
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Time", style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.width(4.dp))
+            var open by remember { mutableStateOf(false) }
+            Box {
+                OutlinedButton(onClick = { open = true }, contentPadding = STEP_PAD) {
+                    Text("${meter.beatsPerBar}/${meter.beatUnit}  ▾")
+                }
+                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                    for ((b, u) in TIME_SIGNATURES) {
+                        DropdownMenuItem(text = { Text("$b/$u") },
+                            onClick = { samba.setTimeSignature(b, u); open = false })
+                    }
+                }
+            }
+        }
+        // Division
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Note", style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.width(4.dp))
+            var open by remember { mutableStateOf(false) }
+            Box {
+                OutlinedButton(onClick = { open = true }, contentPadding = STEP_PAD) {
+                    Text("1/${meter.division}  ▾")
+                }
+                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                    for (d in PercussionMeter.DIVISIONS.filter { it % meter.beatUnit == 0 }) {
+                        DropdownMenuItem(text = { Text("1/$d") },
+                            onClick = { samba.setDivision(d); open = false })
+                    }
+                }
+            }
+        }
+        // Translate (rotate) the loop by ±n slots, wrap-around.
+        TranslateControl(samba)
+    }
+}
+
+private val TIME_SIGNATURES = listOf(
+    2 to 4, 3 to 4, 4 to 4, 5 to 4, 6 to 8, 3 to 8, 12 to 8, 2 to 2,
+)
+
+/** "Shift" the whole loop left/right by ±1, or by a typed amount (wrap-around). */
+@Composable
+private fun TranslateControl(samba: SambaLooperState) {
+    var n by remember { mutableStateOf("1") }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Shift", style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.width(4.dp))
+        OutlinedButton(onClick = { samba.translate(-1) }, contentPadding = STEP_PAD) { Text("◀") }
+        Spacer(Modifier.width(2.dp))
+        OutlinedButton(onClick = { samba.translate(1) }, contentPadding = STEP_PAD) { Text("▶") }
+        Spacer(Modifier.width(6.dp))
+        OutlinedTextField(
+            value = n,
+            onValueChange = { s -> n = s.filter { it.isDigit() || it == '-' }.take(3) },
+            singleLine = true,
+            modifier = Modifier.width(64.dp),
+        )
+        Spacer(Modifier.width(4.dp))
+        OutlinedButton(
+            onClick = { (n.toIntOrNull())?.let { samba.translate(it) } },
+            contentPadding = STEP_PAD,
+        ) { Text("Go") }
+    }
+}
+
 @Composable
 private fun InstrumentRow(
     samba: SambaLooperState,
@@ -388,9 +482,12 @@ private fun InstrumentRow(
                     onColor = MaterialTheme.colorScheme.primary) { samba.toggleSolo(instrument) }
             }
         }
-        // ---- 16 cells (dimmed when the track isn't audible) ----
+        // ---- step cells (dimmed when the track isn't audible) ----
+        val slots = samba.pattern.slots
+        val slotsPerBeat = samba.meter.slotsPerBeat
+        val slotsPerBar = samba.meter.slotsPerBar
         Row(modifier = Modifier.weight(1f).fillMaxHeight().alpha(if (audible) 1f else 0.4f)) {
-            for (slot in 0 until PERCUSSION_SLOTS) {
+            for (slot in 0 until slots) {
                 Cell(
                     samba = samba,
                     instrument = instrument,
@@ -398,9 +495,9 @@ private fun InstrumentRow(
                     eraseMode = eraseMode,
                     modifier = Modifier.weight(1f).fillMaxHeight().padding(1.dp),
                 )
-                // Beat separators: thicker gap after every 4th cell; bar gap after 8th.
-                if (slot % 4 == 3 && slot != PERCUSSION_SLOTS - 1) {
-                    val w = if (slot == 7) 6.dp else 3.dp
+                // Beat separators: a gap after each beat; a wider gap at each bar line.
+                if ((slot + 1) % slotsPerBeat == 0 && slot != slots - 1) {
+                    val w = if ((slot + 1) % slotsPerBar == 0) 6.dp else 3.dp
                     Spacer(Modifier.width(w))
                 }
             }
