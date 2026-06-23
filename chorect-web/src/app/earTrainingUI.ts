@@ -61,6 +61,9 @@ export class EarTrainingUI {
   private kbPickedDeg: number | null = null;
   private kbPickedRoman: string | null = null;
   private kbPickedExt: string | null = null;
+  /** Physical-keyboard handler active while the degree popup is open (1..7 pick a
+   *  degree, Enter commits in extension mode, Esc closes). */
+  private kbKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
   constructor(private ear: EarTrainingState, private state: AppState, private onBack: () => void, private onToLooper: (symbols: string[]) => void) {}
 
@@ -364,6 +367,44 @@ export class EarTrainingUI {
     this.kbPickedDeg = null; this.kbPickedRoman = null; this.kbPickedExt = null;
   }
 
+  /** Item #2: let the physical number keys 1..7 pick a degree while the popup is
+   *  open (Enter commits in extension mode; Esc closes). Attached on open only. */
+  private attachKbKeys(): void {
+    if (this.kbKeyHandler) return;
+    const handler = (e: KeyboardEvent) => {
+      const bar = this.keyboardBar;
+      if (bar === null) return;
+      const ear = this.ear;
+      const needsExt = ear.challengeNeedsExt && !ear.challengeCombinedMode;
+      const finish = () => { this.keyboardBar = null; this.resetKbPicks(); this.detachKbKeys(); this.rerender(); };
+      if (e.key >= "1" && e.key <= "7") {
+        const idx = parseInt(e.key, 10) - 1;
+        const keys = ear.keyboardKeys();
+        if (idx >= keys.length) return;
+        e.preventDefault();
+        const [majDeg, roman] = keys[idx];
+        this.kbPickedDeg = majDeg; this.kbPickedRoman = roman;
+        if (!needsExt) { ear.guessChallengeKeyboard(bar, majDeg, roman, null); finish(); }
+        else this.rerender();
+      } else if (e.key === "Escape") {
+        e.preventDefault(); finish();
+      } else if (e.key === "Enter" && needsExt && this.kbPickedDeg != null) {
+        e.preventDefault();
+        ear.guessChallengeKeyboard(bar, this.kbPickedDeg, this.kbPickedRoman ?? String(this.kbPickedDeg), this.kbPickedExt);
+        finish();
+      }
+    };
+    this.kbKeyHandler = handler;
+    document.addEventListener("keydown", handler);
+  }
+
+  private detachKbKeys(): void {
+    if (this.kbKeyHandler) {
+      document.removeEventListener("keydown", this.kbKeyHandler);
+      this.kbKeyHandler = null;
+    }
+  }
+
   /** The answer "keyboard" popup for one bar: a Major/Minor shift, a row of 7 degree
    *  keys, and (when the level uses them, and not fixed-7ths mode) an extensions row.
    *  Triads / fixed-7ths commit on the degree tap; extended/mix wait for OK. */
@@ -372,14 +413,18 @@ export class EarTrainingUI {
     const needsExt = ear.challengeNeedsExt && !ear.challengeCombinedMode;
     const extOptions = ear.challengeExtOptions();
 
+    // Physical 1..7 keys select degrees while this popup is open.
+    this.attachKbKeys();
+
     const commit = () => {
       if (this.kbPickedDeg == null) return;
       ear.guessChallengeKeyboard(bar, this.kbPickedDeg, this.kbPickedRoman ?? String(this.kbPickedDeg), needsExt ? this.kbPickedExt : null);
       this.keyboardBar = null;
       this.resetKbPicks();
+      this.detachKbKeys();
       this.rerender();
     };
-    const close = () => { this.keyboardBar = null; this.resetKbPicks(); this.rerender(); };
+    const close = () => { this.keyboardBar = null; this.resetKbPicks(); this.detachKbKeys(); this.rerender(); };
 
     const body = el("div", {});
     // Major / Minor shift
