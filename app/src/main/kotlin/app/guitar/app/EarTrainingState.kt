@@ -181,6 +181,25 @@ class EarTrainingState(
         progResolved = resolveCurrent(prog, progKey)
     }
 
+    /**
+     * Transpose the current Progressions-practice progression by [n] semitones:
+     * shift the key and every chord's root, keeping the SAME chords/qualities and
+     * Roman degrees (so it isn't re-randomized). Works for the diatonic generator
+     * and the advanced (non-diatonic) library alike, since both feed [progResolved].
+     */
+    fun transposeProgression(n: Int) {
+        if (progResolved.isEmpty()) return
+        progKey = PitchClass.of(progKey.value + n)
+        progResolved = progResolved.map { rc ->
+            val parsed = ChordLibrary.parse(rc.symbol) ?: return@map rc
+            val (root, q) = parsed
+            val newRoot = PitchClass.of(root.value + n)
+            ResolvedChord(NoteSpeller.spell(newRoot) + q.symbol, rc.romanLabel, newRoot)
+        }
+        prevPlayedShape = null
+        if (isLooping) { stopLoop(); startLoop() }
+    }
+
     /** Resolve the [idx]-th chord of the current progression to a shape (using
      *  voice-leading from whatever last played in the loop, or E-shape if none),
      *  play it once, and update [lastShownShape] so the optional fretboard panel

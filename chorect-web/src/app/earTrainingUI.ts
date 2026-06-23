@@ -225,6 +225,17 @@ export class EarTrainingUI {
 
   // ---------- Progression (practice) ----------
 
+  /** ±1-semitone transpose clicker for the Progressions practice views. */
+  private transposeRow(): HTMLElement {
+    const ear = this.ear;
+    return el("div", { class: "et-row-gap", style: "margin-top:10px" }, [
+      el("span", { class: "ans-label" }, ["Transpose"]),
+      btn("−", () => ear.transposeProgression(-1)),
+      el("span", { class: "et-muted" }, ["semitone"]),
+      btn("+", () => ear.transposeProgression(1)),
+    ]);
+  }
+
   private progressionView(parent: HTMLElement): void {
     const ear = this.ear, s = this.state;
     this.progressionSettings(parent);
@@ -242,6 +253,8 @@ export class EarTrainingUI {
       btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
       btn("→ Looper", () => this.onToLooper(ear.progResolved.map((rc) => rc.symbol))),
     ]));
+
+    parent.appendChild(this.transposeRow());
 
     parent.appendChild(el("div", { class: "v-gap-12" }));
     parent.appendChild(this.revealCard("Key & Mode", !ear.keyRevealed,
@@ -549,6 +562,7 @@ export class EarTrainingUI {
       ear.isLooping ? btn("Stop ⏹", () => ear.stopLoop(), "btn primary") : btn("Play ▶", () => ear.startLoop(), "btn primary"),
       btn("Next →", () => ear.nextAdvancedProgression()),
     ]));
+    parent.appendChild(this.transposeRow());
     parent.appendChild(el("div", { class: "v-gap-8" }));
     this.advancedBody(parent);
   }

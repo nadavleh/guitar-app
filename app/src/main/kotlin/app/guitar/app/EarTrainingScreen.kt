@@ -246,6 +246,9 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
             }) { Text("→ Looper") }
         }
 
+        Spacer(Modifier.height(10.dp))
+        TransposeClicker(ear)
+
         Spacer(Modifier.height(16.dp))
 
         // KEY + MODE combined reveal — deliberately small / low-emphasis (the chord
@@ -337,6 +340,26 @@ private fun KeyDropdown(ear: EarTrainingState) {
                 )
             }
         }
+    }
+}
+
+/** ±1-semitone transpose clicker for the Progressions practice views. Shifts the
+ *  whole progression (key + chords) while keeping the same degrees. */
+@Composable
+private fun TransposeClicker(ear: EarTrainingState) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Transpose", style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.width(8.dp))
+        OutlinedButton(
+            onClick = { ear.transposeProgression(-1) },
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+        ) { Text("−") }
+        Text("  semitone  ", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedButton(
+            onClick = { ear.transposeProgression(1) },
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+        ) { Text("+") }
     }
 }
 
@@ -1576,6 +1599,8 @@ private fun AdvancedProgressionView(ear: EarTrainingState) {
             else Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
             OutlinedButton(onClick = { ear.nextAdvancedProgression() }) { Text("Next →") }
         }
+        Spacer(Modifier.height(10.dp))
+        TransposeClicker(ear)
         Spacer(Modifier.height(12.dp))
         AdvancedProgressionBody(ear)
         Spacer(Modifier.height(20.dp))

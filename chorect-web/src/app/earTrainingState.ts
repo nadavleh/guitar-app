@@ -143,6 +143,25 @@ export class EarTrainingState {
     this.notify();
   }
 
+  /** Transpose the current Progressions-practice progression by n semitones:
+   *  shift the key and every chord's root, keeping the same chords/qualities and
+   *  Roman degrees (no re-randomization). Works for diatonic and advanced alike. */
+  transposeProgression(n: number) {
+    if (this.progResolved.length === 0) return;
+    const pc = (v: number) => (((v + n) % 12) + 12) % 12;
+    this.progKey = pc(this.progKey);
+    this.progResolved = this.progResolved.map((rc) => {
+      const parsed = parseChord(rc.symbol);
+      if (!parsed) return rc;
+      const [root, q] = parsed;
+      const newRoot = pc(root);
+      return { symbol: spellPc(newRoot) + q.symbol, romanLabel: rc.romanLabel, root: newRoot };
+    });
+    this.prevPlayedShape = null;
+    if (this.isLooping) { this.stopLoop(); this.startLoop(); }
+    this.notify();
+  }
+
   playBarOnce(idx: number) {
     const resolved = this.progResolved[idx];
     if (!resolved) return;
