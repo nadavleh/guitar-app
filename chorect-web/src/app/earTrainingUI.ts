@@ -321,6 +321,8 @@ export class EarTrainingUI {
       btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
       btn("Re-roll", () => ear.rerollChallengeQuestion()),
     ]));
+    // Transpose shifts the key/chords but not the degrees, so it's safe in the challenge.
+    parent.appendChild(this.transposeRow());
     parent.appendChild(el("div", { style: "margin-top:8px" }, [`BPM: ${ear.progBpm}`]));
     parent.appendChild(slider(40, 200, ear.progBpm, (v) => { ear.progBpm = Math.round(v); this.rerender(); }));
     parent.appendChild(this.revealCard("Key & Mode (hint)", !ear.keyRevealed,

@@ -1087,6 +1087,11 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         }
 
         Spacer(Modifier.height(8.dp))
+        // Transpose works here too — it shifts the key/chords but not the degrees,
+        // so it never gives away the answer.
+        TransposeClicker(ear)
+
+        Spacer(Modifier.height(8.dp))
 
         // #1: BPM control inside the challenge (mirrors the Practice transport).
         Column {
