@@ -11,23 +11,24 @@ class PercussionPatternTest {
      *  for the structural tests, now that there is no built-in preset. */
     private fun samplePattern(): PercussionPattern =
         PercussionPattern.empty()
-            .withCell(PercussionInstrument.Surdo, 0, 1)
-            .withCell(PercussionInstrument.Surdo, 8, 1)
-            .withCell(PercussionInstrument.Tamborim, 3, 0)
-            .withCell(PercussionInstrument.Pandeiro, 5, 2)
-            .withCell(PercussionInstrument.Agogo, 2, 1)
+            .withCell(PercussionCatalog.Surdo, 0, 1)
+            .withCell(PercussionCatalog.Surdo, 8, 1)
+            .withCell(PercussionCatalog.Tamborim, 3, 0)
+            .withCell(PercussionCatalog.Pandeiro, 5, 2)
+            .withCell(PercussionCatalog.Agogo, 2, 1)
 
     @Test fun `empty pattern has all silent cells`() {
         val p = PercussionPattern.empty()
         assertTrue(p.isEmpty())
-        for (inst in PercussionInstrument.entries) {
+        assertEquals(PercussionCatalog.DEFAULT_KIT, p.instruments)   // default kit = the original four
+        for (inst in p.instruments) {
             for (s in 0 until PERCUSSION_SLOTS) assertNull(p.voiceAt(inst, s))
         }
     }
 
     @Test fun `cycling a 2-voice instrument goes null to 0 to 1 to null`() {
         var p = PercussionPattern.empty()
-        val inst = PercussionInstrument.Agogo  // 2 voices
+        val inst = PercussionCatalog.Agogo  // 2 voices
         assertNull(p.voiceAt(inst, 0))
         p = p.cycled(inst, 0); assertEquals(0, p.voiceAt(inst, 0))
         p = p.cycled(inst, 0); assertEquals(1, p.voiceAt(inst, 0))
@@ -36,7 +37,7 @@ class PercussionPatternTest {
 
     @Test fun `cycling a 3-voice instrument goes null to 0 to 1 to 2 to null`() {
         var p = PercussionPattern.empty()
-        val inst = PercussionInstrument.Surdo  // 3 voices
+        val inst = PercussionCatalog.Surdo  // 3 voices
         p = p.cycled(inst, 5); assertEquals(0, p.voiceAt(inst, 5))
         p = p.cycled(inst, 5); assertEquals(1, p.voiceAt(inst, 5))
         p = p.cycled(inst, 5); assertEquals(2, p.voiceAt(inst, 5))
@@ -45,7 +46,7 @@ class PercussionPatternTest {
 
     @Test fun `cycling the 4-voice pandeiro wraps after voice 3`() {
         var p = PercussionPattern.empty()
-        val inst = PercussionInstrument.Pandeiro  // 4 voices
+        val inst = PercussionCatalog.Pandeiro  // 4 voices
         for (expected in 0..3) {
             p = p.cycled(inst, 9); assertEquals(expected, p.voiceAt(inst, 9))
         }
@@ -62,8 +63,8 @@ class PercussionPatternTest {
 
     @Test fun `non-default meter round-trips through encode-decode`() {
         val meter = PercussionMeter(bars = 4, beatsPerBar = 3, beatUnit = 4, division = 8)
-        var p = PercussionPattern.empty(meter)
-        p = p.cycled(PercussionInstrument.Surdo, 0).cycled(PercussionInstrument.Agogo, meter.totalSlots - 1)
+        var p = PercussionPattern.empty(meter = meter)
+        p = p.cycled(PercussionCatalog.Surdo, 0).cycled(PercussionCatalog.Agogo, meter.totalSlots - 1)
         assertEquals(meter.totalSlots, p.slots)
         assertEquals(p, PercussionPattern.decode(p.encode()))
     }
@@ -77,15 +78,15 @@ class PercussionPatternTest {
     }
 
     @Test fun `withMeter preserves cells by index and resizes`() {
-        val small = PercussionPattern.empty().cycled(PercussionInstrument.Surdo, 0)
+        val small = PercussionPattern.empty().cycled(PercussionCatalog.Surdo, 0)
         val big = small.withMeter(PercussionMeter(bars = 4))   // 32 slots
         assertEquals(32, big.slots)
-        assertEquals(0, big.voiceAt(PercussionInstrument.Surdo, 0))   // preserved
-        assertNull(big.voiceAt(PercussionInstrument.Surdo, 16))       // new slot, silent
+        assertEquals(0, big.voiceAt(PercussionCatalog.Surdo, 0))   // preserved
+        assertNull(big.voiceAt(PercussionCatalog.Surdo, 16))       // new slot, silent
         // Shrinking back drops the extra slots.
         val backToSmall = big.withMeter(PercussionMeter())
         assertEquals(16, backToSmall.slots)
-        assertEquals(0, backToSmall.voiceAt(PercussionInstrument.Surdo, 0))
+        assertEquals(0, backToSmall.voiceAt(PercussionCatalog.Surdo, 0))
     }
 
     @Test fun `translate rotates with wrap-around and is reversible`() {
@@ -96,11 +97,11 @@ class PercussionPatternTest {
         // Shifting +3 then -3 returns the original.
         assertEquals(p, p.translated(3).translated(-3))
         // The cell that was at slot 0 lands at slot 3 after +3.
-        assertEquals(p.voiceAt(PercussionInstrument.Surdo, 0),
-            p.translated(3).voiceAt(PercussionInstrument.Surdo, 3))
+        assertEquals(p.voiceAt(PercussionCatalog.Surdo, 0),
+            p.translated(3).voiceAt(PercussionCatalog.Surdo, 3))
         // Negative wraps around the end.
-        assertEquals(p.voiceAt(PercussionInstrument.Surdo, 0),
-            p.translated(-1).voiceAt(PercussionInstrument.Surdo, p.slots - 1))
+        assertEquals(p.voiceAt(PercussionCatalog.Surdo, 0),
+            p.translated(-1).voiceAt(PercussionCatalog.Surdo, p.slots - 1))
     }
 
     @Test fun `slotMs scales with division`() {
@@ -119,19 +120,59 @@ class PercussionPatternTest {
     }
 
     @Test fun `cycling one cell does not disturb the others`() {
-        var p = PercussionPattern.empty().cycled(PercussionInstrument.Tamborim, 2)
-        p = p.cycled(PercussionInstrument.Tamborim, 7)
-        assertEquals(0, p.voiceAt(PercussionInstrument.Tamborim, 2))
-        assertEquals(0, p.voiceAt(PercussionInstrument.Tamborim, 7))
-        assertNull(p.voiceAt(PercussionInstrument.Tamborim, 3))
+        var p = PercussionPattern.empty().cycled(PercussionCatalog.Tamborim, 2)
+        p = p.cycled(PercussionCatalog.Tamborim, 7)
+        assertEquals(0, p.voiceAt(PercussionCatalog.Tamborim, 2))
+        assertEquals(0, p.voiceAt(PercussionCatalog.Tamborim, 7))
+        assertNull(p.voiceAt(PercussionCatalog.Tamborim, 3))
     }
 
     @Test fun `clearedRow wipes only that instrument`() {
         var p = samplePattern()
-        p = p.clearedRow(PercussionInstrument.Pandeiro)
-        assertTrue((0 until PERCUSSION_SLOTS).all { p.voiceAt(PercussionInstrument.Pandeiro, it) == null })
+        p = p.clearedRow(PercussionCatalog.Pandeiro)
+        assertTrue((0 until PERCUSSION_SLOTS).all { p.voiceAt(PercussionCatalog.Pandeiro, it) == null })
         // Surdo still has its downbeat hits
-        assertTrue((0 until PERCUSSION_SLOTS).any { p.voiceAt(PercussionInstrument.Surdo, it) != null })
+        assertTrue((0 until PERCUSSION_SLOTS).any { p.voiceAt(PercussionCatalog.Surdo, it) != null })
+    }
+
+    @Test fun `default kit is the original four instruments`() {
+        val p = PercussionPattern.empty()
+        assertEquals(listOf("surdo", "tamborim", "pandeiro", "agogo"), p.instruments.map { it.id })
+    }
+
+    @Test fun `addInstrument appends a silent row and removeInstrument drops it`() {
+        val cuica = PercussionCatalog.byId("cuica")!!
+        var p = PercussionPattern.empty()
+        assertTrue(!p.hasInstrument(cuica))
+        p = p.addInstrument(cuica)
+        assertTrue(p.hasInstrument(cuica))
+        assertEquals(PercussionCatalog.DEFAULT_KIT.size + 1, p.instruments.size)
+        assertEquals(cuica, p.instruments.last())              // appended at the end
+        for (s in 0 until p.slots) assertNull(p.voiceAt(cuica, s))   // silent row
+        // Adding again is a no-op.
+        assertEquals(p, p.addInstrument(cuica))
+        // Removing drops the row.
+        val back = p.removeInstrument(cuica)
+        assertTrue(!back.hasInstrument(cuica))
+        assertEquals(PercussionCatalog.DEFAULT_KIT.map { it.id }, back.instruments.map { it.id })
+    }
+
+    @Test fun `pattern with an added instrument round-trips through encode-decode`() {
+        val caxixi = PercussionCatalog.byId("caxixi")!!
+        val p = PercussionPattern.empty()
+            .addInstrument(caxixi)
+            .cycled(caxixi, 2)
+            .cycled(PercussionCatalog.Surdo, 0)
+        assertEquals(p, PercussionPattern.decode(p.encode()))
+    }
+
+    @Test fun `decode skips rows whose instrument id is unknown`() {
+        val p = PercussionPattern.empty().cycled(PercussionCatalog.Surdo, 0)
+        // Inject a bogus instrument row into the encoded string.
+        val encoded = p.encode() + "|bogus=" + (0 until p.slots).joinToString(",") { "-" }
+        val decoded = PercussionPattern.decode(encoded)!!
+        assertEquals(p.instruments.map { it.id }, decoded.instruments.map { it.id })  // bogus dropped
+        assertEquals(0, decoded.voiceAt(PercussionCatalog.Surdo, 0))
     }
 
     @Test fun `slot and loop timing at 120 bpm`() {

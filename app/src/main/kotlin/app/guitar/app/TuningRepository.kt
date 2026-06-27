@@ -225,13 +225,16 @@ class TuningRepository(private val context: Context) {
         }
     }
 
-    /** Entries "name=<encodedPattern>" joined by ';'. */
+    /** Entries "name=<encodedPattern>" joined by newline. A newline is used (not
+     *  ';') because an encoded pattern itself contains ';' and '|'/'=' — only a
+     *  newline is guaranteed absent from both encode() output and (single-line)
+     *  beat names. */
     private fun encodeDrumMap(map: Map<String, app.guitar.theory.PercussionPattern>): String =
-        map.entries.joinToString(";") { (n, p) -> "$n=${p.encode()}" }
+        map.entries.joinToString("\n") { (n, p) -> "$n=${p.encode()}" }
 
     private fun decodeDrumMap(raw: String): Map<String, app.guitar.theory.PercussionPattern> {
         val out = LinkedHashMap<String, app.guitar.theory.PercussionPattern>()
-        for (entry in raw.split(";")) {
+        for (entry in raw.split("\n")) {
             val eq = entry.indexOf('=')
             if (eq <= 0) continue
             val name = entry.substring(0, eq)

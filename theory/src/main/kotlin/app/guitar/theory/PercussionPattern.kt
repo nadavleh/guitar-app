@@ -52,29 +52,37 @@ data class PercussionMeter(
  * Immutable — every mutation returns a new pattern (Compose-friendly).
  */
 data class PercussionPattern(
-    val grid: Map<PercussionInstrument, List<Int?>>,
+    val instruments: List<PercussionInstrument>,
+    val grid: Map<String, List<Int?>>,
     val meter: PercussionMeter = PercussionMeter.DEFAULT,
 ) {
     /** Number of slots in this pattern (= meter.totalSlots). */
     val slots: Int get() = meter.totalSlots
 
     init {
-        require(grid.keys.containsAll(PercussionInstrument.entries.toSet())) {
-            "pattern must cover every instrument; missing ${PercussionInstrument.entries - grid.keys}"
+        require(instruments.map { it.id }.toSet().size == instruments.size) {
+            "kit has duplicate instruments: ${instruments.map { it.id }}"
         }
-        grid.forEach { (inst, row) ->
+        require(grid.keys == instruments.map { it.id }.toSet()) {
+            "grid keys ${grid.keys} must match the kit ${instruments.map { it.id }}"
+        }
+        instruments.forEach { inst ->
+            val row = grid.getValue(inst.id)
             require(row.size == meter.totalSlots) {
-                "$inst row must have ${meter.totalSlots} slots, got ${row.size}"
+                "${inst.id} row must have ${meter.totalSlots} slots, got ${row.size}"
             }
             row.forEach { v ->
-                require(v == null || v in 0 until PercussionVoices.voiceCount(inst)) {
-                    "$inst has out-of-range voice index $v"
+                require(v == null || v in 0 until inst.voiceCount) {
+                    "${inst.id} has out-of-range voice index $v"
                 }
             }
         }
     }
 
-    fun voiceAt(instrument: PercussionInstrument, slot: Int): Int? = grid.getValue(instrument)[slot]
+    fun voiceAt(instrument: PercussionInstrument, slot: Int): Int? = grid.getValue(instrument.id)[slot]
+
+    /** Whether [instrument] (by id) is part of this pattern's kit. */
+    fun hasInstrument(instrument: PercussionInstrument): Boolean = grid.containsKey(instrument.id)
 
     /**
      * Advance a cell one step in the cycle:
@@ -82,8 +90,8 @@ data class PercussionPattern(
      */
     fun cycled(instrument: PercussionInstrument, slot: Int): PercussionPattern {
         require(slot in 0 until slots)
-        val count = PercussionVoices.voiceCount(instrument)
-        val cur = grid.getValue(instrument)[slot]
+        val count = instrument.voiceCount
+        val cur = grid.getValue(instrument.id)[slot]
         val next = when {
             cur == null -> 0
             cur >= count - 1 -> null
@@ -93,12 +101,30 @@ data class PercussionPattern(
     }
 
     fun withCell(instrument: PercussionInstrument, slot: Int, voice: Int?): PercussionPattern {
-        val newRow = grid.getValue(instrument).toMutableList().also { it[slot] = voice }
-        return copy(grid = grid + (instrument to newRow))
+        val newRow = grid.getValue(instrument.id).toMutableList().also { it[slot] = voice }
+        return copy(grid = grid + (instrument.id to newRow))
     }
 
     fun clearedRow(instrument: PercussionInstrument): PercussionPattern =
-        copy(grid = grid + (instrument to List(slots) { null }))
+        copy(grid = grid + (instrument.id to List(slots) { null }))
+
+    /** Append [instrument] to the kit with a silent row. No-op if already present. */
+    fun addInstrument(instrument: PercussionInstrument): PercussionPattern {
+        if (hasInstrument(instrument)) return this
+        return copy(
+            instruments = instruments + instrument,
+            grid = grid + (instrument.id to List(slots) { null }),
+        )
+    }
+
+    /** Remove [instrument] (and its row) from the kit. No-op if absent. */
+    fun removeInstrument(instrument: PercussionInstrument): PercussionPattern {
+        if (!hasInstrument(instrument)) return this
+        return copy(
+            instruments = instruments.filter { it.id != instrument.id },
+            grid = grid - instrument.id,
+        )
+    }
 
     fun isEmpty(): Boolean = grid.values.all { row -> row.all { it == null } }
 
@@ -125,61 +151,71 @@ data class PercussionPattern(
     fun withMeter(newMeter: PercussionMeter): PercussionPattern {
         if (newMeter == meter) return this
         val n = newMeter.totalSlots
-        val newGrid = PercussionInstrument.entries.associateWith { inst ->
-            val old = grid.getValue(inst)
-            List(n) { i -> old.getOrNull(i) }
+        val newGrid = instruments.associate { inst ->
+            val old = grid.getValue(inst.id)
+            inst.id to List(n) { i -> old.getOrNull(i) }
         }
-        return PercussionPattern(newGrid, newMeter)
+        return PercussionPattern(instruments, newGrid, newMeter)
     }
 
     /**
-     * Serialize to a compact string for persistence. New format carries the meter:
-     *   "M:bars,beatsPerBar,beatUnit,division;row|row|…"
-     * Each row is its cells comma-separated, silent = "-". Round-trips via [decode],
-     * which also accepts the legacy meter-less 16-cell format.
+     * Serialize to a compact string for persistence:
+     *   "M:bars,beatsPerBar,beatUnit,division;id=cells|id=cells|…"
+     * Each row is "instrumentId=" then its cells comma-separated (silent = "-").
+     * Round-trips via [decode].
      */
     fun encode(): String {
         val m = "M:${meter.bars},${meter.beatsPerBar},${meter.beatUnit},${meter.division};"
-        val body = PercussionInstrument.entries.joinToString("|") { inst ->
-            grid.getValue(inst).joinToString(",") { it?.toString() ?: "-" }
+        val body = instruments.joinToString("|") { inst ->
+            inst.id + "=" + grid.getValue(inst.id).joinToString(",") { it?.toString() ?: "-" }
         }
         return m + body
     }
 
     companion object {
-        fun empty(meter: PercussionMeter = PercussionMeter.DEFAULT): PercussionPattern =
+        fun empty(
+            kit: List<PercussionInstrument> = PercussionCatalog.DEFAULT_KIT,
+            meter: PercussionMeter = PercussionMeter.DEFAULT,
+        ): PercussionPattern =
             PercussionPattern(
-                PercussionInstrument.entries.associateWith { List(meter.totalSlots) { null } },
+                kit,
+                kit.associate { it.id to List(meter.totalSlots) { null } },
                 meter,
             )
 
-        /** Parse a string produced by [encode]; null if malformed or out of range.
-         *  Accepts the new "M:…;rows" form and the legacy meter-less 16-cell form. */
+        /**
+         * Parse a string produced by [encode]; null only on structural garbage.
+         * Rows whose instrument id isn't in the catalog are skipped (forward/backward
+         * compatibility), so a smaller-but-valid kit can result.
+         */
         fun decode(s: String): PercussionPattern? {
-            var meter = PercussionMeter.DEFAULT
-            var body = s
-            if (s.startsWith("M:")) {
-                val sep = s.indexOf(';')
-                if (sep < 0) return null
-                val parts = s.substring(2, sep).split(",")
-                if (parts.size != 4) return null
-                val ints = parts.map { it.toIntOrNull() ?: return null }
-                meter = runCatching {
-                    PercussionMeter(ints[0], ints[1], ints[2], ints[3])
-                }.getOrNull() ?: return null
-                body = s.substring(sep + 1)
-            }
-            val rows = body.split("|")
-            if (rows.size != PercussionInstrument.entries.size) return null
-            val grid = HashMap<PercussionInstrument, List<Int?>>()
-            for ((idx, inst) in PercussionInstrument.entries.withIndex()) {
-                val cells = rows[idx].split(",")
+            if (!s.startsWith("M:")) return null
+            val sep = s.indexOf(';')
+            if (sep < 0) return null
+            val parts = s.substring(2, sep).split(",")
+            if (parts.size != 4) return null
+            val ints = parts.map { it.toIntOrNull() ?: return null }
+            val meter = runCatching {
+                PercussionMeter(ints[0], ints[1], ints[2], ints[3])
+            }.getOrNull() ?: return null
+
+            val rows = s.substring(sep + 1).split("|")
+            val instruments = ArrayList<PercussionInstrument>()
+            val grid = HashMap<String, List<Int?>>()
+            for (rowStr in rows) {
+                val eq = rowStr.indexOf('=')
+                if (eq < 0) return null
+                val id = rowStr.substring(0, eq)
+                val inst = PercussionCatalog.byId(id) ?: continue   // skip unknown instruments
+                if (grid.containsKey(id)) continue                  // ignore duplicate rows
+                val cells = rowStr.substring(eq + 1).split(",")
                 if (cells.size != meter.totalSlots) return null
                 val row = cells.map { c -> if (c == "-") null else c.toIntOrNull() ?: return null }
-                if (row.any { it != null && it !in 0 until PercussionVoices.voiceCount(inst) }) return null
-                grid[inst] = row
+                if (row.any { it != null && it !in 0 until inst.voiceCount }) return null
+                instruments.add(inst)
+                grid[id] = row
             }
-            return runCatching { PercussionPattern(grid, meter) }.getOrNull()
+            return runCatching { PercussionPattern(instruments, grid, meter) }.getOrNull()
         }
     }
 }

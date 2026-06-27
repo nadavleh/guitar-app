@@ -16,30 +16,40 @@ import kotlin.random.Random
  */
 class PercussionSynth(val sampleRate: Int = 44100) {
 
-    fun synthesize(instrument: PercussionInstrument, voiceIndex: Int): FloatArray = when (instrument) {
+    fun synthesize(instrument: PercussionInstrument, voiceIndex: Int): FloatArray = when (instrument.id) {
         // Surdo: 0 ringing bass, 1 muted bass, 2 light muted tap.
-        PercussionInstrument.Surdo -> when (voiceIndex) {
+        "surdo" -> when (voiceIndex) {
             0 -> surdo(open = true)
             1 -> surdo(open = false)
             else -> tonedTap(freq = 165.0, durSec = 0.055, decay = 75.0, amp = 0.30)
         }
         // Tamborim: 0 high clack, 1 muted clack, 2 light tap.
-        PercussionInstrument.Tamborim -> when (voiceIndex) {
+        "tamborim" -> when (voiceIndex) {
             0 -> tamborimClack(muted = false)
             1 -> tamborimClack(muted = true)
             else -> noiseDrum(durSec = 0.05, decay = 95.0, lpAlpha = 0.30, hp = true, amp = 0.30)
         }
         // Pandeiro: 0 open bass, 1 muted bass (low-mid), 2 slap, 3 jingle.
-        PercussionInstrument.Pandeiro -> when (voiceIndex) {
+        "pandeiro" -> when (voiceIndex) {
             0 -> tonedTap(freq = 150.0, durSec = 0.22, decay = 13.0, amp = 0.62) // open bass
             1 -> tonedTap(freq = 155.0, durSec = 0.08, decay = 42.0, amp = 0.55) // muted bass
             2 -> noiseDrum(durSec = 0.08, decay = 60.0, lpAlpha = 0.50, hp = true, amp = 0.72) // slap
             else -> jingle()
         }
-        PercussionInstrument.Agogo -> when (voiceIndex) {
+        "agogo" -> when (voiceIndex) {
             0 -> bell(freq = 590.0)
             else -> bell(freq = 740.0)
         }
+        // Instruments added from the catalog ship bundled samples; this is only a
+        // safety fallback if a sample is ever missing — a short neutral click whose
+        // brightness rises a little with the voice index so adjacent voices differ.
+        else -> noiseDrum(
+            durSec = 0.06,
+            decay = 80.0,
+            lpAlpha = (0.30 + 0.12 * voiceIndex).coerceAtMost(0.85),
+            hp = true,
+            amp = 0.5,
+        )
     }
 
     // ---- voices ----

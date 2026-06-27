@@ -153,13 +153,14 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
         Spacer(Modifier.height(8.dp))
 
         // ----- Grid -----
-        // The grid has a FIXED height (not weight) so each of the 4 instrument
-        // rows always has room for its name, the ▾ voice popup, and the M/S
-        // toggles — nothing gets clipped in short-height (landscape) layouts.
-        // 4 rows × ROW_HEIGHT_DP + 3 inter-row spacers + caption row.
+        // The grid has a FIXED height (not weight) so each instrument row always has
+        // room for its name, the ▾ voice popup, and the M/S toggles — nothing gets
+        // clipped in short-height (landscape) layouts. Height scales with the current
+        // kit size; the whole screen scrolls vertically when the kit is large.
+        val kit = samba.pattern.instruments
+        val rowCount = kit.size.coerceAtLeast(1)
         val gridHeight =
-            (PercussionInstrument.entries.size * ROW_HEIGHT_DP +
-                (PercussionInstrument.entries.size - 1) * 6 + CAPTION_DP).dp
+            (rowCount * ROW_HEIGHT_DP + (rowCount - 1) * 6 + CAPTION_DP).dp
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -228,14 +229,14 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                         translationY = offsetY
                     },
             ) {
-                for ((i, inst) in PercussionInstrument.entries.withIndex()) {
+                for ((i, inst) in kit.withIndex()) {
                     InstrumentRow(
                         samba = samba,
                         instrument = inst,
                         eraseMode = eraseMode,
                         modifier = Modifier.height(ROW_HEIGHT_DP.dp).fillMaxWidth(),
                     )
-                    if (i != PercussionInstrument.entries.lastIndex) {
+                    if (i != kit.lastIndex) {
                         Spacer(Modifier.height(6.dp))
                     }
                 }
@@ -291,6 +292,27 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 }
             }
             OutlinedButton(onClick = { samba.clearAll() }) { Text("Clear all") }
+
+            // Add an instrument to the kit, sourced from the catalog.
+            var addMenu by remember { mutableStateOf(false) }
+            Box {
+                Button(onClick = { addMenu = true }) { Text("+ Add instrument") }
+                DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
+                    val toAdd = samba.instrumentsToAdd()
+                    if (toAdd.isEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("(all instruments added)") },
+                            enabled = false, onClick = {},
+                        )
+                    }
+                    for (inst in toAdd) {
+                        DropdownMenuItem(
+                            text = { Text(inst.displayName) },
+                            onClick = { samba.addInstrument(inst); addMenu = false },
+                        )
+                    }
+                }
+            }
         }
 
         if (saveDialog) {
@@ -472,12 +494,17 @@ private fun InstrumentRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                     )
-                    for (v in voices) {
+                    voices.forEachIndexed { idx, v ->
                         DropdownMenuItem(
                             text = { Text("${v.glyph}   ${v.displayName}") },
-                            onClick = { samba.preview(instrument, v.index) },
+                            onClick = { samba.preview(instrument, idx) },
                         )
                     }
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Remove ${instrument.displayName}") },
+                        onClick = { voiceMenu = false; samba.removeInstrument(instrument) },
+                    )
                 }
             }
             Spacer(Modifier.height(4.dp))

@@ -93,7 +93,7 @@ fun App(audio: AudioEngine) {
     // decoded to mono 44.1 kHz; null → SambaLooperState falls back to the synth.
     val drumSampleLoader = remember(context) {
         loader@{ inst: app.guitar.theory.PercussionInstrument, voice: Int ->
-            val name = "drums/${inst.name.lowercase()}_$voice.wav"
+            val name = "drums/${inst.id}_$voice.wav"
             runCatching {
                 context.applicationContext.assets.open(name).use { it.readBytes() }
             }.getOrNull()?.let { app.guitar.audio.WavDecoder.decode(it) }

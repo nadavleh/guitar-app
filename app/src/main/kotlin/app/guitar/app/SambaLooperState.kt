@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.guitar.audio.AudioEngine
 import app.guitar.audio.PercussionSynth
+import app.guitar.theory.PercussionCatalog
 import app.guitar.theory.PercussionInstrument
 import app.guitar.theory.PercussionMeter
 import app.guitar.theory.PercussionPattern
@@ -65,18 +66,17 @@ class SambaLooperState(
     fun isAudible(inst: PercussionInstrument): Boolean =
         inst !in muted && (soloed.isEmpty() || inst in soloed)
 
-    /** Per-instrument playback volume, 0f..1f (1 = full). Applied as a gain at
-     *  mix time so the cached one-shot buffers are never mutated. App-lifetime,
-     *  so the mix you dial in survives leaving and returning to the screen. */
-    var volumes by mutableStateOf(
-        PercussionInstrument.entries.associateWith { 1f },
-    )
+    /** Per-instrument playback volume, 0f..1f (1 = full), keyed by instrument id.
+     *  Applied as a gain at mix time so the cached one-shot buffers are never
+     *  mutated. App-lifetime, so the mix you dial in survives leaving and returning
+     *  to the screen; instruments not yet dialled default to full. */
+    var volumes by mutableStateOf<Map<String, Float>>(emptyMap())
         private set
 
-    fun volumeOf(inst: PercussionInstrument): Float = volumes[inst] ?: 1f
+    fun volumeOf(inst: PercussionInstrument): Float = volumes[inst.id] ?: 1f
 
     fun setVolume(inst: PercussionInstrument, value: Float) {
-        volumes = volumes + (inst to value.coerceIn(0f, 1f))
+        volumes = volumes + (inst.id to value.coerceIn(0f, 1f))
     }
 
     private var job: Job? = null
@@ -111,7 +111,26 @@ class SambaLooperState(
     }
 
     fun clearAll() {
-        pattern = PercussionPattern.empty(pattern.meter)
+        pattern = PercussionPattern.empty(pattern.instruments, pattern.meter)
+    }
+
+    // ---- Kit: add / remove instruments ----
+
+    /** Catalog instruments not yet in the kit, in catalog order (for the picker). */
+    fun instrumentsToAdd(): List<PercussionInstrument> =
+        PercussionCatalog.ALL.filter { !pattern.hasInstrument(it) }
+
+    /** Add [inst] to the kit (silent row) and audition its first voice. */
+    fun addInstrument(inst: PercussionInstrument) {
+        pattern = pattern.addInstrument(inst)
+        if (!isPlaying) audio.playSamples(buffer(inst, 0), volumeOf(inst))
+    }
+
+    /** Remove [inst] from the kit, also clearing its mute/solo state. */
+    fun removeInstrument(inst: PercussionInstrument) {
+        pattern = pattern.removeInstrument(inst)
+        muted = muted - inst
+        soloed = soloed - inst
     }
 
     // ---- Meter (bars / time signature / division) ----
@@ -177,7 +196,7 @@ class SambaLooperState(
                 for (slot in 0 until snapshot.slots) {
                     if (!isPlaying) break
                     currentSlot = slot
-                    for (inst in PercussionInstrument.entries) {
+                    for (inst in snapshot.instruments) {
                         if (!isAudible(inst)) continue
                         val v = snapshot.voiceAt(inst, slot) ?: continue
                         audio.playSamples(buffer(inst, v), volumeOf(inst))
