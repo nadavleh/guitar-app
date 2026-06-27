@@ -8,7 +8,7 @@ import { FretMark, MarkKind } from "./marks";
 import { Colors } from "./theme";
 import { el, btn, clear } from "./dom";
 import {
-  PitchClass, spellPc, noteAt, fp, fpKey,
+  PitchClass, spellPc, noteAt, midiPitchClass, fp, fpKey,
   ChordDecomposition, CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
 } from "../theory";
 import { Timbres } from "../audio";
@@ -113,7 +113,7 @@ export class DecomposeUI {
     for (let str = 0; str < tuning.openStrings.length; str++) {
       for (let f = 0; f <= DISPLAY_FRETS; f++) {
         const pos = fp(str, f);
-        const pc = noteAt(tuning, pos).pitchClass;
+        const pc = midiPitchClass(noteAt(tuning, pos).midi);
         const label = this.state.labelMode === LabelMode.Notes ? spellPc(pc) : "";
         if (shellPcs.has(pc)) {
           out.set(fpKey(pos), { label, isRoot: pc === rootPc, kind: MarkKind.Chord });

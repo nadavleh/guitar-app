@@ -750,6 +750,7 @@ export class App {
       case Sheet.Tuner: return "Tuner";
       case Sheet.EarTraining: return "Ear";
       case Sheet.SambaLooper: return "Drums";
+      case Sheet.Decompose: return "Decompose";
     }
   }
 }
