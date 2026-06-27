@@ -18,11 +18,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -69,14 +75,6 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     val samba = state.sambaLooper
     DisposableEffect(Unit) { onDispose { samba.stop() } }
 
-    // Free-transform state for the drum-loop grid. scaleX/scaleY are INDEPENDENT so
-    // a 2-finger pinch can change the aspect ratio (stretch wider or taller) — handy
-    // in portrait where the default grid looks squished. Single-finger drag pans
-    // once zoomed. The transform is a pure render-layer effect (graphicsLayer).
-    var scaleX by remember { mutableFloatStateOf(1f) }
-    var scaleY by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
     // Eraser tool: when on, tapping a cell clears it instead of cycling its voice.
     var eraseMode by remember { mutableStateOf(false) }
 
@@ -97,9 +95,15 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 modifier = Modifier.weight(1f),
             )
             if (samba.isPlaying) {
-                Button(onClick = { samba.stop() }) { Text("Stop ⏹") }
+                Button(onClick = { samba.stop() }) {
+                    Icon(Icons.Outlined.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp)); Text("Stop")
+                }
             } else {
-                Button(onClick = { samba.start() }) { Text("Play ▶") }
+                Button(onClick = { samba.start() }) {
+                    Icon(Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp)); Text("Play")
+                }
             }
             Spacer(Modifier.width(8.dp))
             AudioQuickButton(state, compact = true)
@@ -158,98 +162,33 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
         // clipped in short-height (landscape) layouts. Height scales with the current
         // kit size; the whole screen scrolls vertically when the kit is large.
         val kit = samba.pattern.instruments
-        val rowCount = kit.size.coerceAtLeast(1)
-        val gridHeight =
-            (rowCount * ROW_HEIGHT_DP + (rowCount - 1) * 6 + CAPTION_DP).dp
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(gridHeight)
-                .clipToBounds()
-                // Gestures on the CONTAINER (never on a cell, so cell taps still hit):
-                //  • 2 fingers → independent X/Y zoom (changes the aspect ratio) + pan.
-                //  • 1 finger, when zoomed → drag-pan the grid.
-                //  • 1 finger, when NOT zoomed → not consumed, so it falls through to
-                //    the page scroll and to the per-cell tap/long-press handlers.
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
-                        var dragging = false
-                        var totalDrag = 0f
-                        val slop = viewConfiguration.touchSlop
-                        do {
-                            val event = awaitPointerEvent()
-                            val pressed = event.changes.filter { it.pressed }
-                            if (pressed.size >= 2) {
-                                val a = pressed[0]; val b = pressed[1]
-                                val curDx = kotlin.math.abs(a.position.x - b.position.x)
-                                val curDy = kotlin.math.abs(a.position.y - b.position.y)
-                                val preDx = kotlin.math.abs(a.previousPosition.x - b.previousPosition.x)
-                                val preDy = kotlin.math.abs(a.previousPosition.y - b.previousPosition.y)
-                                val zx = if (preDx > 10f) curDx / preDx else 1f
-                                val zy = if (preDy > 10f) curDy / preDy else 1f
-                                val cenX = (a.position.x + b.position.x) / 2f
-                                val cenY = (a.position.y + b.position.y) / 2f
-                                val panX = cenX - (a.previousPosition.x + b.previousPosition.x) / 2f
-                                val panY = cenY - (a.previousPosition.y + b.previousPosition.y) / 2f
-                                val oldSx = scaleX; val oldSy = scaleY
-                                scaleX = (scaleX * zx).coerceIn(0.4f, 4f)
-                                scaleY = (scaleY * zy).coerceIn(0.4f, 4f)
-                                val mx = max(0f, size.width * (scaleX - 1f) / 2f)
-                                val my = max(0f, size.height * (scaleY - 1f) / 2f)
-                                offsetX = (offsetX + panX + (cenX - size.width / 2f) * (oldSx - scaleX)).coerceIn(-mx, mx)
-                                offsetY = (offsetY + panY + (cenY - size.height / 2f) * (oldSy - scaleY)).coerceIn(-my, my)
-                                event.changes.forEach { it.consume() }
-                                dragging = true
-                            } else if (pressed.size == 1 && (scaleX > 1.001f || scaleY > 1.001f)) {
-                                val ch = pressed[0]
-                                val dx = ch.position.x - ch.previousPosition.x
-                                val dy = ch.position.y - ch.previousPosition.y
-                                totalDrag += kotlin.math.abs(dx) + kotlin.math.abs(dy)
-                                if (dragging || totalDrag > slop) {
-                                    dragging = true
-                                    val mx = max(0f, size.width * (scaleX - 1f) / 2f)
-                                    val my = max(0f, size.height * (scaleY - 1f) / 2f)
-                                    offsetX = (offsetX + dx).coerceIn(-mx, mx)
-                                    offsetY = (offsetY + dy).coerceIn(-my, my)
-                                    ch.consume()
-                                }
-                            }
-                        } while (event.changes.any { it.pressed })
-                    }
-                },
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        this.scaleX = scaleX
-                        this.scaleY = scaleY
-                        translationX = offsetX
-                        translationY = offsetY
-                    },
-            ) {
-                for ((i, inst) in kit.withIndex()) {
-                    InstrumentRow(
-                        samba = samba,
-                        instrument = inst,
-                        eraseMode = eraseMode,
-                        modifier = Modifier.height(ROW_HEIGHT_DP.dp).fillMaxWidth(),
-                    )
-                    if (i != kit.lastIndex) {
-                        Spacer(Modifier.height(6.dp))
-                    }
+        // Cells are a FIXED size and the step lane scrolls horizontally (shared
+        // across all rows), so each cell looks the same regardless of orientation /
+        // aspect ratio — instead of stretching to fill the width. The instrument
+        // label column stays pinned on the left while the lane scrolls.
+        val cellScroll = rememberScrollState()
+        Column(modifier = Modifier.fillMaxWidth()) {
+            for ((i, inst) in kit.withIndex()) {
+                InstrumentRow(
+                    samba = samba,
+                    instrument = inst,
+                    eraseMode = eraseMode,
+                    cellScroll = cellScroll,
+                    modifier = Modifier.height(ROW_HEIGHT_DP.dp).fillMaxWidth(),
+                )
+                if (i != kit.lastIndex) {
+                    Spacer(Modifier.height(6.dp))
                 }
-                // Beat / bar caption
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Spacer(Modifier.width(ROW_LABEL_DP.dp))
-                    Text(
-                        samba.meter.describe(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                }
+            }
+            // Beat / bar caption
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Spacer(Modifier.width(ROW_LABEL_DP.dp))
+                Text(
+                    samba.meter.describe(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
             }
         }
 
@@ -342,6 +281,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
 private const val ROW_LABEL_DP = 128
 private const val ROW_HEIGHT_DP = 70   // per-instrument row: name + ▾ + M/S all fit
 private const val CAPTION_DP = 18      // bar/beat caption strip below the rows
+private const val CELL_DP = 34         // fixed step-cell width → consistent across orientations
 
 private val STEP_PAD = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp)
 
@@ -438,6 +378,7 @@ private fun InstrumentRow(
     samba: SambaLooperState,
     instrument: PercussionInstrument,
     eraseMode: Boolean,
+    cellScroll: androidx.compose.foundation.ScrollState,
     modifier: Modifier = Modifier,
 ) {
     val voices = PercussionVoices.voicesFor(instrument)
@@ -519,14 +460,22 @@ private fun InstrumentRow(
         val slots = samba.pattern.slots
         val slotsPerBeat = samba.meter.slotsPerBeat
         val slotsPerBar = samba.meter.slotsPerBar
-        Row(modifier = Modifier.weight(1f).fillMaxHeight().alpha(if (audible) 1f else 0.4f)) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .horizontalScroll(cellScroll)
+                .alpha(if (audible) 1f else 0.4f),
+        ) {
             for (slot in 0 until slots) {
                 Cell(
                     samba = samba,
                     instrument = instrument,
                     slot = slot,
                     eraseMode = eraseMode,
-                    modifier = Modifier.weight(1f).fillMaxHeight().padding(1.dp),
+                    // Fixed cell size → consistent "resolution" in any orientation;
+                    // the lane scrolls horizontally instead of squishing.
+                    modifier = Modifier.width(CELL_DP.dp).fillMaxHeight().padding(1.dp),
                 )
                 // Beat separators: a gap after each beat; a wider gap at each bar line.
                 if ((slot + 1) % slotsPerBeat == 0 && slot != slots - 1) {

@@ -18,6 +18,16 @@ const TIME_SIGNATURES: [number, number][] = [
 
 const LONG_PRESS_MS = 450;
 
+// White line icons for the transport (no emoji/▶⏹ glyphs).
+const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><polygon points="7 4 20 12 7 20 7 4"/></svg>';
+const ICON_STOP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
+function iconBtn(svg: string, label: string, onClick: () => void): HTMLButtonElement {
+  const b = el("button", { class: "btn primary" }) as HTMLButtonElement;
+  b.innerHTML = `<span class="btn-ico">${svg}</span>${label}`;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
 export class SambaLooperUI {
   private eraseMode = false;
   private openVoiceMenu: string | null = null;   // instrument id whose voice popup is open
@@ -35,7 +45,7 @@ export class SambaLooperUI {
     // header
     screen.appendChild(el("div", { class: "tool-topbar" }, [
       el("div", { class: "tool-title" }, ["DRUMS"]),
-      s.isPlaying ? btn("Stop ⏹", () => s.stop(), "btn primary") : btn("Play ▶", () => s.start(), "btn primary"),
+      s.isPlaying ? iconBtn(ICON_STOP, "Stop", () => s.stop()) : iconBtn(ICON_PLAY, "Play", () => s.start()),
       btn("Back", () => { s.stop(); this.onBack(); }),
     ]));
 
@@ -80,6 +90,15 @@ export class SambaLooperUI {
     ]));
 
     container.appendChild(screen);
+
+    // Keep all step lanes scrolled together (fixed-size cells scroll horizontally
+    // so they stay a consistent size regardless of viewport width).
+    const lanes = Array.from(screen.querySelectorAll<HTMLElement>(".drum-cells"));
+    for (const lane of lanes) {
+      lane.addEventListener("scroll", () => {
+        for (const other of lanes) if (other !== lane && other.scrollLeft !== lane.scrollLeft) other.scrollLeft = lane.scrollLeft;
+      });
+    }
 
     // Close any open popup when the next tap lands outside a popup (so you don't
     // have to tap the same trigger again). Deferred so the click that just opened

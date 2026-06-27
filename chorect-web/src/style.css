@@ -568,14 +568,15 @@ select.et-select {
 }
 .ms-tag.on-m { background: var(--root-tone); border-color: var(--root-tone); color: #fff; }
 .ms-tag.on-s { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
-.drum-cells { display: flex; flex: 1 1 auto; gap: 0; }
+.drum-cells { display: flex; flex: 1 1 auto; gap: 0; overflow-x: auto; scrollbar-width: thin; }
 .drum-cell {
-  flex: 1 1 0; height: 46px; margin: 0 1px; border-radius: 4px;
+  flex: 0 0 30px; height: 46px; margin: 0 1px; border-radius: 4px;
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; color: var(--on-primary); cursor: pointer; user-select: none;
   border: 2px solid transparent;
 }
 .drum-cell.playhead { border-color: var(--text-primary); }
+.btn .btn-ico svg, .btn-ico svg { width: 15px; height: 15px; vertical-align: -2px; margin-right: 5px; }
 .drum-cells.dim { opacity: 0.4; }
 .drum-voice-pop {
   position: absolute; z-index: 30; margin-top: 4px; width: 240px;
