@@ -7,7 +7,7 @@
 import "../style.css";
 
 const VOICE_FILES = [
-  "pandeiro_3.wav", "pandeiro_4.wav", "pandeiro_2.wav", "pandeiro_0.wav", "pandeiro_1.wav",
+  "pandeiro_0.wav", "pandeiro_1.wav", "pandeiro_2.wav", "pandeiro_3.wav",
   "surdo_0.wav", "surdo_1.wav", "surdo_2.wav",
   "tamborim_0.wav", "tamborim_1.wav", "tamborim_2.wav",
   "agogo_0.wav", "agogo_1.wav",

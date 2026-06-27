@@ -33,6 +33,9 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
+      # Type-check first so a type error fails the deploy loudly (vite/esbuild
+      # alone strips types without checking them).
+      - run: npx tsc --noEmit
       # Repo is served at /<repo>/ on project Pages, so build with that base.
       - run: npx vite build --base=/${{ github.event.repository.name }}/
       - uses: actions/upload-pages-artifact@v3

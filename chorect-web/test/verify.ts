@@ -10,7 +10,7 @@ import {
 } from "../src/theory";
 import { standard } from "../src/theory/tunings";
 import {
-  PercussionInstrument, PercussionPattern, SAMBA, swungSlotMs, slotMs, voiceCount,
+  PercussionCatalog, PercussionPattern, PercussionMeter, swungSlotMs, slotMs, voiceCount,
   movementCost, pickMinMovement, BUILTIN_PATTERNS,
 } from "../src/theory";
 import { PluckedSynth, PitchDetector, analyzePitch, PercussionSynth } from "../src/audio";
@@ -103,27 +103,45 @@ check("C major root position bass note is C (pc 0)", rootPos[0] % 12 === 0);
 const n2c = randomN2c();
 check("random N2C produces a known label", n2cAnswerLabel(n2c) !== "?");
 
-// --- Percussion: SAMBA groove + pattern round-trip ---
-check("SAMBA groove is non-empty", !SAMBA.isEmpty());
-const roundTrip = PercussionPattern.decode(SAMBA.encode());
-check("PercussionPattern encode→decode round-trips", roundTrip !== null && roundTrip.encode() === SAMBA.encode());
+// --- Percussion: dynamic kit, add/remove, pattern round-trip ---
+const M = PercussionMeter.DEFAULT;
+const empty = PercussionPattern.empty();
+check("default kit is the original four", empty.instruments.map((i) => i.id).join(",") === "surdo,tamborim,pandeiro,agogo");
 // cycle: null → 0 → 1 → 2 → null for Surdo (3 voices)
-let p = PercussionPattern.empty();
+let p = empty;
 const cy: (number | null)[] = [];
-for (let i = 0; i < 4; i++) { p = p.cycled(PercussionInstrument.Surdo, 0); cy.push(p.voiceAt(PercussionInstrument.Surdo, 0)); }
+for (let i = 0; i < 4; i++) { p = p.cycled(PercussionCatalog.Surdo, 0); cy.push(p.voiceAt(PercussionCatalog.Surdo, 0)); }
 check("Surdo cell cycles 0,1,2,null", cy[0] === 0 && cy[1] === 1 && cy[2] === 2 && cy[3] === null);
-check("Surdo has 3 voices, Pandeiro 5", voiceCount(PercussionInstrument.Surdo) === 3 && voiceCount(PercussionInstrument.Pandeiro) === 5);
+check("Surdo has 3 voices, Pandeiro 4 (no jingle-hi)", voiceCount(PercussionCatalog.Surdo) === 3 && voiceCount(PercussionCatalog.Pandeiro) === 4);
+// add an instrument → silent row appended; round-trips through encode/decode
+const cuica = PercussionCatalog.byId("cuica")!;
+const withCuica = empty.addInstrument(cuica).cycled(cuica, 2).cycled(PercussionCatalog.Surdo, 0);
+check("addInstrument appends a row", withCuica.hasInstrument(cuica) && withCuica.instruments.length === 5);
+const rt2 = PercussionPattern.decode(withCuica.encode());
+check("pattern with added instrument round-trips", rt2 !== null && rt2.encode() === withCuica.encode());
+check("removeInstrument drops the row", !withCuica.removeInstrument(cuica).hasInstrument(cuica));
+// decode skips unknown instrument ids
+const withBogus = withCuica.encode() + "|bogus=" + Array.from({ length: withCuica.slots }, () => "-").join(",");
+const rtBogus = PercussionPattern.decode(withBogus);
+check("decode skips unknown instrument ids", rtBogus !== null && rtBogus.instruments.every((i) => i.id !== "bogus"));
 
-// --- Swing: straight = even slots; swung delays the off-16ths but preserves loop length ---
-const straightSum = Array.from({ length: 16 }, (_, i) => swungSlotMs(i, 100, 0)).reduce((a, b) => a + b, 0);
-const swungSum = Array.from({ length: 16 }, (_, i) => swungSlotMs(i, 100, 60)).reduce((a, b) => a + b, 0);
-check("straight slot = base slotMs", Math.abs(swungSlotMs(0, 100, 0) - slotMs(100)) < 1.5);
+// --- Swing: anchors 1st/3rd, delays 2nd, advances 4th; preserves loop length; 1/16 only ---
+const straightSum = Array.from({ length: 16 }, (_, i) => swungSlotMs(i, 100, 0, M)).reduce((a, b) => a + b, 0);
+const swungSum = Array.from({ length: 16 }, (_, i) => swungSlotMs(i, 100, 60, M)).reduce((a, b) => a + b, 0);
+check("straight slot = base slotMs", Math.abs(swungSlotMs(0, 100, 0, M) - slotMs(100)) < 1.5);
 check("swing preserves total loop length (±a few ms rounding)", Math.abs(straightSum - swungSum) <= 16);
+// at 100%, 1st→2nd gap stretches and 2nd→3rd compresses (and they mirror across the beat)
+const g0 = swungSlotMs(0, 100, 100, M), g1 = swungSlotMs(1, 100, 100, M), g2 = swungSlotMs(2, 100, 100, M), g3 = swungSlotMs(3, 100, 100, M);
+check("full swing: stretched 1st/4th gaps exceed compressed 2nd/3rd, beat length intact",
+  g0 > g1 && g0 === g3 && g1 === g2 && g0 + g1 + g2 + g3 === slotMs(100) * 4);
+// non-1/16 grids ignore swing entirely
+const eighths = new PercussionMeter(2, 2, 4, 8);
+check("swing does nothing off a 1/16 grid", swungSlotMs(1, 100, 100, eighths) === slotMs(100, 8));
 
-// --- Percussion synth: every voice renders bounded, finite audio ---
+// --- Percussion synth: every catalog voice renders bounded, finite audio ---
 const psynth = new PercussionSynth(44100);
 let psOk = true;
-for (const inst of [PercussionInstrument.Surdo, PercussionInstrument.Tamborim, PercussionInstrument.Pandeiro, PercussionInstrument.Agogo]) {
+for (const inst of PercussionCatalog.ALL) {
   for (let v = 0; v < voiceCount(inst); v++) {
     const buf = psynth.synthesize(inst, v);
     if (buf.length === 0) psOk = false;
@@ -142,12 +160,12 @@ const isMin = cShapes.every((sh) => chosenCost <= movementCost(prev, sh));
 check("pickMinMovement returns the lowest-cost voicing", isMin && idx >= 0 && idx < cShapes.length);
 
 // --- Built-in grooves are valid (16 slots, in-range voice indices) ---
-let builtinsOk = BUILTIN_PATTERNS.length === 3;
+let builtinsOk = BUILTIN_PATTERNS.length === 2;
 for (const b of BUILTIN_PATTERNS) {
   const rt = PercussionPattern.decode(b.pattern.encode());
   if (!rt || rt.encode() !== b.pattern.encode()) builtinsOk = false;
 }
-check("built-in grooves (stock samba + teleco-teco 1/2) are valid & round-trip", builtinsOk);
+check("built-in grooves (teleco-teco 1/2) are valid & round-trip", builtinsOk);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

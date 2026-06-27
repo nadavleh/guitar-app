@@ -3,8 +3,8 @@
 // async loop; voices are synthesized once and cached, then replayed each tick.
 
 import {
-  PercussionInstrument, PERCUSSION_INSTRUMENTS,
-  PercussionMeter, PercussionPattern, SAMBA, swungSlotMs, voiceCount,
+  PercussionInstrument, PercussionCatalog,
+  PercussionMeter, PercussionPattern, swungSlotMs, voiceCount,
   BEAT_UNITS, DIVISIONS,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
@@ -22,28 +22,29 @@ export interface SambaDeps {
 }
 
 export class SambaLooperState {
-  pattern: PercussionPattern = SAMBA;
+  pattern: PercussionPattern = PercussionPattern.empty();
   bpm = 100;
   swing = 0;
   isPlaying = false;
   currentSlot = -1;
 
-  muted = new Set<PercussionInstrument>();
-  soloed = new Set<PercussionInstrument>();
-  volumes = new Map<PercussionInstrument, number>(PERCUSSION_INSTRUMENTS.map((i) => [i, 1]));
+  // Keyed by instrument id (string) so add/remove can't trip object-identity.
+  muted = new Set<string>();
+  soloed = new Set<string>();
+  volumes = new Map<string, number>();
 
   private token = 0;
   private synth = new PercussionSynth();
   private synthCache = new Map<string, Float32Array>();
   private loadedSamples = new Map<string, Float32Array>();
-  private samplesRequested = false;
+  private requestedSampleKits = new Set<string>();
 
   constructor(private deps: SambaDeps) {}
 
   private notify() { this.deps.onChange(); }
 
   private key(instrument: PercussionInstrument, voiceIndex: number): string {
-    return `${instrument}:${voiceIndex}`;
+    return `${instrument.id}:${voiceIndex}`;
   }
 
   /** Prefer a loaded one-shot sample; otherwise the synthesized voice (cached). */
@@ -61,34 +62,37 @@ export class SambaLooperState {
     return this.loadedSamples.has(this.key(instrument, voiceIndex));
   }
 
-  /** Kick off a one-time async load of any available WAV samples (synth meanwhile). */
+  /** Kick off a one-time async load of any available WAV samples for the current
+   *  kit (synth meanwhile). Per-instrument so newly added instruments load too. */
   private ensureSamplesLoaded(): void {
-    if (this.samplesRequested) return;
-    this.samplesRequested = true;
-    for (const inst of PERCUSSION_INSTRUMENTS) {
-      for (let v = 0; v < voiceCount(inst); v++) {
-        void this.deps.loadSample(inst, v).then((buf) => {
-          if (buf) { this.loadedSamples.set(this.key(inst, v), buf); this.notify(); }
-        });
-      }
+    for (const inst of this.pattern.instruments) this.loadSamplesFor(inst);
+  }
+
+  private loadSamplesFor(inst: PercussionInstrument): void {
+    if (this.requestedSampleKits.has(inst.id)) return;
+    this.requestedSampleKits.add(inst.id);
+    for (let v = 0; v < voiceCount(inst); v++) {
+      void this.deps.loadSample(inst, v).then((buf) => {
+        if (buf) { this.loadedSamples.set(this.key(inst, v), buf); this.notify(); }
+      });
     }
   }
 
   toggleMute(inst: PercussionInstrument) {
-    if (this.muted.has(inst)) this.muted.delete(inst); else this.muted.add(inst);
+    if (this.muted.has(inst.id)) this.muted.delete(inst.id); else this.muted.add(inst.id);
     this.notify();
   }
   toggleSolo(inst: PercussionInstrument) {
-    if (this.soloed.has(inst)) this.soloed.delete(inst); else this.soloed.add(inst);
+    if (this.soloed.has(inst.id)) this.soloed.delete(inst.id); else this.soloed.add(inst.id);
     this.notify();
   }
   isAudible(inst: PercussionInstrument): boolean {
-    return !this.muted.has(inst) && (this.soloed.size === 0 || this.soloed.has(inst));
+    return !this.muted.has(inst.id) && (this.soloed.size === 0 || this.soloed.has(inst.id));
   }
 
-  volumeOf(inst: PercussionInstrument): number { return this.volumes.get(inst) ?? 1; }
+  volumeOf(inst: PercussionInstrument): number { return this.volumes.get(inst.id) ?? 1; }
   setVolume(inst: PercussionInstrument, value: number) {
-    this.volumes.set(inst, Math.min(Math.max(value, 0), 1));
+    this.volumes.set(inst.id, Math.min(Math.max(value, 0), 1));
     this.notify();
   }
 
@@ -107,8 +111,30 @@ export class SambaLooperState {
 
   clearCell(instrument: PercussionInstrument, slot: number) { this.pattern = this.pattern.withCell(instrument, slot, null); this.notify(); }
   clearRow(instrument: PercussionInstrument) { this.pattern = this.pattern.clearedRow(instrument); this.notify(); }
-  clearAll() { this.pattern = PercussionPattern.empty(this.pattern.meter); this.notify(); }
-  loadSamba() { this.pattern = SAMBA; this.notify(); }
+  clearAll() { this.pattern = PercussionPattern.empty(this.pattern.instruments, this.pattern.meter); this.notify(); }
+
+  // ---- kit: add / remove instruments ----
+
+  /** Catalog instruments not yet in the kit, in catalog order (for the picker). */
+  instrumentsToAdd(): PercussionInstrument[] {
+    return PercussionCatalog.ALL.filter((i) => !this.pattern.hasInstrument(i));
+  }
+
+  /** Add `inst` to the kit (silent row), load its samples, and audition voice 0. */
+  addInstrument(inst: PercussionInstrument) {
+    this.pattern = this.pattern.addInstrument(inst);
+    this.loadSamplesFor(inst);
+    if (!this.isPlaying) this.deps.audio.playSamples(this.buffer(inst, 0), this.volumeOf(inst));
+    this.notify();
+  }
+
+  /** Remove `inst` from the kit, also clearing its mute/solo state. */
+  removeInstrument(inst: PercussionInstrument) {
+    this.pattern = this.pattern.removeInstrument(inst);
+    this.muted.delete(inst.id);
+    this.soloed.delete(inst.id);
+    this.notify();
+  }
 
   // ---- meter (bars / time signature / division) ----
 
@@ -166,18 +192,17 @@ export class SambaLooperState {
     void (async () => {
       while (this.isPlaying && token === this.token) {
         const snapshot = this.pattern;          // re-read each loop so meter edits take effect
-        const division = snapshot.meter.division;
         for (let slot = 0; slot < snapshot.slots; slot++) {
           if (!this.isPlaying || token !== this.token) break;
           this.currentSlot = slot;
-          for (const inst of PERCUSSION_INSTRUMENTS) {
+          for (const inst of snapshot.instruments) {
             if (!this.isAudible(inst)) continue;
             const v = snapshot.voiceAt(inst, slot);
             if (v === null) continue;
             this.deps.audio.playSamples(this.buffer(inst, v), this.volumeOf(inst));
           }
           this.notify();
-          await sleep(swungSlotMs(slot, this.bpm, this.swing, division));
+          await sleep(swungSlotMs(slot, this.bpm, this.swing, snapshot.meter));
         }
       }
     })();

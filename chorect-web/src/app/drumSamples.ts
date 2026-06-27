@@ -9,7 +9,7 @@ import { PercussionInstrument } from "../theory";
 import { WebAudioEngine } from "../audio";
 
 export async function loadDrumSample(engine: WebAudioEngine, inst: PercussionInstrument, voice: number): Promise<Float32Array | null> {
-  const name = `${inst.toLowerCase()}_${voice}.wav`;
+  const name = `${inst.id}_${voice}.wav`;
   const url = `${import.meta.env.BASE_URL}drums/${name}`;
   try {
     const res = await fetch(url);

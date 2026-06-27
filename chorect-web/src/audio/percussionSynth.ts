@@ -21,23 +21,27 @@ export class PercussionSynth {
   constructor(public readonly sampleRate = 44100) {}
 
   synthesize(instrument: PercussionInstrument, voiceIndex: number): Float32Array {
-    switch (instrument) {
-      case PercussionInstrument.Surdo:
+    switch (instrument.id) {
+      case "surdo":
         if (voiceIndex === 0) return this.surdo(true);
         if (voiceIndex === 1) return this.surdo(false);
         return this.tonedTap(165, 0.055, 75, 0.30);
-      case PercussionInstrument.Tamborim:
+      case "tamborim":
         if (voiceIndex === 0) return this.tamborimClack(false);
         if (voiceIndex === 1) return this.tamborimClack(true);
         return this.noiseDrum(0.05, 95, 0.30, true, 0.30);
-      case PercussionInstrument.Pandeiro:
+      case "pandeiro":
         if (voiceIndex === 0) return this.tonedTap(150, 0.22, 13, 0.62);
         if (voiceIndex === 1) return this.tonedTap(155, 0.08, 42, 0.55);
         if (voiceIndex === 2) return this.noiseDrum(0.08, 60, 0.50, true, 0.72);
-        if (voiceIndex === 3) return this.jingle(false);
-        return this.jingle(true);
-      case PercussionInstrument.Agogo:
+        return this.jingle();
+      case "agogo":
         return voiceIndex === 0 ? this.bell(590) : this.bell(740);
+      // Instruments added from the catalog ship bundled samples; this is only a
+      // safety fallback if a sample is missing — a short neutral click whose
+      // brightness rises a little with the voice index so adjacent voices differ.
+      default:
+        return this.noiseDrum(0.06, 80, Math.min(0.30 + 0.12 * voiceIndex, 0.85), true, 0.5);
     }
   }
 
@@ -92,10 +96,10 @@ export class PercussionSynth {
     return this.fadeOut(out);
   }
 
-  private jingle(hi: boolean): Float32Array {
-    const durSec = hi ? 0.16 : 0.20;
-    const decay = hi ? 26.0 : 20.0;
-    const base = hi ? 3400.0 : 2700.0;
+  private jingle(): Float32Array {
+    const durSec = 0.20;
+    const decay = 20.0;
+    const base = 2700.0;
     const n = Math.max(Math.floor(this.sampleRate * durSec), 1);
     const out = new Float32Array(n);
     const rng = mulberry32(303);

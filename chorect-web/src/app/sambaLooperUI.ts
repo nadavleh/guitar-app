@@ -7,8 +7,7 @@ import { SambaLooperState } from "./sambaLooperState";
 import { Colors } from "./theme";
 import { el, btn, slider } from "./dom";
 import {
-  PercussionInstrument, PERCUSSION_INSTRUMENTS,
-  PercussionInstrumentName, voicesFor, voiceOf, PercussionPattern, BUILTIN_PATTERNS,
+  PercussionInstrument, voicesFor, voiceOf, PercussionPattern, BUILTIN_PATTERNS,
   DIVISIONS,
 } from "../theory";
 
@@ -21,8 +20,9 @@ const LONG_PRESS_MS = 450;
 
 export class SambaLooperUI {
   private eraseMode = false;
-  private openVoiceMenu: PercussionInstrument | null = null;
+  private openVoiceMenu: string | null = null;   // instrument id whose voice popup is open
   private loadMenuOpen = false;
+  private addMenuOpen = false;
   private saveOpen = false;
   private saveName = "";
 
@@ -45,16 +45,24 @@ export class SambaLooperUI {
     // BPM + swing
     body.appendChild(el("div", {}, [`BPM: ${s.bpm}`]));
     body.appendChild(slider(60, 200, s.bpm, (v) => s.setBpm(v)));
-    body.appendChild(el("div", {}, [s.swing === 0 ? "Swing: straight" : `Swing: ${s.swing}%`]));
-    body.appendChild(slider(0, 100, s.swing, (v) => s.setSwing(v)));
+    // Swing only acts on a 1/16 grid (a quarter-note split into four 16ths): it
+    // holds the 1st & 3rd 16ths, delays the 2nd, and pulls the 4th early. On any
+    // other division it does nothing, so the slider is disabled and says why.
+    const swingActive = s.meter.beatUnit === 4 && s.meter.division === 16;
+    body.appendChild(el("div", {}, [
+      !swingActive ? "Swing: 1/16 grid only" : s.swing === 0 ? "Swing: straight" : `Swing: ${s.swing}% (16ths)`,
+    ]));
+    const swingSlider = slider(0, 100, s.swing, (v) => s.setSwing(v));
+    swingSlider.disabled = !swingActive;
+    body.appendChild(swingSlider);
 
     // loop setup: bars / time signature / division + translate
     body.appendChild(this.loopSetupControls());
 
     body.appendChild(el("div", { class: "divider-line" }));
 
-    // grid
-    for (const inst of PERCUSSION_INSTRUMENTS) body.appendChild(this.instrumentRow(inst));
+    // grid — dynamic kit
+    for (const inst of s.pattern.instruments) body.appendChild(this.instrumentRow(inst));
     body.appendChild(el("div", { class: "drum-caption" }, [s.meter.describe()]));
 
     body.appendChild(el("div", { class: "v-gap-12" }));
@@ -68,6 +76,7 @@ export class SambaLooperUI {
       this.saveControl(),
       this.loadControl(),
       btn("Clear all", () => s.clearAll()),
+      this.addInstrumentControl(),
     ]));
 
     container.appendChild(screen);
@@ -138,13 +147,13 @@ export class SambaLooperUI {
     const audible = s.isAudible(inst);
 
     // label + M/S + voice popup
-    const name = el("span", { class: "name" }, [PercussionInstrumentName[inst] + " ▾"]);
-    name.addEventListener("click", () => { this.openVoiceMenu = this.openVoiceMenu === inst ? null : inst; this.rerender(); });
+    const name = el("span", { class: "name" }, [inst.displayName + " ▾"]);
+    name.addEventListener("click", () => { this.openVoiceMenu = this.openVoiceMenu === inst.id ? null : inst.id; this.rerender(); });
     const labelInner = el("div", {}, [name]);
-    if (this.openVoiceMenu === inst) labelInner.appendChild(this.voicePopup(inst));
-    const mTag = el("button", { class: s.muted.has(inst) ? "ms-tag on-m" : "ms-tag" }, ["M"]);
+    if (this.openVoiceMenu === inst.id) labelInner.appendChild(this.voicePopup(inst));
+    const mTag = el("button", { class: s.muted.has(inst.id) ? "ms-tag on-m" : "ms-tag" }, ["M"]);
     mTag.addEventListener("click", () => s.toggleMute(inst));
-    const sTag = el("button", { class: s.soloed.has(inst) ? "ms-tag on-s" : "ms-tag" }, ["S"]);
+    const sTag = el("button", { class: s.soloed.has(inst.id) ? "ms-tag on-s" : "ms-tag" }, ["S"]);
     sTag.addEventListener("click", () => s.toggleSolo(inst));
     const label = el("div", { class: audible ? "drum-label" : "drum-label dim", style: "position:relative" }, [
       labelInner,
@@ -204,24 +213,52 @@ export class SambaLooperUI {
       el("div", { style: "font-weight:600;font-size:13px" }, [`Volume: ${Math.round(vol * 100)}%`]),
       slider(0, 1, vol, (v) => s.setVolume(inst, v), 0.01),
       el("div", { class: "divider-line" }),
-      el("div", { class: "ans-label" }, [`${PercussionInstrumentName[inst]} voices`]),
+      el("div", { class: "ans-label" }, [`${inst.displayName} voices`]),
     ]);
-    for (const v of voicesFor(inst)) {
-      const src = s.usesSample(inst, v.index) ? "sample" : "synth";
+    voicesFor(inst).forEach((v, idx) => {
+      const src = s.usesSample(inst, idx) ? "sample" : "synth";
       const row = el("div", { class: "vrow", style: "display:flex;align-items:center;gap:8px" }, [
         el("span", { style: "flex:1" }, [`${v.glyph}   ${v.displayName}`]),
-        el("span", { style: `font-size:10px;color:${s.usesSample(inst, v.index) ? Colors.primary : Colors.textSecondary}` }, [src]),
+        el("span", { style: `font-size:10px;color:${s.usesSample(inst, idx) ? Colors.primary : Colors.textSecondary}` }, [src]),
       ]);
-      row.addEventListener("click", (e) => { e.stopPropagation(); s.preview(inst, v.index); });
+      row.addEventListener("click", (e) => { e.stopPropagation(); s.preview(inst, idx); });
       pop.appendChild(row);
-    }
+    });
+    // Remove this instrument from the kit.
+    pop.appendChild(el("div", { class: "divider-line" }));
+    const remove = el("div", { class: "vrow", style: `color:${Colors.textSecondary}` }, [`Remove ${inst.displayName}`]);
+    remove.addEventListener("click", (e) => { e.stopPropagation(); this.openVoiceMenu = null; s.removeInstrument(inst); this.rerender(); });
+    pop.appendChild(remove);
     return pop;
+  }
+
+  /** "+ Add instrument" button + dropdown of catalog instruments not yet in the kit. */
+  private addInstrumentControl(): HTMLElement {
+    const s = this.samba;
+    const wrap = el("div", { style: "position:relative" });
+    wrap.appendChild(btn(this.addMenuOpen ? "+ Add ✕" : "+ Add instrument", () => {
+      this.addMenuOpen = !this.addMenuOpen; this.loadMenuOpen = false; this.saveOpen = false; this.rerender();
+    }, "btn primary"));
+    if (this.addMenuOpen) {
+      const pop = el("div", { class: "drum-load-pop" });
+      const toAdd = s.instrumentsToAdd();
+      if (toAdd.length === 0) {
+        pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary)" }, ["(all instruments added)"]));
+      }
+      for (const inst of toAdd) {
+        const row = el("div", { class: "lrow" }, [inst.displayName]);
+        row.addEventListener("click", () => { s.addInstrument(inst); this.addMenuOpen = false; this.rerender(); });
+        pop.appendChild(row);
+      }
+      wrap.appendChild(pop);
+    }
+    return wrap;
   }
 
   private saveControl(): HTMLElement {
     const s = this.samba;
     const wrap = el("div", { style: "position:relative" });
-    wrap.appendChild(btn(this.saveOpen ? "Save ✕" : "Save…", () => { this.saveOpen = !this.saveOpen; this.loadMenuOpen = false; this.rerender(); }));
+    wrap.appendChild(btn(this.saveOpen ? "Save ✕" : "Save…", () => { this.saveOpen = !this.saveOpen; this.loadMenuOpen = false; this.addMenuOpen = false; this.rerender(); }));
     if (this.saveOpen) {
       const input = el("input", { type: "text", placeholder: "Beat name", style: "width:150px" }) as HTMLInputElement;
       input.value = this.saveName;
@@ -238,7 +275,7 @@ export class SambaLooperUI {
   private loadControl(): HTMLElement {
     const s = this.samba;
     const wrap = el("div", { style: "position:relative" });
-    wrap.appendChild(btn(this.loadMenuOpen ? "Load ✕" : "Load…", () => { this.loadMenuOpen = !this.loadMenuOpen; this.saveOpen = false; this.rerender(); }));
+    wrap.appendChild(btn(this.loadMenuOpen ? "Load ✕" : "Load…", () => { this.loadMenuOpen = !this.loadMenuOpen; this.saveOpen = false; this.addMenuOpen = false; this.rerender(); }));
     if (this.loadMenuOpen) {
       const pop = el("div", { class: "drum-load-pop" });
       for (const b of BUILTIN_PATTERNS) {
