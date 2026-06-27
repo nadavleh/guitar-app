@@ -209,4 +209,29 @@ class EarTrainingTest {
         val p = EarTraining.randomProgression(TrainingMode.Major, rng)
         assertTrue(p in EarTraining.MAJOR_PROGRESSIONS)
     }
+
+    // ---- Interval trainer (#6) ----
+
+    @Test fun `interval trainer offers 13 intervals from unison to octave`() {
+        val iv = IntervalTrainer.INTERVALS
+        assertEquals(13, iv.size)
+        assertEquals((0..12).toList(), iv.map { it.semitones })
+        assertEquals("unison", iv.first().longName)
+        assertEquals("octave", iv.last().longName)
+        // semitones are unique and ascending
+        assertEquals(iv.map { it.semitones }.sorted(), iv.map { it.semitones })
+    }
+
+    @Test fun `targetMidi goes above for ascending and below for descending`() {
+        val tonic = 60
+        assertEquals(67, IntervalTrainer.targetMidi(tonic, 7, ascending = true))   // P5 up
+        assertEquals(53, IntervalTrainer.targetMidi(tonic, 7, ascending = false))  // P5 down
+        assertEquals(tonic, IntervalTrainer.targetMidi(tonic, 0, ascending = true))    // unison
+        assertEquals(72, IntervalTrainer.targetMidi(tonic, 12, ascending = true))      // octave up
+    }
+
+    @Test fun `choiceFor maps semitones to the right interval`() {
+        assertEquals("M3", IntervalTrainer.choiceFor(4).shortName)
+        assertEquals("TT", IntervalTrainer.choiceFor(6).shortName)
+    }
 }

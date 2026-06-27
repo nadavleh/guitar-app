@@ -311,3 +311,41 @@ object EarTraining {
     fun randomAdvanced(rng: kotlin.random.Random): NamedProgression =
         ADVANCED_PROGRESSIONS[rng.nextInt(ADVANCED_PROGRESSIONS.size)]
 }
+
+/** Direction an interval is played in the interval-ID trainer. */
+enum class IntervalDirection { Ascending, Descending, Mixed }
+
+/** One choosable interval: [semitones] above the tonic, with a short and long name. */
+data class IntervalChoice(val semitones: Int, val shortName: String, val longName: String)
+
+/**
+ * Pure theory for the interval-identification ear trainer (#6). The 13 intervals
+ * from unison to the octave, plus the arithmetic to turn a (tonic midi, interval,
+ * direction) into the played target note. Direction-aware so a descending m3 plays
+ * the tonic, then a note 3 semitones BELOW it.
+ */
+object IntervalTrainer {
+    val INTERVALS: List<IntervalChoice> = listOf(
+        IntervalChoice(0, "P1", "unison"),
+        IntervalChoice(1, "m2", "minor 2nd"),
+        IntervalChoice(2, "M2", "major 2nd"),
+        IntervalChoice(3, "m3", "minor 3rd"),
+        IntervalChoice(4, "M3", "major 3rd"),
+        IntervalChoice(5, "P4", "perfect 4th"),
+        IntervalChoice(6, "TT", "tritone"),
+        IntervalChoice(7, "P5", "perfect 5th"),
+        IntervalChoice(8, "m6", "minor 6th"),
+        IntervalChoice(9, "M6", "major 6th"),
+        IntervalChoice(10, "m7", "minor 7th"),
+        IntervalChoice(11, "M7", "major 7th"),
+        IntervalChoice(12, "P8", "octave"),
+    )
+
+    /** The MIDI note [semitones] from [tonicMidi] in [direction]. Mixed must be
+     *  resolved to Ascending/Descending by the caller before calling this. */
+    fun targetMidi(tonicMidi: Int, semitones: Int, ascending: Boolean): Int =
+        if (ascending) tonicMidi + semitones else tonicMidi - semitones
+
+    fun choiceFor(semitones: Int): IntervalChoice =
+        INTERVALS.first { it.semitones == semitones }
+}

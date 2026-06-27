@@ -12,6 +12,8 @@ import app.guitar.theory.ChordTypeLevel
 import app.guitar.theory.EarTraining
 import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
+import app.guitar.theory.IntervalDirection
+import app.guitar.theory.IntervalTrainer
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
 import app.guitar.theory.Progression
@@ -337,12 +339,38 @@ class EarTrainingState(
     var n2cChallenge by mutableStateOf<app.guitar.theory.N2cChallenge?>(null)
     var n2cRevealed by mutableStateOf(false)
     var n2cPlaying by mutableStateOf(false)
+    /** Show the current Note2Chord triad on the fretboard (#3). */
+    var n2cShowFretboard by mutableStateOf(false)
 
     private var n2cJob: Job? = null
 
+    // Drawn-challenge history for Previous/Next (#3).
+    private val n2cHistory = ArrayList<app.guitar.theory.N2cChallenge>()
+    private var n2cHistIndex by mutableStateOf(-1)
+    val n2cHasPrev: Boolean get() = n2cHistIndex > 0
+    val n2cHasNext: Boolean get() = n2cHistIndex in 0 until n2cHistory.lastIndex
+
     fun nextN2cChallenge() {
-        n2cChallenge = app.guitar.theory.N2cChallenge.random(rng)
+        val c = app.guitar.theory.N2cChallenge.random(rng)
+        n2cChallenge = c
         n2cRevealed = false
+        if (n2cHistIndex < n2cHistory.lastIndex) {
+            while (n2cHistory.lastIndex > n2cHistIndex) n2cHistory.removeAt(n2cHistory.lastIndex)
+        }
+        n2cHistory.add(c)
+        if (n2cHistory.size > 32) n2cHistory.removeAt(0)
+        n2cHistIndex = n2cHistory.lastIndex
+    }
+
+    fun n2cPrev() {
+        if (!n2cHasPrev) return
+        n2cHistIndex--
+        n2cChallenge = n2cHistory[n2cHistIndex]; n2cRevealed = false
+    }
+    fun n2cNext() {
+        if (!n2cHasNext) return
+        n2cHistIndex++
+        n2cChallenge = n2cHistory[n2cHistIndex]; n2cRevealed = false
     }
 
     fun toggleN2cReveal() { n2cRevealed = !n2cRevealed }
@@ -844,6 +872,8 @@ class EarTrainingState(
     var flavorQuality by mutableStateOf("")
         private set
     var flavorRevealed by mutableStateOf(false)
+    /** Show the drawn flavor chord on the fretboard (#3). */
+    var flavorShowFretboard by mutableStateOf(false)
     var flavorGuessDegree by mutableStateOf<Int?>(null)
     var flavorGuessQuality by mutableStateOf<String?>(null)
     var flavorPlaying by mutableStateOf(false)
@@ -892,6 +922,21 @@ class EarTrainingState(
             for (q in quals) if (allowed == null || q in allowed) out.add(deg to q)
         }
         return out
+    }
+
+    /**
+     * Qualities to present as guess/audition options (#4): only flavors that are
+     * diatonic in the current key/mode and enabled — never a flavor that doesn't fit
+     * the key. If a degree is being guessed, narrow to the qualities diatonic for
+     * THAT degree; otherwise show the union across the key. Preserves [flavorPalette]
+     * order. Falls back to the full enabled set only if the diatonic set is empty.
+     */
+    fun flavorQualityOptions(forDegree: Int? = null): List<String> {
+        val candidates = diatonicFlavorCandidates(flavorMode, flavorAllowed)
+        val diatonic = (if (forDegree != null) candidates.filter { it.first == forDegree } else candidates)
+            .map { it.second }.toSet()
+        val ordered = flavorPalette.filter { it in diatonic }
+        return ordered.ifEmpty { flavorPalette.filter { it in flavorAllowed } }
     }
 
     /** Draw a fresh challenge (new random key + mode, then a DIATONIC chord whose
@@ -1072,7 +1117,15 @@ class EarTrainingState(
         private set
     var invPlaying by mutableStateOf(false)
         private set
+    /** Show the current inversion's chord on the fretboard (#3). */
+    var invShowFretboard by mutableStateOf(false)
     private var invJob: Job? = null
+
+    // Drawn-chord history (root, quality, inversion) for Previous/Next (#3).
+    private val invHistory = ArrayList<Triple<PitchClass, String, Int>>()
+    private var invHistIndex by mutableStateOf(-1)
+    val invHasPrev: Boolean get() = invHistIndex > 0
+    val invHasNext: Boolean get() = invHistIndex in 0 until invHistory.lastIndex
 
     fun toggleInvAllowed(sym: String) {
         invAllowed = if (sym in invAllowed) invAllowed - sym else invAllowed + sym
@@ -1099,6 +1152,27 @@ class EarTrainingState(
         invRevealed = false
         invGuess = null
         invStarted = true
+        if (invHistIndex < invHistory.lastIndex) {
+            while (invHistory.lastIndex > invHistIndex) invHistory.removeAt(invHistory.lastIndex)
+        }
+        invHistory.add(Triple(invRoot, invQuality, invInversion))
+        if (invHistory.size > 32) invHistory.removeAt(0)
+        invHistIndex = invHistory.lastIndex
+        playInversion()
+    }
+
+    fun inversionPrev() {
+        if (!invHasPrev) return
+        invHistIndex--
+        val (r, q, inv) = invHistory[invHistIndex]
+        invRoot = r; invQuality = q; invInversion = inv; invRevealed = false; invGuess = null
+        playInversion()
+    }
+    fun inversionNext() {
+        if (!invHasNext) return
+        invHistIndex++
+        val (r, q, inv) = invHistory[invHistIndex]
+        invRoot = r; invQuality = q; invInversion = inv; invRevealed = false; invGuess = null
         playInversion()
     }
 
@@ -1171,7 +1245,15 @@ class EarTrainingState(
     var adGuess by mutableStateOf<String?>(null)
     var adStarted by mutableStateOf(false)
         private set
+    /** Show the current aug/dim chord on the fretboard (#2). */
+    var adShowFretboard by mutableStateOf(false)
     private var adJob: Job? = null
+
+    // Drawn-chord history so Previous/Next revisit chords without re-randomizing (#1).
+    private val adHistory = ArrayList<Pair<PitchClass, String>>()
+    private var adHistIndex by mutableStateOf(-1)
+    val adHasPrev: Boolean get() = adHistIndex > 0
+    val adHasNext: Boolean get() = adHistIndex in 0 until adHistory.lastIndex
 
     fun toggleAugDimAllowed(sym: String) {
         augDimAllowed = if (sym in augDimAllowed) augDimAllowed - sym else augDimAllowed + sym
@@ -1192,6 +1274,29 @@ class EarTrainingState(
         adQuality = pool[rng.nextInt(pool.size)]
         adRoot = PitchClass(rng.nextInt(12))
         adRevealed = false; adGuess = null; adStarted = true
+        // Append to history (dropping any forward entries if we'd branched off).
+        if (adHistIndex < adHistory.lastIndex) {
+            while (adHistory.lastIndex > adHistIndex) adHistory.removeAt(adHistory.lastIndex)
+        }
+        adHistory.add(adRoot to adQuality)
+        if (adHistory.size > 32) adHistory.removeAt(0)
+        adHistIndex = adHistory.lastIndex
+        playAugDim()
+    }
+
+    /** Revisit the previous drawn chord (no re-randomize). Resets the guess/reveal. */
+    fun augDimPrev() {
+        if (!adHasPrev) return
+        adHistIndex--
+        val (r, q) = adHistory[adHistIndex]
+        adRoot = r; adQuality = q; adRevealed = false; adGuess = null
+        playAugDim()
+    }
+    fun augDimNext() {
+        if (!adHasNext) return
+        adHistIndex++
+        val (r, q) = adHistory[adHistIndex]
+        adRoot = r; adQuality = q; adRevealed = false; adGuess = null
         playAugDim()
     }
     fun playAugDim() {
@@ -1243,6 +1348,134 @@ class EarTrainingState(
     }
     fun exitAugDimChallenge() { adChActive = false; adChIndex = 0 }
 
+    // ---------- #6 Interval identification (ascending/descending) ----------
+
+    val intervalChallengeTotal: Int = 10
+    /** Major key the I–V–I reference + tonic are built from (transposable). */
+    var intervalKey by mutableStateOf(PitchClass.C)
+        private set
+    var intervalDirection by mutableStateOf(IntervalDirection.Ascending)
+    var intervalChActive by mutableStateOf(false)
+        private set
+    var intervalChIndex by mutableStateOf(0)
+        private set
+    var intervalChScore by mutableStateOf(0)
+        private set
+    var intervalChAnswered by mutableStateOf(false)
+        private set
+    /** Current question: interval size (semitones) and the direction it's played. */
+    var intervalSemitones by mutableStateOf(0)
+        private set
+    var intervalAscending by mutableStateOf(true)
+        private set
+    var intervalGuess by mutableStateOf<Int?>(null)
+    var intervalPlaying by mutableStateOf(false)
+        private set
+    private var intervalJob: Job? = null
+
+    /** Tonic MIDI for the current key, anchored near C4 so intervals stay audible
+     *  in both directions. */
+    private fun intervalTonicMidi(): Int = 60 + ((intervalKey.value + 6) % 12 - 6)
+
+    fun intervalTranspose(n: Int) {
+        intervalKey = PitchClass(((intervalKey.value + n) % 12 + 12) % 12)
+        if (intervalChActive) playIntervalTonicCadence()
+    }
+
+    /** Play I–V–I in the current major key to anchor the tonic. */
+    fun playIntervalTonicCadence() {
+        intervalJob?.cancel()
+        intervalPlaying = true
+        intervalJob = scope.launch {
+            try {
+                for (deg in listOf(1, 5, 1)) {
+                    val root = EarTraining.degreeRoot(intervalKey, deg, TrainingMode.Major)
+                    val q = EarTraining.MAJOR_DEGREES[deg]?.triadQuality ?: ""
+                    playSymbolOnce(NoteSpeller.spell(root) + q, 600)
+                    delay(650)
+                }
+            } finally { intervalPlaying = false }
+        }
+    }
+
+    /** Re-sound just the tonic note (the reference). */
+    fun playIntervalTonic() {
+        intervalJob?.cancel()
+        intervalJob = scope.launch { audio.playNote(intervalTonicMidi(), durationMillis = sustainProvider()) }
+    }
+
+    /** Play the tonic, then the target note an interval away (current question). */
+    fun playIntervalQuestion() {
+        if (intervalPlaying) return
+        intervalJob?.cancel()
+        intervalPlaying = true
+        intervalJob = scope.launch {
+            try {
+                val tonic = intervalTonicMidi()
+                audio.playNote(tonic, durationMillis = sustainProvider())
+                delay(700)
+                audio.playNote(
+                    IntervalTrainer.targetMidi(tonic, intervalSemitones, intervalAscending),
+                    durationMillis = sustainProvider(),
+                )
+            } finally { intervalPlaying = false }
+        }
+    }
+
+    private fun drawIntervalQuestion() {
+        intervalSemitones = rng.nextInt(IntervalTrainer.INTERVALS.size)   // 0..12
+        intervalAscending = when (intervalDirection) {
+            IntervalDirection.Ascending -> true
+            IntervalDirection.Descending -> false
+            IntervalDirection.Mixed -> rng.nextBoolean()
+        }
+        intervalGuess = null
+        intervalChAnswered = false
+    }
+
+    fun startIntervalChallenge() {
+        intervalChActive = true; intervalChIndex = 0; intervalChScore = 0
+        drawIntervalQuestion()
+        // Anchor the key, then sound the first interval after the cadence.
+        intervalJob?.cancel()
+        intervalPlaying = true
+        intervalJob = scope.launch {
+            try {
+                for (deg in listOf(1, 5, 1)) {
+                    val root = EarTraining.degreeRoot(intervalKey, deg, TrainingMode.Major)
+                    val q = EarTraining.MAJOR_DEGREES[deg]?.triadQuality ?: ""
+                    playSymbolOnce(NoteSpeller.spell(root) + q, 600)
+                    delay(650)
+                }
+                delay(300)
+                val tonic = intervalTonicMidi()
+                audio.playNote(tonic, durationMillis = sustainProvider())
+                delay(700)
+                audio.playNote(
+                    IntervalTrainer.targetMidi(tonic, intervalSemitones, intervalAscending),
+                    durationMillis = sustainProvider(),
+                )
+            } finally { intervalPlaying = false }
+        }
+    }
+
+    fun submitIntervalGuess() {
+        if (!intervalChActive || intervalChAnswered) return
+        val g = intervalGuess ?: return
+        intervalChAnswered = true
+        if (g == intervalSemitones) intervalChScore++
+    }
+
+    fun advanceIntervalChallenge() {
+        if (!intervalChActive) return
+        if (intervalChIndex >= intervalChallengeTotal - 1) { intervalChIndex = intervalChallengeTotal; return }
+        intervalChIndex++
+        drawIntervalQuestion()
+        playIntervalQuestion()
+    }
+
+    fun exitIntervalChallenge() { intervalChActive = false; intervalChIndex = 0; intervalChAnswered = false }
+
     private suspend fun playCadenceInline() {
         val map = flavorDegreesMap()
         for (deg in listOf(1, 5, 1)) {
@@ -1278,10 +1511,12 @@ class EarTrainingState(
         invJob = null
         adJob?.cancel()
         adJob = null
+        intervalJob?.cancel()
+        intervalJob = null
     }
 }
 
-enum class EarSubMode { Progression, Note2Chord, Flavor, Inversions, AugDim }
+enum class EarSubMode { Progression, Note2Chord, Flavor, Inversions, AugDim, Intervals }
 
 /** Within any tab: free Practice or scored Challenge rounds. */
 enum class EarMode { Practice, Challenge }
