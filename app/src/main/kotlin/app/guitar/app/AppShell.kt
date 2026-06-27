@@ -37,6 +37,7 @@ private val RAIL_ITEMS = listOf(
     RailItem(Sheet.Fretboard, "🎸", "Fretboard"),
     RailItem(Sheet.Loop, "⟲", "Loop"),
     RailItem(Sheet.EarTraining, "👂", "Ear"),
+    RailItem(Sheet.Decompose, "🧩", "Decompose"),
     RailItem(Sheet.SambaLooper, "🥁", "Drums"),
     RailItem(Sheet.Tuner, "🎛", "Tuner"),
     RailItem(Sheet.Options, "⚙", "Options"),

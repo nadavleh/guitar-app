@@ -241,6 +241,8 @@ fun App(audio: AudioEngine) {
                 EarTrainingScreen(state, onBack = { state.closeSheet() })
             } else if (state.currentSheet == Sheet.SambaLooper) {
                 SambaLooperScreen(state, onBack = { state.closeSheet() })
+            } else if (state.currentSheet == Sheet.Decompose) {
+                DecomposeScreen(state, onBack = { state.closeSheet() })
             } else {
                 StatusBar(state)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -301,6 +303,7 @@ private fun sheetLabel(s: Sheet): String = when (s) {
     Sheet.Tuner -> "Tuner"
     Sheet.EarTraining -> "Ear"
     Sheet.SambaLooper -> "Drums"
+    Sheet.Decompose -> "Decompose"
 }
 
 @Composable

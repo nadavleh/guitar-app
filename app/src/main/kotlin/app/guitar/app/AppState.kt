@@ -39,7 +39,7 @@ enum class DisplayMode { None, Chord, Scale, Pick }
 
 /** Which bottom sheet (or full-screen route) is currently open (null = none).
  *  Loop and Tuner are full-screen; the others are bottom sheets. */
-enum class Sheet { Fretboard, Options, Loop, Tuner, EarTraining, SambaLooper }
+enum class Sheet { Fretboard, Options, Loop, Tuner, EarTraining, SambaLooper, Decompose }
 
 /** All-notes vs single-position view, for chord & scale display. */
 enum class ChordScaleView { AllNotes, Positions }
@@ -412,6 +412,7 @@ class AppState(
             Sheet.Tuner -> {}   // tuner reads the mic; fretboard view unchanged
             Sheet.EarTraining -> {} // ear training plays its own audio
             Sheet.SambaLooper -> {} // drum machine plays its own audio
+            Sheet.Decompose -> {}   // chord-decomposition reference; plays its own audio
         }
     }
 
