@@ -393,8 +393,10 @@ fun FretboardView(
         // openWidth/2). Font is small for the same reason.
         val labelStyle = TextStyle(
             color = GuitarColors.primary,
-            fontSize = (stringSpacing * 0.32f).toSp(),
-            fontWeight = FontWeight.SemiBold,
+            // Larger + bolder so the per-string note letters stay legible in the
+            // zoomed-in portrait (vertical phone) view.
+            fontSize = (stringSpacing * 0.42f).toSp(),
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Start,
         )
         for (s in 0 until tuning.stringCount) {

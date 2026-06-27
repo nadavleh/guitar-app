@@ -6,16 +6,27 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Hearing
+import androidx.compose.material.icons.outlined.Loop
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -31,16 +42,18 @@ import androidx.compose.ui.unit.sp
  * control dock that replaces the modal sheets lands in a later milestone.
  */
 
-private data class RailItem(val sheet: Sheet, val glyph: String, val label: String)
+private data class RailItem(val sheet: Sheet, val icon: ImageVector, val label: String)
 
+// White outlined (line) icons — no emoji. Tuner uses a gauge/needle (Speed) to
+// echo the tuner's dial; Decompose uses the puzzle-piece outline (Extension).
 private val RAIL_ITEMS = listOf(
-    RailItem(Sheet.Fretboard, "🎸", "Fretboard"),
-    RailItem(Sheet.Loop, "⟲", "Loop"),
-    RailItem(Sheet.EarTraining, "👂", "Ear Training"),
-    RailItem(Sheet.Decompose, "🧩", "Decompose"),
-    RailItem(Sheet.SambaLooper, "🥁", "Drums"),
-    RailItem(Sheet.Tuner, "🎛", "Tuner"),
-    RailItem(Sheet.Options, "⚙", "Options"),
+    RailItem(Sheet.Fretboard, Icons.Outlined.GridView, "Fretboard"),
+    RailItem(Sheet.Loop, Icons.Outlined.Loop, "Loop"),
+    RailItem(Sheet.EarTraining, Icons.Outlined.Hearing, "Ear Training"),
+    RailItem(Sheet.Decompose, Icons.Outlined.Extension, "Decompose"),
+    RailItem(Sheet.SambaLooper, Icons.Outlined.GraphicEq, "Drums"),
+    RailItem(Sheet.Tuner, Icons.Outlined.Speed, "Tuner"),
+    RailItem(Sheet.Options, Icons.Outlined.Settings, "Options"),
 )
 
 private fun isRailActive(state: AppState, sheet: Sheet): Boolean =
@@ -62,7 +75,7 @@ fun NavRail(state: AppState, modifier: Modifier = Modifier) {
     ) {
         RAIL_ITEMS.forEach { item ->
             RailButton(
-                glyph = item.glyph,
+                icon = item.icon,
                 label = item.label,
                 active = isRailActive(state, item.sheet),
                 onClick = { state.openSheet(item.sheet) },
@@ -72,7 +85,7 @@ fun NavRail(state: AppState, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun RailButton(glyph: String, label: String, active: Boolean, onClick: () -> Unit) {
+private fun RailButton(icon: ImageVector, label: String, active: Boolean, onClick: () -> Unit) {
     val fg = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
     val bg = if (active) MaterialTheme.colorScheme.primaryContainer
              else androidx.compose.ui.graphics.Color.Transparent
@@ -85,7 +98,8 @@ private fun RailButton(glyph: String, label: String, active: Boolean, onClick: (
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(glyph, fontSize = 18.sp, color = fg)
+        Icon(icon, contentDescription = label, tint = fg,
+            modifier = Modifier.size(22.dp))
         Text(
             label,
             color = fg,

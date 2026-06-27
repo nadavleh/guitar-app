@@ -17,8 +17,8 @@ android {
         // releases are kept in /releases — never delete them. versionCode is a
         // monotonically increasing integer: major*10000 + minor*100 + patch
         // (e.g. 1.2.0 = 10200, 1.2.1 = 10201, 2.0.0 = 20000).
-        versionCode = 10902
-        versionName = "1.9.2"
+        versionCode = 10903
+        versionName = "1.9.3"
     }
 
     buildTypes {
@@ -65,6 +65,7 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
