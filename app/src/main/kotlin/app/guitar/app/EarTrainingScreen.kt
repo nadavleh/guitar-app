@@ -373,7 +373,16 @@ private fun ChordOnFretboard(
                 .shapesFor(root, q, state.liveTuning, frets = DISPLAY_FRETS)
             val shape = shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E }
                 ?: shapes.firstOrNull()
-            shape?.let { shapeMarks(it, state.labelMode) } ?: emptyMap()
+            // Show ONLY the chord's own tones: some CAGED grips (e.g. the "dim" shape is
+            // really a dim7 voicing) carry an extra note that would otherwise render a
+            // phantom extension on the neck for a plain triad.
+            if (shape == null) emptyMap()
+            else {
+                val chordPcs = q.intervals.map { ((root.value + it.semitones) % 12 + 12) % 12 }.toSet()
+                shapeMarks(shape, state.labelMode).filterKeys { pos ->
+                    Fretboard.noteAt(state.liveTuning, pos).pitchClass.value in chordPcs
+                }
+            }
         }
     }
     Box(modifier = Modifier.fillMaxWidth().height(220.dp).padding(vertical = 4.dp)) {

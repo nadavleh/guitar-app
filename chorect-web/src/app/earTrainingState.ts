@@ -1003,6 +1003,7 @@ export class EarTrainingState {
     if (this.adHistory.length > 32) this.adHistory.shift();
     this.adHistIndex = this.adHistory.length - 1;
     this.playAugDim();
+    this.notify();   // re-render so the reveal card + fretboard refresh to the new chord
   }
   augDimPrev() {
     if (!this.adHasPrev) return;

@@ -11,7 +11,7 @@ import { el, btn, slider, switchRow, labelSm } from "./dom";
 import {
   spellPc, noteAt, TrainingMode, ChordTypeLevel, ChordTypeLevelName,
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
-  parseChord, ChordShapeGenerator, CagedShape,
+  parseChord, ChordShapeGenerator, CagedShape, notesFrom, midiPitchClass, fp, fpKey,
   IntervalDirection, INTERVAL_CHOICES, intervalChoiceFor,
 } from "../theory";
 
@@ -228,7 +228,19 @@ export class EarTrainingUI {
       const [root, q] = parsed;
       const shapes = new ChordShapeGenerator().shapesFor(root, q, s.liveTuning, DISPLAY_FRETS);
       const shape = shapes.find((sh) => sh.cagedShape === CagedShape.E) ?? shapes[0];
-      if (shape) marks = shapeMarks(shape, s.labelMode);
+      if (shape) {
+        // Show ONLY the chord's own tones: some CAGED templates (e.g. the "dim" grip
+        // is really a dim7 voicing) carry an extra note, which would otherwise render
+        // a phantom extension on the neck for a plain triad.
+        const chordPcs = new Set(notesFrom(q, root));
+        const full = shapeMarks(shape, s.labelMode);
+        shape.frets.forEach((f, str) => {
+          if (f == null) return;
+          const key = fpKey(fp(str, f));
+          const mark = full.get(key);
+          if (mark && chordPcs.has(midiPitchClass(noteAt(s.liveTuning, fp(str, f)).midi))) marks.set(key, mark);
+        });
+      }
     }
     this.fb!.setData({
       tuning: s.liveTuning, marks, selectedPosition: null, leftHanded: s.leftHanded,
