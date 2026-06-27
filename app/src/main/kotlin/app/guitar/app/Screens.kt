@@ -19,6 +19,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -819,14 +821,30 @@ private fun BuildByDegreePanel(state: AppState) {
 
             Spacer(Modifier.height(4.dp))
 
-            // ---- Key chips + Random + Mode ----
+            // ---- Key dropdown + Mode (decluttered from a 12-chip row) ----
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text("Key", style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.width(8.dp))
-                OutlinedButton(
-                    onClick = { state.setLoopBuildKeyRandom() },
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                ) { Text("Random") }
+                var keyOpen by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedButton(
+                        onClick = { keyOpen = true },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    ) { Text(NoteSpeller.spell(state.loopBuildKey) + " ▾") }
+                    DropdownMenu(expanded = keyOpen, onDismissRequest = { keyOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Random") },
+                            onClick = { state.setLoopBuildKeyRandom(); keyOpen = false },
+                        )
+                        for (i in 0..11) {
+                            val pc = PitchClass(i)
+                            DropdownMenuItem(
+                                text = { Text(NoteSpeller.spell(pc)) },
+                                onClick = { state.loopBuildKey = pc; keyOpen = false },
+                            )
+                        }
+                    }
+                }
                 Spacer(Modifier.width(16.dp))
                 Text("Mode", style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.width(6.dp))
@@ -839,17 +857,6 @@ private fun BuildByDegreePanel(state: AppState) {
                             label = { Text(if (m == TrainingMode.Major) "Major" else "Minor") },
                         )
                     }
-                }
-            }
-            Spacer(Modifier.height(4.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                for (i in 0..11) {
-                    val pc = PitchClass(i)
-                    FilterChip(
-                        selected = pc == state.loopBuildKey,
-                        onClick = { state.loopBuildKey = pc },
-                        label = { Text(NoteSpeller.spell(pc)) },
-                    )
                 }
             }
 

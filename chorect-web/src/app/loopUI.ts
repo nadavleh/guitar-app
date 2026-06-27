@@ -155,21 +155,24 @@ export class LoopUI {
     ]));
     if (!L.buildExpanded) return panel;
 
-    // key + mode
+    // key (dropdown, decluttered from a 12-chip row) + mode
+    const keySel = el("select", { class: "drum-select" }) as HTMLSelectElement;
+    keySel.appendChild(el("option", { value: "rand" }, ["Random"]));
+    for (let i = 0; i < 12; i++) {
+      const o = el("option", { value: String(i) }, [spellPc(i)]) as HTMLOptionElement;
+      if (i === L.buildKey) o.selected = true;
+      keySel.appendChild(o);
+    }
+    keySel.addEventListener("change", () => {
+      if (keySel.value === "rand") L.setBuildKeyRandom(); else L.buildKey = parseInt(keySel.value, 10);
+      this.rerender();
+    });
     panel.appendChild(el("div", { class: "et-row-gap", style: "margin-top:6px" }, [
-      labelSm("Key"),
-      btn("Random", () => L.setBuildKeyRandom()),
+      labelSm("Key"), keySel,
       labelSm("Mode"),
       segmented<TrainingMode>([{ value: TrainingMode.Major, label: "Major" }, { value: TrainingMode.Minor, label: "Minor" }],
         L.buildMode, (m) => { L.buildMode = m; this.rerender(); }, false),
     ]));
-    const keyRow = el("div", { class: "chip-row" });
-    for (let i = 0; i < 12; i++) {
-      const chip = el("button", { class: i === L.buildKey ? "chip selected" : "chip" }, [spellPc(i)]);
-      chip.addEventListener("click", () => { L.buildKey = i; this.rerender(); });
-      keyRow.appendChild(chip);
-    }
-    panel.appendChild(keyRow);
 
     // level
     panel.appendChild(labelSm("Diatonic level"));
