@@ -11,6 +11,8 @@ import { el, btn, slider, switchRow, labelSm } from "./dom";
 import {
   spellPc, noteAt, TrainingMode, ChordTypeLevel, ChordTypeLevelName,
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
+  parseChord, ChordShapeGenerator, CagedShape,
+  IntervalDirection, INTERVAL_CHOICES, intervalChoiceFor,
 } from "../theory";
 
 const DISPLAY_FRETS = 14;
@@ -86,6 +88,7 @@ export class EarTrainingUI {
           { value: EarSubMode.Flavor, label: "Flavor" },
           { value: EarSubMode.Inversions, label: "Inversions" },
           { value: EarSubMode.AugDim, label: "Aug / Dim" },
+          { value: EarSubMode.Intervals, label: "Intervals" },
         ],
         ear.progSubMode,
         (v) => ear.switchTab(v as EarSubMode),
@@ -124,6 +127,9 @@ export class EarTrainingUI {
         break;
       case EarSubMode.AugDim:
         ear.earMode === EarMode.Challenge ? this.augDimChallenge(body) : this.augDimView(body);
+        break;
+      case EarSubMode.Intervals:   // challenge-only (#6)
+        this.intervalsView(body);
         break;
     }
 
@@ -197,6 +203,33 @@ export class EarTrainingUI {
     parent.appendChild(wrap);
     const shape = ear.currentPlayingShape ?? ear.lastShownShape;
     const marks = shape ? shapeMarks(shape, s.labelMode) : new Map();
+    this.fb!.setData({
+      tuning: s.liveTuning, marks, selectedPosition: null, leftHanded: s.leftHanded,
+      numFrets: DISPLAY_FRETS, playOnTouchDown: false, mutedStrings: new Set<number>(),
+      onTap: (pos) => s.audio.playNote(noteAt(s.liveTuning, pos).midi, s.ringSustainMs),
+    });
+  }
+
+  /** "Show chord on fretboard" panel for a given chord [symbol] (#2/#3). */
+  private chordFretboardPanel(parent: HTMLElement, symbol: string, show: boolean, onToggle: (v: boolean) => void): void {
+    const s = this.state;
+    parent.appendChild(switchRow("Show chord on fretboard", null, show, onToggle));
+    if (!show) return;
+    if (!this.fbCanvasEl) {
+      this.fbCanvasEl = el("canvas", { class: "fretboard" });
+      this.fb = new FretboardCanvas(this.fbCanvasEl);
+    }
+    const wrap = el("div", { style: "height:220px;position:relative;margin:6px 0" });
+    wrap.appendChild(this.fbCanvasEl);
+    parent.appendChild(wrap);
+    let marks = new Map();
+    const parsed = parseChord(symbol);
+    if (parsed) {
+      const [root, q] = parsed;
+      const shapes = new ChordShapeGenerator().shapesFor(root, q, s.liveTuning, DISPLAY_FRETS);
+      const shape = shapes.find((sh) => sh.cagedShape === CagedShape.E) ?? shapes[0];
+      if (shape) marks = shapeMarks(shape, s.labelMode);
+    }
     this.fb!.setData({
       tuning: s.liveTuning, marks, selectedPosition: null, leftHanded: s.leftHanded,
       numFrets: DISPLAY_FRETS, playOnTouchDown: false, mutedStrings: new Set<number>(),
@@ -607,9 +640,11 @@ export class EarTrainingUI {
     const ear = this.ear;
     const c = ear.n2cChallenge;
     parent.appendChild(el("div", { class: "et-muted" }, ["A triad plays, then a single note from its diatonic scale sounds above. Identify the test note's degree relative to the chord (e.g. 9, b7, maj7)."]));
+    const replayN2c = btn(ear.n2cPlaying ? "Playing…" : "Replay both ▶", () => ear.playN2c(), "btn primary");
+    const prevN2c = btn("◀ Prev", () => { ear.n2cPrev(); ear.playN2c(); }); if (!ear.n2cHasPrev) prevN2c.disabled = true;
+    const nextN2c = btn("Next ▶", () => { ear.n2cNext(); ear.playN2c(); }); if (!ear.n2cHasNext) nextN2c.disabled = true;
     parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:10px" }, [
-      btn(ear.n2cPlaying ? "Playing…" : "Play both ▶", () => ear.playN2c(), "btn primary"),
-      btn("Next →", () => { ear.nextN2cChallenge(); ear.playN2c(); }),
+      replayN2c, prevN2c, nextN2c, btn("New +", () => { ear.nextN2cChallenge(); ear.playN2c(); }),
     ]));
     parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:8px" }, [
       btn("♪ Chord", () => ear.playN2cChord()), btn("• Note", () => ear.playN2cNote()),
@@ -628,6 +663,10 @@ export class EarTrainingUI {
     }
     card.addEventListener("click", () => ear.toggleN2cReveal());
     parent.appendChild(card);
+    if (c) {
+      parent.appendChild(el("div", { class: "v-gap-12" }));
+      this.chordFretboardPanel(parent, n2cChordSymbol(c), ear.n2cShowFretboard, (v) => ear.setN2cShowFretboard(v));
+    }
   }
 
   private n2cChallenge(parent: HTMLElement): void {
@@ -681,8 +720,9 @@ export class EarTrainingUI {
     parent.appendChild(labelSm("Degree  (tap to hear & compare)"));
     parent.appendChild(chipsRow([1, 2, 3, 4, 5, 6, 7].map((deg) =>
       chip(String(deg), ear.flavorGuessDegree === deg, () => ear.setFlavorGuessDegree(deg)))));
-    parent.appendChild(labelSm("Flavor  (tap to hear)"));
-    parent.appendChild(chipsRow([...ear.flavorAllowed].map((sym) =>
+    parent.appendChild(labelSm("Flavor  (only diatonic flavors for this key)"));
+    // #4: only flavors diatonic to the current key/mode (narrowed to the guessed degree).
+    parent.appendChild(chipsRow(ear.flavorQualityOptions(ear.flavorGuessDegree).map((sym) =>
       chip(sym === "" ? "maj" : sym, ear.flavorGuessQuality === sym, () => ear.setFlavorGuessQuality(sym)))));
     parent.appendChild(el("div", { class: "v-gap-8" }));
     const revealed = ear.flavorRevealed;
@@ -700,6 +740,8 @@ export class EarTrainingUI {
     }
     card.addEventListener("click", () => ear.toggleFlavorReveal());
     parent.appendChild(card);
+    parent.appendChild(el("div", { class: "v-gap-12" }));
+    this.chordFretboardPanel(parent, ear.flavorChordSymbol(), ear.flavorShowFretboard, (v) => ear.setFlavorShowFretboard(v));
   }
 
   private flavorChallenge(parent: HTMLElement): void {
@@ -731,8 +773,8 @@ export class EarTrainingUI {
     parent.appendChild(labelSm("Degree  (tap to hear & compare)"));
     parent.appendChild(chipsRow([1, 2, 3, 4, 5, 6, 7].map((deg) =>
       chip(String(deg), ear.flavorGuessDegree === deg, () => ear.setFlavorGuessDegree(deg), !ear.flavorChAnswered))));
-    parent.appendChild(labelSm("Flavor  (tap to hear)"));
-    parent.appendChild(chipsRow([...ear.flavorAllowed].map((sym) =>
+    parent.appendChild(labelSm("Flavor  (only diatonic flavors for this key)"));
+    parent.appendChild(chipsRow(ear.flavorQualityOptions(ear.flavorGuessDegree).map((sym) =>
       chip(sym === "" ? "maj" : sym, ear.flavorGuessQuality === sym, () => ear.setFlavorGuessQuality(sym), !ear.flavorChAnswered))));
     parent.appendChild(el("div", { class: "v-gap-8" }));
     if (!ear.flavorChAnswered) {
@@ -769,9 +811,12 @@ export class EarTrainingUI {
     const ear = this.ear;
     parent.appendChild(el("div", { class: "et-muted" }, ["A chord plays in some inversion (which chord tone is in the bass). Identify it. Pick which chord types can appear below."]));
     this.invPalette(parent);
+    const replay = btn(ear.invPlaying ? "Playing…" : "Replay ▶", () => ear.playInversion(), "btn primary");
+    if (!ear.invStarted || ear.invPlaying) replay.disabled = true;
+    const prev = btn("◀ Prev", () => ear.inversionPrev()); if (!ear.invHasPrev) prev.disabled = true;
+    const next = btn("Next ▶", () => ear.inversionNext()); if (!ear.invHasNext) next.disabled = true;
     parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:10px" }, [
-      btn(ear.invPlaying ? "Playing…" : "New chord ▶", () => ear.newInversion(), "btn primary"),
-      btn("Replay", () => ear.playInversion()),
+      replay, prev, next, btn("New chord +", () => ear.newInversion()),
     ]));
     if (!ear.invStarted) return;
     this.invGuessChips(parent, true);
@@ -781,6 +826,9 @@ export class EarTrainingUI {
     if (ear.invRevealed && ear.invGuess !== null) {
       parent.appendChild(el("div", { style: "font-weight:600;margin-top:6px" }, [ear.invGuess === ear.invInversion ? "✔ correct" : `✘ that was the ${inversionName(ear.invGuess).toLowerCase()}`]));
     }
+    parent.appendChild(el("div", { class: "v-gap-12" }));
+    this.chordFretboardPanel(parent, spellPc(ear.invRoot) + ear.invQuality, ear.invShowFretboard,
+      (v) => ear.setInvShowFretboard(v));
   }
 
   private invChallenge(parent: HTMLElement): void {
@@ -844,9 +892,13 @@ export class EarTrainingUI {
     const ear = this.ear;
     parent.appendChild(el("div", { class: "et-muted" }, ["Tell augmented from diminished by ear. Enable the qualities you want to drill (add 7th/extended forms), then identify each chord."]));
     this.augDimPalette(parent);
+    // Replay is primary so it isn't confused with the chord-advancing buttons (#1).
+    const replay = btn("Replay ▶", () => ear.playAugDim(), "btn primary");
+    if (!ear.adStarted) replay.disabled = true;
+    const prev = btn("◀ Prev", () => ear.augDimPrev()); if (!ear.adHasPrev) prev.disabled = true;
+    const next = btn("Next ▶", () => ear.augDimNext()); if (!ear.adHasNext) next.disabled = true;
     parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:10px" }, [
-      btn("New chord ▶", () => ear.newAugDim(), "btn primary"),
-      btn("Replay", () => ear.playAugDim()),
+      replay, prev, next, btn("New chord +", () => ear.newAugDim()),
     ]));
     if (!ear.adStarted) return;
     this.augDimGuessChips(parent, true);
@@ -856,6 +908,9 @@ export class EarTrainingUI {
     if (ear.adRevealed && ear.adGuess !== null) {
       parent.appendChild(el("div", { style: "font-weight:600;margin-top:6px" }, [ear.adGuess === ear.adQuality ? "✔ correct" : `✘ it was ${this.augDimLabel(ear.adQuality)}`]));
     }
+    parent.appendChild(el("div", { class: "v-gap-12" }));
+    this.chordFretboardPanel(parent, spellPc(ear.adRoot) + ear.adQuality, ear.adShowFretboard,
+      (v) => ear.setAdShowFretboard(v));
   }
 
   private augDimChallenge(parent: HTMLElement): void {
@@ -886,6 +941,62 @@ export class EarTrainingUI {
       const ok = ear.adGuess === ear.adQuality;
       parent.appendChild(el("div", { style: `font-weight:700;color:${Colors.primary}` }, [`${ok ? "✔ correct" : `✘ answer: ${this.augDimLabel(ear.adQuality)}`}   (${spellPc(ear.adRoot)}${ear.adQuality})`]));
       parent.appendChild(btn(ear.adChIndex === ear.augDimChallengeTotal - 1 ? "See score →" : "Next →", () => ear.advanceAugDimChallenge(), "btn primary"));
+    }
+  }
+
+  // ---------- #6 Interval identification ----------
+
+  private intervalsView(parent: HTMLElement): void {
+    const ear = this.ear;
+    if (!ear.intervalChActive) {
+      parent.appendChild(el("div", { class: "et-muted" }, [
+        `${ear.intervalChallengeTotal} questions. A I–V–I cadence sets the key, then the tonic and a note sound — identify the interval. Choose a direction first; you can replay the tonic and transpose anytime.`,
+      ]));
+      parent.appendChild(labelSm("Direction"));
+      parent.appendChild(chipsRow([IntervalDirection.Ascending, IntervalDirection.Descending, IntervalDirection.Mixed].map((d) =>
+        chip(d, ear.intervalDirection === d, () => ear.setIntervalDirection(d)))));
+      parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:8px" }, [
+        el("span", { class: "ans-label" }, [`Key: ${spellPc(ear.intervalKey)} major`]),
+        btn("♭", () => ear.intervalTranspose(-1)),
+        btn("♯", () => ear.intervalTranspose(1)),
+      ]));
+      parent.appendChild(el("div", { class: "v-gap-12" }));
+      parent.appendChild(btn("Start challenge ▶", () => ear.startIntervalChallenge(), "btn primary"));
+      return;
+    }
+    if (ear.intervalChIndex >= ear.intervalChallengeTotal) {
+      this.simpleDone(parent, ear.intervalChScore, ear.intervalChallengeTotal,
+        () => ear.startIntervalChallenge(), () => ear.exitIntervalChallenge());
+      return;
+    }
+    this.challengeHeader(parent, `Q ${ear.intervalChIndex + 1} / ${ear.intervalChallengeTotal}`, `Score: ${ear.intervalChScore}`,
+      () => ear.startIntervalChallenge(), () => ear.exitIntervalChallenge());
+    const replay = btn("Replay ▶", () => ear.playIntervalQuestion(), "btn primary");
+    if (ear.intervalPlaying) replay.disabled = true;
+    parent.appendChild(el("div", { class: "et-row-gap" }, [
+      replay,
+      btn("♪ Tonic", () => ear.playIntervalTonic()),
+      btn("Hear I–V–I", () => ear.playIntervalTonicCadence()),
+      btn("♭", () => ear.intervalTranspose(-1)),
+      btn("♯", () => ear.intervalTranspose(1)),
+    ]));
+    parent.appendChild(el("div", { class: "v-gap-8" }));
+    parent.appendChild(labelSm("Which interval?"));
+    parent.appendChild(chipsRow(INTERVAL_CHOICES.map((iv) =>
+      chip(iv.shortName, ear.intervalGuess === iv.semitones, () => ear.setIntervalGuess(iv.semitones), !ear.intervalChAnswered))));
+    parent.appendChild(el("div", { class: "v-gap-8" }));
+    if (!ear.intervalChAnswered) {
+      const b = btn("Submit", () => ear.submitIntervalGuess(), "btn primary");
+      if (ear.intervalGuess == null) b.disabled = true;
+      parent.appendChild(b);
+    } else {
+      const ok = ear.intervalGuess === ear.intervalSemitones;
+      const dir = ear.intervalAscending ? "ascending" : "descending";
+      parent.appendChild(el("div", { style: `font-weight:700;color:${Colors.primary}` }, [
+        `${ok ? "✔ correct" : `✘ answer: ${intervalChoiceFor(ear.intervalSemitones).longName}`}  (${dir})`,
+      ]));
+      parent.appendChild(btn(ear.intervalChIndex === ear.intervalChallengeTotal - 1 ? "See score →" : "Next →",
+        () => ear.advanceIntervalChallenge(), "btn primary"));
     }
   }
 }

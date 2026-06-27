@@ -9,3 +9,4 @@ export * from "./inversions";
 export * from "./note2chord";
 export * from "./voiceLeading";
 export * from "./percussion";
+export * from "./chordDecomposition";

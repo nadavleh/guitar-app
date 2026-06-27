@@ -229,3 +229,35 @@ export const ADVANCED_PROGRESSIONS: NamedProgression[] = [
 export function randomAdvanced(rng: Rng = defaultRng): NamedProgression {
   return ADVANCED_PROGRESSIONS[rng.int(ADVANCED_PROGRESSIONS.length)];
 }
+
+// ---- Interval-identification trainer (#6) ----
+
+export enum IntervalDirection { Ascending = "Ascending", Descending = "Descending", Mixed = "Mixed" }
+
+export interface IntervalChoice { semitones: number; shortName: string; longName: string; }
+
+/** The 13 intervals from unison to octave, with the arithmetic to place a target
+ *  note above/below a tonic. Mirrors theory/EarTraining.kt's IntervalTrainer. */
+export const INTERVAL_CHOICES: IntervalChoice[] = [
+  { semitones: 0, shortName: "P1", longName: "unison" },
+  { semitones: 1, shortName: "m2", longName: "minor 2nd" },
+  { semitones: 2, shortName: "M2", longName: "major 2nd" },
+  { semitones: 3, shortName: "m3", longName: "minor 3rd" },
+  { semitones: 4, shortName: "M3", longName: "major 3rd" },
+  { semitones: 5, shortName: "P4", longName: "perfect 4th" },
+  { semitones: 6, shortName: "TT", longName: "tritone" },
+  { semitones: 7, shortName: "P5", longName: "perfect 5th" },
+  { semitones: 8, shortName: "m6", longName: "minor 6th" },
+  { semitones: 9, shortName: "M6", longName: "major 6th" },
+  { semitones: 10, shortName: "m7", longName: "minor 7th" },
+  { semitones: 11, shortName: "M7", longName: "major 7th" },
+  { semitones: 12, shortName: "P8", longName: "octave" },
+];
+
+export function intervalTargetMidi(tonicMidi: number, semitones: number, ascending: boolean): number {
+  return ascending ? tonicMidi + semitones : tonicMidi - semitones;
+}
+
+export function intervalChoiceFor(semitones: number): IntervalChoice {
+  return INTERVAL_CHOICES.find((i) => i.semitones === semitones)!;
+}

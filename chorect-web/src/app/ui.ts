@@ -10,6 +10,7 @@ import { EarTrainingState } from "./earTrainingState";
 import { EarTrainingUI } from "./earTrainingUI";
 import { SambaLooperState } from "./sambaLooperState";
 import { SambaLooperUI } from "./sambaLooperUI";
+import { DecomposeUI } from "./decomposeUI";
 import { LoopState } from "./loopState";
 import { LoopUI } from "./loopUI";
 import { loadDrumSample } from "./drumSamples";
@@ -31,6 +32,7 @@ const NAV_ITEMS: { sheet: Sheet; glyph: string; label: string }[] = [
   { sheet: Sheet.Fretboard, glyph: "🎸", label: "Fretboard" },
   { sheet: Sheet.Loop, glyph: "⟲", label: "Loop" },
   { sheet: Sheet.EarTraining, glyph: "👂", label: "Ear" },
+  { sheet: Sheet.Decompose, glyph: "🧩", label: "Decompose" },
   { sheet: Sheet.SambaLooper, glyph: "🥁", label: "Drums" },
   { sheet: Sheet.Tuner, glyph: "🎛", label: "Tuner" },
   { sheet: Sheet.Options, glyph: "⚙", label: "Options" },
@@ -56,6 +58,7 @@ export class App {
   private earUI: EarTrainingUI;
   private samba: SambaLooperState;
   private sambaUI: SambaLooperUI;
+  private decomposeUI: DecomposeUI;
   private loop: LoopState;
   private loopUI: LoopUI;
 
@@ -93,6 +96,7 @@ export class App {
       loadSample: (inst, voice) => loadDrumSample(state.audio, inst, voice),
     });
     this.sambaUI = new SambaLooperUI(this.samba, () => state.closeSheet());
+    this.decomposeUI = new DecomposeUI(state, () => state.closeSheet());
     const appRoot = el("div", { class: "app-root" }, [this.railEl, this.contentEl]);
     root.appendChild(appRoot);
     root.appendChild(this.sheetLayer);
@@ -187,6 +191,7 @@ export class App {
     else if (route === Sheet.Loop) this.loopUI.render(this.contentEl);
     else if (route === Sheet.EarTraining) this.earUI.render(this.contentEl);
     else if (route === Sheet.SambaLooper) this.sambaUI.render(this.contentEl);
+    else if (route === Sheet.Decompose) this.decomposeUI.render(this.contentEl);
     else this.renderFretboardView();
 
     const newScroll = this.contentEl.querySelector(".et-scroll");

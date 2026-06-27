@@ -15,13 +15,14 @@ import {
   N2C_MAJOR_TEST_OFFSETS, N2C_MINOR_TEST_OFFSETS,
   inversionCount, inversionMidis,
   pickMinMovement, defaultRng,
+  IntervalDirection, INTERVAL_CHOICES, intervalTargetMidi,
 } from "../theory";
 import { WebAudioEngine, Timbres } from "../audio";
 
 const DISPLAY_FRETS = 14;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-export enum EarSubMode { Progression = "Progression", Note2Chord = "Note2Chord", Flavor = "Flavor", Inversions = "Inversions", AugDim = "AugDim" }
+export enum EarSubMode { Progression = "Progression", Note2Chord = "Note2Chord", Flavor = "Flavor", Inversions = "Inversions", AugDim = "AugDim", Intervals = "Intervals" }
 export enum EarMode { Practice = "Practice", Challenge = "Challenge" }
 
 export interface EarDeps {
@@ -278,9 +279,31 @@ export class EarTrainingState {
   n2cChallenge: N2cChallenge | null = null;
   n2cRevealed = false;
   n2cPlaying = false;
+  n2cShowFretboard = false;
   private n2cToken = 0;
+  private n2cHistory: N2cChallenge[] = [];
+  private n2cHistIndex = -1;
+  get n2cHasPrev(): boolean { return this.n2cHistIndex > 0; }
+  get n2cHasNext(): boolean { return this.n2cHistIndex >= 0 && this.n2cHistIndex < this.n2cHistory.length - 1; }
 
-  nextN2cChallenge() { this.n2cChallenge = randomN2c(this.rng); this.n2cRevealed = false; this.notify(); }
+  nextN2cChallenge() {
+    const c = randomN2c(this.rng);
+    this.n2cChallenge = c; this.n2cRevealed = false;
+    if (this.n2cHistIndex < this.n2cHistory.length - 1) this.n2cHistory.length = this.n2cHistIndex + 1;
+    this.n2cHistory.push(c);
+    if (this.n2cHistory.length > 32) this.n2cHistory.shift();
+    this.n2cHistIndex = this.n2cHistory.length - 1;
+    this.notify();
+  }
+  n2cPrev() {
+    if (!this.n2cHasPrev) return;
+    this.n2cHistIndex--; this.n2cChallenge = this.n2cHistory[this.n2cHistIndex]; this.n2cRevealed = false; this.notify();
+  }
+  n2cNext() {
+    if (!this.n2cHasNext) return;
+    this.n2cHistIndex++; this.n2cChallenge = this.n2cHistory[this.n2cHistIndex]; this.n2cRevealed = false; this.notify();
+  }
+  setN2cShowFretboard(v: boolean) { this.n2cShowFretboard = v; this.notify(); }
   toggleN2cReveal() { this.n2cRevealed = !this.n2cRevealed; this.notify(); }
 
   playN2c() {
@@ -682,8 +705,24 @@ export class EarTrainingState {
   flavorGuessQuality: string | null = null;
   flavorPlaying = false;
   flavorStarted = false;
+  flavorShowFretboard = false;
   flavorMode = TrainingMode.Major;
   private flavorToken = 0;
+  setFlavorShowFretboard(v: boolean) { this.flavorShowFretboard = v; this.notify(); }
+
+  /**
+   * Flavors to present as guess/audition options (#4): only those diatonic in the
+   * current key/mode and enabled. If a degree is being guessed, narrow to flavors
+   * diatonic for THAT degree. Falls back to the full enabled set if empty.
+   */
+  flavorQualityOptions(forDegree: number | null = null): string[] {
+    const candidates = this.diatonicFlavorCandidates(this.flavorMode, this.flavorAllowed);
+    const diatonic = new Set(
+      (forDegree != null ? candidates.filter(([d]) => d === forDegree) : candidates).map(([, q]) => q),
+    );
+    const ordered = this.flavorPalette.filter((q) => diatonic.has(q));
+    return ordered.length ? ordered : this.flavorPalette.filter((q) => this.flavorAllowed.has(q));
+  }
 
   toggleFlavorAllowed(sym: string) {
     if (this.flavorAllowed.has(sym)) this.flavorAllowed.delete(sym); else this.flavorAllowed.add(sym);
@@ -839,7 +878,12 @@ export class EarTrainingState {
   invGuess: number | null = null;
   invStarted = false;
   invPlaying = false;
+  invShowFretboard = false;
   private invToken = 0;
+  private invHistory: [PitchClass, string, number][] = [];
+  private invHistIndex = -1;
+  get invHasPrev(): boolean { return this.invHistIndex > 0; }
+  get invHasNext(): boolean { return this.invHistIndex >= 0 && this.invHistIndex < this.invHistory.length - 1; }
 
   toggleInvAllowed(sym: string) {
     if (this.invAllowed.has(sym)) this.invAllowed.delete(sym); else this.invAllowed.add(sym);
@@ -860,8 +904,27 @@ export class EarTrainingState {
     this.invRoot = this.rng.int(12);
     this.invInversion = this.rng.int(this.invCount());
     this.invRevealed = false; this.invGuess = null; this.invStarted = true;
+    if (this.invHistIndex < this.invHistory.length - 1) this.invHistory.length = this.invHistIndex + 1;
+    this.invHistory.push([this.invRoot, this.invQuality, this.invInversion]);
+    if (this.invHistory.length > 32) this.invHistory.shift();
+    this.invHistIndex = this.invHistory.length - 1;
     this.playInversion();
   }
+  inversionPrev() {
+    if (!this.invHasPrev) return;
+    this.invHistIndex--;
+    [this.invRoot, this.invQuality, this.invInversion] = this.invHistory[this.invHistIndex];
+    this.invRevealed = false; this.invGuess = null;
+    this.playInversion(); this.notify();
+  }
+  inversionNext() {
+    if (!this.invHasNext) return;
+    this.invHistIndex++;
+    [this.invRoot, this.invQuality, this.invInversion] = this.invHistory[this.invHistIndex];
+    this.invRevealed = false; this.invGuess = null;
+    this.playInversion(); this.notify();
+  }
+  setInvShowFretboard(v: boolean) { this.invShowFretboard = v; this.notify(); }
   playInversion() {
     const midis = this.invMidis(this.invInversion);
     if (midis.length === 0) return;
@@ -910,7 +973,13 @@ export class EarTrainingState {
   adRevealed = false;
   adGuess: string | null = null;
   adStarted = false;
+  adShowFretboard = false;
   private adToken = 0;
+  // Drawn-chord history so Prev/Next revisit chords without re-randomizing (#1).
+  private adHistory: [PitchClass, string][] = [];
+  private adHistIndex = -1;
+  get adHasPrev(): boolean { return this.adHistIndex > 0; }
+  get adHasNext(): boolean { return this.adHistIndex >= 0 && this.adHistIndex < this.adHistory.length - 1; }
 
   toggleAugDimAllowed(sym: string) {
     if (this.augDimAllowed.has(sym)) this.augDimAllowed.delete(sym); else this.augDimAllowed.add(sym);
@@ -929,8 +998,27 @@ export class EarTrainingState {
     this.adQuality = pool[this.rng.int(pool.length)];
     this.adRoot = this.rng.int(12);
     this.adRevealed = false; this.adGuess = null; this.adStarted = true;
+    if (this.adHistIndex < this.adHistory.length - 1) this.adHistory.length = this.adHistIndex + 1;
+    this.adHistory.push([this.adRoot, this.adQuality]);
+    if (this.adHistory.length > 32) this.adHistory.shift();
+    this.adHistIndex = this.adHistory.length - 1;
     this.playAugDim();
   }
+  augDimPrev() {
+    if (!this.adHasPrev) return;
+    this.adHistIndex--;
+    [this.adRoot, this.adQuality] = this.adHistory[this.adHistIndex];
+    this.adRevealed = false; this.adGuess = null;
+    this.playAugDim(); this.notify();
+  }
+  augDimNext() {
+    if (!this.adHasNext) return;
+    this.adHistIndex++;
+    [this.adRoot, this.adQuality] = this.adHistory[this.adHistIndex];
+    this.adRevealed = false; this.adGuess = null;
+    this.playAugDim(); this.notify();
+  }
+  setAdShowFretboard(v: boolean) { this.adShowFretboard = v; this.notify(); }
   playAugDim() {
     const midis = this.adMidis(this.adQuality);
     if (midis.length === 0) return;
@@ -965,6 +1053,129 @@ export class EarTrainingState {
   }
   exitAugDimChallenge() { this.adChActive = false; this.adChIndex = 0; this.notify(); }
 
+  // ---------- #6 Interval identification ----------
+
+  intervalChallengeTotal = 10;
+  intervalKey: PitchClass = 0;
+  intervalDirection = IntervalDirection.Ascending;
+  intervalChActive = false;
+  intervalChIndex = 0;
+  intervalChScore = 0;
+  intervalChAnswered = false;
+  intervalSemitones = 0;
+  intervalAscending = true;
+  intervalGuess: number | null = null;
+  intervalPlaying = false;
+  private intervalToken = 0;
+
+  private intervalTonicMidi(): number { return 60 + (((this.intervalKey + 6) % 12) - 6); }
+
+  setIntervalDirection(d: IntervalDirection) { this.intervalDirection = d; this.notify(); }
+  setIntervalGuess(s: number) { this.intervalGuess = s; this.notify(); }
+
+  intervalTranspose(n: number) {
+    this.intervalKey = ((this.intervalKey + n) % 12 + 12) % 12;
+    this.notify();
+    if (this.intervalChActive) this.playIntervalTonicCadence();
+  }
+
+  playIntervalTonicCadence() {
+    this.intervalToken++;
+    const token = this.intervalToken;
+    this.intervalPlaying = true;
+    this.notify();
+    void (async () => {
+      try {
+        for (const deg of [1, 5, 1]) {
+          if (token !== this.intervalToken) return;
+          const root = degreeRoot(this.intervalKey, deg, TrainingMode.Major);
+          const q = EarTrainingDegrees(TrainingMode.Major).get(deg)?.triadQuality ?? "";
+          this.playSymbolOnce(spellPc(root) + q, 600);
+          await sleep(650);
+        }
+      } finally { this.intervalPlaying = false; this.notify(); }
+    })();
+  }
+
+  playIntervalTonic() {
+    this.deps.audio.playNote(this.intervalTonicMidi(), this.deps.sustainProvider());
+  }
+
+  playIntervalQuestion() {
+    if (this.intervalPlaying) return;
+    this.intervalToken++;
+    const token = this.intervalToken;
+    this.intervalPlaying = true;
+    this.notify();
+    void (async () => {
+      try {
+        const tonic = this.intervalTonicMidi();
+        this.deps.audio.playNote(tonic, this.deps.sustainProvider());
+        await sleep(700);
+        if (token !== this.intervalToken) return;
+        this.deps.audio.playNote(
+          intervalTargetMidi(tonic, this.intervalSemitones, this.intervalAscending),
+          this.deps.sustainProvider());
+      } finally { this.intervalPlaying = false; this.notify(); }
+    })();
+  }
+
+  private drawIntervalQuestion() {
+    this.intervalSemitones = this.rng.int(INTERVAL_CHOICES.length);   // 0..12
+    this.intervalAscending = this.intervalDirection === IntervalDirection.Ascending ? true
+      : this.intervalDirection === IntervalDirection.Descending ? false
+      : this.rng.int(2) === 0;
+    this.intervalGuess = null;
+    this.intervalChAnswered = false;
+  }
+
+  startIntervalChallenge() {
+    this.intervalChActive = true; this.intervalChIndex = 0; this.intervalChScore = 0;
+    this.drawIntervalQuestion();
+    this.intervalToken++;
+    const token = this.intervalToken;
+    this.intervalPlaying = true;
+    this.notify();
+    void (async () => {
+      try {
+        for (const deg of [1, 5, 1]) {
+          if (token !== this.intervalToken) return;
+          const root = degreeRoot(this.intervalKey, deg, TrainingMode.Major);
+          const q = EarTrainingDegrees(TrainingMode.Major).get(deg)?.triadQuality ?? "";
+          this.playSymbolOnce(spellPc(root) + q, 600);
+          await sleep(650);
+        }
+        await sleep(300);
+        if (token !== this.intervalToken) return;
+        const tonic = this.intervalTonicMidi();
+        this.deps.audio.playNote(tonic, this.deps.sustainProvider());
+        await sleep(700);
+        if (token !== this.intervalToken) return;
+        this.deps.audio.playNote(
+          intervalTargetMidi(tonic, this.intervalSemitones, this.intervalAscending),
+          this.deps.sustainProvider());
+      } finally { this.intervalPlaying = false; this.notify(); }
+    })();
+  }
+
+  submitIntervalGuess() {
+    if (!this.intervalChActive || this.intervalChAnswered) return;
+    if (this.intervalGuess == null) return;
+    this.intervalChAnswered = true;
+    if (this.intervalGuess === this.intervalSemitones) this.intervalChScore++;
+    this.notify();
+  }
+
+  advanceIntervalChallenge() {
+    if (!this.intervalChActive) return;
+    if (this.intervalChIndex >= this.intervalChallengeTotal - 1) { this.intervalChIndex = this.intervalChallengeTotal; this.notify(); return; }
+    this.intervalChIndex++;
+    this.drawIntervalQuestion();
+    this.playIntervalQuestion();
+  }
+
+  exitIntervalChallenge() { this.intervalChActive = false; this.intervalChIndex = 0; this.intervalChAnswered = false; this.notify(); }
+
   // ---------- shared playback helpers ----------
 
   private async playCadenceInline(token: number, mode: TrainingMode, key: PitchClass): Promise<void> {
@@ -993,5 +1204,6 @@ export class EarTrainingState {
   release() {
     this.stopLoop();
     this.cadenceToken++; this.flavorToken++; this.n2cToken++; this.invToken++; this.adToken++;
+    this.intervalToken++;
   }
 }

@@ -12,6 +12,7 @@ import { standard } from "../src/theory/tunings";
 import {
   PercussionCatalog, PercussionPattern, PercussionMeter, swungSlotMs, slotMs, voiceCount,
   movementCost, pickMinMovement, BUILTIN_PATTERNS,
+  INTERVAL_CHOICES, intervalTargetMidi, CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
 } from "../src/theory";
 import { PluckedSynth, PitchDetector, analyzePitch, PercussionSynth } from "../src/audio";
 
@@ -166,6 +167,25 @@ for (const b of BUILTIN_PATTERNS) {
   if (!rt || rt.encode() !== b.pattern.encode()) builtinsOk = false;
 }
 check("built-in grooves (teleco-teco 1/2) are valid & round-trip", builtinsOk);
+
+// --- Interval trainer (#6) ---
+check("13 intervals from unison to octave", INTERVAL_CHOICES.length === 13 &&
+  INTERVAL_CHOICES[0].longName === "unison" && INTERVAL_CHOICES[12].longName === "octave");
+check("intervalTargetMidi ascends/descends", intervalTargetMidi(60, 7, true) === 67 && intervalTargetMidi(60, 7, false) === 53);
+
+// --- Chord decomposition (#5): shell + a valid 3-note upper triad ---
+let decOk = CHORD_DECOMPOSITIONS.length > 0;
+for (const dec of CHORD_DECOMPOSITIONS) {
+  if (!dec.shell.includes(0)) decOk = false;
+  if (dec.upper.length !== 3) decOk = false;
+  const g1 = dec.upper[1] - dec.upper[0], g2 = dec.upper[2] - dec.upper[1];
+  if (!(g1 >= 3 && g1 <= 4 && g2 >= 3 && g2 <= 4)) decOk = false;
+}
+check("every decomposition has a root shell + stacked-thirds upper triad", decOk);
+// Cmaj7 shell+upper = {0,4,7,11}; upper root = E (pc 4)
+const maj7 = decompositionFor("maj7")!;
+const maj7pcs = new Set([...maj7.shell, ...maj7.upper].map((x) => ((x % 12) + 12) % 12));
+check("Cmaj7 decomposes to C + Em", [0, 4, 7, 11].every((p) => maj7pcs.has(p)) && upperRootInterval(maj7) === 4);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

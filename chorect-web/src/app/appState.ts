@@ -30,7 +30,7 @@ export const CHALLENGE_SCORE_ORDER = (a: ChallengeScore, b: ChallengeScore): num
 
 export enum DisplayMode { None = "None", Chord = "Chord", Scale = "Scale", Pick = "Pick" }
 export enum LabelMode { Notes = "Notes", Intervals = "Intervals", Empty = "Empty" }
-export enum Sheet { Fretboard = "Fretboard", Options = "Options", Tuner = "Tuner", Loop = "Loop", EarTraining = "EarTraining", SambaLooper = "SambaLooper" }
+export enum Sheet { Fretboard = "Fretboard", Options = "Options", Tuner = "Tuner", Loop = "Loop", EarTraining = "EarTraining", SambaLooper = "SambaLooper", Decompose = "Decompose" }
 export enum ChordScaleView { AllNotes = "AllNotes", Positions = "Positions" }
 
 const LS_KEY = "chorect-web.v1";
