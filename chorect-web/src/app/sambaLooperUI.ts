@@ -80,6 +80,20 @@ export class SambaLooperUI {
     ]));
 
     container.appendChild(screen);
+
+    // Close any open popup when the next tap lands outside a popup (so you don't
+    // have to tap the same trigger again). Deferred so the click that just opened
+    // it doesn't immediately close it.
+    if (this.openVoiceMenu !== null || this.loadMenuOpen || this.addMenuOpen || this.saveOpen) {
+      const onDoc = (e: Event) => {
+        if (!(e.target as HTMLElement).closest(".drum-voice-pop, .drum-load-pop")) {
+          document.removeEventListener("pointerdown", onDoc, true);
+          this.openVoiceMenu = null; this.loadMenuOpen = false; this.addMenuOpen = false; this.saveOpen = false;
+          this.rerender();
+        }
+      };
+      setTimeout(() => document.addEventListener("pointerdown", onDoc, true), 0);
+    }
   }
 
   private rerender(): void { (this.samba as unknown as { deps: { onChange: () => void } }).deps.onChange(); }
