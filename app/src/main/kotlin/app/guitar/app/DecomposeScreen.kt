@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -24,6 +26,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,9 +58,12 @@ import kotlinx.coroutines.launch
 fun DecomposeScreen(state: AppState, onBack: () -> Unit) {
     var root by remember { mutableStateOf(PitchClass.C) }
     var quality by remember { mutableStateOf(ChordDecompositions.ALL.first().quality) }
+    var showGuide by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val dec = ChordDecompositions.forQuality(quality) ?: ChordDecompositions.ALL.first()
+
+    if (showGuide) DecomposeGuideDialog(onDismiss = { showGuide = false })
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
@@ -66,6 +72,8 @@ fun DecomposeScreen(state: AppState, onBack: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("DECOMPOSE", style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { showGuide = true }) { Text("Guide") }
+            Spacer(Modifier.width(8.dp))
             AudioQuickButton(state, compact = true)
             Spacer(Modifier.width(8.dp))
             OutlinedButton(onClick = onBack) { Text("Back") }
@@ -128,7 +136,14 @@ fun DecomposeScreen(state: AppState, onBack: () -> Unit) {
                         sustainMillis = 1100, timbre = Timbre.Clarity)
                 }
             }) { Text("Play shell → triad ▶") }
-            Text("● shell   ● triad", style = MaterialTheme.typography.labelSmall,
+        }
+        Spacer(Modifier.height(6.dp))
+        // Legend: the circle colours + a note that the labels are interval degrees.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            LegendDot(GuitarColors.rootTone, "root (1)")
+            LegendDot(GuitarColors.chordTone, "shell")
+            LegendDot(GuitarColors.scaleTone, "upper triad")
+            Text("numbers = interval degree", style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
@@ -155,6 +170,50 @@ fun DecomposeScreen(state: AppState, onBack: () -> Unit) {
 }
 
 @Composable
+private fun LegendDot(color: androidx.compose.ui.graphics.Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("●", color = color, style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.width(4.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+private const val DECOMPOSE_GUIDE =
+    "Pianists voice extensions as a shell in the left hand (root + the 3rd & 7th that " +
+    "define the quality) and a triad in the right hand. On guitar it's the same idea — " +
+    "and every circle here is labelled with its interval degree.\n\n" +
+    "6th chords — root + a triad on the 6th:\n" +
+    "• C6 = C + A minor (the 6th carries a minor triad)\n" +
+    "• Cm6 = C + A°\n" +
+    "(C6 shares its notes with Am7 — the relative-minor 7th.)\n\n" +
+    "7th chords — root + a triad on the 3rd:\n" +
+    "• Cmaj7 = C + E minor (3·5·7)\n" +
+    "• C7 = C + E° (3·5·♭7)\n" +
+    "• Cm7 = C + E♭ major (♭3·5·♭7)\n" +
+    "• Cm7♭5 = C + E♭ minor;   C°7 = C + E♭°\n\n" +
+    "Extensions — shell (1·3·♭7) + an upper-structure triad:\n" +
+    "• C9 = C7 shell + G minor (5·♭7·9)\n" +
+    "• Cmaj9 = Cmaj7 shell + G major (5·7·9)\n" +
+    "• C11 = C7 shell + B♭ major (♭7·9·11)\n" +
+    "• C13 = C7 shell + D major (9·♯11·13)\n" +
+    "• C7♯9 = C + E♭ major (♯9·5·♭7);   C7♭9 = C + D♭° (♭9·3·5)"
+
+@Composable
+private fun DecomposeGuideDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Got it") } },
+        title = { Text("How chords decompose") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                Text(DECOMPOSE_GUIDE, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+    )
+}
+
+@Composable
 private fun RootPicker(root: PitchClass, onPick: (PitchClass) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
@@ -169,33 +228,51 @@ private fun RootPicker(root: PitchClass, onPick: (PitchClass) -> Unit) {
     }
 }
 
-/** Mark every fret position whose pitch class is a shell tone (Chord kind, root
- *  highlighted) or an upper-triad tone (Scale kind). */
+/** Degree label for a chord-relative interval (incl. compound 9/11/13), so the
+ *  circles read "1 / 3 / ♭7 / 9 / ♯11 / 13" rather than note names. */
+private fun decomposeDegree(interval: Int): String = when (interval) {
+    0, 12 -> "1"
+    1 -> "♭9"; 13 -> "♭9"
+    2, 14 -> "9"
+    3 -> "♭3"; 15 -> "♯9"
+    4, 16 -> "3"
+    5, 17 -> "11"
+    6 -> "♭5"; 18 -> "♯11"
+    7 -> "5"
+    8 -> "♯5"; 20 -> "♭13"
+    9 -> "6"; 21 -> "13"
+    10 -> "♭7"
+    11 -> "7"
+    else -> "$interval"
+}
+
+/**
+ * Mark fret positions, labelling each circle with its INTERVAL degree (always —
+ * independent of the global note/interval setting). Shell tones use the Chord
+ * colour (root highlighted); upper-triad tones use the Scale colour.
+ */
 private fun decomposeMarks(
     state: AppState,
     root: PitchClass,
     dec: ChordDecomposition,
 ): Map<FretPosition, FretMark> {
     val rootPc = root.value
-    val shellPcs = dec.shell.map { ((rootPc + it) % 12 + 12) % 12 }.toSet()
-    val upperPcs = dec.upper.map { ((rootPc + it) % 12 + 12) % 12 }.toSet()
+    // pitch class -> (degree label, isUpper). Shell wins if a pc appears in both.
+    val pcInfo = HashMap<Int, Pair<String, Boolean>>()
+    for (iv in dec.upper) pcInfo[((rootPc + iv) % 12 + 12) % 12] = decomposeDegree(iv) to true
+    for (iv in dec.shell) pcInfo[((rootPc + iv) % 12 + 12) % 12] = decomposeDegree(iv) to false
     val tuning = state.liveTuning
     val out = HashMap<FretPosition, FretMark>()
     for (s in tuning.openStrings.indices) {
         for (f in 0..DISPLAY_FRETS) {
             val pos = FretPosition(s, f)
-            val pc = Fretboard.noteAt(tuning, pos).pitchClass
-            val label = when (state.labelMode) {
-                LabelMode.Notes -> NoteSpeller.spell(pc)
-                else -> ""
-            }
-            when {
-                pc.value in shellPcs ->
-                    out[pos] = FretMark(label = label, isRoot = pc.value == rootPc, kind = MarkKind.Chord)
-                // Don't double-mark a pitch class that's already a shell tone.
-                pc.value in upperPcs ->
-                    out[pos] = FretMark(label = label, isRoot = false, kind = MarkKind.Scale)
-            }
+            val pc = Fretboard.noteAt(tuning, pos).pitchClass.value
+            val info = pcInfo[pc] ?: continue
+            out[pos] = FretMark(
+                label = info.first,
+                isRoot = pc == rootPc,
+                kind = if (info.second) MarkKind.Scale else MarkKind.Chord,
+            )
         }
     }
     return out

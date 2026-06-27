@@ -87,11 +87,11 @@ class EarTrainingState(
      *  opens in major-triads-only for the simplest starting point. */
     var includeMinor by mutableStateOf(false)
     /** Triads vs Sevenths vs Extended. Default Triads (simplest). */
-    var chordTypeLevel by mutableStateOf(ChordTypeLevel.Triads)
+    var chordTypeLevel by mutableStateOf(ChordTypeLevel.Sevenths)
     /** Null = random key each round. Non-null = always use this key. */
     var fixedKey by mutableStateOf<PitchClass?>(null)
     /** BPM for progression loop. */
-    var progBpm by mutableStateOf(120)
+    var progBpm by mutableStateOf(140)
 
     /** Current progression state. */
     var progKey by mutableStateOf(PitchClass.C)

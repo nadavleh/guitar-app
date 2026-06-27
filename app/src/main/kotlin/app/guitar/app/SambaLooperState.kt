@@ -39,7 +39,7 @@ class SambaLooperState(
 ) {
     var pattern by mutableStateOf(PercussionPattern.empty())
         private set
-    var bpm by mutableStateOf(100)
+    var bpm by mutableStateOf(140)
     /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
     var swing by mutableStateOf(0)
     var isPlaying by mutableStateOf(false)

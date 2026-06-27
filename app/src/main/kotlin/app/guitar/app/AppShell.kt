@@ -36,7 +36,7 @@ private data class RailItem(val sheet: Sheet, val glyph: String, val label: Stri
 private val RAIL_ITEMS = listOf(
     RailItem(Sheet.Fretboard, "🎸", "Fretboard"),
     RailItem(Sheet.Loop, "⟲", "Loop"),
-    RailItem(Sheet.EarTraining, "👂", "Ear"),
+    RailItem(Sheet.EarTraining, "👂", "Ear Training"),
     RailItem(Sheet.Decompose, "🧩", "Decompose"),
     RailItem(Sheet.SambaLooper, "🥁", "Drums"),
     RailItem(Sheet.Tuner, "🎛", "Tuner"),

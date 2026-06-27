@@ -57,9 +57,9 @@ export class EarTrainingState {
 
   includeMajor = true;
   includeMinor = false;
-  chordTypeLevel = ChordTypeLevel.Triads;
+  chordTypeLevel = ChordTypeLevel.Sevenths;
   fixedKey: PitchClass | null = null;
-  progBpm = 120;
+  progBpm = 140;
 
   progKey: PitchClass = 0;
   progMode = TrainingMode.Major;

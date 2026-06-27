@@ -23,7 +23,7 @@ export interface SambaDeps {
 
 export class SambaLooperState {
   pattern: PercussionPattern = PercussionPattern.empty();
-  bpm = 100;
+  bpm = 140;
   swing = 0;
   isPlaying = false;
   currentSlot = -1;

@@ -31,7 +31,7 @@ const qualityLabel = (sym: string) => (sym === "" ? "major" : sym);
 const NAV_ITEMS: { sheet: Sheet; glyph: string; label: string }[] = [
   { sheet: Sheet.Fretboard, glyph: "🎸", label: "Fretboard" },
   { sheet: Sheet.Loop, glyph: "⟲", label: "Loop" },
-  { sheet: Sheet.EarTraining, glyph: "👂", label: "Ear" },
+  { sheet: Sheet.EarTraining, glyph: "👂", label: "Ear Training" },
   { sheet: Sheet.Decompose, glyph: "🧩", label: "Decompose" },
   { sheet: Sheet.SambaLooper, glyph: "🥁", label: "Drums" },
   { sheet: Sheet.Tuner, glyph: "🎛", label: "Tuner" },
@@ -97,8 +97,13 @@ export class App {
     });
     this.sambaUI = new SambaLooperUI(this.samba, () => state.closeSheet());
     this.decomposeUI = new DecomposeUI(state, () => state.closeSheet());
+    const header = el("div", { class: "app-header" }, [
+      el("span", { class: "app-brand" }, ["chorect"]),
+      el("span", { class: "app-byline" }, ["made by Nadavileh"]),
+    ]);
     const appRoot = el("div", { class: "app-root" }, [this.railEl, this.contentEl]);
-    root.appendChild(appRoot);
+    const shell = el("div", { class: "app-shell" }, [header, appRoot]);
+    root.appendChild(shell);
     root.appendChild(this.sheetLayer);
     this.setupPressGuard();
     state.subscribe(() => this.scheduleRender());

@@ -301,7 +301,7 @@ private fun sheetLabel(s: Sheet): String = when (s) {
     Sheet.Loop -> "Loop"
     Sheet.Options -> "Options"
     Sheet.Tuner -> "Tuner"
-    Sheet.EarTraining -> "Ear"
+    Sheet.EarTraining -> "Ear Training"
     Sheet.SambaLooper -> "Drums"
     Sheet.Decompose -> "Decompose"
 }
