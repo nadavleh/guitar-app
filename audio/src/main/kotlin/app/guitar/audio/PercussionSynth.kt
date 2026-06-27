@@ -29,13 +29,12 @@ class PercussionSynth(val sampleRate: Int = 44100) {
             1 -> tamborimClack(muted = true)
             else -> noiseDrum(durSec = 0.05, decay = 95.0, lpAlpha = 0.30, hp = true, amp = 0.30)
         }
-        // Pandeiro: 0 open bass, 1 muted bass (low-mid), 2 slap, 3 jingle, 4 jingle hi.
+        // Pandeiro: 0 open bass, 1 muted bass (low-mid), 2 slap, 3 jingle.
         PercussionInstrument.Pandeiro -> when (voiceIndex) {
             0 -> tonedTap(freq = 150.0, durSec = 0.22, decay = 13.0, amp = 0.62) // open bass
             1 -> tonedTap(freq = 155.0, durSec = 0.08, decay = 42.0, amp = 0.55) // muted bass
             2 -> noiseDrum(durSec = 0.08, decay = 60.0, lpAlpha = 0.50, hp = true, amp = 0.72) // slap
-            3 -> jingle(hi = false)
-            else -> jingle(hi = true)
+            else -> jingle()
         }
         PercussionInstrument.Agogo -> when (voiceIndex) {
             0 -> bell(freq = 590.0)
@@ -102,12 +101,12 @@ class PercussionSynth(val sampleRate: Int = 44100) {
         return fadeOut(out)
     }
 
-    /** Pandeiro jingles (platinelas): bright high-passed noise + inharmonic high
-     *  partials that shimmer and ring. [hi] makes a slightly higher, shorter version. */
-    private fun jingle(hi: Boolean): FloatArray {
-        val durSec = if (hi) 0.16 else 0.20
-        val decay = if (hi) 26.0 else 20.0
-        val base = if (hi) 3400.0 else 2700.0
+    /** Pandeiro jingle (platinelas): bright high-passed noise + inharmonic high
+     *  partials that shimmer and ring. */
+    private fun jingle(): FloatArray {
+        val durSec = 0.20
+        val decay = 20.0
+        val base = 2700.0
         val n = (sampleRate * durSec).toInt().coerceAtLeast(1)
         val out = FloatArray(n)
         val rng = Random(303)

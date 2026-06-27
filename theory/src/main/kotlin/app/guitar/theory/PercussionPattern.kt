@@ -1,7 +1,7 @@
 package app.guitar.theory
 
 /** Slot count of the default meter (2 bars of 2/4 in sixteenths = 16). Kept as a
- *  named constant for the stock samba / empty patterns and the unit tests. */
+ *  named constant for the empty pattern and the unit tests. */
 const val PERCUSSION_SLOTS = 16
 
 /**
@@ -181,47 +181,6 @@ data class PercussionPattern(
             }
             return runCatching { PercussionPattern(grid, meter) }.getOrNull()
         }
-
-        /**
-         * The built-in "stock samba" groove over 2 bars of 2/4 (default meter).
-         *  - Surdo: muted bass on each bar downbeat (0, 8), ringing accent on the "2" (4, 12).
-         *  - Tamborim: the teleco-teco — a syncopated clack ostinato with choked mutes.
-         *  - Pandeiro: continuous sixteenths — bass / jingle / slap / jingle-hi.
-         *  - Agogô: low/high alternating bell figure.
-         */
-        val SAMBA: PercussionPattern = run {
-            // Surdo voices: 0 open(ring), 1 muted bass, 2 tap.
-            val surdo = arrayOfNulls<Int>(PERCUSSION_SLOTS).also {
-                it[0] = 1; it[4] = 0; it[8] = 1; it[12] = 0
-            }.toList()
-            // Tamborim voices: 0 clack, 1 muted clack, 2 tap.
-            val tamborim = arrayOfNulls<Int>(PERCUSSION_SLOTS).also {
-                it[0] = 0; it[3] = 0; it[4] = 1; it[6] = 0
-                it[8] = 0; it[11] = 0; it[12] = 1; it[14] = 0
-            }.toList()
-            // Pandeiro voices: 0 bass(open), 1 bass(muted), 2 slap, 3 jingle, 4 jingle hi.
-            val pandeiro = (0 until PERCUSSION_SLOTS).map { i ->
-                when (i % 4) {
-                    0 -> 0   // bass (open) on the beat
-                    1 -> 3   // jingle
-                    2 -> 2   // slap
-                    else -> 4 // jingle hi
-                }
-            }
-            val agogo = arrayOfNulls<Int>(PERCUSSION_SLOTS).also {
-                it[0] = 0; it[2] = 1; it[3] = 1; it[6] = 0
-                it[8] = 0; it[10] = 1; it[11] = 1; it[14] = 0
-            }.toList()
-            PercussionPattern(
-                mapOf(
-                    PercussionInstrument.Surdo to surdo,
-                    PercussionInstrument.Tamborim to tamborim,
-                    PercussionInstrument.Pandeiro to pandeiro,
-                    PercussionInstrument.Agogo to agogo,
-                ),
-                PercussionMeter.DEFAULT,
-            )
-        }
     }
 }
 
@@ -236,16 +195,35 @@ object PercussionTiming {
 
     /**
      * Duration (ms) to wait AFTER [slot] before the next slot, applying a Brazilian
-     * subdivision swing. [swingPercent] 0 = straight; higher pushes the odd
-     * subdivisions (the off-beats — e.g. the "e"/"a" of every beat in sixteenths)
-     * progressively later, so each on→off pair stretches from 1:1 (straight) toward
-     * a hemiola/triplet lilt (≈2:1 around 66%, up to 3:1 at 100%). The loop's total
-     * length is unchanged — only the internal subdivision shifts.
+     * 16th-note swing.
+     *
+     * Swing only operates when a quarter-note beat is split into exactly four 16th
+     * notes ([PercussionMeter.beatUnit] == 4 and [PercussionMeter.division] == 16);
+     * any other meter plays straight. Within each beat the four 16ths sit at the
+     * nominal positions 0, ¼, ½, ¾ of the beat. As [swingPercent] rises 0→100 the
+     * 1st and 3rd 16ths stay anchored, the 2nd is delayed toward ⅓ of the beat
+     * (+1/12 beat at 100 %), and the 4th is advanced (made early) toward ⅔ of the
+     * beat (−1/12 beat at 100 %). Equivalently the per-beat slot durations scale by
+     * [1+s/3, 1−s/3, 1−s/3, 1+s/3] where s = swingPercent/100, so each beat — and
+     * thus the whole loop — keeps its total length; only the inner onsets move.
      */
-    fun swungSlotMs(slot: Int, bpm: Int, swingPercent: Int, division: Int = 16): Long {
-        val base = slotMs(bpm, division).toDouble()
-        val frac = (swingPercent.coerceIn(0, 100) / 100.0) * 0.5   // max: off-slots half a slot late
-        fun delayOf(s: Int) = if (s % 2 == 1) base * frac else 0.0  // odd subdivisions arrive late
-        return (base + delayOf(slot + 1) - delayOf(slot)).toLong().coerceAtLeast(1L)
+    fun swungSlotMs(slot: Int, bpm: Int, swingPercent: Int, meter: PercussionMeter): Long {
+        val base = slotMs(bpm, meter.division)
+        // Swing is defined only for a quarter-note beat divided into four 16ths.
+        if (meter.beatUnit != 4 || meter.division != 16) return base.coerceAtLeast(1L)
+        val s = swingPercent.coerceIn(0, 100) / 100.0
+        // Each 16th's onset, in ms from loop start, rounded independently — so the
+        // anchors (beat start, half-beat, beat boundary) stay exactly on grid and the
+        // rounding never accumulates. The slot's duration is the gap to the next onset.
+        fun onsetMs(k: Int): Long {
+            val offsetSlots = when (k % 4) {
+                0 -> 0.0              // 1st 16th: anchored on the beat
+                1 -> 1.0 + s / 3.0    // 2nd: delayed ¼→⅓ of the beat
+                2 -> 2.0              // 3rd: anchored on the half-beat
+                else -> 3.0 - s / 3.0 // 4th: advanced ¾→⅔ of the beat
+            }
+            return Math.round(((k / 4) * 4 + offsetSlots) * base)
+        }
+        return (onsetMs(slot + 1) - onsetMs(slot)).coerceAtLeast(1L)
     }
 }

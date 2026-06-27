@@ -36,7 +36,7 @@ class SambaLooperState(
      *  back to the built-in synth. Injected so the pure state stays Context-free. */
     private val sampleLoader: (PercussionInstrument, Int) -> FloatArray? = { _, _ -> null },
 ) {
-    var pattern by mutableStateOf(PercussionPattern.SAMBA)
+    var pattern by mutableStateOf(PercussionPattern.empty())
         private set
     var bpm by mutableStateOf(100)
     /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
@@ -114,11 +114,6 @@ class SambaLooperState(
         pattern = PercussionPattern.empty(pattern.meter)
     }
 
-    /** Load the built-in "stock samba" groove. */
-    fun loadSamba() {
-        pattern = PercussionPattern.SAMBA
-    }
-
     // ---- Meter (bars / time signature / division) ----
 
     val meter get() = pattern.meter
@@ -179,7 +174,6 @@ class SambaLooperState(
         job = scope.launch {
             while (isPlaying) {
                 val snapshot = pattern        // re-read each bar so meter edits take effect
-                val division = snapshot.meter.division
                 for (slot in 0 until snapshot.slots) {
                     if (!isPlaying) break
                     currentSlot = slot
@@ -188,7 +182,7 @@ class SambaLooperState(
                         val v = snapshot.voiceAt(inst, slot) ?: continue
                         audio.playSamples(buffer(inst, v), volumeOf(inst))
                     }
-                    delay(PercussionTiming.swungSlotMs(slot, bpm, swing, division))
+                    delay(PercussionTiming.swungSlotMs(slot, bpm, swing, snapshot.meter))
                 }
             }
         }

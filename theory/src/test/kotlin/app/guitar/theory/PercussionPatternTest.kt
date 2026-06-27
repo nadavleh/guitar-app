@@ -7,6 +7,16 @@ import kotlin.test.assertTrue
 
 class PercussionPatternTest {
 
+    /** A non-trivial hand-built pattern (Surdo on both bar downbeats + assorted hits)
+     *  for the structural tests, now that there is no built-in preset. */
+    private fun samplePattern(): PercussionPattern =
+        PercussionPattern.empty()
+            .withCell(PercussionInstrument.Surdo, 0, 1)
+            .withCell(PercussionInstrument.Surdo, 8, 1)
+            .withCell(PercussionInstrument.Tamborim, 3, 0)
+            .withCell(PercussionInstrument.Pandeiro, 5, 2)
+            .withCell(PercussionInstrument.Agogo, 2, 1)
+
     @Test fun `empty pattern has all silent cells`() {
         val p = PercussionPattern.empty()
         assertTrue(p.isEmpty())
@@ -33,17 +43,17 @@ class PercussionPatternTest {
         p = p.cycled(inst, 5); assertNull(p.voiceAt(inst, 5))
     }
 
-    @Test fun `cycling the 5-voice pandeiro wraps after voice 4`() {
+    @Test fun `cycling the 4-voice pandeiro wraps after voice 3`() {
         var p = PercussionPattern.empty()
-        val inst = PercussionInstrument.Pandeiro  // 5 voices
-        for (expected in 0..4) {
+        val inst = PercussionInstrument.Pandeiro  // 4 voices
+        for (expected in 0..3) {
             p = p.cycled(inst, 9); assertEquals(expected, p.voiceAt(inst, 9))
         }
         p = p.cycled(inst, 9); assertNull(p.voiceAt(inst, 9))
     }
 
     @Test fun `pattern encodes and decodes round-trip`() {
-        val p = PercussionPattern.SAMBA
+        val p = samplePattern()
         val decoded = PercussionPattern.decode(p.encode())
         assertEquals(p, decoded)
         // Empty round-trips too.
@@ -79,7 +89,7 @@ class PercussionPatternTest {
     }
 
     @Test fun `translate rotates with wrap-around and is reversible`() {
-        val p = PercussionPattern.SAMBA
+        val p = samplePattern()
         // A full-loop shift is the identity.
         assertEquals(p, p.translated(p.slots))
         assertEquals(p, p.translated(0))
@@ -102,8 +112,9 @@ class PercussionPatternTest {
     @Test fun `decode rejects malformed or out-of-range input`() {
         assertNull(PercussionPattern.decode("garbage"))
         assertNull(PercussionPattern.decode(""))
-        // A surdo cell of 9 is out of range (surdo has 3 voices).
-        val bad = PercussionPattern.SAMBA.encode().replaceFirst("1", "9")
+        // A surdo cell of 9 is out of range (surdo has 3 voices). The first "-" is the
+        // first body cell (the meter prefix has none), so this corrupts Surdo slot 0.
+        val bad = PercussionPattern.empty().encode().replaceFirst("-", "9")
         assertNull(PercussionPattern.decode(bad))
     }
 
@@ -116,25 +127,11 @@ class PercussionPatternTest {
     }
 
     @Test fun `clearedRow wipes only that instrument`() {
-        var p = PercussionPattern.SAMBA
+        var p = samplePattern()
         p = p.clearedRow(PercussionInstrument.Pandeiro)
         assertTrue((0 until PERCUSSION_SLOTS).all { p.voiceAt(PercussionInstrument.Pandeiro, it) == null })
         // Surdo still has its downbeat hits
         assertTrue((0 until PERCUSSION_SLOTS).any { p.voiceAt(PercussionInstrument.Surdo, it) != null })
-    }
-
-    @Test fun `samba preset hits the downbeat of each bar on the surdo`() {
-        val p = PercussionPattern.SAMBA
-        // slot 0 = bar 1 downbeat, slot 8 = bar 2 downbeat
-        assertTrue(p.voiceAt(PercussionInstrument.Surdo, 0) != null)
-        assertTrue(p.voiceAt(PercussionInstrument.Surdo, 8) != null)
-    }
-
-    @Test fun `samba pandeiro plays every sixteenth`() {
-        val p = PercussionPattern.SAMBA
-        for (s in 0 until PERCUSSION_SLOTS) {
-            assertTrue(p.voiceAt(PercussionInstrument.Pandeiro, s) != null, "pandeiro silent at slot $s")
-        }
     }
 
     @Test fun `slot and loop timing at 120 bpm`() {
@@ -143,19 +140,59 @@ class PercussionPatternTest {
         assertEquals(2000L, PercussionTiming.loopMs(120))
     }
 
+    private val swingMeter = PercussionMeter.DEFAULT  // 2/4, 1/16 → four 16ths per beat
+
     @Test fun `zero swing keeps every slot straight`() {
         for (s in 0 until PERCUSSION_SLOTS) {
-            assertEquals(PercussionTiming.slotMs(120), PercussionTiming.swungSlotMs(s, 120, 0))
+            assertEquals(PercussionTiming.slotMs(120), PercussionTiming.swungSlotMs(s, 120, 0, swingMeter))
         }
     }
 
-    @Test fun `swing delays off-16ths but preserves loop length`() {
-        val base = PercussionTiming.slotMs(120) // 125
-        // 100% swing: even→odd pair stretches to 3:1 (≈1.5x then 0.5x of base).
-        assertEquals((base * 1.5).toLong(), PercussionTiming.swungSlotMs(0, 120, 100))
-        assertEquals((base * 0.5).toLong(), PercussionTiming.swungSlotMs(1, 120, 100))
-        // Total loop length is unchanged (within per-slot integer-ms rounding).
-        val total = (0 until PERCUSSION_SLOTS).sumOf { PercussionTiming.swungSlotMs(it, 120, 100) }
+    @Test fun `full swing stretches the 1st and 4th gaps and compresses the 2nd and 3rd`() {
+        val d0 = PercussionTiming.swungSlotMs(0, 120, 100, swingMeter)  // 1st → 2nd
+        val d1 = PercussionTiming.swungSlotMs(1, 120, 100, swingMeter)  // 2nd → 3rd
+        val d2 = PercussionTiming.swungSlotMs(2, 120, 100, swingMeter)  // 3rd → 4th
+        val d3 = PercussionTiming.swungSlotMs(3, 120, 100, swingMeter)  // 4th → next beat
+        assertEquals(d0, d3)              // the two stretched gaps match
+        assertEquals(d1, d2)              // the two compressed gaps match
+        assertTrue(d0 > d1, "stretched gap $d0 should exceed compressed gap $d1")
+        assertEquals(d0 + d1 + d2 + d3, PercussionTiming.slotMs(120) * 4)  // beat length intact
+    }
+
+    @Test fun `full swing puts the 2nd 16th a third of a beat in and the 4th two thirds in`() {
+        // beat = four 16ths = 4 × 125 = 500 ms. Onsets are cumulative slot durations.
+        val beatMs = PercussionTiming.slotMs(120) * 4   // 500
+        fun onset(slot: Int) = (0 until slot).sumOf { PercussionTiming.swungSlotMs(it, 120, 100, swingMeter) }
+        assertEquals(0L, onset(0))                        // 1st anchored at beat start
+        // 2nd delayed from 1/4 (125) to ~1/3 (166) of the beat.
+        assertTrue(kotlin.math.abs(onset(1) - beatMs / 3) <= 1, "2nd 16th onset ${onset(1)} ≉ ${beatMs / 3}")
+        assertEquals(beatMs / 2, onset(2))                // 3rd anchored at half the beat
+        // 4th advanced (early) from 3/4 (375) to ~2/3 (333) of the beat.
+        assertTrue(kotlin.math.abs(onset(3) - 2 * beatMs / 3) <= 1, "4th 16th onset ${onset(3)} ≉ ${2 * beatMs / 3}")
+    }
+
+    @Test fun `swing pattern repeats every beat`() {
+        for (s in 0 until 4) {
+            assertEquals(
+                PercussionTiming.swungSlotMs(s, 120, 70, swingMeter),
+                PercussionTiming.swungSlotMs(s + 4, 120, 70, swingMeter),
+            )
+        }
+    }
+
+    @Test fun `swing preserves total loop length`() {
+        val total = (0 until PERCUSSION_SLOTS).sumOf { PercussionTiming.swungSlotMs(it, 120, 100, swingMeter) }
         assertTrue(kotlin.math.abs(total - PercussionTiming.loopMs(120)) <= PERCUSSION_SLOTS.toLong())
+    }
+
+    @Test fun `swing does nothing unless the division is sixteenth notes`() {
+        // 1/8 division: a beat is two 8ths, not four 16ths → no swing at any level.
+        val eighths = PercussionMeter(division = 8)
+        for (s in 0 until eighths.totalSlots) {
+            assertEquals(PercussionTiming.slotMs(120, 8), PercussionTiming.swungSlotMs(s, 120, 100, eighths))
+        }
+        // 1/32 division likewise untouched.
+        val thirtyseconds = PercussionMeter(division = 32)
+        assertEquals(PercussionTiming.slotMs(120, 32), PercussionTiming.swungSlotMs(1, 120, 100, thirtyseconds))
     }
 }

@@ -24,7 +24,7 @@ class PercussionSynthTest {
     @Test fun voiceCountsMatchTheNewLayout() {
         assertTrue(PercussionVoices.voiceCount(PercussionInstrument.Surdo) == 3)
         assertTrue(PercussionVoices.voiceCount(PercussionInstrument.Tamborim) == 3)
-        assertTrue(PercussionVoices.voiceCount(PercussionInstrument.Pandeiro) == 5)
+        assertTrue(PercussionVoices.voiceCount(PercussionInstrument.Pandeiro) == 4)
         assertTrue(PercussionVoices.voiceCount(PercussionInstrument.Agogo) == 2)
     }
 }

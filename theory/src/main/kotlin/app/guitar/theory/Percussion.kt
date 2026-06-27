@@ -39,13 +39,12 @@ object PercussionVoices {
             PercussionVoice(PercussionInstrument.Tamborim, 2, "tap", "·"),
         ),
         // Pandeiro (frame drum): two low-mid bass notes (open + muted), a slap, and
-        // two jingle (platinela) shimmers, one slightly higher.
+        // a jingle (platinela) shimmer.
         PercussionInstrument.Pandeiro to listOf(
             PercussionVoice(PercussionInstrument.Pandeiro, 0, "bass (open)", "●"),
             PercussionVoice(PercussionInstrument.Pandeiro, 1, "bass (muted)", "◐"),
             PercussionVoice(PercussionInstrument.Pandeiro, 2, "slap", "✦"),
             PercussionVoice(PercussionInstrument.Pandeiro, 3, "jingle", "○"),
-            PercussionVoice(PercussionInstrument.Pandeiro, 4, "jingle hi", "◌"),
         ),
         PercussionInstrument.Agogo to listOf(
             PercussionVoice(PercussionInstrument.Agogo, 0, "low bell", "▼"),

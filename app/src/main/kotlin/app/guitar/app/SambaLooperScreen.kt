@@ -122,13 +122,24 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
         }
 
         // ----- Swing (Brazilian 16th-note swing; 0 = straight) -----
+        // Only meaningful on a 1/16 grid (a quarter-note beat split into four 16ths):
+        // it holds the 1st & 3rd 16ths in place, delays the 2nd, and pulls the 4th
+        // early — straight → triplet lilt. On any other division it does nothing, so
+        // the slider is disabled and the label says why.
+        val swingActive = samba.meter.beatUnit == 4 && samba.meter.division == 16
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(if (samba.swing == 0) "Swing: straight" else "Swing: ${samba.swing}%",
+            Text(
+                when {
+                    !swingActive -> "Swing: 1/16 grid only"
+                    samba.swing == 0 -> "Swing: straight"
+                    else -> "Swing: ${samba.swing}% (16ths)"
+                },
                 style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(140.dp))
             Slider(
                 value = samba.swing.toFloat(),
                 onValueChange = { samba.swing = it.toInt() },
                 valueRange = 0f..100f,
+                enabled = swingActive,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -263,11 +274,6 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             Box {
                 OutlinedButton(onClick = { loadMenu = true }) { Text("Load…") }
                 DropdownMenu(expanded = loadMenu, onDismissRequest = { loadMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("stock samba") },
-                        onClick = { samba.loadSamba(); loadMenu = false },
-                    )
-                    if (saved.isNotEmpty()) HorizontalDivider()
                     for ((name, pat) in saved) {
                         DropdownMenuItem(
                             text = {
