@@ -43,11 +43,16 @@ data class PercussionMeter(
     }
 }
 
+/** Accent flag folded into a cell's raw value: raw = voice + ACCENT when accented. */
+const val PERCUSSION_ACCENT = 100
+
 /**
  * A percussion loop grid. For each instrument there is a list of cells (one per
- * slot of [meter]); a cell is either `null` (silent) or a 0-based voice index for
- * that instrument. The slot count is [PercussionMeter.totalSlots], so it varies
- * with the chosen bars / time signature / division.
+ * slot of [meter]); a cell is either `null` (silent) or a raw value encoding a
+ * 0-based voice index plus an optional accent flag (raw = voice, or voice +
+ * [PERCUSSION_ACCENT] when the hit is accented). Use [voiceAt] / [isAccented]
+ * rather than reading the raw grid. The slot count is
+ * [PercussionMeter.totalSlots], so it varies with bars / time signature / division.
  *
  * Immutable — every mutation returns a new pattern (Compose-friendly).
  */
@@ -72,32 +77,47 @@ data class PercussionPattern(
                 "${inst.id} row must have ${meter.totalSlots} slots, got ${row.size}"
             }
             row.forEach { v ->
-                require(v == null || v in 0 until inst.voiceCount) {
-                    "${inst.id} has out-of-range voice index $v"
+                require(v == null || (v % PERCUSSION_ACCENT) in 0 until inst.voiceCount &&
+                    v / PERCUSSION_ACCENT <= 1 && v >= 0) {
+                    "${inst.id} has out-of-range cell value $v"
                 }
             }
         }
     }
 
-    fun voiceAt(instrument: PercussionInstrument, slot: Int): Int? = grid.getValue(instrument.id)[slot]
+    fun voiceAt(instrument: PercussionInstrument, slot: Int): Int? =
+        grid.getValue(instrument.id)[slot]?.let { it % PERCUSSION_ACCENT }
+
+    /** Whether the (non-silent) cell is an accented hit. */
+    fun isAccented(instrument: PercussionInstrument, slot: Int): Boolean =
+        (grid.getValue(instrument.id)[slot] ?: 0) >= PERCUSSION_ACCENT
+
+    /** Toggle the accent on a non-silent cell (no-op on silent cells). */
+    fun accentToggled(instrument: PercussionInstrument, slot: Int): PercussionPattern {
+        val raw = grid.getValue(instrument.id)[slot] ?: return this
+        val next = if (raw >= PERCUSSION_ACCENT) raw - PERCUSSION_ACCENT else raw + PERCUSSION_ACCENT
+        val newRow = grid.getValue(instrument.id).toMutableList().also { it[slot] = next }
+        return copy(grid = grid + (instrument.id to newRow))
+    }
 
     /** Whether [instrument] (by id) is part of this pattern's kit. */
     fun hasInstrument(instrument: PercussionInstrument): Boolean = grid.containsKey(instrument.id)
 
     /**
      * Advance a cell one step in the cycle:
-     * `null → 0 → 1 → … → (voiceCount-1) → null`.
+     * `null → 0 → 1 → … → (voiceCount-1) → null`. An accent survives voice cycling.
      */
     fun cycled(instrument: PercussionInstrument, slot: Int): PercussionPattern {
         require(slot in 0 until slots)
         val count = instrument.voiceCount
-        val cur = grid.getValue(instrument.id)[slot]
+        val cur = voiceAt(instrument, slot)
+        val accent = isAccented(instrument, slot)
         val next = when {
             cur == null -> 0
             cur >= count - 1 -> null
             else -> cur + 1
         }
-        return withCell(instrument, slot, next)
+        return withCell(instrument, slot, next?.plus(if (accent) PERCUSSION_ACCENT else 0))
     }
 
     fun withCell(instrument: PercussionInstrument, slot: Int, voice: Int?): PercussionPattern {
@@ -211,7 +231,9 @@ data class PercussionPattern(
                 val cells = rowStr.substring(eq + 1).split(",")
                 if (cells.size != meter.totalSlots) return null
                 val row = cells.map { c -> if (c == "-") null else c.toIntOrNull() ?: return null }
-                if (row.any { it != null && it !in 0 until inst.voiceCount }) return null
+                // Raw cell = voice or voice + PERCUSSION_ACCENT (accented hit).
+                if (row.any { it != null &&
+                        !(it >= 0 && it / PERCUSSION_ACCENT <= 1 && (it % PERCUSSION_ACCENT) in 0 until inst.voiceCount) }) return null
                 instruments.add(inst)
                 grid[id] = row
             }

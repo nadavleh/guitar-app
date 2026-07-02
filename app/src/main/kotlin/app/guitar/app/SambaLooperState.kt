@@ -115,6 +115,11 @@ class SambaLooperState(
         audio.playSamples(buffer(instrument, voiceIndex), volumeOf(instrument))
     }
 
+    /** Toggle the accent on a non-silent cell (Accent tool). */
+    fun toggleAccent(instrument: PercussionInstrument, slot: Int) {
+        pattern = pattern.accentToggled(instrument, slot)
+    }
+
     /** Clear a single cell (long-press) without cycling through the voices. */
     fun clearCell(instrument: PercussionInstrument, slot: Int) {
         pattern = pattern.withCell(instrument, slot, null)
@@ -221,7 +226,9 @@ class SambaLooperState(
                     for (inst in snapshot.instruments) {
                         if (!isAudible(inst)) continue
                         val v = snapshot.voiceAt(inst, slot) ?: continue
-                        audio.playSamples(buffer(inst, v), volumeOf(inst))
+                        // Accented hits play ~1.4× louder (mixer clamps overall).
+                        val gain = volumeOf(inst) * (if (snapshot.isAccented(inst, slot)) 1.4f else 1f)
+                        audio.playSamples(buffer(inst, v), gain)
                     }
                     delay(PercussionTiming.swungSlotMs(slot, bpm, swing, snapshot.meter))
                 }

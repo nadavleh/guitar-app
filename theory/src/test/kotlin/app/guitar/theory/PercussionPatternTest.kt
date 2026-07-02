@@ -117,6 +117,32 @@ class PercussionPatternTest {
         // first body cell (the meter prefix has none), so this corrupts Surdo slot 0.
         val bad = PercussionPattern.empty().encode().replaceFirst("-", "9")
         assertNull(PercussionPattern.decode(bad))
+        // Accented out-of-range voice (surdo 100+9) is rejected too.
+        assertNull(PercussionPattern.decode(PercussionPattern.empty().encode().replaceFirst("-", "109")))
+        // Double-accent (200+) is rejected.
+        assertNull(PercussionPattern.decode(PercussionPattern.empty().encode().replaceFirst("-", "201")))
+    }
+
+    // ---- Accents ----
+
+    @Test fun `accent toggles on a hit, survives voice cycling, and round-trips`() {
+        val surdo = PercussionCatalog.Surdo
+        var p = PercussionPattern.empty().cycled(surdo, 0)     // voice 0, plain
+        assertTrue(!p.isAccented(surdo, 0))
+        p = p.accentToggled(surdo, 0)
+        assertTrue(p.isAccented(surdo, 0))
+        assertEquals(0, p.voiceAt(surdo, 0))                    // voice unchanged
+        // Cycling to the next voice keeps the accent…
+        p = p.cycled(surdo, 0)
+        assertEquals(1, p.voiceAt(surdo, 0))
+        assertTrue(p.isAccented(surdo, 0))
+        // …and encode/decode preserves it.
+        val rt = PercussionPattern.decode(p.encode())!!
+        assertTrue(rt.isAccented(surdo, 0))
+        assertEquals(1, rt.voiceAt(surdo, 0))
+        // Toggling off works; toggling a silent cell is a no-op.
+        assertTrue(!p.accentToggled(surdo, 0).isAccented(surdo, 0))
+        assertEquals(p, p.accentToggled(surdo, 5))
     }
 
     @Test fun `cycling one cell does not disturb the others`() {

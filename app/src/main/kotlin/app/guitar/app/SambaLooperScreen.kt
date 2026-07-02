@@ -73,6 +73,8 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
 
     // Eraser tool: when on, tapping a cell clears it instead of cycling its voice.
     var eraseMode by remember { mutableStateOf(false) }
+    // Accent tool: when on, tapping a non-silent cell toggles its accent (louder hit).
+    var accentMode by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -195,6 +197,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                     samba = samba,
                     instrument = inst,
                     eraseMode = eraseMode,
+                    accentMode = accentMode,
                     cellScroll = cellScroll,
                     modifier = Modifier.height(ROW_HEIGHT_DP.dp).fillMaxWidth(),
                 )
@@ -230,7 +233,13 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             if (eraseMode) {
                 Button(onClick = { eraseMode = false }) { Text("Erase ✓") }
             } else {
-                OutlinedButton(onClick = { eraseMode = true }) { Text("Erase") }
+                OutlinedButton(onClick = { eraseMode = true; accentMode = false }) { Text("Erase") }
+            }
+            // Accent: when on, tapping a hit toggles its accent (played louder).
+            if (accentMode) {
+                Button(onClick = { accentMode = false }) { Text("Accent ✓") }
+            } else {
+                OutlinedButton(onClick = { accentMode = true; eraseMode = false }) { Text("Accent") }
             }
             OutlinedButton(onClick = { saveName = ""; saveDialog = true }) { Text("Save…") }
             Box {
@@ -400,6 +409,7 @@ private fun InstrumentRow(
     samba: SambaLooperState,
     instrument: PercussionInstrument,
     eraseMode: Boolean,
+    accentMode: Boolean,
     cellScroll: androidx.compose.foundation.ScrollState,
     modifier: Modifier = Modifier,
 ) {
@@ -495,6 +505,7 @@ private fun InstrumentRow(
                     instrument = instrument,
                     slot = slot,
                     eraseMode = eraseMode,
+                    accentMode = accentMode,
                     // Fixed cell size → consistent "resolution" in any orientation;
                     // the lane scrolls horizontally instead of squishing.
                     modifier = Modifier.width(CELL_DP.dp).fillMaxHeight().padding(1.dp),
@@ -541,9 +552,11 @@ private fun Cell(
     instrument: PercussionInstrument,
     slot: Int,
     eraseMode: Boolean,
+    accentMode: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val voice = samba.pattern.voiceAt(instrument, slot)
+    val accented = samba.pattern.isAccented(instrument, slot)
     val isPlayhead = samba.currentSlot == slot
     val base = MaterialTheme.colorScheme.surfaceVariant
     val fill = when (voice) {
@@ -552,17 +565,26 @@ private fun Cell(
         1 -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.secondary
     }
-    val border = if (isPlayhead) MaterialTheme.colorScheme.onBackground else Color.Transparent
+    // Border precedence: playhead > accent ring > none.
+    val borderWidth = if (isPlayhead) 2.dp else if (accented) 2.dp else 0.dp
+    val borderColor = when {
+        isPlayhead -> MaterialTheme.colorScheme.onBackground
+        accented -> Color.White.copy(alpha = 0.85f)
+        else -> Color.Transparent
+    }
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
             .background(fill)
-            .border(if (isPlayhead) 2.dp else 0.dp, border, RoundedCornerShape(4.dp))
-            .pointerInput(instrument, slot, eraseMode) {
+            .border(borderWidth, borderColor, RoundedCornerShape(4.dp))
+            .pointerInput(instrument, slot, eraseMode, accentMode) {
                 detectTapGestures(
                     onTap = {
-                        if (eraseMode) samba.clearCell(instrument, slot)
-                        else samba.toggleSlot(instrument, slot)
+                        when {
+                            eraseMode -> samba.clearCell(instrument, slot)
+                            accentMode -> samba.toggleAccent(instrument, slot)
+                            else -> samba.toggleSlot(instrument, slot)
+                        }
                     },
                     onLongPress = { samba.clearCell(instrument, slot) },
                 )
@@ -572,7 +594,8 @@ private fun Cell(
         if (voice != null) {
             Text(
                 PercussionVoices.voice(instrument, voice).glyph,
-                fontSize = 16.sp,
+                fontSize = if (accented) 18.sp else 16.sp,
+                fontWeight = if (accented) FontWeight.Bold else FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onPrimary,
             )
         }

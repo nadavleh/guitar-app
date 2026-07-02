@@ -127,6 +127,7 @@ export class SambaLooperState {
     this.deps.audio.playSamples(this.buffer(instrument, voiceIndex), this.volumeOf(instrument));
   }
 
+  toggleAccent(instrument: PercussionInstrument, slot: number) { this.pattern = this.pattern.accentToggled(instrument, slot); this.notify(); }
   clearCell(instrument: PercussionInstrument, slot: number) { this.pattern = this.pattern.withCell(instrument, slot, null); this.notify(); }
   clearRow(instrument: PercussionInstrument) { this.pattern = this.pattern.clearedRow(instrument); this.notify(); }
   clearAll() { this.pattern = PercussionPattern.empty(this.pattern.instruments, this.pattern.meter); this.notify(); }
@@ -223,7 +224,9 @@ export class SambaLooperState {
             if (!this.isAudible(inst)) continue;
             const v = snapshot.voiceAt(inst, slot);
             if (v === null) continue;
-            this.deps.audio.playSamples(this.buffer(inst, v), this.volumeOf(inst));
+            // Accented hits play ~1.4× louder (mixer clamps overall).
+            const gain = this.volumeOf(inst) * (snapshot.isAccented(inst, slot) ? 1.4 : 1);
+            this.deps.audio.playSamples(this.buffer(inst, v), gain);
           }
           this.notify();
           await sleep(swungSlotMs(slot, this.bpm, this.swing, snapshot.meter));

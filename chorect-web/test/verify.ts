@@ -182,6 +182,19 @@ for (const b of BUILTIN_PATTERNS) {
 }
 check("built-in grooves (teleco-teco 1/2) are valid & round-trip", builtinsOk);
 
+// --- Drum accents: toggle, survive voice cycling, round-trip encode/decode ---
+{
+  const surdo = PercussionCatalog.Surdo;
+  let ap = PercussionPattern.empty().cycled(surdo, 0).accentToggled(surdo, 0);
+  check("accent toggles on and keeps the voice", ap.isAccented(surdo, 0) && ap.voiceAt(surdo, 0) === 0);
+  ap = ap.cycled(surdo, 0);
+  check("accent survives voice cycling", ap.isAccented(surdo, 0) && ap.voiceAt(surdo, 0) === 1);
+  const art = PercussionPattern.decode(ap.encode());
+  check("accent round-trips encode/decode", art !== null && art.isAccented(surdo, 0) && art.voiceAt(surdo, 0) === 1);
+  check("accent toggles off / silent no-op", !ap.accentToggled(surdo, 0).isAccented(surdo, 0) && ap.accentToggled(surdo, 5).encode() === ap.encode());
+  check("decode rejects accented out-of-range voice", PercussionPattern.decode(PercussionPattern.empty().encode().replace("-", "109")) === null);
+}
+
 // --- Interval trainer (#6) ---
 check("13 intervals from unison to octave", INTERVAL_CHOICES.length === 13 &&
   INTERVAL_CHOICES[0].longName === "unison" && INTERVAL_CHOICES[12].longName === "octave");

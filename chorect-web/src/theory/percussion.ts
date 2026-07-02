@@ -70,6 +70,9 @@ export function voiceOf(instrument: PercussionInstrument, index: number): Percus
 /** Slot count of the default meter (2 bars of 2/4 in sixteenths = 16). */
 export const PERCUSSION_SLOTS = 16;
 
+/** Accent flag folded into a cell's raw value: raw = voice + PERCUSSION_ACCENT. */
+export const PERCUSSION_ACCENT = 100;
+
 /** Allowed beat units (the lower number of the time signature). */
 export const BEAT_UNITS = [2, 4, 8] as const;
 /** Allowed subdivision values (the "1/N" note each beat is split into). */
@@ -147,15 +150,31 @@ export class PercussionPattern {
 
   hasInstrument(instrument: PercussionInstrument): boolean { return this.grid.has(instrument.id); }
 
+  /** Voice index (accent flag stripped), or null when silent. */
   voiceAt(instrument: PercussionInstrument, slot: number): number | null {
-    return this.grid.get(instrument.id)![slot];
+    const raw = this.grid.get(instrument.id)![slot];
+    return raw === null ? null : raw % PERCUSSION_ACCENT;
   }
 
+  /** Whether the (non-silent) cell is an accented hit. */
+  isAccented(instrument: PercussionInstrument, slot: number): boolean {
+    return (this.grid.get(instrument.id)![slot] ?? 0) >= PERCUSSION_ACCENT;
+  }
+
+  /** Toggle the accent on a non-silent cell (no-op on silent cells). */
+  accentToggled(instrument: PercussionInstrument, slot: number): PercussionPattern {
+    const raw = this.grid.get(instrument.id)![slot];
+    if (raw === null) return this;
+    return this.withCell(instrument, slot, raw >= PERCUSSION_ACCENT ? raw - PERCUSSION_ACCENT : raw + PERCUSSION_ACCENT);
+  }
+
+  /** Cycle the voice `null → 0 → … → last → null`; an accent survives cycling. */
   cycled(instrument: PercussionInstrument, slot: number): PercussionPattern {
     const count = instrument.voices.length;
-    const cur = this.grid.get(instrument.id)![slot];
+    const cur = this.voiceAt(instrument, slot);
+    const accent = this.isAccented(instrument, slot);
     const next = cur === null ? 0 : cur >= count - 1 ? null : cur + 1;
-    return this.withCell(instrument, slot, next);
+    return this.withCell(instrument, slot, next === null ? null : next + (accent ? PERCUSSION_ACCENT : 0));
   }
 
   withCell(instrument: PercussionInstrument, slot: number, voice: number | null): PercussionPattern {
@@ -279,7 +298,9 @@ export class PercussionPattern {
       for (const c of cells) {
         if (c === "-") { row.push(null); continue; }
         const n = parseInt(c, 10);
-        if (Number.isNaN(n) || n < 0 || n >= instrument.voices.length) return null;
+        // Raw cell = voice or voice + PERCUSSION_ACCENT (accented hit).
+        if (Number.isNaN(n) || n < 0 || Math.floor(n / PERCUSSION_ACCENT) > 1 ||
+            (n % PERCUSSION_ACCENT) >= instrument.voices.length) return null;
         row.push(n);
       }
       instruments.push(instrument);

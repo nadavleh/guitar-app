@@ -30,6 +30,7 @@ function iconBtn(svg: string, label: string, onClick: () => void): HTMLButtonEle
 
 export class SambaLooperUI {
   private eraseMode = false;
+  private accentMode = false;
   private openVoiceMenu: string | null = null;   // instrument id whose voice popup is open
   private loadMenuOpen = false;
   private addMenuOpen = false;
@@ -88,9 +89,13 @@ export class SambaLooperUI {
     // footer actions
     const erase = this.eraseMode
       ? btn("Erase ✓", () => { this.eraseMode = false; this.rerender(); }, "btn primary")
-      : btn("Erase", () => { this.eraseMode = true; this.rerender(); });
+      : btn("Erase", () => { this.eraseMode = true; this.accentMode = false; this.rerender(); });
+    const accent = this.accentMode
+      ? btn("Accent ✓", () => { this.accentMode = false; this.rerender(); }, "btn primary")
+      : btn("Accent", () => { this.accentMode = true; this.eraseMode = false; this.rerender(); });
     body.appendChild(el("div", { class: "et-row-gap" }, [
       erase,
+      accent,
       this.saveControl(),
       this.loadControl(),
       btn("Clear all", () => s.clearAll()),
@@ -237,15 +242,17 @@ export class SambaLooperUI {
   private cell(inst: PercussionInstrument, slot: number): HTMLElement {
     const s = this.samba;
     const voice = s.pattern.voiceAt(inst, slot);
+    const accented = s.pattern.isAccented(inst, slot);
     const isPlayhead = s.currentSlot === slot;
     const fill = voice === null ? "rgba(120,128,144,0.25)"
       : voice === 0 ? Colors.primary
       : voice === 1 ? Colors.scaleTone
       : Colors.chordTone;
-    const c = el("div", { class: isPlayhead ? "drum-cell playhead" : "drum-cell", style: `background:${fill}` },
+    const cls = "drum-cell" + (isPlayhead ? " playhead" : "") + (accented ? " accent" : "");
+    const c = el("div", { class: cls, style: `background:${fill}` },
       [voice !== null ? voiceOf(inst, voice).glyph : ""]);
 
-    // tap = cycle/erase; long-press = clear
+    // tap = cycle/erase/accent; long-press = clear
     let longPressed = false;
     let timer: number | undefined;
     c.addEventListener("pointerdown", () => {
@@ -257,6 +264,7 @@ export class SambaLooperUI {
       cancel();
       if (longPressed) return;
       if (this.eraseMode) s.clearCell(inst, slot);
+      else if (this.accentMode) s.toggleAccent(inst, slot);
       else s.toggleSlot(inst, slot);
     });
     c.addEventListener("pointerleave", cancel);
