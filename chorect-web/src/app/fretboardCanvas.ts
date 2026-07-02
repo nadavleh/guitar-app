@@ -393,6 +393,18 @@ export class FretboardCanvas {
       circle(ctx, x, h * 0.68, inlayR);
     }
 
+    // Fret numbers at the marker frets (bottom edge) — position is hard to tell
+    // when zoomed, so number the markers.
+    ctx.fillStyle = withAlpha(Colors.inlay, 0.85);
+    ctx.font = `600 ${Math.max(9, stringSpacing * 0.28)}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    for (const f of [...singleDots, ...doubleDots]) {
+      if (f > numFrets) continue;
+      const x = mx(openWidth + nutWidth + (f - 0.5) * fretSpacing);
+      ctx.fillText(String(f), x, h - 1);
+    }
+
     // strings (index 0 = lowest pitch = bottom)
     const woundCutoff = sc === 4 ? 0 : Math.floor((sc + 1) / 2);
     for (let s = 0; s < sc; s++) {

@@ -273,6 +273,23 @@ fun FretboardView(
             drawCircle(GuitarColors.inlay.copy(alpha = 0.6f), radius = inlayR, center = Offset(x, h * 0.68f))
         }
 
+        // ---------- Fret numbers (marker frets, bottom edge) ----------
+        // Position is hard to tell in the zoomed portrait view, so number the
+        // marker frets in the strip below the lowest string.
+        val fretNumStyle = TextStyle(
+            color = GuitarColors.inlay.copy(alpha = 0.85f),
+            fontSize = (stringSpacing * 0.28f).toSp(),
+            fontWeight = FontWeight.SemiBold,
+        )
+        for (f in singleDots + doubleDots) if (f <= numFrets) {
+            val x = mx(openWidth + nutWidth + (f - 0.5f) * fretSpacing)
+            val measured = measurer.measure(text = "$f", style = fretNumStyle)
+            drawText(
+                textLayoutResult = measured,
+                topLeft = Offset(x - measured.size.width / 2f, h - measured.size.height - 1f),
+            )
+        }
+
         // ---------- Strings ----------
         // stringIndex 0 = lowest pitch = bottom of the screen.
         // For guitar (6-string), the bottom half (E, A, D) are wound bronze and
