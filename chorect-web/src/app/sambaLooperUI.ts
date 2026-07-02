@@ -35,6 +35,10 @@ export class SambaLooperUI {
   private addMenuOpen = false;
   private saveOpen = false;
   private saveName = "";
+  /** Shared lane scroll position, preserved across the full re-renders. */
+  private laneScrollLeft = 0;
+  /** The single active outside-tap popup closer (never stacked). */
+  private outsideCloser: ((e: Event) => void) | null = null;
 
   constructor(private samba: SambaLooperState, private onBack: () => void) {}
 
@@ -95,23 +99,40 @@ export class SambaLooperUI {
     // so they stay a consistent size regardless of viewport width).
     const lanes = Array.from(screen.querySelectorAll<HTMLElement>(".drum-cells"));
     for (const lane of lanes) {
+      lane.scrollLeft = this.laneScrollLeft;
       lane.addEventListener("scroll", () => {
+        this.laneScrollLeft = lane.scrollLeft;
         for (const other of lanes) if (other !== lane && other.scrollLeft !== lane.scrollLeft) other.scrollLeft = lane.scrollLeft;
       });
     }
+    // Auto-follow the playhead while playing: center the sounding column.
+    if (s.isPlaying && lanes.length) {
+      const ph = lanes[0].querySelector<HTMLElement>(".drum-cell.playhead");
+      if (ph) {
+        const target = Math.max(ph.offsetLeft - lanes[0].clientWidth / 2, 0);
+        this.laneScrollLeft = target;
+        for (const lane of lanes) lane.scrollLeft = target;
+      }
+    }
 
     // Close any open popup when the next tap lands outside a popup (so you don't
-    // have to tap the same trigger again). Deferred so the click that just opened
-    // it doesn't immediately close it.
+    // have to tap the same trigger again). A SINGLE tracked listener — re-renders
+    // while a popup is open must not stack additional listeners.
+    if (this.outsideCloser) {
+      document.removeEventListener("pointerdown", this.outsideCloser, true);
+      this.outsideCloser = null;
+    }
     if (this.openVoiceMenu !== null || this.loadMenuOpen || this.addMenuOpen || this.saveOpen) {
       const onDoc = (e: Event) => {
         if (!(e.target as HTMLElement).closest(".drum-voice-pop, .drum-load-pop")) {
           document.removeEventListener("pointerdown", onDoc, true);
+          if (this.outsideCloser === onDoc) this.outsideCloser = null;
           this.openVoiceMenu = null; this.loadMenuOpen = false; this.addMenuOpen = false; this.saveOpen = false;
           this.rerender();
         }
       };
-      setTimeout(() => document.addEventListener("pointerdown", onDoc, true), 0);
+      this.outsideCloser = onDoc;
+      setTimeout(() => { if (this.outsideCloser === onDoc) document.addEventListener("pointerdown", onDoc, true); }, 0);
     }
   }
 

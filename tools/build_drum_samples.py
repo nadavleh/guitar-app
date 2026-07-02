@@ -20,6 +20,8 @@ import sys
 import numpy as np
 import soundfile as sf
 
+from align_drum_onsets import align   # onset alignment (fixes 'bloom' lateness)
+
 PACK = r"C:\Users\Nadav\Documents\Ableton\Factory Packs\Latin Percussion"
 HITS = os.path.join(PACK, "Ableton Folder Info", "Previews", "Drums", "Drum Hits")
 OUT = os.path.join(os.path.dirname(__file__), "..", "app", "src", "main", "assets", "drums")
@@ -78,6 +80,8 @@ def process(path):
     peak = float(np.max(np.abs(mono))) if len(mono) else 0.0
     if peak > 1e-6:
         mono = mono * (10 ** (-1 / 20) / peak)
+    # Align the onset so ~90% of peak lands right at the trigger (0-swing grid).
+    mono, _ = align(mono, SR)
     return mono.astype(np.float32)
 
 

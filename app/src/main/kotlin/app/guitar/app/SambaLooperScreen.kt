@@ -2,8 +2,6 @@ package app.guitar.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,8 +39,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,9 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -61,7 +57,6 @@ import androidx.compose.ui.unit.sp
 import app.guitar.theory.PercussionInstrument
 import app.guitar.theory.PercussionMeter
 import app.guitar.theory.PercussionVoices
-import kotlin.math.max
 
 /**
  * Drum-machine / samba-looper screen. A 4-row × 16-cell step grid (2 bars of
@@ -167,6 +162,22 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
         // aspect ratio — instead of stretching to fill the width. The instrument
         // label column stays pinned on the left while the lane scrolls.
         val cellScroll = rememberScrollState()
+        // Auto-follow the playhead: while playing, keep the sounding column visible
+        // by centering the shared lane scroll on it (fixed cells → position is
+        // computable: k cells + beat/bar separator gaps before slot k).
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        LaunchedEffect(samba.currentSlot, samba.isPlaying) {
+            val slot = samba.currentSlot
+            if (!samba.isPlaying || slot < 0) return@LaunchedEffect
+            val perBeat = samba.meter.slotsPerBeat
+            val perBar = samba.meter.slotsPerBar
+            val beatGaps = if (perBeat > 0) slot / perBeat else 0
+            val barGaps = if (perBar > 0) slot / perBar else 0
+            val xDp = slot * CELL_DP + beatGaps * 3 + barGaps * 3   // bar gap = 6 (3 extra)
+            val xPx = with(density) { xDp.dp.toPx() }.toInt()
+            val target = (xPx - cellScroll.viewportSize / 2).coerceAtLeast(0)
+            cellScroll.scrollTo(target)
+        }
         Column(modifier = Modifier.fillMaxWidth()) {
             for ((i, inst) in kit.withIndex()) {
                 InstrumentRow(
