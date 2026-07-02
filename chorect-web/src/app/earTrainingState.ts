@@ -1115,8 +1115,7 @@ export class EarTrainingState {
 
   playIntervalQuestion() {
     if (this.intervalPlaying) return;
-    this.intervalToken++;
-    const token = this.intervalToken;
+    this.intervalToken++;   // cancels any in-flight cadence/question sequence
     this.intervalPlaying = true;
     this.notify();
     void (async () => {
