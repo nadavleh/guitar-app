@@ -869,6 +869,10 @@ export class EarTrainingUI {
       const ok = ear.invGuess === ear.invInversion;
       parent.appendChild(el("div", { style: `font-weight:700;color:${Colors.primary}` }, [`${ok ? "✔ correct" : `✘ answer: ${inversionName(ear.invInversion)}`}   (${spellPc(ear.invRoot)}${ear.invQuality})`]));
       parent.appendChild(btn(ear.invChIndex === ear.invChallengeTotal - 1 ? "See score →" : "Next →", () => ear.advanceInvChallenge(), "btn primary"));
+      // Post-answer only: showing the chord earlier would leak the answer.
+      parent.appendChild(el("div", { class: "v-gap-8" }));
+      this.chordFretboardPanel(parent, spellPc(ear.invRoot) + ear.invQuality, ear.invShowFretboard,
+        (v) => ear.setInvShowFretboard(v));
     }
   }
 
@@ -953,6 +957,10 @@ export class EarTrainingUI {
       const ok = ear.adGuess === ear.adQuality;
       parent.appendChild(el("div", { style: `font-weight:700;color:${Colors.primary}` }, [`${ok ? "✔ correct" : `✘ answer: ${this.augDimLabel(ear.adQuality)}`}   (${spellPc(ear.adRoot)}${ear.adQuality})`]));
       parent.appendChild(btn(ear.adChIndex === ear.augDimChallengeTotal - 1 ? "See score →" : "Next →", () => ear.advanceAugDimChallenge(), "btn primary"));
+      // Post-answer only: showing the chord earlier would leak the answer.
+      parent.appendChild(el("div", { class: "v-gap-8" }));
+      this.chordFretboardPanel(parent, spellPc(ear.adRoot) + ear.adQuality, ear.adShowFretboard,
+        (v) => ear.setAdShowFretboard(v));
     }
   }
 
@@ -967,6 +975,11 @@ export class EarTrainingUI {
       parent.appendChild(labelSm("Direction"));
       parent.appendChild(chipsRow([IntervalDirection.Ascending, IntervalDirection.Descending, IntervalDirection.Mixed].map((d) =>
         chip(d, ear.intervalDirection === d, () => ear.setIntervalDirection(d)))));
+      parent.appendChild(labelSm("Playback"));
+      parent.appendChild(chipsRow([
+        chip("Melodic (one after the other)", !ear.intervalHarmonic, () => ear.setIntervalHarmonic(false)),
+        chip("Harmonic (together)", ear.intervalHarmonic, () => ear.setIntervalHarmonic(true)),
+      ]));
       parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:8px" }, [
         el("span", { class: "ans-label" }, [`Key: ${spellPc(ear.intervalKey)} major`]),
         btn("♭", () => ear.intervalTranspose(-1)),

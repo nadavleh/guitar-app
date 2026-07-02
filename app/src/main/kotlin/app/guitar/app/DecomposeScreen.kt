@@ -123,19 +123,20 @@ fun DecomposeScreen(state: AppState, onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Audition each group separately, together, or as the teaching sequence.
+        val base = 48 + root.value              // C3-ish so the upper triad sits up top
+        val shellMidis = dec.shell.map { base + it }
+        val upperMidis = dec.upper.map { base + it }
+        fun play(midis: List<Int>) {
+            state.audio.playChord(midis, strumDelayMillis = 26, sustainMillis = 1100, timbre = Timbre.Clarity)
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
-                scope.launch {
-                    val base = 48 + root.value          // C3-ish so the upper triad sits up top
-                    val shellMidis = dec.shell.map { base + it }
-                    val upperMidis = dec.upper.map { base + it }
-                    state.audio.playChord(shellMidis, strumDelayMillis = 26,
-                        sustainMillis = 1100, timbre = Timbre.Clarity)
-                    delay(700)
-                    state.audio.playChord(upperMidis, strumDelayMillis = 26,
-                        sustainMillis = 1100, timbre = Timbre.Clarity)
-                }
-            }) { Text("Play shell → triad ▶") }
+                scope.launch { play(shellMidis); delay(700); play(upperMidis) }
+            }) { Text("Shell → triad ▶") }
+            OutlinedButton(onClick = { play(shellMidis) }) { Text("Shell") }
+            OutlinedButton(onClick = { play(upperMidis) }) { Text("Triad") }
+            OutlinedButton(onClick = { play(shellMidis + upperMidis) }) { Text("Full chord") }
         }
         Spacer(Modifier.height(6.dp))
         // Legend: the circle colours + a note that the labels are interval degrees.

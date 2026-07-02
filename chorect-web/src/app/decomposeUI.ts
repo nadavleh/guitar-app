@@ -116,8 +116,11 @@ export class DecomposeUI {
     ]);
     body.appendChild(card);
 
-    body.appendChild(el("div", { class: "et-row-gap", style: "margin-top:10px" }, [
-      btn("Play shell → triad ▶", () => this.play(dec), "btn primary"),
+    body.appendChild(el("div", { class: "et-row-gap", style: "margin-top:10px;flex-wrap:wrap" }, [
+      btn("Shell → triad ▶", () => this.play(dec), "btn primary"),
+      btn("Shell", () => this.playGroup(dec, "shell")),
+      btn("Triad", () => this.playGroup(dec, "upper")),
+      btn("Full chord", () => this.playGroup(dec, "full")),
     ]));
     // Legend: circle colours + that the numbers are interval degrees.
     body.appendChild(el("div", { class: "et-row-gap", style: "margin-top:4px;font-size:12px;flex-wrap:wrap;gap:12px" }, [
@@ -160,12 +163,21 @@ export class DecomposeUI {
     }
   }
 
-  private play(dec: ChordDecomposition): void {
+  private groupMidis(dec: ChordDecomposition): { shell: number[]; upper: number[] } {
     const base = 48 + this.root;
-    const shell = dec.shell.map((iv) => base + iv);
-    const upper = dec.upper.map((iv) => base + iv);
+    return { shell: dec.shell.map((iv) => base + iv), upper: dec.upper.map((iv) => base + iv) };
+  }
+
+  private play(dec: ChordDecomposition): void {
+    const { shell, upper } = this.groupMidis(dec);
     this.state.audio.playChord(shell, 26, 1100, Timbres.Clarity);
     setTimeout(() => this.state.audio.playChord(upper, 26, 1100, Timbres.Clarity), 700);
+  }
+
+  private playGroup(dec: ChordDecomposition, which: "shell" | "upper" | "full"): void {
+    const { shell, upper } = this.groupMidis(dec);
+    const midis = which === "shell" ? shell : which === "upper" ? upper : shell.concat(upper);
+    this.state.audio.playChord(midis, 26, 1100, Timbres.Clarity);
   }
 
   private marks(dec: ChordDecomposition): Map<string, FretMark> {

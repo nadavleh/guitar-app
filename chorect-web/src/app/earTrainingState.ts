@@ -1072,6 +1072,17 @@ export class EarTrainingState {
   private intervalTonicMidi(): number { return 60 + (((this.intervalKey + 6) % 12) - 6); }
 
   setIntervalDirection(d: IntervalDirection) { this.intervalDirection = d; this.notify(); }
+  /** Harmonic mode: sound tonic + target TOGETHER (else melodic). */
+  intervalHarmonic = false;
+  setIntervalHarmonic(v: boolean) { this.intervalHarmonic = v; this.notify(); }
+  private playIntervalPair(tonic: number, target: number): Promise<void> {
+    if (this.intervalHarmonic) {
+      this.deps.audio.playChord([tonic, target], 0, this.deps.sustainProvider(), Timbres.Clarity);
+      return Promise.resolve();
+    }
+    this.deps.audio.playNote(tonic, this.deps.sustainProvider());
+    return sleep(700).then(() => this.deps.audio.playNote(target, this.deps.sustainProvider()));
+  }
   setIntervalGuess(s: number) { this.intervalGuess = s; this.notify(); }
 
   intervalTranspose(n: number) {
@@ -1111,12 +1122,8 @@ export class EarTrainingState {
     void (async () => {
       try {
         const tonic = this.intervalTonicMidi();
-        this.deps.audio.playNote(tonic, this.deps.sustainProvider());
-        await sleep(700);
-        if (token !== this.intervalToken) return;
-        this.deps.audio.playNote(
-          intervalTargetMidi(tonic, this.intervalSemitones, this.intervalAscending),
-          this.deps.sustainProvider());
+        await this.playIntervalPair(tonic,
+          intervalTargetMidi(tonic, this.intervalSemitones, this.intervalAscending));
       } finally { this.intervalPlaying = false; this.notify(); }
     })();
   }
@@ -1149,12 +1156,8 @@ export class EarTrainingState {
         await sleep(300);
         if (token !== this.intervalToken) return;
         const tonic = this.intervalTonicMidi();
-        this.deps.audio.playNote(tonic, this.deps.sustainProvider());
-        await sleep(700);
-        if (token !== this.intervalToken) return;
-        this.deps.audio.playNote(
-          intervalTargetMidi(tonic, this.intervalSemitones, this.intervalAscending),
-          this.deps.sustainProvider());
+        await this.playIntervalPair(tonic,
+          intervalTargetMidi(tonic, this.intervalSemitones, this.intervalAscending));
       } finally { this.intervalPlaying = false; this.notify(); }
     })();
   }

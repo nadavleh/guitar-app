@@ -1355,6 +1355,8 @@ class EarTrainingState(
     var intervalKey by mutableStateOf(PitchClass.C)
         private set
     var intervalDirection by mutableStateOf(IntervalDirection.Ascending)
+    /** Harmonic mode: sound tonic + target TOGETHER (else melodic: one after the other). */
+    var intervalHarmonic by mutableStateOf(false)
     var intervalChActive by mutableStateOf(false)
         private set
     var intervalChIndex by mutableStateOf(0)
@@ -1404,7 +1406,8 @@ class EarTrainingState(
         intervalJob = scope.launch { audio.playNote(intervalTonicMidi(), durationMillis = sustainProvider()) }
     }
 
-    /** Play the tonic, then the target note an interval away (current question). */
+    /** Play the current interval question: tonic then target (melodic), or both
+     *  together (harmonic mode). */
     fun playIntervalQuestion() {
         if (intervalPlaying) return
         intervalJob?.cancel()
@@ -1412,12 +1415,15 @@ class EarTrainingState(
         intervalJob = scope.launch {
             try {
                 val tonic = intervalTonicMidi()
-                audio.playNote(tonic, durationMillis = sustainProvider())
-                delay(700)
-                audio.playNote(
-                    IntervalTrainer.targetMidi(tonic, intervalSemitones, intervalAscending),
-                    durationMillis = sustainProvider(),
-                )
+                val target = IntervalTrainer.targetMidi(tonic, intervalSemitones, intervalAscending)
+                if (intervalHarmonic) {
+                    audio.playChord(listOf(tonic, target), strumDelayMillis = 0,
+                        sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
+                } else {
+                    audio.playNote(tonic, durationMillis = sustainProvider())
+                    delay(700)
+                    audio.playNote(target, durationMillis = sustainProvider())
+                }
             } finally { intervalPlaying = false }
         }
     }
@@ -1449,12 +1455,15 @@ class EarTrainingState(
                 }
                 delay(300)
                 val tonic = intervalTonicMidi()
-                audio.playNote(tonic, durationMillis = sustainProvider())
-                delay(700)
-                audio.playNote(
-                    IntervalTrainer.targetMidi(tonic, intervalSemitones, intervalAscending),
-                    durationMillis = sustainProvider(),
-                )
+                val target = IntervalTrainer.targetMidi(tonic, intervalSemitones, intervalAscending)
+                if (intervalHarmonic) {
+                    audio.playChord(listOf(tonic, target), strumDelayMillis = 0,
+                        sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
+                } else {
+                    audio.playNote(tonic, durationMillis = sustainProvider())
+                    delay(700)
+                    audio.playNote(target, durationMillis = sustainProvider())
+                }
             } finally { intervalPlaying = false }
         }
     }

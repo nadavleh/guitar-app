@@ -40,6 +40,20 @@ for (const s of cmaj7Shapes) {
 }
 check("every Cmaj7 shape contains all chord tones", allContain);
 
+// --- CAGED template purity: templates must not ADD foreign tones (e.g. the old
+// dim E-shape sneaked in the dim7's maj6) ---
+let templatesPure = true;
+for (const sym of ["", "m", "7", "maj7", "m7", "m7b5", "dim7", "dim", "aug", "sus2", "sus4", "6", "m6"]) {
+  const q = QUALITIES.get(sym)!;
+  for (let r = 0; r < 12; r++) {
+    const allowed = new Set(notesFrom(q, r));
+    for (const s of cagedShapesFor(r, q, standard, 14)) {
+      for (const n of s.notes) if (n !== null && !allowed.has(midiPitchClass(n.midi))) templatesPure = false;
+    }
+  }
+}
+check("every CAGED template sounds only chord tones", templatesPure);
+
 // --- CAGED templates: C major → 5 ascending shapes ---
 const cMajCaged = cagedShapesFor(0, parseChord("C")![1], standard, 14);
 check("C major has 5 CAGED shapes", cMajCaged.length === 5);

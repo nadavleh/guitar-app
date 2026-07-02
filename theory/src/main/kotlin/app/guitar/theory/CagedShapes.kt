@@ -141,8 +141,9 @@ internal object CagedTemplates {
         CagedShape.A to listOf(null,  0, +1, +2, +1, null),
         // Gdim "G-shape" at X=8 for Cdim:  8 6 4 5 4 8   (b3, b5, R, b3, R)
         CagedShape.G to listOf(   0, -2, -4, -3, -4,  0),
-        // Edim at X=0:  0 1 2 0 2 x   (b5 on A, R on D, b3 on G, b5 on B)
-        CagedShape.E to listOf(   0, +1, +2,  0, +2, null),
+        // Edim at X=0:  0 1 2 0 x x   (b5 on A, R on D, b3 on G). The old grip also
+        // fretted B at +2 — that note is the maj6 (the dim7 tone), NOT a dim-triad tone.
+        CagedShape.E to listOf(   0, +1, +2,  0, null, null),
         // Ddim at X=0:  x x 0 1 x 1   (b5 on G, b3 on e — B muted, since open B is not in Ddim)
         CagedShape.D to listOf(null, null,  0, +1, null, +1),
     )

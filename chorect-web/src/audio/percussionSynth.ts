@@ -45,6 +45,19 @@ export class PercussionSynth {
     }
   }
 
+  /** Metronome click: short bright tick; accent (bar downbeat) is higher + louder. */
+  metronomeClick(accent: boolean): Float32Array {
+    const freq = accent ? 1900 : 1300;
+    const amp = accent ? 0.55 : 0.42;
+    const n = Math.floor(this.sampleRate * 0.03);
+    const out = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / this.sampleRate;
+      out[i] = Math.sin(TAU * freq * t) * Math.exp(-180 * t) * amp;
+    }
+    return this.fadeOut(out);
+  }
+
   private surdo(open: boolean): Float32Array {
     const durSec = open ? 0.50 : 0.12;
     const decay = open ? 6.0 : 34.0;

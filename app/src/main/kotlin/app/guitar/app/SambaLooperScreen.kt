@@ -31,6 +31,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -117,6 +118,16 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 onValueChange = { samba.bpm = it.toInt() },
                 valueRange = 60f..200f,
                 modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(8.dp))
+            // Tap-tempo: tap along; BPM follows the average tap interval.
+            OutlinedButton(onClick = { samba.tapTempo() }) { Text("Tap") }
+            Spacer(Modifier.width(6.dp))
+            // Metronome click on each beat (accented downbeats).
+            FilterChip(
+                selected = samba.metronome,
+                onClick = { samba.metronome = !samba.metronome },
+                label = { Text("Metro") },
             )
         }
 

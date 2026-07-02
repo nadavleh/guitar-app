@@ -25,8 +25,26 @@ export class SambaLooperState {
   pattern: PercussionPattern = PercussionPattern.empty();
   bpm = 140;
   swing = 0;
+  /** Metronome click on each beat (accented on bar downbeats). */
+  metronome = false;
   isPlaying = false;
   currentSlot = -1;
+
+  // Tap-tempo: average the intervals of the recent taps (2 s window, last 6).
+  private tapTimes: number[] = [];
+  tapTempo(nowMs: number = Date.now()) {
+    if (this.tapTimes.length && nowMs - this.tapTimes[this.tapTimes.length - 1] > 2000) this.tapTimes = [];
+    this.tapTimes.push(nowMs);
+    while (this.tapTimes.length > 6) this.tapTimes.shift();
+    if (this.tapTimes.length >= 2) {
+      const avg = (this.tapTimes[this.tapTimes.length - 1] - this.tapTimes[0]) / (this.tapTimes.length - 1);
+      this.bpm = Math.min(Math.max(Math.round(60000 / avg), 60), 200);
+    }
+    this.notify();
+  }
+  toggleMetronome() { this.metronome = !this.metronome; this.notify(); }
+  private clickAccent: Float32Array | null = null;
+  private clickBeat: Float32Array | null = null;
 
   // Keyed by instrument id (string) so add/remove can't trip object-identity.
   muted = new Set<string>();
@@ -195,6 +213,12 @@ export class SambaLooperState {
         for (let slot = 0; slot < snapshot.slots; slot++) {
           if (!this.isPlaying || token !== this.token) break;
           this.currentSlot = slot;
+          if (this.metronome && slot % snapshot.meter.slotsPerBeat === 0) {
+            const accent = slot % snapshot.meter.slotsPerBar === 0;
+            if (!this.clickAccent) this.clickAccent = this.synth.metronomeClick(true);
+            if (!this.clickBeat) this.clickBeat = this.synth.metronomeClick(false);
+            this.deps.audio.playSamples(accent ? this.clickAccent : this.clickBeat, 1);
+          }
           for (const inst of snapshot.instruments) {
             if (!this.isAudible(inst)) continue;
             const v = snapshot.voiceAt(inst, slot);

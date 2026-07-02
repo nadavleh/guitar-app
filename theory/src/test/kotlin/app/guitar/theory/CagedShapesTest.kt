@@ -180,4 +180,26 @@ class CagedShapesTest {
             "expected shape $expected not found in cagedShapesFor($chordSymbol) → ${all.map { it.frets }}"
         )
     }
+
+    /** Every note a CAGED template sounds must be a tone of the chord it claims to
+     *  voice (omitting tones is fine; ADDING a foreign tone is not — e.g. a "dim"
+     *  grip that sneaks in the dim7's 6th). */
+    @Test fun `every CAGED template sounds only chord tones`() {
+        for ((sym, quality) in ChordLibrary.qualities) {
+            if (CagedTemplates.forQuality(sym) == null) continue
+            for (rootVal in 0..11) {
+                val root = PitchClass(rootVal)
+                val chordPcs = quality.intervals.map { ((root.value + it.semitones) % 12 + 12) % 12 }.toSet()
+                for (shape in cagedShapesFor(root, quality, std, frets)) {
+                    shape.notes.filterNotNull().forEach { n ->
+                        assertTrue(
+                            n.pitchClass.value in chordPcs,
+                            "${NoteSpeller.spell(root)}$sym ${shape.cagedShape}-shape sounds foreign tone " +
+                                "${NoteSpeller.spell(n.pitchClass)} (frets=${shape.frets})",
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

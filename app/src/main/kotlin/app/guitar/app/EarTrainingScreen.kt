@@ -142,10 +142,10 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                 if (ear.earMode == EarMode.Challenge) FlavorChallengeView(ear)
                 else FlavorView(state, ear)
             EarSubMode.Inversions ->
-                if (ear.earMode == EarMode.Challenge) InversionsChallengeView(ear)
+                if (ear.earMode == EarMode.Challenge) InversionsChallengeView(state, ear)
                 else InversionsView(state, ear)
             EarSubMode.AugDim ->
-                if (ear.earMode == EarMode.Challenge) AugDimChallengeView(ear)
+                if (ear.earMode == EarMode.Challenge) AugDimChallengeView(state, ear)
                 else AugDimView(state, ear)
             // Intervals is challenge-only (#6) — same view in either mode.
             EarSubMode.Intervals -> IntervalsView(ear)
@@ -1816,7 +1816,7 @@ private fun InversionsView(state: AppState, ear: EarTrainingState) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun InversionsChallengeView(ear: EarTrainingState) {
+private fun InversionsChallengeView(state: AppState, ear: EarTrainingState) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         if (!ear.invChActive) {
             Text("${ear.invChallengeTotal} rounds. A chord plays in an inversion — identify which. " +
@@ -1862,6 +1862,10 @@ private fun InversionsChallengeView(ear: EarTrainingState) {
             Button(onClick = { ear.advanceInvChallenge() }, modifier = Modifier.fillMaxWidth()) {
                 Text(if (ear.invChIndex == ear.invChallengeTotal - 1) "See score →" else "Next →")
             }
+            Spacer(Modifier.height(10.dp))
+            // Post-answer only: showing the chord earlier would leak the answer.
+            ChordOnFretboard(state, NoteSpeller.spell(ear.invRoot) + ear.invQuality,
+                ear.invShowFretboard) { ear.invShowFretboard = it }
         }
         Spacer(Modifier.height(20.dp))
     }
@@ -1957,7 +1961,7 @@ private fun AugDimView(state: AppState, ear: EarTrainingState) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AugDimChallengeView(ear: EarTrainingState) {
+private fun AugDimChallengeView(state: AppState, ear: EarTrainingState) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         if (!ear.adChActive) {
             Text("${ear.augDimChallengeTotal} rounds. Identify each augmented/diminished chord. " +
@@ -2004,6 +2008,10 @@ private fun AugDimChallengeView(ear: EarTrainingState) {
             Button(onClick = { ear.advanceAugDimChallenge() }, modifier = Modifier.fillMaxWidth()) {
                 Text(if (ear.adChIndex == ear.augDimChallengeTotal - 1) "See score →" else "Next →")
             }
+            Spacer(Modifier.height(10.dp))
+            // Post-answer only: showing the chord earlier would leak the answer.
+            ChordOnFretboard(state, NoteSpeller.spell(ear.adRoot) + ear.adQuality,
+                ear.adShowFretboard) { ear.adShowFretboard = it }
         }
         Spacer(Modifier.height(20.dp))
     }
@@ -2048,6 +2056,16 @@ private fun IntervalsView(ear: EarTrainingState) {
                         label = { Text(dir.name) },
                     )
                 }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Playback", style = MaterialTheme.typography.labelMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = !ear.intervalHarmonic,
+                    onClick = { ear.intervalHarmonic = false },
+                    label = { Text("Melodic (one after the other)") })
+                FilterChip(selected = ear.intervalHarmonic,
+                    onClick = { ear.intervalHarmonic = true },
+                    label = { Text("Harmonic (together)") })
             }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {

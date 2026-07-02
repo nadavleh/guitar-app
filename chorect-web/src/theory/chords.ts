@@ -196,7 +196,8 @@ const CAGED: Record<string, Partial<Record<CagedShape, Tmpl>>> = {
   },
   dim: {
     C: [null, 0, -2, -4, -2, null], A: [null, 0, 1, 2, 1, null], G: [0, -2, -4, -3, -4, 0],
-    E: [0, 1, 2, 0, 2, null], D: [null, null, 0, 1, null, 1],
+    // E-shape drops the B string: at +2 it sounds the maj6 (a dim7 tone, not a dim-triad tone).
+    E: [0, 1, 2, 0, null, null], D: [null, null, 0, 1, null, 1],
   },
   aug: {
     C: [null, 0, -1, -2, -2, -3], A: [null, 0, 3, 2, 2, 1], G: [0, -1, -2, -3, null, 0],

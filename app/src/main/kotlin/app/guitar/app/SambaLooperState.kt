@@ -42,8 +42,22 @@ class SambaLooperState(
     var bpm by mutableStateOf(140)
     /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
     var swing by mutableStateOf(0)
+    /** Metronome click on each beat (accented on bar downbeats). */
+    var metronome by mutableStateOf(false)
     var isPlaying by mutableStateOf(false)
         private set
+
+    // Tap-tempo: average the intervals of the recent taps (2 s window, last 6).
+    private val tapTimes = ArrayList<Long>()
+    fun tapTempo(nowMs: Long = System.currentTimeMillis()) {
+        if (tapTimes.isNotEmpty() && nowMs - tapTimes.last() > 2000) tapTimes.clear()
+        tapTimes.add(nowMs)
+        while (tapTimes.size > 6) tapTimes.removeAt(0)
+        if (tapTimes.size >= 2) {
+            val avg = (tapTimes.last() - tapTimes.first()).toDouble() / (tapTimes.size - 1)
+            bpm = (60_000.0 / avg).toInt().coerceIn(60, 200)
+        }
+    }
     /** Slot currently sounding (0..15), or -1 when stopped. Drives the playhead. */
     var currentSlot by mutableStateOf(-1)
         private set
@@ -187,6 +201,10 @@ class SambaLooperState(
         scope.launch { repo.deleteDrumPattern(name) }
     }
 
+    // Metronome click buffers (lazy; accented downbeat vs plain beat).
+    private val clickAccent by lazy { synth.metronomeClick(accent = true) }
+    private val clickBeat by lazy { synth.metronomeClick(accent = false) }
+
     fun start() {
         if (isPlaying) return
         isPlaying = true
@@ -196,6 +214,10 @@ class SambaLooperState(
                 for (slot in 0 until snapshot.slots) {
                     if (!isPlaying) break
                     currentSlot = slot
+                    if (metronome && slot % snapshot.meter.slotsPerBeat == 0) {
+                        audio.playSamples(
+                            if (slot % snapshot.meter.slotsPerBar == 0) clickAccent else clickBeat, 1f)
+                    }
                     for (inst in snapshot.instruments) {
                         if (!isAudible(inst)) continue
                         val v = snapshot.voiceAt(inst, slot) ?: continue
