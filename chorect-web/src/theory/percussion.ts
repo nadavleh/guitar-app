@@ -349,7 +349,7 @@ export const BUILTIN_PATTERNS: { name: string; pattern: PercussionPattern }[] = 
  *  so a 1/[division] note = quarter × 4 / division). Floored to mirror Kotlin's
  *  integer arithmetic. */
 export function slotMs(bpm: number, division = 16): number {
-  return Math.floor((60000 / Math.max(bpm, 20)) * 4 / division);
+  return Math.floor((60000 / Math.max(bpm, 10)) * 4 / division);
 }
 export function loopMs(bpm: number): number {
   return slotMs(bpm) * PERCUSSION_SLOTS;

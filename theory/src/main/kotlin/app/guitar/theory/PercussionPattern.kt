@@ -280,7 +280,7 @@ object PercussionBuiltins {
 object PercussionTiming {
     /** Milliseconds of one [division]-note slot at [bpm] (a quarter-note = 4 sixteenths,
      *  so a 1/[division] note = quarter × 4 / division). */
-    fun slotMs(bpm: Int, division: Int = 16): Long = (60_000L / bpm.coerceAtLeast(20)) * 4 / division
+    fun slotMs(bpm: Int, division: Int = 16): Long = (60_000L / bpm.coerceAtLeast(10)) * 4 / division
 
     /** Total loop length in milliseconds for the default 16-slot meter. */
     fun loopMs(bpm: Int): Long = slotMs(bpm) * PERCUSSION_SLOTS

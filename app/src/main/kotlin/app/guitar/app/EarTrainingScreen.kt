@@ -417,13 +417,25 @@ private fun TransposeClicker(ear: EarTrainingState) {
             onClick = { ear.transposeProgression(-1) },
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 4.dp),
         ) { Text("−") }
-        Text("  semitone  ", style = MaterialTheme.typography.bodySmall,
+        // Running net offset from the generated key (e.g. "+3 semitones").
+        Text("  ${transposeLabel(ear.progTranspose)}  ", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedButton(
             onClick = { ear.transposeProgression(1) },
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 4.dp),
         ) { Text("+") }
     }
+}
+
+/** "0 semitones" / "+3 semitones" / "−2 semitones" for the transpose counters. */
+private fun transposeLabel(n: Int): String {
+    val unit = if (n == 1 || n == -1) "semitone" else "semitones"
+    val num = when {
+        n > 0 -> "+$n"
+        n < 0 -> "−${-n}"   // U+2212 minus to match the − button
+        else -> "0"
+    }
+    return "$num $unit"
 }
 
 /** Full-width BPM + strum sliders, shared by the progression trainer & challenge. */
@@ -434,7 +446,7 @@ private fun TempoStrumSliders(state: AppState, ear: EarTrainingState) {
         androidx.compose.material3.Slider(
             value = ear.progBpm.toFloat(),
             onValueChange = { ear.progBpm = it.toInt() },
-            valueRange = 40f..200f,
+            valueRange = 10f..200f,
         )
         Text(
             if (state.strumMs == 0) "Strum: struck at once" else "Strum: ${state.strumMs} ms",
@@ -1171,7 +1183,7 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
             androidx.compose.material3.Slider(
                 value = ear.progBpm.toFloat(),
                 onValueChange = { ear.progBpm = it.toInt() },
-                valueRange = 40f..200f,
+                valueRange = 10f..200f,
             )
         }
 
@@ -2080,6 +2092,9 @@ private fun IntervalsView(ear: EarTrainingState) {
                 OutlinedButton(onClick = { ear.intervalTranspose(-1) }) { Text("♭") }
                 Spacer(Modifier.width(6.dp))
                 OutlinedButton(onClick = { ear.intervalTranspose(1) }) { Text("♯") }
+                Spacer(Modifier.width(8.dp))
+                Text(transposeLabel(ear.intervalTransposeSteps), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.height(16.dp))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -2108,6 +2123,9 @@ private fun IntervalsView(ear: EarTrainingState) {
             OutlinedButton(onClick = { ear.playIntervalTonicCadence() }) { Text("Hear I–V–I") }
             OutlinedButton(onClick = { ear.intervalTranspose(-1) }) { Text("♭") }
             OutlinedButton(onClick = { ear.intervalTranspose(1) }) { Text("♯") }
+            Text(transposeLabel(ear.intervalTransposeSteps), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.CenterVertically))
         }
         Spacer(Modifier.height(12.dp))
         IntervalGuessChips(ear, enabled = !ear.intervalChAnswered)

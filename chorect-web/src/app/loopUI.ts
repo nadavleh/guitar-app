@@ -32,7 +32,7 @@ export class LoopUI {
 
     // tempo
     body.appendChild(el("div", {}, [`Tempo: ${L.bpm} BPM`]));
-    body.appendChild(slider(40, 200, L.bpm, (v) => L.setBpm(v)));
+    body.appendChild(slider(10, 200, L.bpm, (v) => L.setBpm(v)));
 
     // slots/bar + bars
     body.appendChild(el("div", { class: "et-row-gap", style: "margin-top:6px" }, [

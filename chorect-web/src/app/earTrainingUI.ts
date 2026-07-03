@@ -45,6 +45,13 @@ function chipsRow(children: HTMLElement[]): HTMLElement {
   return el("div", { class: "chip-row" }, children);
 }
 
+/** "0 semitones" / "+3 semitones" / "−2 semitones" for the transpose counters. */
+function transposeLabel(n: number): string {
+  const unit = Math.abs(n) === 1 ? "semitone" : "semitones";
+  const num = n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0";
+  return `${num} ${unit}`;
+}
+
 function formatDuration(ms: number): string {
   const total = Math.max(Math.floor(ms / 1000), 0);
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
@@ -226,7 +233,7 @@ export class EarTrainingUI {
   private tempoStrumSliders(parent: HTMLElement): void {
     const ear = this.ear, s = this.state;
     parent.appendChild(el("div", { style: "margin-top:8px" }, [`Tempo: ${ear.progBpm} BPM`]));
-    parent.appendChild(slider(40, 200, ear.progBpm, (v) => { ear.progBpm = Math.round(v); this.rerender(); }));
+    parent.appendChild(slider(10, 200, ear.progBpm, (v) => { ear.progBpm = Math.round(v); this.rerender(); }));
     parent.appendChild(el("div", { class: "et-muted" }, [s.strumMs === 0 ? "Strum: struck at once" : `Strum: ${s.strumMs} ms`]));
     parent.appendChild(slider(0, 150, s.strumMs, (v) => s.setStrumMs(v)));
   }
@@ -317,8 +324,8 @@ export class EarTrainingUI {
     return el("div", { class: "et-row-gap", style: "margin-top:10px" }, [
       el("span", { class: "ans-label" }, ["Transpose"]),
       btn("−", () => ear.transposeProgression(-1)),
-      el("span", { class: "et-muted" }, ["semitone"]),
       btn("+", () => ear.transposeProgression(1)),
+      el("span", { class: "et-muted" }, [transposeLabel(ear.progTranspose)]),
     ]);
   }
 
@@ -410,7 +417,7 @@ export class EarTrainingUI {
     // Transpose shifts the key/chords but not the degrees, so it's safe in the challenge.
     parent.appendChild(this.transposeRow());
     parent.appendChild(el("div", { style: "margin-top:8px" }, [`BPM: ${ear.progBpm}`]));
-    parent.appendChild(slider(40, 200, ear.progBpm, (v) => { ear.progBpm = Math.round(v); this.rerender(); }));
+    parent.appendChild(slider(10, 200, ear.progBpm, (v) => { ear.progBpm = Math.round(v); this.rerender(); }));
     parent.appendChild(this.revealCard("Key & Mode (hint)", !ear.keyRevealed,
       spellPc(ear.progKey) + "  " + (ear.progMode === TrainingMode.Major ? "Major" : "Minor"),
       () => ear.toggleKeyModeReveal(), false));
@@ -1025,6 +1032,7 @@ export class EarTrainingUI {
         el("span", { class: "ans-label" }, [`Key: ${spellPc(ear.intervalKey)} major`]),
         btn("♭", () => ear.intervalTranspose(-1)),
         btn("♯", () => ear.intervalTranspose(1)),
+        el("span", { class: "et-muted" }, [transposeLabel(ear.intervalTransposeSteps)]),
       ]));
       parent.appendChild(el("div", { class: "v-gap-12" }));
       parent.appendChild(btn("Start challenge ▶", () => ear.startIntervalChallenge(), "btn primary"));
@@ -1045,6 +1053,7 @@ export class EarTrainingUI {
       btn("Hear I–V–I", () => ear.playIntervalTonicCadence()),
       btn("♭", () => ear.intervalTranspose(-1)),
       btn("♯", () => ear.intervalTranspose(1)),
+      el("span", { class: "et-muted" }, [transposeLabel(ear.intervalTransposeSteps)]),
     ]));
     parent.appendChild(el("div", { class: "v-gap-8" }));
     parent.appendChild(labelSm("Which interval?"));

@@ -556,7 +556,7 @@ fun LoopScreen(state: AppState) {
         androidx.compose.material3.Slider(
             value = state.bpm.toFloat(),
             onValueChange = { state.bpm = it.toInt() },
-            valueRange = 40f..200f,
+            valueRange = 10f..200f,
         )
         Spacer(Modifier.height(4.dp))
         FlowRow(

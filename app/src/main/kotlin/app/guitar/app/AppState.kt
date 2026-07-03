@@ -589,7 +589,7 @@ class AppState(
     }
 
     private suspend fun playBar(bar: List<LoopSlot>) {
-        val beatMs = (60_000L / bpm.coerceAtLeast(20))
+        val beatMs = (60_000L / bpm.coerceAtLeast(10))
         // Each slot is one (whole bar / slotsPerBar) division.
         val slotMs = beatMs * 4 / bar.size.coerceAtLeast(1)
         for (slotIdx in bar.indices) {

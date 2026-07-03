@@ -63,7 +63,7 @@ export class SambaLooperUI {
       btn("Tap", () => s.tapTempo()),
       btn(s.metronome ? "Metro ✓" : "Metro", () => s.toggleMetronome(), s.metronome ? "btn primary" : "btn"),
     ]));
-    body.appendChild(slider(60, 200, s.bpm, (v) => s.setBpm(v)));
+    body.appendChild(slider(10, 200, s.bpm, (v) => s.setBpm(v)));
     // Swing only acts on a 1/16 grid (a quarter-note split into four 16ths): it
     // holds the 1st & 3rd 16ths, delays the 2nd, and pulls the 4th early. On any
     // other division it does nothing, so the slider is disabled and says why.

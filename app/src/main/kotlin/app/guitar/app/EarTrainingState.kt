@@ -107,6 +107,10 @@ class EarTrainingState(
     /** Current progression state. */
     var progKey by mutableStateOf(PitchClass.C)
     var progMode by mutableStateOf(TrainingMode.Major)
+    /** Net semitones the current progression has been transposed from its generated
+     *  key (0 = as generated). Reset when a fresh progression/question is drawn. */
+    var progTranspose by mutableStateOf(0)
+        private set
     var progProgression by mutableStateOf<Progression?>(null)
     var progResolved by mutableStateOf<List<ResolvedChord>>(emptyList())
     var progBarRevealed by mutableStateOf<Set<Int>>(emptySet())  // indices 0..3
@@ -161,6 +165,7 @@ class EarTrainingState(
         progMode = mode
         progProgression = prog
         progResolved = resolveCurrent(prog, key)
+        progTranspose = 0
         // Hide all reveals for the new round
         progBarRevealed = emptySet()
         keyRevealed = false
@@ -202,6 +207,7 @@ class EarTrainingState(
      */
     fun transposeProgression(n: Int) {
         if (progResolved.isEmpty()) return
+        progTranspose += n
         progKey = PitchClass.of(progKey.value + n)
         progResolved = progResolved.map { rc ->
             val parsed = ChordLibrary.parse(rc.symbol) ?: return@map rc
@@ -274,7 +280,7 @@ class EarTrainingState(
         prevPlayedShape = null   // reset voice-leading state so first chord = E-shape
         isLooping = true
         loopJob = scope.launch {
-            val beatMs = (60_000L / progBpm.coerceAtLeast(20))
+            val beatMs = (60_000L / progBpm.coerceAtLeast(10))
             // One chord per bar; 4 beats per bar.
             val barMs = beatMs * 4
             while (isLooping) {
@@ -654,6 +660,7 @@ class EarTrainingState(
         progMode = q.mode
         progProgression = q.prog
         progResolved = q.resolved
+        progTranspose = 0
         challengeGuessDegree = q.guessDeg
         challengeGuessExt = q.guessExt
         challengeGuessLabel = q.guessLabel
@@ -1079,6 +1086,7 @@ class EarTrainingState(
         progMode = np.tonicMode
         progProgression = null
         progResolved = np.resolve(key)
+        progTranspose = 0
         advRevealed = false
         hasGenerated = true
         prevPlayedShape = null
@@ -1385,6 +1393,9 @@ class EarTrainingState(
     /** Major key the I–V–I reference + tonic are built from (transposable). */
     var intervalKey by mutableStateOf(PitchClass.C)
         private set
+    /** Net semitones the interval key has been transposed from C (0 = C). */
+    var intervalTransposeSteps by mutableStateOf(0)
+        private set
     var intervalDirection by mutableStateOf(IntervalDirection.Ascending)
     /** Harmonic mode: sound tonic + target TOGETHER (else melodic: one after the other). */
     var intervalHarmonic by mutableStateOf(false)
@@ -1412,6 +1423,7 @@ class EarTrainingState(
 
     fun intervalTranspose(n: Int) {
         intervalKey = PitchClass(((intervalKey.value + n) % 12 + 12) % 12)
+        intervalTransposeSteps += n
         if (intervalChActive) playIntervalTonicCadence()
     }
 

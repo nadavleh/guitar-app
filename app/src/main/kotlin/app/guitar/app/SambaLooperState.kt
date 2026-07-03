@@ -55,7 +55,7 @@ class SambaLooperState(
         while (tapTimes.size > 6) tapTimes.removeAt(0)
         if (tapTimes.size >= 2) {
             val avg = (tapTimes.last() - tapTimes.first()).toDouble() / (tapTimes.size - 1)
-            bpm = (60_000.0 / avg).toInt().coerceIn(60, 200)
+            bpm = (60_000.0 / avg).toInt().coerceIn(10, 200)
         }
     }
     /** Slot currently sounding (0..15), or -1 when stopped. Drives the playhead. */

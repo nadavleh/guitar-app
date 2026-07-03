@@ -118,7 +118,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             Slider(
                 value = samba.bpm.toFloat(),
                 onValueChange = { samba.bpm = it.toInt() },
-                valueRange = 60f..200f,
+                valueRange = 10f..200f,
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(8.dp))

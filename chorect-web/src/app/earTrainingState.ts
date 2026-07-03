@@ -67,6 +67,8 @@ export class EarTrainingState {
   progMode = TrainingMode.Major;
   progProgression: Progression | null = null;
   progResolved: ResolvedChord[] = [];
+  /** Net semitones transposed from the generated key (reset on a fresh draw). */
+  progTranspose = 0;
   progBarRevealed = new Set<number>();
   keyRevealed = false;
   modeRevealed = false;
@@ -131,6 +133,7 @@ export class EarTrainingState {
     this.progMode = mode;
     this.progProgression = prog;
     this.progResolved = this.resolveCurrent(prog, key);
+    this.progTranspose = 0;
     this.progBarRevealed = new Set();
     this.keyRevealed = false;
     this.modeRevealed = false;
@@ -160,6 +163,7 @@ export class EarTrainingState {
    *  Roman degrees (no re-randomization). Works for diatonic and advanced alike. */
   transposeProgression(n: number) {
     if (this.progResolved.length === 0) return;
+    this.progTranspose += n;
     const pc = (v: number) => (((v + n) % 12) + 12) % 12;
     this.progKey = pc(this.progKey);
     this.progResolved = this.progResolved.map((rc) => {
@@ -227,7 +231,7 @@ export class EarTrainingState {
     const token = this.loopToken;
     this.notify();
     void (async () => {
-      const beatMs = 60000 / Math.max(this.progBpm, 20);
+      const beatMs = 60000 / Math.max(this.progBpm, 10);
       const barMs = beatMs * 4;
       while (this.isLooping && token === this.loopToken) {
         for (let i = 0; i < this.progResolved.length; i++) {
@@ -508,6 +512,7 @@ export class EarTrainingState {
 
   /** Make [q] the live question (prog* + guesses), resetting reveals. */
   private applyChallengeQuestion(q: QState) {
+    this.progTranspose = 0;
     this.progKey = q.key;
     this.progMode = q.mode;
     this.progProgression = q.prog;
@@ -850,6 +855,7 @@ export class EarTrainingState {
     this.progMode = np.tonicMode;
     this.progProgression = null;
     this.progResolved = resolveNamed(np, key);
+    this.progTranspose = 0;
     this.advRevealed = false;
     this.hasGenerated = true;
     this.prevPlayedShape = null;
@@ -1069,6 +1075,8 @@ export class EarTrainingState {
 
   intervalChallengeTotal = 10;
   intervalKey: PitchClass = 0;
+  /** Net semitones the interval key has been transposed from C. */
+  intervalTransposeSteps = 0;
   intervalDirection = IntervalDirection.Ascending;
   intervalChActive = false;
   intervalChIndex = 0;
@@ -1098,6 +1106,7 @@ export class EarTrainingState {
 
   intervalTranspose(n: number) {
     this.intervalKey = ((this.intervalKey + n) % 12 + 12) % 12;
+    this.intervalTransposeSteps += n;
     this.notify();
     if (this.intervalChActive) this.playIntervalTonicCadence();
   }

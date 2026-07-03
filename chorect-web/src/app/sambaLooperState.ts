@@ -38,7 +38,7 @@ export class SambaLooperState {
     while (this.tapTimes.length > 6) this.tapTimes.shift();
     if (this.tapTimes.length >= 2) {
       const avg = (this.tapTimes[this.tapTimes.length - 1] - this.tapTimes[0]) / (this.tapTimes.length - 1);
-      this.bpm = Math.min(Math.max(Math.round(60000 / avg), 60), 200);
+      this.bpm = Math.min(Math.max(Math.round(60000 / avg), 10), 200);
     }
     this.notify();
   }

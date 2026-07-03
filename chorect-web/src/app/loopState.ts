@@ -193,7 +193,7 @@ export class LoopState {
   }
 
   private async playBar(bar: LoopSlot[], token: number) {
-    const beatMs = 60000 / Math.max(this.bpm, 20);
+    const beatMs = 60000 / Math.max(this.bpm, 10);
     const slotMs = (beatMs * 4) / Math.max(bar.length, 1);
     for (let slotIdx = 0; slotIdx < bar.length; slotIdx++) {
       if (!this.isLooping || token !== this.token) return;
