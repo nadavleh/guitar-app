@@ -210,6 +210,41 @@ class EarTrainingTest {
         assertTrue(p in EarTraining.MAJOR_PROGRESSIONS)
     }
 
+    // ---- Circle of fifths ----
+
+    @Test fun `circle of fifths yields 4 adjacent descending-fifths chords`() {
+        val cycle = EarTraining.CIRCLE_OF_FIFTHS
+        assertEquals(7, cycle.size)
+        // Roots fall by a fifth around the cycle — a PERFECT fifth (+5 semitones up
+        // = fifth down) at every step except the single diatonic DIMINISHED fifth
+        // into vii° (F→B°, +6), which is what makes that chord diminished.
+        var tritones = 0
+        for (i in cycle.indices) {
+            val next = cycle[(i + 1) % cycle.size]
+            val step = ((next.semitone - cycle[i].semitone) % 12 + 12) % 12
+            assertTrue(step == 5 || step == 6, "root ${cycle[i].roman}→${next.roman} step $step not a fifth")
+            if (step == 6) tritones++
+        }
+        assertEquals(1, tritones, "diatonic cycle should have exactly one diminished-fifth link")
+        val rng = kotlin.random.Random(7)
+        repeat(30) {
+            val p = EarTraining.randomCircleOfFifths(rng)
+            assertEquals(4, p.chords.size)
+            // The 4 chords are a contiguous window of the cycle (ignoring a possible
+            // dom-7 recolouring of the 2nd chord's quality).
+            val startRoman = p.chords[0].roman
+            val start = cycle.indexOfFirst { it.roman == startRoman }
+            assertTrue(start >= 0)
+            for (k in 0 until 4) {
+                val expected = cycle[(start + k) % cycle.size]
+                assertEquals(expected.semitone, p.chords[k].semitone, "window position $k root")
+            }
+            // A domified 2nd chord is a 7th and never the diminished chord.
+            val second = p.chords[1]
+            if (second.quality == "7") assertTrue(cycle[(start + 1) % cycle.size].quality != "dim")
+        }
+    }
+
     // ---- Interval trainer (#6) ----
 
     @Test fun `interval trainer offers 13 intervals from unison to octave`() {

@@ -310,6 +310,49 @@ object EarTraining {
     /** Pick a random advanced progression. */
     fun randomAdvanced(rng: kotlin.random.Random): NamedProgression =
         ADVANCED_PROGRESSIONS[rng.nextInt(ADVANCED_PROGRESSIONS.size)]
+
+    /** The seven diatonic chords of a major key arranged by DESCENDING fifths
+     *  (each root a fifth below the previous / a fourth above): I–IV–vii°–iii–vi–ii–V,
+     *  then back to I. This is the "circle of fifths" cycle. */
+    val CIRCLE_OF_FIFTHS: List<AdvChord> = listOf(
+        AdvChord(0,  "",    "I"),
+        AdvChord(5,  "",    "IV"),
+        AdvChord(11, "dim", "vii°"),
+        AdvChord(4,  "m",   "iii"),
+        AdvChord(9,  "m",   "vi"),
+        AdvChord(2,  "m",   "ii"),
+        AdvChord(7,  "",    "V"),
+    )
+
+    /**
+     * Four adjacent chords of the diatonic [CIRCLE_OF_FIFTHS], starting at a random
+     * point and moving along the cycle (roots falling by a fifth). The 2nd chord may
+     * be sounded as a dominant 7th (a secondary dominant intensifying the pull to the
+     * 3rd), UNLESS it is the diminished chord. Realised as a [NamedProgression] so it
+     * reuses the advanced-progression play/reveal flow.
+     */
+    fun randomCircleOfFifths(rng: kotlin.random.Random): NamedProgression {
+        val n = CIRCLE_OF_FIFTHS.size
+        val start = rng.nextInt(n)
+        val window = (0 until 4).map { CIRCLE_OF_FIFTHS[(start + it) % n] }.toMutableList()
+        val second = window[1]
+        val domified = second.quality != "dim" && rng.nextBoolean()
+        if (domified) {
+            // Same root, dominant-7 quality → a secondary dominant of the 3rd chord.
+            window[1] = AdvChord(second.semitone, "7", second.roman.uppercase() + "7")
+        }
+        val note = "Four chords along the diatonic circle of fifths (roots falling by a fifth) — " +
+            "a strong pull back toward the tonic." +
+            if (domified) " The 2nd chord is a secondary dominant (7th)." else ""
+        return NamedProgression("Circle of 5ths", note, TrainingMode.Major, window)
+    }
+
+    /** Roman-numeral line for a diatonic [Progression], e.g. "I – V – vi – IV". Used
+     *  by the progression-library viewer. */
+    fun romanLineFor(prog: Progression): String {
+        val map = if (prog.mode == TrainingMode.Major) MAJOR_DEGREES else MINOR_DEGREES
+        return prog.degrees.joinToString("  –  ") { map[it]?.roman ?: it.toString() }
+    }
 }
 
 /** Direction an interval is played in the interval-ID trainer. */

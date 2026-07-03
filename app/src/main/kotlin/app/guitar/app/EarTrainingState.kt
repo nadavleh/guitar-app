@@ -247,8 +247,10 @@ class EarTrainingState(
 
     private var cadenceJob: Job? = null
 
-    /** Mode-aware cadence label for the progression key: "I–V–I" / "i–V–i". */
-    fun progCadenceLabel(): String = if (progMode == TrainingMode.Major) "I–V–I" else "i–V–i"
+    /** Cadence label for the progression key. Plain DIGITS ("1–5–1") on purpose:
+     *  the challenge is to identify major vs minor by ear, so the reference button
+     *  must not reveal the mode (Roman case would).  */
+    fun progCadenceLabel(): String = "1–5–1"
 
     /** #1: play a I-V-I (major) / i-V-i (minor) cadence in the current progression
      *  key so the user can hear the tonic before identifying the progression. */
@@ -1092,16 +1094,26 @@ class EarTrainingState(
 
     /** Whether the Progression sub-mode is showing advanced named progressions. */
     var advancedMode by mutableStateOf(false)
+    /** Whether the Progression sub-mode is drawing 4-chord circle-of-fifths windows.
+     *  Reuses the advanced play/reveal flow; mutually exclusive with [advancedMode]. */
+    var circleMode by mutableStateOf(false)
+    /** True when either special generator (advanced or circle) is active — both use
+     *  the advanced-style views. */
+    val specialProgMode: Boolean get() = advancedMode || circleMode
+
+    fun chooseAdvancedMode(on: Boolean) { advancedMode = on; if (on) circleMode = false; stopLoop() }
+    fun chooseCircleMode(on: Boolean) { circleMode = on; if (on) advancedMode = false; stopLoop() }
+
     /** The currently-drawn advanced progression (null until generated). */
     var advProg by mutableStateOf<app.guitar.theory.EarTraining.NamedProgression?>(null)
         private set
     /** Whether the advanced answer (name + Roman line + chords) is revealed. */
     var advRevealed by mutableStateOf(false)
 
-    /** Draw a fresh advanced progression (random named progression + key), load it
-     *  into [progResolved] for the shared looper, and reset the reveal. */
+    /** Draw a fresh advanced/circle progression (random named progression + key),
+     *  load it into [progResolved] for the shared looper, and reset the reveal. */
     fun nextAdvancedProgression() {
-        val np = EarTraining.randomAdvanced(rng)
+        val np = if (circleMode) EarTraining.randomCircleOfFifths(rng) else EarTraining.randomAdvanced(rng)
         val key = fixedKey ?: PitchClass(rng.nextInt(12))
         advProg = np
         progKey = key

@@ -13,6 +13,7 @@ import {
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
   parseChord, ChordShapeGenerator, CagedShape, notesFrom, midiPitchClass, fp, fpKey,
   IntervalDirection, INTERVAL_CHOICES, intervalChoiceFor,
+  MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, ADVANCED_PROGRESSIONS, CIRCLE_OF_FIFTHS, romanLineFor,
 } from "../theory";
 
 const DISPLAY_FRETS = 14;
@@ -75,6 +76,7 @@ export class EarTrainingUI {
   private kbKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
   private statsOpen = false;
+  private libraryOpen = false;
 
   constructor(private ear: EarTrainingState, private state: AppState, private onBack: () => void, private onToLooper: (symbols: string[]) => void) {}
 
@@ -153,6 +155,13 @@ export class EarTrainingUI {
         "Borrowed chords, secondary dominants & jazz turnarounds, each with a note.",
         ear.advancedMode, (v) => ear.setAdvancedMode(v),
       ));
+      screen.appendChild(switchRow(
+        "Circle of fifths",
+        "Four adjacent diatonic chords around the circle (roots falling by a fifth).",
+        ear.circleMode, (v) => ear.setCircleMode(v),
+      ));
+      const libBtn = btn("Progression library", () => { this.libraryOpen = true; this.rerender(); });
+      screen.appendChild(el("div", { style: "margin:4px 0" }, [libBtn]));
     }
 
     const body = el("div", { class: "et-scroll" });
@@ -160,7 +169,7 @@ export class EarTrainingUI {
 
     switch (ear.progSubMode) {
       case EarSubMode.Progression:
-        if (ear.advancedMode) ear.earMode === EarMode.Challenge ? this.advancedChallenge(body) : this.advancedView(body);
+        if (ear.specialProgMode) ear.earMode === EarMode.Challenge ? this.advancedChallenge(body) : this.advancedView(body);
         else ear.earMode === EarMode.Challenge ? this.progressionChallenge(body) : this.progressionView(body);
         break;
       case EarSubMode.Note2Chord:
@@ -182,6 +191,32 @@ export class EarTrainingUI {
 
     container.appendChild(screen);
     if (this.statsOpen) container.appendChild(this.statsOverlay());
+    if (this.libraryOpen) container.appendChild(this.libraryOverlay());
+  }
+
+  /** Progression-library popup: the pools the trainer draws from. */
+  private libraryOverlay(): HTMLElement {
+    const close = () => { this.libraryOpen = false; this.rerender(); };
+    const section = (title: string, lines: string[]): HTMLElement =>
+      el("div", { style: "margin-bottom:10px" }, [
+        el("div", { style: `font-weight:700;color:${Colors.primary}` }, [title]),
+        ...lines.map((l) => el("div", { class: "et-muted", style: "font-size:13px" }, [l])),
+      ]);
+    const body = el("div", { class: "et-card", style: "max-width:520px;max-height:75vh;overflow:auto;margin:auto" }, [
+      el("div", { style: "font-weight:700;font-size:16px;margin-bottom:8px" }, ["Progression library"]),
+      section("Major (diatonic)", MAJOR_PROGRESSIONS.map((p) => romanLineFor(p))),
+      section("Minor (diatonic)", MINOR_PROGRESSIONS.map((p) => romanLineFor(p))),
+      section("Advanced (non-diatonic)", ADVANCED_PROGRESSIONS.map((p) => `${p.name}:  ${namedRomanLine(p)}`)),
+      section("Circle of fifths", [
+        CIRCLE_OF_FIFTHS.map((ch) => ch.roman).join("  →  ") + "  → (repeat)",
+        "Draws 4 adjacent chords; the 2nd may become a dominant 7th (except vii°).",
+      ]),
+      el("div", { style: "text-align:right;margin-top:8px" }, [btn("Close", close, "btn primary")]),
+    ]);
+    body.addEventListener("click", (e) => e.stopPropagation());
+    const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:50" }, [body]);
+    scrim.addEventListener("click", close);
+    return scrim;
   }
 
   // ---------- shared widgets ----------

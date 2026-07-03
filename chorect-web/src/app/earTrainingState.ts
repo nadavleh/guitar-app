@@ -9,7 +9,7 @@ import {
   parseChord, QUALITIES, spellPc,
   TrainingMode, ChordTypeLevel, Progression, ResolvedChord, NamedProgression,
   EarTrainingDegrees, degreeRoot, resolve as resolveDegree, resolveProgression,
-  randomProgression, romanLabel, randomAdvanced, resolveNamed,
+  randomProgression, romanLabel, randomAdvanced, randomCircleOfFifths, resolveNamed,
   majorRelativeDegree, degreeFromMajorRelative,
   N2cChallenge, randomN2c, n2cAnswerLabel, n2cChordSymbol, n2cTestNote, n2cLabel,
   N2C_MAJOR_TEST_OFFSETS, N2C_MINOR_TEST_OFFSETS,
@@ -199,7 +199,9 @@ export class EarTrainingState {
     this.notify();
   }
 
-  progCadenceLabel(): string { return this.progMode === TrainingMode.Major ? "I–V–I" : "i–V–i"; }
+  // Plain digits so the reference button doesn't reveal major vs minor (the point
+  // of the challenge is to hear which it is).
+  progCadenceLabel(): string { return "1–5–1"; }
 
   playProgKeyCadence() {
     this.cadenceToken++;
@@ -862,13 +864,18 @@ export class EarTrainingState {
   // ---------- Advanced progressions ----------
 
   advancedMode = false;
+  /** 4-chord circle-of-fifths windows; reuses the advanced flow, mutually exclusive. */
+  circleMode = false;
   advProg: NamedProgression | null = null;
   advRevealed = false;
 
-  setAdvancedMode(v: boolean) { this.advancedMode = v; this.stopLoop(); this.notify(); }
+  /** True when either special generator (advanced or circle) is active. */
+  get specialProgMode(): boolean { return this.advancedMode || this.circleMode; }
+  setAdvancedMode(v: boolean) { this.advancedMode = v; if (v) this.circleMode = false; this.stopLoop(); this.notify(); }
+  setCircleMode(v: boolean) { this.circleMode = v; if (v) this.advancedMode = false; this.stopLoop(); this.notify(); }
 
   nextAdvancedProgression() {
-    const np = randomAdvanced(this.rng);
+    const np = this.circleMode ? randomCircleOfFifths(this.rng) : randomAdvanced(this.rng);
     const key = this.fixedKey ?? this.rng.int(12);
     this.advProg = np;
     this.progKey = key;

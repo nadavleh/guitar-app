@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.guitar.theory.ChordTypeLevel
+import app.guitar.theory.EarTraining
 import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
 import app.guitar.theory.NoteSpeller
@@ -111,8 +112,8 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
             ModeDropdown(ear, modifier = Modifier.weight(1f))
         }
 
-        // Progression sub-mode gets an "Advanced (non-diatonic)" toggle that swaps
-        // the diatonic generator for the curated special-progression library.
+        // Progression sub-mode gets two mutually-exclusive generator toggles that
+        // swap the diatonic generator for a special one, plus a "Library" button.
         if (ear.progSubMode == EarSubMode.Progression) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -125,16 +126,30 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = ear.advancedMode, onCheckedChange = {
-                    ear.advancedMode = it
-                    ear.stopLoop()
-                })
+                Switch(checked = ear.advancedMode, onCheckedChange = { ear.chooseAdvancedMode(it) })
             }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Circle of fifths", style = MaterialTheme.typography.bodyMedium)
+                    Text("Four adjacent diatonic chords around the circle (roots falling by a fifth).",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = ear.circleMode, onCheckedChange = { ear.chooseCircleMode(it) })
+            }
+            var libOpen by remember { mutableStateOf(false) }
+            OutlinedButton(onClick = { libOpen = true }, modifier = Modifier.padding(bottom = 8.dp)) {
+                Text("Progression library")
+            }
+            if (libOpen) ProgressionLibraryDialog(onDismiss = { libOpen = false })
         }
 
         when (ear.progSubMode) {
             EarSubMode.Progression ->
-                if (ear.advancedMode) {
+                if (ear.specialProgMode) {
                     if (ear.earMode == EarMode.Challenge) AdvancedChallengeView(ear)
                     else AdvancedProgressionView(ear)
                 } else {
@@ -2213,4 +2228,46 @@ private fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
             }
         },
     )
+}
+
+// ======================================================================================
+// Progression library — the pools the trainer draws from (major / minor / advanced / circle)
+// ======================================================================================
+
+@Composable
+private fun ProgressionLibraryDialog(onDismiss: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        title = { Text("Progression library") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState()),
+            ) {
+                LibrarySection("Major (diatonic)",
+                    EarTraining.MAJOR_PROGRESSIONS.map { EarTraining.romanLineFor(it) })
+                LibrarySection("Minor (diatonic)",
+                    EarTraining.MINOR_PROGRESSIONS.map { EarTraining.romanLineFor(it) })
+                LibrarySection("Advanced (non-diatonic)",
+                    EarTraining.ADVANCED_PROGRESSIONS.map { "${it.name}:  ${it.romanLine}" })
+                LibrarySection("Circle of fifths",
+                    listOf(
+                        EarTraining.CIRCLE_OF_FIFTHS.joinToString("  →  ") { it.roman } + "  → (repeat)",
+                        "Draws 4 adjacent chords; the 2nd may become a dominant 7th (except vii°).",
+                    ))
+            }
+        },
+    )
+}
+
+@Composable
+private fun LibrarySection(title: String, lines: List<String>) {
+    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary)
+    Spacer(Modifier.height(2.dp))
+    for (line in lines) {
+        Text(line, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Spacer(Modifier.height(10.dp))
 }

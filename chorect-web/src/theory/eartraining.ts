@@ -230,6 +230,34 @@ export function randomAdvanced(rng: Rng = defaultRng): NamedProgression {
   return ADVANCED_PROGRESSIONS[rng.int(ADVANCED_PROGRESSIONS.length)];
 }
 
+/** Diatonic chords of a major key by DESCENDING fifths: I–IV–vii°–iii–vi–ii–V, then
+ *  back to I (the "circle of fifths"). */
+export const CIRCLE_OF_FIFTHS: AdvChord[] = [
+  c(0, "", "I"), c(5, "", "IV"), c(11, "dim", "vii°"), c(4, "m", "iii"),
+  c(9, "m", "vi"), c(2, "m", "ii"), c(7, "", "V"),
+];
+
+/** Four adjacent chords of CIRCLE_OF_FIFTHS from a random start (roots falling by a
+ *  fifth). The 2nd may sound as a dominant 7th (secondary dominant), unless it's vii°. */
+export function randomCircleOfFifths(rng: Rng = defaultRng): NamedProgression {
+  const n = CIRCLE_OF_FIFTHS.length;
+  const start = rng.int(n);
+  const window = Array.from({ length: 4 }, (_, i) => ({ ...CIRCLE_OF_FIFTHS[(start + i) % n] }));
+  const second = window[1];
+  const domified = second.quality !== "dim" && rng.int(2) === 0;
+  if (domified) window[1] = c(second.semitone, "7", second.roman.toUpperCase() + "7");
+  const note = "Four chords along the diatonic circle of fifths (roots falling by a fifth) — "
+    + "a strong pull back toward the tonic."
+    + (domified ? " The 2nd chord is a secondary dominant (7th)." : "");
+  return { name: "Circle of 5ths", explanation: note, tonicMode: TrainingMode.Major, chords: window };
+}
+
+/** Roman-numeral line for a diatonic progression, e.g. "I – V – vi – IV". */
+export function romanLineFor(prog: Progression): string {
+  const map = degreesMapFor(prog.mode);
+  return prog.degrees.map((d) => map.get(d)?.roman ?? String(d)).join("  –  ");
+}
+
 // ---- Interval-identification trainer (#6) ----
 
 export enum IntervalDirection { Ascending = "Ascending", Descending = "Descending", Mixed = "Mixed" }
