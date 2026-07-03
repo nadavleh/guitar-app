@@ -36,6 +36,17 @@ android {
             (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
                 .outputFileName = "Chorect_beta_V${variant.versionName}.apk"
         }
+        // The output folder must only ever hold the MOST RECENT APK (it is synced
+        // to the phone): after assembling, delete any stale Chorect_beta_V*.apk
+        // left over from earlier versions. Historical APKs live in /releases.
+        val current = "Chorect_beta_V${variant.versionName}.apk"
+        variant.assembleProvider.get().doLast {
+            variant.outputs.forEach { out ->
+                out.outputFile.parentFile
+                    ?.listFiles { f -> f.name.startsWith("Chorect_beta_V") && f.name.endsWith(".apk") && f.name != current }
+                    ?.forEach { it.delete() }
+            }
+        }
     }
 
     compileOptions {
