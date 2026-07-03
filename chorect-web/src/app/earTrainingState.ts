@@ -58,7 +58,7 @@ export class EarTrainingState {
   earMode = EarMode.Practice;
 
   includeMajor = true;
-  includeMinor = false;
+  includeMinor = true;
   chordTypeLevel = ChordTypeLevel.Sevenths;
   fixedKey: PitchClass | null = null;
   progBpm = 140;
@@ -582,6 +582,19 @@ export class EarTrainingState {
     return [...new Set(out.filter((x) => x.length))].sort();
   }
 
+  /** Diatonic extension suffixes to offer for a keyboard key ([majorRel]) in
+   *  Extended mode, in the actual key's mode — so after picking a degree the
+   *  extension row shows only what's valid on THAT chord. Mix keeps the union. */
+  challengeExtOptionsForDegree(majorRel: number): string[] {
+    if (this.earMixAll || this.chordTypeLevel !== ChordTypeLevel.Extended) return this.challengeExtOptions();
+    const deg = degreeFromMajorRelative(majorRel, this.progMode);
+    const info = EarTrainingDegrees(this.progMode).get(deg);
+    if (!info) return [];
+    return info.extendedOptions.length
+      ? [...new Set(info.extendedOptions.map(([, suffix]) => suffix))]
+      : [romanLabel(info.roman, info.extendedQuality).replace(info.roman, "")];
+  }
+
   correctExtLabel(i: number): string {
     const deg = this.progProgression?.degrees[i];
     if (deg == null) return "";
@@ -655,7 +668,13 @@ export class EarTrainingState {
     const map = this.keyboardMinor ? EarTrainingDegrees(TrainingMode.Minor) : EarTrainingDegrees(TrainingMode.Major);
     const mode = this.keyboardMinor ? TrainingMode.Minor : TrainingMode.Major;
     const out: [number, string][] = [];
-    for (let pos = 1; pos <= 7; pos++) out.push([majorRelativeDegree(pos, mode), map.get(pos)?.roman ?? String(pos)]);
+    for (let pos = 1; pos <= 7; pos++) {
+      const info = map.get(pos);
+      const roman = info?.roman ?? String(pos);
+      // Fixed-7ths: the key IS the answer, so show the 7th (ii7, V7, Imaj7, viiø7).
+      const label = this.challengeCombinedMode && info ? romanLabel(info.roman, info.seventhQuality) : roman;
+      out.push([majorRelativeDegree(pos, mode), label]);
+    }
     return out;
   }
 
@@ -672,16 +691,17 @@ export class EarTrainingState {
     if (!this.challengeActive || bar < 0 || bar > 3) return;
     const deg = degreeFromMajorRelative(majorRel, this.progMode);
     this.challengeGuessDegree[bar] = deg;
-    let extSuffix = "";
+    // label = what shows in the square; roman already carries the 7th in combined
+    // mode (from keyboardKeys), so don't append the suffix again there.
+    let label = roman;
     if (this.challengeCombinedMode) {
       const info = EarTrainingDegrees(this.progMode).get(deg);
-      extSuffix = info ? romanLabel(info.roman, info.seventhQuality).replace(info.roman, "") : "";
-      this.challengeGuessExt[bar] = extSuffix;
+      this.challengeGuessExt[bar] = info ? romanLabel(info.roman, info.seventhQuality).replace(info.roman, "") : "";
     } else if (this.challengeNeedsExt) {
-      extSuffix = ext ?? "";
-      this.challengeGuessExt[bar] = extSuffix;
+      this.challengeGuessExt[bar] = ext ?? "";
+      label = roman + (ext ?? "");
     }
-    this.challengeGuessLabel[bar] = roman + extSuffix;
+    this.challengeGuessLabel[bar] = label;
     this.maybeAutoMark();
     this.notify();
   }

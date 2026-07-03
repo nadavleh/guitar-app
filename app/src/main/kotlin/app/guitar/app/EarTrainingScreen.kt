@@ -1375,7 +1375,8 @@ private fun DegreeKeyboardDialog(ear: EarTrainingState, bar: Int, onDismiss: () 
     var pickedRoman by remember(bar) { mutableStateOf<String?>(null) }
     var pickedExt by remember(bar) { mutableStateOf<String?>(null) }
     val needsExt = ear.challengeNeedsExt && !ear.challengeCombinedMode
-    val extOptions = ear.challengeExtOptions()
+    // Extension options depend on the picked degree (only its diatonic extensions).
+    val extOptions = pickedDeg?.let { ear.challengeExtOptionsForDegree(it) } ?: emptyList()
 
     fun commit() {
         val deg = pickedDeg ?: return
@@ -1414,6 +1415,8 @@ private fun DegreeKeyboardDialog(ear: EarTrainingState, bar: Int, onDismiss: () 
                         FilterChip(
                             selected = pickedDeg == majDeg,
                             onClick = {
+                                // Changing the degree invalidates the chosen extension.
+                                if (pickedDeg != majDeg) pickedExt = null
                                 pickedDeg = majDeg; pickedRoman = roman
                                 if (!needsExt) commit()
                             },
@@ -1421,20 +1424,26 @@ private fun DegreeKeyboardDialog(ear: EarTrainingState, bar: Int, onDismiss: () 
                         )
                     }
                 }
-                if (needsExt && extOptions.isNotEmpty()) {
+                if (needsExt) {
                     Spacer(Modifier.height(10.dp))
                     Text("Extension", style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        for (ext in extOptions) {
-                            FilterChip(
-                                selected = pickedExt == ext,
-                                onClick = { pickedExt = ext },
-                                label = { Text(if (ext.isEmpty()) "triad" else ext) },
-                            )
+                    if (pickedDeg == null) {
+                        Text("Pick a degree first — its valid extensions appear here.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            for (ext in extOptions) {
+                                FilterChip(
+                                    selected = pickedExt == ext,
+                                    onClick = { pickedExt = ext },
+                                    label = { Text(if (ext.isEmpty()) "triad" else ext) },
+                                )
+                            }
                         }
                     }
                 }
@@ -1442,7 +1451,7 @@ private fun DegreeKeyboardDialog(ear: EarTrainingState, bar: Int, onDismiss: () 
         },
         confirmButton = {
             if (needsExt) {
-                TextButton(onClick = { commit() }, enabled = pickedDeg != null) { Text("OK") }
+                TextButton(onClick = { commit() }, enabled = pickedDeg != null && pickedExt != null) { Text("OK") }
             } else {
                 TextButton(onClick = onDismiss) { Text("Close") }
             }

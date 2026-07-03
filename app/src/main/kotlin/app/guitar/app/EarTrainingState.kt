@@ -96,7 +96,7 @@ class EarTrainingState(
     var includeMajor by mutableStateOf(true)
     /** Whether the user wants Minor mode in the rotation. Default off: the app
      *  opens in major-triads-only for the simplest starting point. */
-    var includeMinor by mutableStateOf(false)
+    var includeMinor by mutableStateOf(true)
     /** Triads vs Sevenths vs Extended. Default Triads (simplest). */
     var chordTypeLevel by mutableStateOf(ChordTypeLevel.Sevenths)
     /** Null = random key each round. Non-null = always use this key. */
@@ -812,8 +812,28 @@ class EarTrainingState(
         val map = if (keyboardMinor) EarTraining.MINOR_DEGREES else EarTraining.MAJOR_DEGREES
         val mode = if (keyboardMinor) TrainingMode.Minor else TrainingMode.Major
         return (1..7).map { pos ->
-            EarTraining.majorRelativeDegree(pos, mode) to (map[pos]?.roman ?: pos.toString())
+            val info = map[pos]
+            val roman = info?.roman ?: pos.toString()
+            // In fixed-7ths mode the key IS the whole answer, so show the 7th on it
+            // (ii7, V7, Imaj7, viiø7…). Extended/triad/mix keep the plain numeral.
+            val label = if (challengeCombinedMode && info != null)
+                EarTraining.romanLabel(info.roman, info.seventhQuality) else roman
+            EarTraining.majorRelativeDegree(pos, mode) to label
         }
+    }
+
+    /**
+     * Diatonic extension suffixes to offer for a keyboard key ([majorRelativeDegree])
+     * in Extended mode, in the actual key's mode — so after picking a degree the
+     * extension row shows only what's valid on THAT chord (e.g. IV→9/♯11/13,
+     * ii→9/11, V→9/11/13). Mix mode keeps the full union (level varies per bar).
+     */
+    fun challengeExtOptionsForDegree(majorRelativeDegree: Int): List<String> {
+        if (earMixAll || chordTypeLevel != ChordTypeLevel.Extended) return challengeExtOptions()
+        val deg = EarTraining.degreeFromMajorRelative(majorRelativeDegree, progMode)
+        val info = degreesMap()[deg] ?: return emptyList()
+        return if (info.extendedOptions.isNotEmpty()) info.extendedOptions.map { it.second }.distinct()
+        else listOf(EarTraining.romanLabel(info.roman, info.extendedQuality).removePrefix(info.roman))
     }
 
     fun toggleKeyboardShift() { keyboardMinor = !keyboardMinor }
@@ -831,21 +851,23 @@ class EarTrainingState(
         if (!challengeActive || bar !in 0..3) return
         val deg = EarTraining.degreeFromMajorRelative(majorRelativeDegree, progMode)
         challengeGuessDegree = challengeGuessDegree.toMutableList().also { it[bar] = deg }
-        val extSuffix: String = when {
+        // label = what shows in the square; roman already carries the 7th in combined
+        // mode (from keyboardKeys), so don't append the suffix again there.
+        val label: String = when {
             challengeCombinedMode -> {
                 val info = degreesMap()[deg]
                 val e = if (info != null)
                     EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman) else ""
                 challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = e }
-                e
+                roman
             }
             challengeNeedsExt -> {
                 challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = ext ?: "" }
-                ext ?: ""
+                roman + (ext ?: "")
             }
-            else -> ""
+            else -> roman
         }
-        challengeGuessLabel = challengeGuessLabel.toMutableList().also { it[bar] = roman + extSuffix }
+        challengeGuessLabel = challengeGuessLabel.toMutableList().also { it[bar] = label }
         maybeAutoMarkChallenge()
     }
 

@@ -491,6 +491,7 @@ export class EarTrainingUI {
         if (idx >= keys.length) return;
         e.preventDefault();
         const [majDeg, roman] = keys[idx];
+        if (this.kbPickedDeg !== majDeg) this.kbPickedExt = null;   // ext depends on degree
         this.kbPickedDeg = majDeg; this.kbPickedRoman = roman;
         if (!needsExt) { ear.guessChallengeKeyboard(bar, majDeg, roman, null); finish(); }
         else this.rerender();
@@ -519,7 +520,8 @@ export class EarTrainingUI {
   private degreeKeyboardDialog(bar: number): HTMLElement {
     const ear = this.ear;
     const needsExt = ear.challengeNeedsExt && !ear.challengeCombinedMode;
-    const extOptions = ear.challengeExtOptions();
+    // Extension options depend on the picked degree (only its diatonic extensions).
+    const extOptions = this.kbPickedDeg != null ? ear.challengeExtOptionsForDegree(this.kbPickedDeg) : [];
 
     // Physical 1..7 keys select degrees while this popup is open.
     this.attachKbKeys();
@@ -544,20 +546,26 @@ export class EarTrainingUI {
     body.appendChild(labelSm("Degree"));
     body.appendChild(chipsRow(ear.keyboardKeys().map(([majDeg, roman]) =>
       chip(roman, this.kbPickedDeg === majDeg, () => {
+        // Changing the degree invalidates the chosen extension.
+        if (this.kbPickedDeg !== majDeg) this.kbPickedExt = null;
         this.kbPickedDeg = majDeg; this.kbPickedRoman = roman;
         if (!needsExt) commit(); else this.rerender();
       }))));
-    if (needsExt && extOptions.length) {
+    if (needsExt) {
       body.appendChild(labelSm("Extension"));
-      body.appendChild(chipsRow(extOptions.map((ext) =>
-        chip(ext === "" ? "triad" : ext, this.kbPickedExt === ext, () => { this.kbPickedExt = ext; this.rerender(); }))));
+      if (this.kbPickedDeg == null) {
+        body.appendChild(el("div", { class: "et-muted" }, ["Pick a degree first — its valid extensions appear here."]));
+      } else {
+        body.appendChild(chipsRow(extOptions.map((ext) =>
+          chip(ext === "" ? "triad" : ext, this.kbPickedExt === ext, () => { this.kbPickedExt = ext; this.rerender(); }))));
+      }
     }
 
     const footer = el("div", { class: "row", style: "gap:8px;justify-content:flex-end;margin-top:12px" });
     footer.appendChild(btn("Clear", () => { ear.clearChallengeBar(bar); close(); }));
     if (needsExt) {
       const ok = btn("OK", commit, "btn primary");
-      if (this.kbPickedDeg == null) ok.disabled = true;
+      if (this.kbPickedDeg == null || this.kbPickedExt == null) ok.disabled = true;
       footer.appendChild(ok);
     } else {
       footer.appendChild(btn("Close", close));
