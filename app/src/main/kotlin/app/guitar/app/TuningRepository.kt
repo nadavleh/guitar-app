@@ -215,6 +215,42 @@ class TuningRepository(private val context: Context) {
             ChallengeScore(s, t, d, dt, p.getOrNull(4) ?: "progression")
         }.sortedWith(CHALLENGE_SCORE_ORDER)
 
+    // ---------- Drum-machine mixer volumes ----------
+
+    private val keyDrumVolumes = stringPreferencesKey("drum_volumes")
+
+    /** Per-instrument and per-voice playback volumes, keyed by "<instId>" (global)
+     *  or "<instId>:<voiceIndex>" (single voice); value in 0f..1f. Absent keys use
+     *  their code default (1f, or 0.5f for the two soft tamborim voices). Persisted
+     *  so the mix survives closing the app. */
+    val drumVolumes: Flow<Map<String, Float>> =
+        context.tuningDataStore.data.map { prefs -> decodeVolumes(prefs[keyDrumVolumes] ?: "") }
+
+    /** Set one volume entry (global or per-voice) and persist the whole map. */
+    suspend fun setDrumVolume(key: String, value: Float) {
+        if (key.isEmpty() || key.any { it in "=;" }) return
+        context.tuningDataStore.edit { prefs ->
+            val current = decodeVolumes(prefs[keyDrumVolumes] ?: "").toMutableMap()
+            current[key] = value.coerceIn(0f, 1f)
+            prefs[keyDrumVolumes] = encodeVolumes(current)
+        }
+    }
+
+    /** Entries "key=value" joined by ';'. Keys never contain '=' or ';'. */
+    private fun encodeVolumes(map: Map<String, Float>): String =
+        map.entries.joinToString(";") { (k, v) -> "$k=$v" }
+
+    private fun decodeVolumes(raw: String): Map<String, Float> {
+        val out = LinkedHashMap<String, Float>()
+        for (entry in raw.split(";")) {
+            val eq = entry.indexOf('=')
+            if (eq <= 0) continue
+            val value = entry.substring(eq + 1).toFloatOrNull() ?: continue
+            out[entry.substring(0, eq)] = value.coerceIn(0f, 1f)
+        }
+        return out
+    }
+
     // ---------- Saved drum-machine beats ----------
 
     private val keyDrumPatterns = stringPreferencesKey("drum_patterns")

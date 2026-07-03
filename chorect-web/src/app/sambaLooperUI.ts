@@ -276,19 +276,22 @@ export class SambaLooperUI {
     const s = this.samba;
     const vol = s.volumeOf(inst);
     const pop = el("div", { class: "drum-voice-pop" }, [
-      el("div", { style: "font-weight:600;font-size:13px" }, [`Volume: ${Math.round(vol * 100)}%`]),
+      el("div", { style: "font-weight:600;font-size:13px" }, [`Overall volume: ${Math.round(vol * 100)}%`]),
       slider(0, 1, vol, (v) => s.setVolume(inst, v), 0.01),
       el("div", { class: "divider-line" }),
-      el("div", { class: "ans-label" }, [`${inst.displayName} voices`]),
+      el("div", { class: "ans-label" }, ["Per-voice volume (tap name to audition)"]),
     ]);
     voicesFor(inst).forEach((v, idx) => {
       const src = s.usesSample(inst, idx) ? "sample" : "synth";
+      const vvol = s.voiceVolumeOf(inst, idx);
+      const label = el("span", { style: "flex:1" }, [`${v.glyph}   ${v.displayName}   ·   ${Math.round(vvol * 100)}%`]);
       const row = el("div", { class: "vrow", style: "display:flex;align-items:center;gap:8px" }, [
-        el("span", { style: "flex:1" }, [`${v.glyph}   ${v.displayName}`]),
+        label,
         el("span", { style: `font-size:10px;color:${s.usesSample(inst, idx) ? Colors.primary : Colors.textSecondary}` }, [src]),
       ]);
-      row.addEventListener("click", (e) => { e.stopPropagation(); s.preview(inst, idx); });
+      label.addEventListener("click", (e) => { e.stopPropagation(); s.preview(inst, idx); });
       pop.appendChild(row);
+      pop.appendChild(slider(0, 1, vvol, (val) => s.setVoiceVolume(inst, idx, val), 0.01));
     });
     // Remove this instrument from the kit.
     pop.appendChild(el("div", { class: "divider-line" }));

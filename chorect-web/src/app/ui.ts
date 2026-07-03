@@ -108,6 +108,8 @@ export class App {
       save: (name, enc) => state.saveDrumPattern(name, enc),
       del: (name) => state.deleteDrumPattern(name),
       loadSample: (inst, voice) => loadDrumSample(state.audio, inst, voice),
+      getVolumes: () => state.drumVolumes,
+      saveVolume: (key, value) => state.setDrumVolume(key, value),
     });
     this.sambaUI = new SambaLooperUI(this.samba, () => state.closeSheet());
     this.decomposeUI = new DecomposeUI(state, () => state.closeSheet(), (symbols) => {

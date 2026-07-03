@@ -453,12 +453,12 @@ private fun InstrumentRow(
                 // Voice menu: a button per voice; tap to audition (stays open to
                 // compare). Tap outside to dismiss.
                 DropdownMenu(expanded = voiceMenu, onDismissRequest = { voiceMenu = false }) {
-                    // Per-instrument volume (task #4). Lives in the voice popup so
-                    // the dense step-grid stays uncluttered.
-                    Column(modifier = Modifier.width(240.dp).padding(horizontal = 12.dp, vertical = 4.dp)) {
+                    // Overall instrument volume (task #4). Lives in the voice popup
+                    // so the dense step-grid stays uncluttered.
+                    Column(modifier = Modifier.width(260.dp).padding(horizontal = 12.dp, vertical = 4.dp)) {
                         val vol = samba.volumeOf(instrument)
                         Text(
-                            "Volume: ${(vol * 100).toInt()}%",
+                            "Overall volume: ${(vol * 100).toInt()}%",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -470,16 +470,29 @@ private fun InstrumentRow(
                     }
                     HorizontalDivider()
                     Text(
-                        "  ${instrument.displayName} voices",
+                        "  Per-voice volume (tap name to audition)",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                     )
+                    // Each voice: its own level slider; the label auditions the voice
+                    // at its current effective gain so tuning is immediate.
                     voices.forEachIndexed { idx, v ->
-                        DropdownMenuItem(
-                            text = { Text("${v.glyph}   ${v.displayName}") },
-                            onClick = { samba.preview(instrument, idx) },
-                        )
+                        val vvol = samba.voiceVolumeOf(instrument, idx)
+                        Column(modifier = Modifier.width(260.dp).padding(horizontal = 12.dp, vertical = 2.dp)) {
+                            Text(
+                                "${v.glyph}   ${v.displayName}   ·   ${(vvol * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.pointerInput(instrument, idx) {
+                                    detectTapGestures(onTap = { samba.preview(instrument, idx) })
+                                },
+                            )
+                            Slider(
+                                value = vvol,
+                                onValueChange = { samba.setVoiceVolume(instrument, idx, it) },
+                                valueRange = 0f..1f,
+                            )
+                        }
                     }
                     HorizontalDivider()
                     DropdownMenuItem(

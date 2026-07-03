@@ -52,6 +52,7 @@ interface Persisted {
   customTunings: Record<string, number[]>;
   challengeScores: ChallengeScore[];
   drumPatterns: Record<string, string>;
+  drumVolumes: Record<string, number>;
 }
 
 export class AppState {
@@ -92,6 +93,8 @@ export class AppState {
   challengeScores: ChallengeScore[] = [];
   /** Saved drum beats: name → encoded PercussionPattern string (insertion order). */
   drumPatterns = new Map<string, string>();
+  /** Drum mixer volumes: "<instId>" (global) or "<instId>:<voice>" → 0..1. */
+  drumVolumes = new Map<string, number>();
 
   private listeners = new Set<() => void>();
 
@@ -133,6 +136,9 @@ export class AppState {
       }
       if (Array.isArray(p.challengeScores)) this.challengeScores = p.challengeScores.slice();
       if (p.drumPatterns) for (const [name, enc] of Object.entries(p.drumPatterns)) this.drumPatterns.set(name, enc);
+      if (p.drumVolumes) for (const [k, v] of Object.entries(p.drumVolumes)) {
+        if (typeof v === "number") this.drumVolumes.set(k, Math.min(Math.max(v, 0), 1));
+      }
       // Resolve the saved tuning name against presets + customs for the current instrument.
       const name = p.tuningName ?? Tunings.defaultNameFor(this.instrument);
       const resolved = Tunings.allPresets.get(name) ?? this.customTunings.get(name) ?? Tunings.defaultFor(this.instrument);
@@ -160,6 +166,7 @@ export class AppState {
       customTunings,
       challengeScores: this.challengeScores,
       drumPatterns: Object.fromEntries(this.drumPatterns),
+      drumVolumes: Object.fromEntries(this.drumVolumes),
     };
     localStorage.setItem(LS_KEY, JSON.stringify(p));
   }
@@ -183,6 +190,11 @@ export class AppState {
   }
   deleteDrumPattern(name: string): void {
     this.commit(() => { this.drumPatterns.delete(name); });
+  }
+
+  /** Persist one drum mixer volume entry (global or per-voice). */
+  setDrumVolume(key: string, value: number): void {
+    this.commit(() => { this.drumVolumes.set(key, Math.min(Math.max(value, 0), 1)); });
   }
 
   /** Mutate + persist + re-render in one shot. */

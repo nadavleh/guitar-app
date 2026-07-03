@@ -19,6 +19,9 @@ export interface SambaDeps {
   del: (name: string) => void;
   /** Load a bundled one-shot sample for (instrument, voice), or null → synth fallback. */
   loadSample: (inst: PercussionInstrument, voice: number) => Promise<Float32Array | null>;
+  /** Persisted mixer volumes, keyed by "<instId>" or "<instId>:<voice>" → 0..1. */
+  getVolumes: () => Map<string, number>;
+  saveVolume: (key: string, value: number) => void;
 }
 
 export class SambaLooperState {
@@ -72,7 +75,23 @@ export class SambaLooperState {
   private loadedSamples = new Map<string, Float32Array>();
   private requestedSampleKits = new Set<string>();
 
-  constructor(private deps: SambaDeps) {}
+  constructor(private deps: SambaDeps) {
+    // Load the persisted mix so it survives reloads / closing the tab.
+    this.volumes = new Map(deps.getVolumes());
+  }
+
+  /** Voices that start quieter than full: the tamborim "muted clack" (1) and
+   *  "tap" (2) are much softer than its open clack, so default them to 50%. */
+  private static readonly SOFT_VOICE_DEFAULTS: Record<string, number> = {
+    "tamborim:1": 0.5,
+    "tamborim:2": 0.5,
+  };
+  static defaultVoiceVolume(instId: string, voiceIndex: number): number {
+    return SambaLooperState.SOFT_VOICE_DEFAULTS[`${instId}:${voiceIndex}`] ?? 1;
+  }
+  private voiceKey(inst: PercussionInstrument, voiceIndex: number): string {
+    return `${inst.id}:${voiceIndex}`;
+  }
 
   private notify() { this.deps.onChange(); }
 
@@ -123,9 +142,27 @@ export class SambaLooperState {
     return !this.muted.has(inst.id) && (this.soloed.size === 0 || this.soloed.has(inst.id));
   }
 
+  /** Global level of an instrument (default full). */
   volumeOf(inst: PercussionInstrument): number { return this.volumes.get(inst.id) ?? 1; }
+  /** Level of one voice (default full, or 50% for the soft tamborim voices). */
+  voiceVolumeOf(inst: PercussionInstrument, voiceIndex: number): number {
+    return this.volumes.get(this.voiceKey(inst, voiceIndex)) ?? SambaLooperState.defaultVoiceVolume(inst.id, voiceIndex);
+  }
+  /** Combined gain a hit actually plays at: global × per-voice. */
+  effectiveGain(inst: PercussionInstrument, voiceIndex: number): number {
+    return this.volumeOf(inst) * this.voiceVolumeOf(inst, voiceIndex);
+  }
   setVolume(inst: PercussionInstrument, value: number) {
-    this.volumes.set(inst.id, Math.min(Math.max(value, 0), 1));
+    const v = Math.min(Math.max(value, 0), 1);
+    this.volumes.set(inst.id, v);
+    this.deps.saveVolume(inst.id, v);
+    this.notify();
+  }
+  setVoiceVolume(inst: PercussionInstrument, voiceIndex: number, value: number) {
+    const v = Math.min(Math.max(value, 0), 1);
+    const key = this.voiceKey(inst, voiceIndex);
+    this.volumes.set(key, v);
+    this.deps.saveVolume(key, v);
     this.notify();
   }
 
@@ -133,13 +170,13 @@ export class SambaLooperState {
     this.ensureSamplesLoaded();
     this.pattern = this.pattern.cycled(instrument, slot);
     const v = this.pattern.voiceAt(instrument, slot);
-    if (v !== null && !this.isPlaying) this.deps.audio.playSamples(this.buffer(instrument, v), this.volumeOf(instrument));
+    if (v !== null && !this.isPlaying) this.deps.audio.playSamples(this.buffer(instrument, v), this.effectiveGain(instrument, v));
     this.notify();
   }
 
   preview(instrument: PercussionInstrument, voiceIndex: number) {
     this.ensureSamplesLoaded();
-    this.deps.audio.playSamples(this.buffer(instrument, voiceIndex), this.volumeOf(instrument));
+    this.deps.audio.playSamples(this.buffer(instrument, voiceIndex), this.effectiveGain(instrument, voiceIndex));
   }
 
   toggleAccent(instrument: PercussionInstrument, slot: number) { this.pattern = this.pattern.accentToggled(instrument, slot); this.notify(); }
@@ -158,7 +195,7 @@ export class SambaLooperState {
   addInstrument(inst: PercussionInstrument) {
     this.pattern = this.pattern.addInstrument(inst);
     this.loadSamplesFor(inst);
-    if (!this.isPlaying) this.deps.audio.playSamples(this.buffer(inst, 0), this.volumeOf(inst));
+    if (!this.isPlaying) this.deps.audio.playSamples(this.buffer(inst, 0), this.effectiveGain(inst, 0));
     this.notify();
   }
 
@@ -247,7 +284,7 @@ export class SambaLooperState {
         const now = this.deps.audio.now();
         const advance = peak > 0.02 ? Math.min(peak, Math.max(when - now, 0)) : 0;
         // Accented hits play ~1.4× louder (mixer clamps overall).
-        const gain = this.volumeOf(inst) * (snapshot.isAccented(inst, slot) ? 1.4 : 1);
+        const gain = this.effectiveGain(inst, v) * (snapshot.isAccented(inst, slot) ? 1.4 : 1);
         this.deps.audio.playSamples(buf, gain, when - advance);
       }
     };

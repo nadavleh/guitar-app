@@ -15,6 +15,7 @@ import app.guitar.theory.PercussionVoices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -80,17 +81,56 @@ class SambaLooperState(
     fun isAudible(inst: PercussionInstrument): Boolean =
         inst !in muted && (soloed.isEmpty() || inst in soloed)
 
-    /** Per-instrument playback volume, 0f..1f (1 = full), keyed by instrument id.
-     *  Applied as a gain at mix time so the cached one-shot buffers are never
-     *  mutated. App-lifetime, so the mix you dial in survives leaving and returning
-     *  to the screen; instruments not yet dialled default to full. */
+    /** Mixer volumes, 0f..1f, keyed by "<instId>" (global instrument level) or
+     *  "<instId>:<voiceIndex>" (a single voice). Applied as a gain at mix time so
+     *  the cached one-shot buffers are never mutated. Effective gain of a hit is
+     *  global × per-voice. Loaded from and written through to [repo] so the mix
+     *  survives closing the app; unset keys fall back to [defaultVoiceVolume]. */
     var volumes by mutableStateOf<Map<String, Float>>(emptyMap())
         private set
 
+    init {
+        // Load the persisted mix once at startup (state is app-scoped, built once).
+        scope.launch { runCatching { volumes = repo.drumVolumes.first() } }
+    }
+
+    private fun voiceKey(inst: PercussionInstrument, voiceIndex: Int) = "${inst.id}:$voiceIndex"
+
+    /** Global level of an instrument (default full). */
     fun volumeOf(inst: PercussionInstrument): Float = volumes[inst.id] ?: 1f
 
+    /** Level of one voice (default full, or 50% for the soft tamborim voices). */
+    fun voiceVolumeOf(inst: PercussionInstrument, voiceIndex: Int): Float =
+        volumes[voiceKey(inst, voiceIndex)] ?: defaultVoiceVolume(inst.id, voiceIndex)
+
+    /** Combined gain a hit of [voiceIndex] actually plays at: global × per-voice. */
+    fun effectiveGain(inst: PercussionInstrument, voiceIndex: Int): Float =
+        volumeOf(inst) * voiceVolumeOf(inst, voiceIndex)
+
     fun setVolume(inst: PercussionInstrument, value: Float) {
-        volumes = volumes + (inst.id to value.coerceIn(0f, 1f))
+        val v = value.coerceIn(0f, 1f)
+        volumes = volumes + (inst.id to v)
+        scope.launch { repo.setDrumVolume(inst.id, v) }
+    }
+
+    fun setVoiceVolume(inst: PercussionInstrument, voiceIndex: Int, value: Float) {
+        val v = value.coerceIn(0f, 1f)
+        val key = voiceKey(inst, voiceIndex)
+        volumes = volumes + (key to v)
+        scope.launch { repo.setDrumVolume(key, v) }
+    }
+
+    companion object {
+        /** Voices that should start quieter than full. The tamborim "muted clack"
+         *  (voice 1) and "tap" (voice 2) are much softer than its open clack, so
+         *  they default to 50% until the user dials them in. */
+        private val SOFT_VOICE_DEFAULTS = mapOf(
+            "tamborim:1" to 0.5f,
+            "tamborim:2" to 0.5f,
+        )
+
+        fun defaultVoiceVolume(instId: String, voiceIndex: Int): Float =
+            SOFT_VOICE_DEFAULTS["$instId:$voiceIndex"] ?: 1f
     }
 
     private var job: Job? = null
@@ -107,12 +147,12 @@ class SambaLooperState(
     fun toggleSlot(instrument: PercussionInstrument, slot: Int) {
         pattern = pattern.cycled(instrument, slot)
         val v = pattern.voiceAt(instrument, slot)
-        if (v != null && !isPlaying) audio.playSamples(buffer(instrument, v), volumeOf(instrument))
+        if (v != null && !isPlaying) audio.playSamples(buffer(instrument, v), effectiveGain(instrument, v))
     }
 
     /** Audition a single voice (used by the row-label tap). */
     fun preview(instrument: PercussionInstrument, voiceIndex: Int) {
-        audio.playSamples(buffer(instrument, voiceIndex), volumeOf(instrument))
+        audio.playSamples(buffer(instrument, voiceIndex), effectiveGain(instrument, voiceIndex))
     }
 
     /** Toggle the accent on a non-silent cell (Accent tool). */
@@ -142,7 +182,7 @@ class SambaLooperState(
     /** Add [inst] to the kit (silent row) and audition its first voice. */
     fun addInstrument(inst: PercussionInstrument) {
         pattern = pattern.addInstrument(inst)
-        if (!isPlaying) audio.playSamples(buffer(inst, 0), volumeOf(inst))
+        if (!isPlaying) audio.playSamples(buffer(inst, 0), effectiveGain(inst, 0))
     }
 
     /** Remove [inst] from the kit, also clearing its mute/solo state. */
@@ -253,7 +293,7 @@ class SambaLooperState(
                     val peak = peakOffsetFrames(inst, v, buf)
                     val advance = if (peak > sr / 50) minOf(peak, baseFrames) else 0
                     // Accented hits play ~1.4× louder (mixer clamps overall).
-                    val gain = volumeOf(inst) * (if (snapshot.isAccented(inst, slot)) 1.4f else 1f)
+                    val gain = effectiveGain(inst, v) * (if (snapshot.isAccented(inst, slot)) 1.4f else 1f)
                     audio.playSamplesAt(buf, gain, baseFrames - advance)
                 }
             }
