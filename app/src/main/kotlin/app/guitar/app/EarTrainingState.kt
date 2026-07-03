@@ -52,7 +52,18 @@ class EarTrainingState(
      *  the max possible bar score, and the wall-clock duration in ms. */
     private val onProgressionChallengeComplete: (score: Int, total: Int, durationMs: Long) -> Unit =
         { _, _, _ -> },
+    /** Called once when any OTHER challenge finishes (kind = "inversions" / "augdim" /
+     *  "flavor" / "intervals" / "note2chord") — feeds the per-kind stats. */
+    private val onChallengeComplete: (kind: String, score: Int, total: Int, durationMs: Long) -> Unit =
+        { _, _, _, _ -> },
 ) {
+    /** Per-kind challenge start time, for duration in the recorded stats. */
+    private val kindChallengeStart = HashMap<String, Long>()
+    private fun markChallengeStart(kind: String) { kindChallengeStart[kind] = System.currentTimeMillis() }
+    private fun reportChallengeDone(kind: String, score: Int, total: Int) {
+        val started = kindChallengeStart.remove(kind) ?: System.currentTimeMillis()
+        onChallengeComplete(kind, score, total, System.currentTimeMillis() - started)
+    }
 
     // ---- Voicing / variety options (apply to progression playback & generation) ----
     /** Use shell (jazz drop-2) voicings for ear-training chords. */
@@ -461,6 +472,7 @@ class EarTrainingState(
 
     fun startN2cChallenge() {
         n2cChActive = true; n2cChIndex = 0; n2cChScore = 0; n2cChGuess = null
+        markChallengeStart("note2chord")
         nextN2cChallenge(); playN2c()
     }
     fun guessN2c(label: String) {
@@ -470,7 +482,11 @@ class EarTrainingState(
     }
     fun advanceN2cChallenge() {
         if (!n2cChActive) return
-        if (n2cChIndex >= n2cChallengeTotal - 1) { n2cChIndex = n2cChallengeTotal; return }
+        if (n2cChIndex >= n2cChallengeTotal - 1) {
+            n2cChIndex = n2cChallengeTotal
+            reportChallengeDone("note2chord", n2cChScore, n2cChallengeTotal)
+            return
+        }
         n2cChIndex++; n2cChGuess = null; nextN2cChallenge(); playN2c()
     }
     fun exitN2cChallenge() { n2cChActive = false; n2cChIndex = 0; n2cChGuess = null }
@@ -1021,6 +1037,7 @@ class EarTrainingState(
 
     fun startFlavorChallenge() {
         flavorChActive = true; flavorChIndex = 0; flavorChScore = 0; flavorChAnswered = false
+        markChallengeStart("flavor")
         newFlavorChallenge()
     }
     /** Lock in the current degree+flavor guess and score it. */
@@ -1033,7 +1050,11 @@ class EarTrainingState(
     }
     fun advanceFlavorChallenge() {
         if (!flavorChActive) return
-        if (flavorChIndex >= flavorChallengeTotal - 1) { flavorChIndex = flavorChallengeTotal; return }
+        if (flavorChIndex >= flavorChallengeTotal - 1) {
+            flavorChIndex = flavorChallengeTotal
+            reportChallengeDone("flavor", flavorChScore, flavorChallengeTotal)
+            return
+        }
         flavorChIndex++; flavorChAnswered = false; newFlavorChallenge()
     }
     fun exitFlavorChallenge() { flavorChActive = false; flavorChIndex = 0; flavorChAnswered = false }
@@ -1216,6 +1237,7 @@ class EarTrainingState(
 
     fun startInvChallenge() {
         invChActive = true; invChIndex = 0; invChScore = 0; invChAnswered = false
+        markChallengeStart("inversions")
         newInversion()
     }
     fun submitInvGuess() {
@@ -1226,7 +1248,11 @@ class EarTrainingState(
     }
     fun advanceInvChallenge() {
         if (!invChActive) return
-        if (invChIndex >= invChallengeTotal - 1) { invChIndex = invChallengeTotal; return }
+        if (invChIndex >= invChallengeTotal - 1) {
+            invChIndex = invChallengeTotal
+            reportChallengeDone("inversions", invChScore, invChallengeTotal)
+            return
+        }
         invChIndex++; invChAnswered = false; newInversion()
     }
     fun exitInvChallenge() { invChActive = false; invChIndex = 0 }
@@ -1333,6 +1359,7 @@ class EarTrainingState(
 
     fun startAugDimChallenge() {
         adChActive = true; adChIndex = 0; adChScore = 0; adChAnswered = false
+        markChallengeStart("augdim")
         newAugDim()
     }
     fun submitAugDimGuess() {
@@ -1343,7 +1370,11 @@ class EarTrainingState(
     }
     fun advanceAugDimChallenge() {
         if (!adChActive) return
-        if (adChIndex >= augDimChallengeTotal - 1) { adChIndex = augDimChallengeTotal; return }
+        if (adChIndex >= augDimChallengeTotal - 1) {
+            adChIndex = augDimChallengeTotal
+            reportChallengeDone("augdim", adChScore, augDimChallengeTotal)
+            return
+        }
         adChIndex++; adChAnswered = false; newAugDim()
     }
     fun exitAugDimChallenge() { adChActive = false; adChIndex = 0 }
@@ -1441,6 +1472,7 @@ class EarTrainingState(
 
     fun startIntervalChallenge() {
         intervalChActive = true; intervalChIndex = 0; intervalChScore = 0
+        markChallengeStart("intervals")
         drawIntervalQuestion()
         // Anchor the key, then sound the first interval after the cadence.
         intervalJob?.cancel()
@@ -1477,7 +1509,11 @@ class EarTrainingState(
 
     fun advanceIntervalChallenge() {
         if (!intervalChActive) return
-        if (intervalChIndex >= intervalChallengeTotal - 1) { intervalChIndex = intervalChallengeTotal; return }
+        if (intervalChIndex >= intervalChallengeTotal - 1) {
+            intervalChIndex = intervalChallengeTotal
+            reportChallengeDone("intervals", intervalChScore, intervalChallengeTotal)
+            return
+        }
         intervalChIndex++
         drawIntervalQuestion()
         playIntervalQuestion()

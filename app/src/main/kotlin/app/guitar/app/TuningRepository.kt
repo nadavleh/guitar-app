@@ -27,6 +27,9 @@ data class ChallengeScore(
     val total: Int,
     val durationMs: Long,
     val dateMillis: Long,
+    /** Which trainer produced this result ("progression", "inversions", "augdim",
+     *  "flavor", "intervals", "note2chord"). Legacy rows decode as "progression". */
+    val kind: String = "progression",
 )
 
 /** Ranking: higher score first; ties broken by the faster (smaller) completion time. */
@@ -81,6 +84,16 @@ class TuningRepository(private val context: Context) {
         context.tuningDataStore.edit { prefs ->
             prefs[keyLeftHanded] = value
         }
+    }
+
+    private val keyDarkTheme = booleanPreferencesKey("dark_theme")
+
+    /** UI theme; defaults to dark (the original look). */
+    val darkTheme: Flow<Boolean> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyDarkTheme] ?: true }
+
+    suspend fun setDarkTheme(value: Boolean) {
+        context.tuningDataStore.edit { prefs -> prefs[keyDarkTheme] = value }
     }
 
     private val keyVoicingShell = booleanPreferencesKey("voicing_shell")
@@ -175,28 +188,31 @@ class TuningRepository(private val context: Context) {
             decodeScores(prefs[keyChallengeScores] ?: "")
         }
 
-    /** Insert a result, keep the top [maxScoresKept] by [CHALLENGE_SCORE_ORDER]. */
+    /** Insert a result; keep the top [maxScoresKept] PER KIND by [CHALLENGE_SCORE_ORDER]. */
     suspend fun addChallengeScore(entry: ChallengeScore) {
         context.tuningDataStore.edit { prefs ->
             val current = decodeScores(prefs[keyChallengeScores] ?: "")
-            val updated = (current + entry).sortedWith(CHALLENGE_SCORE_ORDER).take(maxScoresKept)
+            val updated = (current + entry)
+                .groupBy { it.kind }
+                .flatMap { (_, rows) -> rows.sortedWith(CHALLENGE_SCORE_ORDER).take(maxScoresKept) }
             prefs[keyChallengeScores] = encodeScores(updated)
         }
     }
 
-    /** Serialize as "score,total,durationMs,dateMillis" rows joined by ';'. */
+    /** Serialize as "score,total,durationMs,dateMillis,kind" rows joined by ';'
+     *  (kind added later — 4-field legacy rows decode as "progression"). */
     private fun encodeScores(list: List<ChallengeScore>): String =
-        list.joinToString(";") { "${it.score},${it.total},${it.durationMs},${it.dateMillis}" }
+        list.joinToString(";") { "${it.score},${it.total},${it.durationMs},${it.dateMillis},${it.kind}" }
 
     private fun decodeScores(raw: String): List<ChallengeScore> =
         raw.split(";").mapNotNull { row ->
             val p = row.split(",")
-            if (p.size != 4) return@mapNotNull null
+            if (p.size !in 4..5) return@mapNotNull null
             val s = p[0].toIntOrNull() ?: return@mapNotNull null
             val t = p[1].toIntOrNull() ?: return@mapNotNull null
             val d = p[2].toLongOrNull() ?: return@mapNotNull null
             val dt = p[3].toLongOrNull() ?: return@mapNotNull null
-            ChallengeScore(s, t, d, dt)
+            ChallengeScore(s, t, d, dt, p.getOrNull(4) ?: "progression")
         }.sortedWith(CHALLENGE_SCORE_ORDER)
 
     // ---------- Saved drum-machine beats ----------

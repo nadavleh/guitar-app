@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -86,6 +88,10 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
             )
+            var statsOpen by remember { mutableStateOf(false) }
+            OutlinedButton(onClick = { statsOpen = true }) { Text("Stats") }
+            if (statsOpen) EarStatsDialog(state, onDismiss = { statsOpen = false })
+            Spacer(Modifier.width(4.dp))
             AudioQuickButton(state, compact = true)
             Spacer(Modifier.width(4.dp))
             OutlinedButton(onClick = { ear.release(); onBack() }) { Text("Back") }
@@ -2123,4 +2129,61 @@ private fun IntervalsView(ear: EarTrainingState) {
         }
         Spacer(Modifier.height(20.dp))
     }
+}
+
+// ======================================================================================
+// Stats — per-kind challenge history (recorded on every completed challenge)
+// ======================================================================================
+
+private fun statsKindLabel(kind: String): String = when (kind) {
+    "progression" -> "Progressions"
+    "note2chord"  -> "Note→Chord"
+    "flavor"      -> "Flavor"
+    "inversions"  -> "Inversions"
+    "augdim"      -> "Aug / Dim"
+    "intervals"   -> "Intervals"
+    else -> kind
+}
+
+@Composable
+private fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
+    val scores by state.challengeScores.collectAsState(initial = emptyList())
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        title = { Text("Challenge stats") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                if (scores.isEmpty()) {
+                    Text("No completed challenges yet — finish any 10-question " +
+                        "challenge and it lands here.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    return@Column
+                }
+                val fmt = java.text.SimpleDateFormat("d MMM", java.util.Locale.getDefault())
+                for ((kind, rows) in scores.groupBy { it.kind }) {
+                    val best = rows.first()   // repo stores rows best-first per kind
+                    val avg = rows.sumOf { it.score * 100.0 / it.total } / rows.size
+                    val last = rows.maxByOrNull { it.dateMillis }
+                    Text(statsKindLabel(kind), style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        "best ${best.score}/${best.total}  ·  avg ${avg.toInt()}%  ·  " +
+                            "${rows.size} run${if (rows.size == 1) "" else "s"}" +
+                            (last?.let { "  ·  last ${fmt.format(java.util.Date(it.dateMillis))}" } ?: ""),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+        },
+    )
 }

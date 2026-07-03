@@ -69,7 +69,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            GuitarTheme {
+            // Theme flag read straight from the repository so the theme wraps the
+            // whole app (AppState is created inside App()).
+            val repo = androidx.compose.runtime.remember { TuningRepository(applicationContext) }
+            val dark by repo.darkTheme.collectAsState(initial = true)
+            GuitarTheme(dark = dark) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     App(audioEngine)
                 }
@@ -121,6 +125,8 @@ fun App(audio: AudioEngine) {
         }
     }
     LaunchedEffect(persistedLeftHanded) { state.leftHanded = persistedLeftHanded }
+    val persistedDarkTheme by repo.darkTheme.collectAsState(initial = true)
+    LaunchedEffect(persistedDarkTheme) { state.darkTheme = persistedDarkTheme }
     LaunchedEffect(persistedVoicingShell) {
         state.voicingStyle =
             if (persistedVoicingShell) app.guitar.theory.VoicingStyle.Shell

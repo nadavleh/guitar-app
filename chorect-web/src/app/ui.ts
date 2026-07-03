@@ -84,6 +84,7 @@ export class App {
       strumProvider: () => state.strumMs,
       onChange: () => this.scheduleRender(),
       onProgressionChallengeComplete: (s, t, d) => state.recordChallengeScore(s, t, d),
+      onChallengeComplete: (kind, s, t, d) => state.recordChallengeScore(s, t, d, kind),
     });
     this.loop = new LoopState({
       audio: state.audio,
@@ -109,7 +110,10 @@ export class App {
       loadSample: (inst, voice) => loadDrumSample(state.audio, inst, voice),
     });
     this.sambaUI = new SambaLooperUI(this.samba, () => state.closeSheet());
-    this.decomposeUI = new DecomposeUI(state, () => state.closeSheet());
+    this.decomposeUI = new DecomposeUI(state, () => state.closeSheet(), (symbols) => {
+      this.loop.loadProgressionIntoLoop(symbols);
+      state.openSheet(Sheet.Loop);
+    });
     const header = el("div", { class: "app-header" }, [
       el("span", { class: "app-brand" }, ["chorect"]),
       el("span", { class: "app-byline" }, ["made by Nadavileh"]),
@@ -182,6 +186,8 @@ export class App {
     // Guard against re-entrant renders (a state mutation firing onChange mid-render).
     if (this.rendering) return;
     this.rendering = true;
+    // Theme: the light palette is a :root.light override of the CSS variables.
+    document.documentElement.classList.toggle("light", !this.state.darkTheme);
     try {
       this.renderInner();
     } finally {
@@ -607,6 +613,7 @@ export class App {
     sheet.appendChild(labelSm("Labels on dots"));
     sheet.appendChild(this.labelModeSeg());
     sheet.appendChild(switchRow("Left-handed", null, s.leftHanded, (v) => s.toggleLeftHanded(v)));
+    sheet.appendChild(switchRow("Dark theme", null, s.darkTheme, (v) => s.toggleDarkTheme(v)));
     sheet.appendChild(switchRow(
       "Play note on touch-down",
       "Off (default): notes play on tap-release, so swiping the neck won't sound a note. On: notes fire the instant you touch.",

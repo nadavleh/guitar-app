@@ -64,7 +64,18 @@ export function chipRow<T>(
 /** A labeled slider that reports its live value. */
 export function slider(min: number, max: number, value: number, onInput: (v: number) => void, step = 1): HTMLInputElement {
   const s = el("input", { type: "range", min: String(min), max: String(max), step: String(step), value: String(value) });
-  s.addEventListener("input", () => onInput(parseFloat(s.value)));
+  // Throttle to one state update per animation frame: a drag fires "input" per
+  // pixel, and each update triggers a full re-render pass upstream.
+  let raf = 0;
+  s.addEventListener("input", () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = 0; onInput(parseFloat(s.value)); });
+  });
+  // Always deliver the final value on release.
+  s.addEventListener("change", () => {
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    onInput(parseFloat(s.value));
+  });
   return s;
 }
 

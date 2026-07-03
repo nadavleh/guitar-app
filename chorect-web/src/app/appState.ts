@@ -22,6 +22,9 @@ export interface ChallengeScore {
   total: number;
   durationMs: number;
   dateMillis: number;
+  /** Which trainer produced this ("progression" | "inversions" | "augdim" |
+   *  "flavor" | "intervals" | "note2chord"). Legacy rows load as "progression". */
+  kind?: string;
 }
 
 /** Higher score first; ties broken by faster (smaller) completion time. */
@@ -40,6 +43,7 @@ interface Persisted {
   tuningName: string;
   labelMode: string;
   leftHanded: boolean;
+  darkTheme: boolean;
   voicingShell: boolean;
   a4Hz: number;
   ringSustainMs: number;
@@ -63,6 +67,8 @@ export class AppState {
   labelMode = LabelMode.Intervals;
   selectedPosition: FretPosition | null = null;
   leftHanded = false;
+  /** UI theme; dark is the original look. */
+  darkTheme = true;
 
   displayMode = DisplayMode.None;
   currentSheet: Sheet | null = null;
@@ -114,6 +120,7 @@ export class AppState {
       if (p.instrument && p.instrument in InstrumentInfo) this.instrument = p.instrument as Instrument;
       if (p.labelMode && p.labelMode in LabelMode) this.labelMode = p.labelMode as LabelMode;
       if (typeof p.leftHanded === "boolean") this.leftHanded = p.leftHanded;
+      if (typeof p.darkTheme === "boolean") this.darkTheme = p.darkTheme;
       if (typeof p.voicingShell === "boolean") this.voicingStyle = p.voicingShell ? VoicingStyle.Shell : VoicingStyle.Standard;
       if (typeof p.a4Hz === "number") this.a4Hz = p.a4Hz;
       if (typeof p.ringSustainMs === "number") this.ringSustainMs = p.ringSustainMs;
@@ -144,6 +151,7 @@ export class AppState {
       tuningName: this.tuningName,
       labelMode: this.labelMode,
       leftHanded: this.leftHanded,
+      darkTheme: this.darkTheme,
       voicingShell: this.voicingStyle === VoicingStyle.Shell,
       a4Hz: this.a4Hz,
       ringSustainMs: this.ringSustainMs,
@@ -156,12 +164,17 @@ export class AppState {
     localStorage.setItem(LS_KEY, JSON.stringify(p));
   }
 
-  /** Record a finished progression-challenge result (best first, keep top 10). */
-  recordChallengeScore(score: number, total: number, durationMs: number): void {
+  /** Record a finished challenge result (best first, keep top 10 PER KIND). */
+  recordChallengeScore(score: number, total: number, durationMs: number, kind = "progression"): void {
     this.commit(() => {
-      this.challengeScores = [...this.challengeScores, { score, total, durationMs, dateMillis: Date.now() }]
-        .sort(CHALLENGE_SCORE_ORDER)
-        .slice(0, 10);
+      const all = [...this.challengeScores, { score, total, durationMs, dateMillis: Date.now(), kind }];
+      const byKind = new Map<string, ChallengeScore[]>();
+      for (const s of all) {
+        const k = s.kind ?? "progression";
+        if (!byKind.has(k)) byKind.set(k, []);
+        byKind.get(k)!.push(s);
+      }
+      this.challengeScores = [...byKind.values()].flatMap((rows) => rows.sort(CHALLENGE_SCORE_ORDER).slice(0, 10));
     });
   }
 
@@ -258,6 +271,7 @@ export class AppState {
   setScaleView(v: ChordScaleView): void { this.commit(() => { this.scaleView = v; }); }
   setLabelMode(m: LabelMode): void { this.commit(() => { this.labelMode = m; }); }
   toggleLeftHanded(v: boolean): void { this.commit(() => { this.leftHanded = v; }); }
+  toggleDarkTheme(v: boolean): void { this.commit(() => { this.darkTheme = v; }); }
   setTapOnTouchDown(v: boolean): void { this.commit(() => { this.tapOnTouchDown = v; }); }
   setA4Hz(v: number): void { this.commit(() => { this.a4Hz = Math.min(Math.max(Math.round(v), 435), 445); }); }
   setRingSustainMs(v: number): void { this.commit(() => { this.ringSustainMs = Math.min(Math.max(Math.round(v), 300), 4000); }); }

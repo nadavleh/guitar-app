@@ -20,6 +20,25 @@
   background: var(--bg);
 }
 
+/* Light theme: warm paper background, deeper brand accents for contrast.
+   (The wooden fretboard canvas keeps its own palette either way.) */
+:root.light {
+  --bg: #F6F3EC;
+  --surface: #FFFDF7;
+  --surface-elev: #ECE7DB;
+  --divider: #CFC9BB;
+  --text-primary: #1E222A;
+  --text-secondary: #5A6070;
+  --text-disabled: #A8ADB8;
+  --primary: #B57612;
+  --on-primary: #FFFFFF;
+  --root-tone: #B3282E;
+  --chord-tone: #16766F;
+  --scale-tone: #6B47C9;
+  --tuned: #2E7D32;
+  --primary-container: rgba(181, 118, 18, 0.18);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

@@ -426,6 +426,12 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
 
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Dark theme", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Switch(checked = state.darkTheme, onCheckedChange = { state.toggleDarkTheme(it) })
+        }
+
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Play note on touch-down", style = MaterialTheme.typography.bodyMedium)
                 Text(

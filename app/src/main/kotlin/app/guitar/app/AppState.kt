@@ -89,6 +89,9 @@ class AppState(
     var labelMode by mutableStateOf(LabelMode.Intervals)
     var selectedPosition by mutableStateOf<FretPosition?>(null)
     var leftHanded by mutableStateOf(false)
+    /** UI theme (persisted). MainActivity reads the repo flow directly to wrap the
+     *  whole app; this mirror keeps the Options switch in sync. */
+    var darkTheme by mutableStateOf(true)
 
     // v1 GUI state.
     // Start with NOTHING lit on the neck (task #5): the user wants a clean
@@ -152,17 +155,20 @@ class AppState(
             onProgressionChallengeComplete = { score, total, durationMs ->
                 recordChallengeScore(score, total, durationMs)
             },
+            onChallengeComplete = { kind, score, total, durationMs ->
+                recordChallengeScore(score, total, durationMs, kind)
+            },
         )
     }
 
-    /** Persisted progression-challenge high scores (best first). */
+    /** Persisted challenge results across all ear-training kinds (best first). */
     val challengeScores get() = repo.challengeScores
 
-    /** Save a finished progression-challenge result to the high-score table. */
-    fun recordChallengeScore(score: Int, total: Int, durationMs: Long) {
+    /** Save a finished challenge result to the per-kind high-score table. */
+    fun recordChallengeScore(score: Int, total: Int, durationMs: Long, kind: String = "progression") {
         scope.launch {
             repo.addChallengeScore(
-                ChallengeScore(score, total, durationMs, System.currentTimeMillis()),
+                ChallengeScore(score, total, durationMs, System.currentTimeMillis(), kind),
             )
         }
     }
@@ -397,6 +403,11 @@ class AppState(
     fun toggleLeftHanded(value: Boolean) {
         leftHanded = value
         scope.launch { repo.setLeftHanded(value) }
+    }
+
+    fun toggleDarkTheme(value: Boolean) {
+        darkTheme = value
+        scope.launch { repo.setDarkTheme(value) }
     }
 
     // ---------- Sheet / display-mode interactions ----------

@@ -4,6 +4,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -88,13 +89,44 @@ private val GuitarColorScheme = darkColorScheme(
     onError           = GuitarColors.textPrimary,
 )
 
+// Light variant: warm paper background, same brand accents (the wooden fretboard
+// canvas keeps its own GuitarColors regardless of theme).
+private val GuitarLightColorScheme = lightColorScheme(
+    primary           = Color(0xFFB57612),          // deeper amber for contrast on light
+    onPrimary         = Color(0xFFFFFFFF),
+    primaryContainer  = Color(0xFFB57612).copy(alpha = 0.18f),
+    onPrimaryContainer = Color(0xFF221A0A),
+
+    secondary         = Color(0xFF16766F),          // deeper teal
+    onSecondary       = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFE9E4D8),
+    onSecondaryContainer = Color(0xFF1E222A),
+
+    tertiary          = Color(0xFF6B47C9),          // deeper lavender
+    onTertiary        = Color(0xFFFFFFFF),
+
+    background        = Color(0xFFF6F3EC),
+    onBackground      = Color(0xFF1E222A),
+
+    surface           = Color(0xFFFFFDF7),
+    onSurface         = Color(0xFF1E222A),
+    surfaceVariant    = Color(0xFFECE7DB),
+    onSurfaceVariant  = Color(0xFF5A6070),
+
+    outline           = Color(0xFFCFC9BB),
+    outlineVariant    = Color(0xFFCFC9BB),
+
+    error             = Color(0xFFB3282E),
+    onError           = Color(0xFFFFFFFF),
+)
+
 @Composable
 fun GuitarTheme(
-    @Suppress("UNUSED_PARAMETER") dark: Boolean = isSystemInDarkTheme(),  // ignored — we are always dark in v1
+    dark: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
-        colorScheme = GuitarColorScheme,
+        colorScheme = if (dark) GuitarColorScheme else GuitarLightColorScheme,
         typography  = GuitarTypography,
         content     = content,
     )

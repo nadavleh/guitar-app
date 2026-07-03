@@ -59,6 +59,9 @@ fun DecomposeScreen(state: AppState, onBack: () -> Unit) {
     var root by remember { mutableStateOf(PitchClass.C) }
     var quality by remember { mutableStateOf(ChordDecompositions.ALL.first().quality) }
     var showGuide by remember { mutableStateOf(false) }
+    // Upper-triad inversion for the auditioned voicing (0 = root position; the
+    // pitch-class set — and thus the fretboard — is unchanged by inversion).
+    var upperInv by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
 
     val dec = ChordDecompositions.forQuality(quality) ?: ChordDecompositions.ALL.first()
@@ -126,7 +129,10 @@ fun DecomposeScreen(state: AppState, onBack: () -> Unit) {
         // Audition each group separately, together, or as the teaching sequence.
         val base = 48 + root.value              // C3-ish so the upper triad sits up top
         val shellMidis = dec.shell.map { base + it }
-        val upperMidis = dec.upper.map { base + it }
+        // Invert the upper triad k times: rotate the lowest note up an octave.
+        val upperMidis = dec.upper.map { base + it }.toMutableList().also { m ->
+            repeat(upperInv) { m.add(m.removeAt(0) + 12) }
+        }.toList()
         fun play(midis: List<Int>) {
             state.audio.playChord(midis, strumDelayMillis = 26, sustainMillis = 1100, timbre = Timbre.Clarity)
         }
@@ -137,6 +143,22 @@ fun DecomposeScreen(state: AppState, onBack: () -> Unit) {
             OutlinedButton(onClick = { play(shellMidis) }) { Text("Shell") }
             OutlinedButton(onClick = { play(upperMidis) }) { Text("Triad") }
             OutlinedButton(onClick = { play(shellMidis + upperMidis) }) { Text("Full chord") }
+        }
+        Spacer(Modifier.height(6.dp))
+        // Upper-triad inversion (how comping voicings actually get grabbed) +
+        // send the chord to the Loop tool to practice it in a progression.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Triad inversion:", style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.align(Alignment.CenterVertically))
+            listOf("Root", "1st", "2nd").forEachIndexed { i, label ->
+                FilterChip(selected = upperInv == i, onClick = { upperInv = i }, label = { Text(label) })
+            }
+            val symbol = NoteSpeller.spell(root) + dec.quality
+            val parseable = app.guitar.theory.ChordLibrary.parse(symbol) != null
+            OutlinedButton(
+                onClick = { state.loadProgressionIntoLoop(listOf(symbol)) },
+                enabled = parseable,
+            ) { Text("Send $symbol to Loop") }
         }
         Spacer(Modifier.height(6.dp))
         // Legend: the circle colours + a note that the labels are interval degrees.

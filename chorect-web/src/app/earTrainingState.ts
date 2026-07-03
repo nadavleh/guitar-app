@@ -32,6 +32,8 @@ export interface EarDeps {
   strumProvider: () => number;
   onChange: () => void;
   onProgressionChallengeComplete: (score: number, total: number, durationMs: number) => void;
+  /** Fires when any OTHER challenge completes (kind = inversions/augdim/flavor/intervals/note2chord). */
+  onChallengeComplete?: (kind: string, score: number, total: number, durationMs: number) => void;
 }
 
 /** One challenge question: the generated progression + the user's saved guesses. */
@@ -80,6 +82,15 @@ export class EarTrainingState {
   private prevPlayedShape: ChordShape | null = null;
   private loopToken = 0;
   private cadenceToken = 0;
+
+  /** Per-kind challenge start time → duration in the recorded stats. */
+  private kindChallengeStart = new Map<string, number>();
+  private markChallengeStart(kind: string) { this.kindChallengeStart.set(kind, Date.now()); }
+  private reportChallengeDone(kind: string, score: number, total: number) {
+    const started = this.kindChallengeStart.get(kind) ?? Date.now();
+    this.kindChallengeStart.delete(kind);
+    this.deps.onChallengeComplete?.(kind, score, total, Date.now() - started);
+  }
 
   constructor(private deps: EarDeps) {
     // Pre-seed a Note2Chord challenge so the UI never has to mutate during render.
@@ -376,7 +387,7 @@ export class EarTrainingState {
     const set = new Set<number>([...N2C_MAJOR_TEST_OFFSETS, ...N2C_MINOR_TEST_OFFSETS]);
     return [...set].sort((a, b) => a - b).map((o) => n2cLabel(o));
   }
-  startN2cChallenge() { this.n2cChActive = true; this.n2cChIndex = 0; this.n2cChScore = 0; this.n2cChGuess = null; this.nextN2cChallenge(); this.playN2c(); }
+  startN2cChallenge() { this.n2cChActive = true; this.n2cChIndex = 0; this.n2cChScore = 0; this.n2cChGuess = null; this.markChallengeStart("note2chord"); this.nextN2cChallenge(); this.playN2c(); }
   guessN2c(label: string) {
     if (!this.n2cChActive || this.n2cChGuess !== null) return;
     this.n2cChGuess = label;
@@ -385,7 +396,7 @@ export class EarTrainingState {
   }
   advanceN2cChallenge() {
     if (!this.n2cChActive) return;
-    if (this.n2cChIndex >= this.n2cChallengeTotal - 1) { this.n2cChIndex = this.n2cChallengeTotal; this.notify(); return; }
+    if (this.n2cChIndex >= this.n2cChallengeTotal - 1) { this.n2cChIndex = this.n2cChallengeTotal; this.reportChallengeDone("note2chord", this.n2cChScore, this.n2cChallengeTotal); this.notify(); return; }
     this.n2cChIndex++; this.n2cChGuess = null; this.nextN2cChallenge(); this.playN2c();
   }
   exitN2cChallenge() { this.n2cChActive = false; this.n2cChIndex = 0; this.n2cChGuess = null; this.notify(); }
@@ -807,7 +818,7 @@ export class EarTrainingState {
   flavorChScore = 0;
   flavorChAnswered = false;
 
-  startFlavorChallenge() { this.flavorChActive = true; this.flavorChIndex = 0; this.flavorChScore = 0; this.flavorChAnswered = false; this.newFlavorChallenge(); }
+  startFlavorChallenge() { this.flavorChActive = true; this.flavorChIndex = 0; this.flavorChScore = 0; this.flavorChAnswered = false; this.markChallengeStart("flavor"); this.newFlavorChallenge(); }
   submitFlavorGuess() {
     if (!this.flavorChActive || this.flavorChAnswered) return;
     if (this.flavorGuessDegree == null || this.flavorGuessQuality == null) return;
@@ -818,7 +829,7 @@ export class EarTrainingState {
   }
   advanceFlavorChallenge() {
     if (!this.flavorChActive) return;
-    if (this.flavorChIndex >= this.flavorChallengeTotal - 1) { this.flavorChIndex = this.flavorChallengeTotal; this.notify(); return; }
+    if (this.flavorChIndex >= this.flavorChallengeTotal - 1) { this.flavorChIndex = this.flavorChallengeTotal; this.reportChallengeDone("flavor", this.flavorChScore, this.flavorChallengeTotal); this.notify(); return; }
     this.flavorChIndex++; this.flavorChAnswered = false; this.newFlavorChallenge();
   }
   exitFlavorChallenge() { this.flavorChActive = false; this.flavorChIndex = 0; this.flavorChAnswered = false; this.notify(); }
@@ -949,7 +960,7 @@ export class EarTrainingState {
   invChScore = 0;
   invChAnswered = false;
 
-  startInvChallenge() { this.invChActive = true; this.invChIndex = 0; this.invChScore = 0; this.invChAnswered = false; this.newInversion(); }
+  startInvChallenge() { this.invChActive = true; this.invChIndex = 0; this.invChScore = 0; this.invChAnswered = false; this.markChallengeStart("inversions"); this.newInversion(); }
   submitInvGuess() {
     if (!this.invChActive || this.invChAnswered) return;
     if (this.invGuess == null) return;
@@ -959,7 +970,7 @@ export class EarTrainingState {
   }
   advanceInvChallenge() {
     if (!this.invChActive) return;
-    if (this.invChIndex >= this.invChallengeTotal - 1) { this.invChIndex = this.invChallengeTotal; this.notify(); return; }
+    if (this.invChIndex >= this.invChallengeTotal - 1) { this.invChIndex = this.invChallengeTotal; this.reportChallengeDone("inversions", this.invChScore, this.invChallengeTotal); this.notify(); return; }
     this.invChIndex++; this.invChAnswered = false; this.newInversion();
   }
   exitInvChallenge() { this.invChActive = false; this.invChIndex = 0; this.notify(); }
@@ -1039,7 +1050,7 @@ export class EarTrainingState {
   adChScore = 0;
   adChAnswered = false;
 
-  startAugDimChallenge() { this.adChActive = true; this.adChIndex = 0; this.adChScore = 0; this.adChAnswered = false; this.newAugDim(); }
+  startAugDimChallenge() { this.adChActive = true; this.adChIndex = 0; this.adChScore = 0; this.adChAnswered = false; this.markChallengeStart("augdim"); this.newAugDim(); }
   submitAugDimGuess() {
     if (!this.adChActive || this.adChAnswered) return;
     if (this.adGuess == null) return;
@@ -1049,7 +1060,7 @@ export class EarTrainingState {
   }
   advanceAugDimChallenge() {
     if (!this.adChActive) return;
-    if (this.adChIndex >= this.augDimChallengeTotal - 1) { this.adChIndex = this.augDimChallengeTotal; this.notify(); return; }
+    if (this.adChIndex >= this.augDimChallengeTotal - 1) { this.adChIndex = this.augDimChallengeTotal; this.reportChallengeDone("augdim", this.adChScore, this.augDimChallengeTotal); this.notify(); return; }
     this.adChIndex++; this.adChAnswered = false; this.newAugDim();
   }
   exitAugDimChallenge() { this.adChActive = false; this.adChIndex = 0; this.notify(); }
@@ -1138,6 +1149,7 @@ export class EarTrainingState {
 
   startIntervalChallenge() {
     this.intervalChActive = true; this.intervalChIndex = 0; this.intervalChScore = 0;
+    this.markChallengeStart("intervals");
     this.drawIntervalQuestion();
     this.intervalToken++;
     const token = this.intervalToken;
@@ -1171,7 +1183,7 @@ export class EarTrainingState {
 
   advanceIntervalChallenge() {
     if (!this.intervalChActive) return;
-    if (this.intervalChIndex >= this.intervalChallengeTotal - 1) { this.intervalChIndex = this.intervalChallengeTotal; this.notify(); return; }
+    if (this.intervalChIndex >= this.intervalChallengeTotal - 1) { this.intervalChIndex = this.intervalChallengeTotal; this.reportChallengeDone("intervals", this.intervalChScore, this.intervalChallengeTotal); this.notify(); return; }
     this.intervalChIndex++;
     this.drawIntervalQuestion();
     this.playIntervalQuestion();

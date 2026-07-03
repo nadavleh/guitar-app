@@ -67,7 +67,46 @@ export class EarTrainingUI {
    *  degree, Enter commits in extension mode, Esc closes). */
   private kbKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
+  private statsOpen = false;
+
   constructor(private ear: EarTrainingState, private state: AppState, private onBack: () => void, private onToLooper: (symbols: string[]) => void) {}
+
+  /** Per-kind challenge stats popup (scrim closes it). */
+  private statsOverlay(): HTMLElement {
+    const kindLabel = (k: string) => ({
+      progression: "Progressions", note2chord: "Note→Chord", flavor: "Flavor",
+      inversions: "Inversions", augdim: "Aug / Dim", intervals: "Intervals",
+    } as Record<string, string>)[k] ?? k;
+    const close = () => { this.statsOpen = false; this.rerender(); };
+    const body = el("div", { class: "et-card", style: "max-width:460px;max-height:75vh;overflow:auto;margin:auto" }, [
+      el("div", { style: "font-weight:700;font-size:16px;margin-bottom:6px" }, ["Challenge stats"]),
+    ]);
+    const scores = this.state.challengeScores;
+    if (!scores.length) {
+      body.appendChild(el("div", { class: "et-muted" }, ["No completed challenges yet — finish any 10-question challenge and it lands here."]));
+    } else {
+      const byKind = new Map<string, typeof scores>();
+      for (const s of scores) {
+        const k = s.kind ?? "progression";
+        if (!byKind.has(k)) byKind.set(k, []);
+        byKind.get(k)!.push(s);
+      }
+      for (const [kind, rows] of byKind) {
+        const best = rows[0];   // stored best-first per kind
+        const avg = Math.round(rows.reduce((a, r) => a + (r.score * 100) / r.total, 0) / rows.length);
+        const last = rows.reduce((a, r) => Math.max(a, r.dateMillis), 0);
+        body.appendChild(el("div", { style: `font-weight:700;color:${Colors.primary};margin-top:6px` }, [kindLabel(kind)]));
+        body.appendChild(el("div", { class: "et-muted" }, [
+          `best ${best.score}/${best.total}  ·  avg ${avg}%  ·  ${rows.length} run${rows.length === 1 ? "" : "s"}  ·  last ${new Date(last).toLocaleDateString()}`,
+        ]));
+      }
+    }
+    body.appendChild(el("div", { style: "margin-top:10px;text-align:right" }, [btn("Close", close, "btn primary")]));
+    body.addEventListener("click", (e) => e.stopPropagation());
+    const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:50" }, [body]);
+    scrim.addEventListener("click", close);
+    return scrim;
+  }
 
   render(container: HTMLElement): void {
     const ear = this.ear;
@@ -76,6 +115,7 @@ export class EarTrainingUI {
     // header
     screen.appendChild(el("div", { class: "tool-topbar" }, [
       el("div", { class: "tool-title" }, ["EAR TRAINING"]),
+      btn("Stats", () => { this.statsOpen = true; this.rerender(); }),
       btn("Back", () => { ear.release(); this.onBack(); }),
     ]));
 
@@ -134,6 +174,7 @@ export class EarTrainingUI {
     }
 
     container.appendChild(screen);
+    if (this.statsOpen) container.appendChild(this.statsOverlay());
   }
 
   // ---------- shared widgets ----------

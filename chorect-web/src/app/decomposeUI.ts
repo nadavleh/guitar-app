@@ -48,7 +48,7 @@ const DECOMPOSE_GUIDE = [
   "• C7♯9 = C + E♭ major (♯9·5·♭7);   C7♭9 = C + D♭° (♭9·3·5)",
 ].join("\n");
 import {
-  PitchClass, spellPc, noteAt, midiPitchClass, fp, fpKey,
+  PitchClass, spellPc, noteAt, midiPitchClass, fp, fpKey, parseChord,
   ChordDecomposition, CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
 } from "../theory";
 import { Timbres } from "../audio";
@@ -59,11 +59,17 @@ export class DecomposeUI {
   private root: PitchClass = 0;
   private quality = CHORD_DECOMPOSITIONS[0].quality;
   private showGuide = false;
+  /** Upper-triad inversion for the auditioned voicing (pc set unchanged). */
+  private upperInv = 0;
   private parent: HTMLElement | null = null;
   private fbCanvasEl: HTMLCanvasElement | null = null;
   private fb: FretboardCanvas | null = null;
 
-  constructor(private state: AppState, private onBack: () => void) {}
+  constructor(
+    private state: AppState,
+    private onBack: () => void,
+    private onSendToLoop: (symbols: string[]) => void,
+  ) {}
 
   private rerender(): void { if (this.parent) this.render(this.parent); }
 
@@ -122,6 +128,18 @@ export class DecomposeUI {
       btn("Triad", () => this.playGroup(dec, "upper")),
       btn("Full chord", () => this.playGroup(dec, "full")),
     ]));
+    // Upper-triad inversion + send-to-loop.
+    const symbol = spellPc(this.root) + dec.quality;
+    const invChips = ["Root", "1st", "2nd"].map((label, i) => {
+      const b = el("button", { class: i === this.upperInv ? "chip selected" : "chip" }, [label]);
+      b.addEventListener("click", () => { this.upperInv = i; this.rerender(); });
+      return b;
+    });
+    const sendBtn = btn(`Send ${symbol} to Loop`, () => this.onSendToLoop([symbol]));
+    if (!parseChord(symbol)) sendBtn.disabled = true;
+    body.appendChild(el("div", { class: "et-row-gap", style: "margin-top:6px;flex-wrap:wrap" }, [
+      el("span", { class: "ans-label" }, ["Triad inversion:"]), ...invChips, sendBtn,
+    ]));
     // Legend: circle colours + that the numbers are interval degrees.
     body.appendChild(el("div", { class: "et-row-gap", style: "margin-top:4px;font-size:12px;flex-wrap:wrap;gap:12px" }, [
       el("span", {}, [el("span", { style: `color:${Colors.rootTone}` }, ["●"]), " root (1)"]),
@@ -165,7 +183,10 @@ export class DecomposeUI {
 
   private groupMidis(dec: ChordDecomposition): { shell: number[]; upper: number[] } {
     const base = 48 + this.root;
-    return { shell: dec.shell.map((iv) => base + iv), upper: dec.upper.map((iv) => base + iv) };
+    // Invert the upper triad k times: rotate the lowest note up an octave.
+    const upper = dec.upper.map((iv) => base + iv);
+    for (let k = 0; k < this.upperInv; k++) upper.push(upper.shift()! + 12);
+    return { shell: dec.shell.map((iv) => base + iv), upper };
   }
 
   private play(dec: ChordDecomposition): void {
