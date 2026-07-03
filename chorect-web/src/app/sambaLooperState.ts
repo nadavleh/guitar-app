@@ -46,6 +46,21 @@ export class SambaLooperState {
   private clickAccent: Float32Array | null = null;
   private clickBeat: Float32Array | null = null;
 
+  /** Seconds until a buffer first reaches 90% of its peak (crescendos bloom late). */
+  private peakOffsetCache = new Map<string, number>();
+  private peakOffsetSec(inst: PercussionInstrument, voiceIndex: number, buf: Float32Array): number {
+    const k = this.key(inst, voiceIndex);
+    const hit = this.peakOffsetCache.get(k);
+    if (hit !== undefined) return hit;
+    let peak = 0;
+    for (const s of buf) { const a = Math.abs(s); if (a > peak) peak = a; }
+    let i = 0;
+    if (peak > 0) { const th = peak * 0.9; while (i < buf.length && Math.abs(buf[i]) < th) i++; }
+    const sec = i / 44100;
+    this.peakOffsetCache.set(k, sec);
+    return sec;
+  }
+
   // Keyed by instrument id (string) so add/remove can't trip object-identity.
   muted = new Set<string>();
   soloed = new Set<string>();
@@ -201,6 +216,14 @@ export class SambaLooperState {
   loadPattern(p: PercussionPattern) { this.pattern = p; this.notify(); }
   deleteSaved(name: string) { this.deps.del(name); }
 
+  /**
+   * Lookahead sequencer ("a tale of two clocks"): each slot's audio is scheduled
+   * ONE SLOT AHEAD on the AudioContext clock via playSamples(…, when), so
+   * setTimeout jitter no longer moves hits and timing never drifts. Crescendo
+   * voices (peak later than ~20 ms) are started early — capped by the one-slot
+   * lookahead — so their peak lands on the beat. The sleep loop only drives the
+   * UI playhead.
+   */
   start() {
     if (this.isPlaying) return;
     this.ensureSamplesLoaded();
@@ -208,28 +231,43 @@ export class SambaLooperState {
     this.token++;
     const token = this.token;
     this.notify();
+    const scheduleSlot = (snapshot: PercussionPattern, slot: number, when: number) => {
+      if (this.metronome && slot % snapshot.meter.slotsPerBeat === 0) {
+        const accent = slot % snapshot.meter.slotsPerBar === 0;
+        if (!this.clickAccent) this.clickAccent = this.synth.metronomeClick(true);
+        if (!this.clickBeat) this.clickBeat = this.synth.metronomeClick(false);
+        this.deps.audio.playSamples(accent ? this.clickAccent : this.clickBeat, 1, when);
+      }
+      for (const inst of snapshot.instruments) {
+        if (!this.isAudible(inst)) continue;
+        const v = snapshot.voiceAt(inst, slot);
+        if (v === null) continue;
+        const buf = this.buffer(inst, v);
+        const peak = this.peakOffsetSec(inst, v, buf);
+        const now = this.deps.audio.now();
+        const advance = peak > 0.02 ? Math.min(peak, Math.max(when - now, 0)) : 0;
+        // Accented hits play ~1.4× louder (mixer clamps overall).
+        const gain = this.volumeOf(inst) * (snapshot.isAccented(inst, slot) ? 1.4 : 1);
+        this.deps.audio.playSamples(buf, gain, when - advance);
+      }
+    };
     void (async () => {
+      let nextOnset = this.deps.audio.now();
+      let first = true;
       while (this.isPlaying && token === this.token) {
         const snapshot = this.pattern;          // re-read each loop so meter edits take effect
         for (let slot = 0; slot < snapshot.slots; slot++) {
           if (!this.isPlaying || token !== this.token) break;
           this.currentSlot = slot;
-          if (this.metronome && slot % snapshot.meter.slotsPerBeat === 0) {
-            const accent = slot % snapshot.meter.slotsPerBar === 0;
-            if (!this.clickAccent) this.clickAccent = this.synth.metronomeClick(true);
-            if (!this.clickBeat) this.clickBeat = this.synth.metronomeClick(false);
-            this.deps.audio.playSamples(accent ? this.clickAccent : this.clickBeat, 1);
-          }
-          for (const inst of snapshot.instruments) {
-            if (!this.isAudible(inst)) continue;
-            const v = snapshot.voiceAt(inst, slot);
-            if (v === null) continue;
-            // Accented hits play ~1.4× louder (mixer clamps overall).
-            const gain = this.volumeOf(inst) * (snapshot.isAccented(inst, slot) ? 1.4 : 1);
-            this.deps.audio.playSamples(this.buffer(inst, v), gain);
-          }
+          if (first) { scheduleSlot(snapshot, slot, 0); first = false; }
+          const slotSec = swungSlotMs(slot, this.bpm, this.swing, snapshot.meter) / 1000;
+          nextOnset += slotSec;
+          const nextSlot = (slot + 1) % snapshot.slots;
+          const nextSnapshot = nextSlot === 0 ? this.pattern : snapshot;
+          if (nextSlot < nextSnapshot.slots) scheduleSlot(nextSnapshot, nextSlot, nextOnset);
           this.notify();
-          await sleep(swungSlotMs(slot, this.bpm, this.swing, snapshot.meter));
+          // Sleep till the next onset (UI playhead only — audio is already queued).
+          await sleep(Math.max((nextOnset - this.deps.audio.now()) * 1000, 0));
         }
       }
     })();

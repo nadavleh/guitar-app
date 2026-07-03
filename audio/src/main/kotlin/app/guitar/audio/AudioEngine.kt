@@ -31,6 +31,15 @@ interface AudioEngine {
      */
     fun playSamples(samples: FloatArray, gain: Float = 1f)
 
+    /**
+     * Like [playSamples], but the buffer starts sounding [delayFrames] engine
+     * frames after insertion, counted on the MIXER's own clock — sample-accurate
+     * lookahead scheduling for sequencers. The pending voice keeps the output
+     * loop running, so the countdown never pauses. Default: immediate.
+     */
+    fun playSamplesAt(samples: FloatArray, gain: Float = 1f, delayFrames: Int = 0) =
+        playSamples(samples, gain)
+
     /** Stop any currently-playing audio immediately. */
     fun stop()
 

@@ -84,8 +84,15 @@ export class WebAudioEngine {
     this.play(samples);
   }
 
-  /** Play a pre-rendered one-shot buffer (e.g. a percussion voice), scaled by [gain]. */
-  playSamples(samples: Float32Array, gain = 1): void {
+  /** The AudioContext clock (seconds) — the timebase for [playSamples]' `when`. */
+  now(): number {
+    return this.ensure().currentTime;
+  }
+
+  /** Play a pre-rendered one-shot buffer (e.g. a percussion voice), scaled by [gain].
+   *  [when] (AudioContext seconds, from [now]) schedules the start sample-accurately;
+   *  omitted/past values start immediately. */
+  playSamples(samples: Float32Array, gain = 1, when = 0): void {
     if (samples.length === 0) return;
     const ctx = this.ensure();
     const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
@@ -102,7 +109,7 @@ export class WebAudioEngine {
       g.disconnect();
     };
     this.active.add(src);
-    src.start();
+    src.start(when > ctx.currentTime ? when : 0);
   }
 
   stop(): void {

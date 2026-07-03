@@ -210,27 +210,68 @@ class SambaLooperState(
     private val clickAccent by lazy { synth.metronomeClick(accent = true) }
     private val clickBeat by lazy { synth.metronomeClick(accent = false) }
 
+    /** Frames until a buffer first reaches 90 % of its peak. Aligned hits sit at
+     *  ~3 ms; crescendo articulations (shake rolls, long scrapes) bloom much later
+     *  and are started early so their accent lands on the grid. */
+    private val peakOffsetCache = HashMap<Pair<PercussionInstrument, Int>, Int>()
+    private fun peakOffsetFrames(inst: PercussionInstrument, voiceIndex: Int, buf: FloatArray): Int =
+        peakOffsetCache.getOrPut(inst to voiceIndex) {
+            var peak = 0f
+            for (s in buf) { val a = kotlin.math.abs(s); if (a > peak) peak = a }
+            if (peak <= 0f) return@getOrPut 0
+            val th = peak * 0.9f
+            var i = 0
+            while (i < buf.size && kotlin.math.abs(buf[i]) < th) i++
+            i
+        }
+
+    /**
+     * Lookahead sequencer. Each slot's audio is queued ONE SLOT AHEAD via
+     * [AudioEngine.playSamplesAt] with a delay counted on the mixer's own
+     * sample clock, computed from an absolute wall-clock schedule. So:
+     *   - coroutine wake-up jitter no longer moves hits (it's absorbed by the
+     *     delay), and timing errors never accumulate across the loop;
+     *   - crescendo voices (peak later than ~20 ms) are started early — capped
+     *     by the one-slot lookahead — so their peak lands on the beat.
+     * The delay() loop itself only drives the UI playhead.
+     */
     fun start() {
         if (isPlaying) return
         isPlaying = true
         job = scope.launch {
+            val sr = 44100
+            fun scheduleSlot(snapshot: PercussionPattern, slot: Int, delayMs: Long) {
+                val baseFrames = (delayMs * sr / 1000).toInt()
+                if (metronome && slot % snapshot.meter.slotsPerBeat == 0) {
+                    val click = if (slot % snapshot.meter.slotsPerBar == 0) clickAccent else clickBeat
+                    audio.playSamplesAt(click, 1f, baseFrames)
+                }
+                for (inst in snapshot.instruments) {
+                    if (!isAudible(inst)) continue
+                    val v = snapshot.voiceAt(inst, slot) ?: continue
+                    val buf = buffer(inst, v)
+                    val peak = peakOffsetFrames(inst, v, buf)
+                    val advance = if (peak > sr / 50) minOf(peak, baseFrames) else 0
+                    // Accented hits play ~1.4× louder (mixer clamps overall).
+                    val gain = volumeOf(inst) * (if (snapshot.isAccented(inst, slot)) 1.4f else 1f)
+                    audio.playSamplesAt(buf, gain, baseFrames - advance)
+                }
+            }
+            var nextOnsetNanos = System.nanoTime()
+            var first = true
             while (isPlaying) {
-                val snapshot = pattern        // re-read each bar so meter edits take effect
+                val snapshot = pattern        // re-read each pass so meter edits take effect
                 for (slot in 0 until snapshot.slots) {
                     if (!isPlaying) break
                     currentSlot = slot
-                    if (metronome && slot % snapshot.meter.slotsPerBeat == 0) {
-                        audio.playSamples(
-                            if (slot % snapshot.meter.slotsPerBar == 0) clickAccent else clickBeat, 1f)
-                    }
-                    for (inst in snapshot.instruments) {
-                        if (!isAudible(inst)) continue
-                        val v = snapshot.voiceAt(inst, slot) ?: continue
-                        // Accented hits play ~1.4× louder (mixer clamps overall).
-                        val gain = volumeOf(inst) * (if (snapshot.isAccented(inst, slot)) 1.4f else 1f)
-                        audio.playSamples(buffer(inst, v), gain)
-                    }
-                    delay(PercussionTiming.swungSlotMs(slot, bpm, swing, snapshot.meter))
+                    if (first) { scheduleSlot(snapshot, slot, 0); first = false }
+                    val slotMs = PercussionTiming.swungSlotMs(slot, bpm, swing, snapshot.meter)
+                    nextOnsetNanos += slotMs * 1_000_000
+                    val nextSlot = (slot + 1) % snapshot.slots
+                    val nextSnapshot = if (nextSlot == 0) pattern else snapshot
+                    val delayMs = ((nextOnsetNanos - System.nanoTime()) / 1_000_000).coerceAtLeast(0)
+                    if (nextSlot < nextSnapshot.slots) scheduleSlot(nextSnapshot, nextSlot, delayMs)
+                    delay(delayMs)
                 }
             }
         }

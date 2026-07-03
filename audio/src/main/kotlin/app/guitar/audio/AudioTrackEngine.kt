@@ -66,6 +66,10 @@ class AudioTrackEngine(
             }
         }
 
+    /** An active voice. [pos] < 0 is a scheduling delay: the mixer advances it one
+     *  frame per output frame but emits nothing until it reaches 0 — so a voice
+     *  inserted with pos = -delayFrames starts exactly delayFrames later on the
+     *  mixer clock. */
     private class Voice(val samples: FloatArray, val gain: Float = 1f, @Volatile var pos: Int = 0)
 
     private val voicesLock = Any()
@@ -113,7 +117,9 @@ class AudioTrackEngine(
                     val iter = voices.iterator()
                     while (iter.hasNext()) {
                         val v = iter.next()
-                        if (v.pos < v.samples.size) {
+                        if (v.pos < 0) {
+                            v.pos++              // scheduled voice: consume its delay silently
+                        } else if (v.pos < v.samples.size) {
                             sample += v.samples[v.pos] * v.gain
                             v.pos++
                         } else {
@@ -201,9 +207,14 @@ class AudioTrackEngine(
         addVoice(samples, gain)
     }
 
-    private fun addVoice(samples: FloatArray, gain: Float = 1f) {
+    override fun playSamplesAt(samples: FloatArray, gain: Float, delayFrames: Int) {
+        if (!running.get() || samples.isEmpty() || gain <= 0f) return
+        addVoice(samples, gain, delayFrames.coerceAtLeast(0))
+    }
+
+    private fun addVoice(samples: FloatArray, gain: Float = 1f, delayFrames: Int = 0) {
         synchronized(voicesLock) {
-            voices.add(Voice(samples, gain))
+            voices.add(Voice(samples, gain, pos = -delayFrames))
             // Cap concurrent voices; oldest dropped first.
             while (voices.size > MAX_VOICES) voices.removeAt(0)
         }
