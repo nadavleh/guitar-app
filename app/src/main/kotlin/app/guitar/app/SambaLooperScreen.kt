@@ -245,6 +245,14 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             Box {
                 OutlinedButton(onClick = { loadMenu = true }) { Text("Load…") }
                 DropdownMenu(expanded = loadMenu, onDismissRequest = { loadMenu = false }) {
+                    // Built-in grooves first (same set as the web), then saved beats.
+                    for ((name, pat) in app.guitar.theory.PercussionBuiltins.ALL) {
+                        DropdownMenuItem(
+                            text = { Text(name) },
+                            onClick = { samba.loadPattern(pat); loadMenu = false },
+                        )
+                    }
+                    if (saved.isNotEmpty()) HorizontalDivider()
                     for ((name, pat) in saved) {
                         DropdownMenuItem(
                             text = {

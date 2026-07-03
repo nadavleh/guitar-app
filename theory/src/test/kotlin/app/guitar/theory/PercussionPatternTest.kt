@@ -123,6 +123,18 @@ class PercussionPatternTest {
         assertNull(PercussionPattern.decode(PercussionPattern.empty().encode().replaceFirst("-", "201")))
     }
 
+    @Test fun `built-in teleco-teco grooves decode, are non-empty, and round-trip`() {
+        assertEquals(2, PercussionBuiltins.ALL.size)
+        for ((name, pat) in PercussionBuiltins.ALL) {
+            assertTrue(!pat.isEmpty(), "$name is empty")
+            assertEquals(16, pat.slots, "$name should be the default 16-slot meter")
+            assertEquals(pat, PercussionPattern.decode(pat.encode()), "$name doesn't round-trip")
+            // Surdo hits both bar downbeats in both phrasings.
+            assertTrue(pat.voiceAt(PercussionCatalog.Surdo, 0) != null)
+            assertTrue(pat.voiceAt(PercussionCatalog.Surdo, 8) != null)
+        }
+    }
+
     // ---- Accents ----
 
     @Test fun `accent toggles on a hit, survives voice cycling, and round-trips`() {

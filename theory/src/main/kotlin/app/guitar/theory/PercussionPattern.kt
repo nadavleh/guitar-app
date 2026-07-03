@@ -242,6 +242,40 @@ data class PercussionPattern(
     }
 }
 
+/**
+ * Built-in loadable grooves for the drum-machine Load… menu, defined via the
+ * [PercussionPattern.encode] string form so they're compact and self-validating
+ * through decode. Same set as chorect-web's BUILTIN_PATTERNS (keep in sync).
+ */
+object PercussionBuiltins {
+    private fun builtin(encoded: String): PercussionPattern =
+        requireNotNull(PercussionPattern.decode(encoded)) { "invalid built-in pattern: $encoded" }
+
+    /** Teleco-teco — the two classic phrasings. Surdo + pandeiro are shared; the
+     *  tamborim and agogô are phase-shifted between the two. */
+    val TELECOTECO_1: PercussionPattern = builtin(
+        "M:2,2,4,16;" +
+            "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
+            "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
+            "pandeiro=0,3,2,0,0,3,2,0,0,3,2,0,0,3,2,0" + "|" +
+            "agogo=-,0,-,1,-,-,0,-,0,-,0,-,1,-,-,0",
+    )
+
+    val TELECOTECO_2: PercussionPattern = builtin(
+        "M:2,2,4,16;" +
+            "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
+            "tamborim=0,1,0,1,0,1,2,0,1,0,1,0,1,2,0,1" + "|" +
+            "pandeiro=0,3,2,0,0,3,2,0,0,3,2,0,0,3,2,0" + "|" +
+            "agogo=0,-,0,-,1,-,-,0,-,0,-,1,-,-,0,-",
+    )
+
+    /** Grooves offered in the Load… menu (before the user's saved beats). */
+    val ALL: List<Pair<String, PercussionPattern>> = listOf(
+        "teleco-teco 1" to TELECOTECO_1,
+        "teleco-teco 2" to TELECOTECO_2,
+    )
+}
+
 /** Loop timing helpers (kept pure so they're unit-testable on the JVM). */
 object PercussionTiming {
     /** Milliseconds of one [division]-note slot at [bpm] (a quarter-note = 4 sixteenths,
