@@ -348,8 +348,15 @@ object EarTraining {
     }
 
     /** One draw-able 4-chord window of the diatonic circle of fifths, for the
-     *  progression-library viewer. [id] ("W1".."W7") keys its song list. */
-    data class CircleWindow(val id: String, val romanLine: String)
+     *  progression-library viewer. [id] ("W1".."W7") keys its song list. Carries
+     *  its [chords] so the library's preview player can sound and voice it. */
+    data class CircleWindow(val id: String, val romanLine: String, val chords: List<AdvChord>) {
+        /** Realise the window in [key] as concrete, playable chords (major-key spelling). */
+        fun resolve(key: PitchClass): List<ResolvedChord> = chords.map { c ->
+            val root = PitchClass.of(key.value + c.semitone)
+            ResolvedChord(NoteSpeller.spell(root) + c.quality, c.roman, root)
+        }
+    }
 
     /** The seven 4-chord windows the [randomCircleOfFifths] trainer can draw, in
      *  cycle order starting from each diatonic chord. Used by the library viewer. */
@@ -357,7 +364,7 @@ object EarTraining {
         val n = CIRCLE_OF_FIFTHS.size
         (0 until n).map { start ->
             val w = (0 until 4).map { CIRCLE_OF_FIFTHS[(start + it) % n] }
-            CircleWindow("W${start + 1}", w.joinToString("  –  ") { it.roman })
+            CircleWindow("W${start + 1}", w.joinToString("  –  ") { it.roman }, w)
         }
     }
 

@@ -57,6 +57,7 @@ import app.guitar.theory.FretPosition
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
 import app.guitar.theory.ProgressionSongs
+import app.guitar.theory.ResolvedChord
 import app.guitar.theory.SongExample
 import app.guitar.theory.TrainingMode
 
@@ -67,7 +68,7 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
     val ear = state.earTraining
     // Stop audio/looping when leaving the screen, but keep all state (progression,
     // reveals, counters) so returning shows exactly what you left.
-    DisposableEffect(Unit) { onDispose { ear.stopLoop() } }
+    DisposableEffect(Unit) { onDispose { ear.stopLoop(); ear.libraryStop() } }
     LaunchedEffect(Unit) {
         // NB: deliberately do NOT auto-generate a progression here. The user
         // wants the first progression to honor settings they pick beforehand,
@@ -147,7 +148,7 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
             OutlinedButton(onClick = { libOpen = true }, modifier = Modifier.padding(bottom = 8.dp)) {
                 Text("Progression library")
             }
-            if (libOpen) ProgressionLibraryDialog(onDismiss = { libOpen = false })
+            if (libOpen) ProgressionLibraryDialog(state, onDismiss = { libOpen = false })
         }
 
         when (ear.progSubMode) {
@@ -2238,44 +2239,56 @@ private fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
 // ======================================================================================
 
 @Composable
-private fun ProgressionLibraryDialog(onDismiss: () -> Unit) {
-    // Keys of rows whose song list is expanded; multiple may be open at once.
-    var expanded by remember { mutableStateOf(setOf<String>()) }
+private fun ProgressionLibraryDialog(state: AppState, onDismiss: () -> Unit) {
+    val ear = state.earTraining
+    // Single-open accordion: at most one row's drop-down is open at a time. Opening a
+    // new row closes the previously-open one.
+    var expandedKey by remember { mutableStateOf<String?>(null) }
     val toggle: (String) -> Unit = { key ->
-        expanded = if (key in expanded) expanded - key else expanded + key
+        // Any change of which row is open stops whatever the preview player was sounding.
+        ear.libraryStop()
+        expandedKey = if (expandedKey == key) null else key
     }
+    val dismiss = { ear.libraryStop(); onDismiss() }
     androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        onDismissRequest = dismiss,
+        confirmButton = { TextButton(onClick = dismiss) { Text("Close") } },
         title = { Text("Progression library") },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState()),
             ) {
-                LibrarySection("Major (diatonic)", "Tap a progression for famous songs built on it.") {
+                LibrarySection("Major (diatonic)", "Tap a progression for songs + to hear it (fixed key C major).") {
                     EarTraining.MAJOR_PROGRESSIONS.forEach { p ->
-                        LibraryRow("maj:${p.degrees}", EarTraining.romanLineFor(p),
-                            ProgressionSongs.forDiatonic(p), expanded, toggle)
+                        LibraryRow(state, "maj:${p.degrees}", EarTraining.romanLineFor(p),
+                            ProgressionSongs.forDiatonic(p),
+                            EarTraining.resolveProgression(p, PitchClass.C, ChordTypeLevel.Triads),
+                            expandedKey, toggle)
                     }
                 }
-                LibrarySection("Minor (diatonic)", null) {
+                LibrarySection("Minor (diatonic)", "Fixed key A minor.") {
                     EarTraining.MINOR_PROGRESSIONS.forEach { p ->
-                        LibraryRow("min:${p.degrees}", EarTraining.romanLineFor(p),
-                            ProgressionSongs.forDiatonic(p), expanded, toggle)
+                        LibraryRow(state, "min:${p.degrees}", EarTraining.romanLineFor(p),
+                            ProgressionSongs.forDiatonic(p),
+                            EarTraining.resolveProgression(p, PitchClass.A, ChordTypeLevel.Triads),
+                            expandedKey, toggle)
                     }
                 }
                 LibrarySection("Advanced (non-diatonic)",
                     "Characteristic examples — the signature harmonic move, not always note-for-note.") {
                     EarTraining.ADVANCED_PROGRESSIONS.forEach { np ->
-                        LibraryRow("adv:${np.name}", "${np.name}:  ${np.romanLine}",
-                            ProgressionSongs.forAdvanced(np.name), expanded, toggle)
+                        val key = if (np.tonicMode == TrainingMode.Major) PitchClass.C else PitchClass.A
+                        LibraryRow(state, "adv:${np.name}", "${np.name}:  ${np.romanLine}",
+                            ProgressionSongs.forAdvanced(np.name), np.resolve(key),
+                            expandedKey, toggle)
                     }
                 }
                 LibrarySection("Circle of fifths",
                     "Draws 4 adjacent chords; the 2nd may become a dominant 7th (except vii°). Characteristic examples.") {
                     EarTraining.CIRCLE_WINDOWS.forEach { w ->
-                        LibraryRow("cof:${w.id}", w.romanLine,
-                            ProgressionSongs.forCircleWindow(w.id), expanded, toggle)
+                        LibraryRow(state, "cof:${w.id}", w.romanLine,
+                            ProgressionSongs.forCircleWindow(w.id), w.resolve(PitchClass.C),
+                            expandedKey, toggle)
                     }
                 }
             }
@@ -2296,34 +2309,86 @@ private fun LibrarySection(title: String, caption: String?, content: @Composable
     Spacer(Modifier.height(10.dp))
 }
 
-/** A progression row in the library. Clickable (with a ▸/▾ chevron) when it has
- *  song examples; tapping toggles an indented list of "Title — Artist" lines. */
+/** Best-effort E-shape (or first) voicing for a chord symbol, for the idle fretboard
+ *  preview before playback starts. Null for unvoiceable/exotic chords. */
+private fun previewShape(state: AppState, symbol: String): app.guitar.theory.ChordShape? {
+    val parsed = app.guitar.theory.ChordLibrary.parse(symbol) ?: return null
+    val (root, q) = parsed
+    val shapes = app.guitar.theory.ChordShapeGenerator()
+        .shapesFor(root, q, state.liveTuning, frets = DISPLAY_FRETS)
+    return shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.firstOrNull()
+}
+
+/** A progression row in the library. Always clickable (▸/▾ chevron): tapping expands an
+ *  indented panel with a Play/Stop button (loops the progression in a fixed key via the
+ *  preview player), an optional follow-along fretboard, and the "Title — Artist" list. */
 @Composable
 private fun LibraryRow(
+    state: AppState,
     key: String,
     label: String,
     songs: List<SongExample>,
-    expanded: Set<String>,
+    chords: List<ResolvedChord>,
+    expandedKey: String?,
     onToggle: (String) -> Unit,
 ) {
-    val hasSongs = songs.isNotEmpty()
-    val isOpen = key in expanded
+    val ear = state.earTraining
+    val isOpen = expandedKey == key
     Row(
-        modifier = if (hasSongs) Modifier.fillMaxWidth().clickable { onToggle(key) } else Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { onToggle(key) },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-        if (hasSongs) {
-            Text(if (isOpen) "▾" else "▸", style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary)
-        }
+        Text(if (isOpen) "▾" else "▸", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary)
     }
-    if (hasSongs && isOpen) {
-        Column(modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 2.dp, bottom = 4.dp)) {
-            for (song in songs) {
-                Text("•  ${song.title} — ${song.artist}", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface)
+    if (isOpen) {
+        var showFb by remember { mutableStateOf(false) }
+        val isPlaying = ear.libPlayingId == key
+        Column(modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp, bottom = 6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                if (isPlaying) {
+                    Button(onClick = { ear.libraryStop() }) { Text("Stop ■") }
+                } else {
+                    Button(onClick = { ear.libraryPlay(key, chords) }) { Text("Play ▶") }
+                }
+                Spacer(Modifier.weight(1f))
+                Text("Fretboard", style = MaterialTheme.typography.labelMedium)
+                Switch(checked = showFb, onCheckedChange = { showFb = it })
+            }
+            if (showFb) {
+                // While playing, the board follows the preview player's live shape; when
+                // idle it shows the progression's first chord as a static preview.
+                val idleShape = remember(chords, state.liveTuning) {
+                    chords.firstOrNull()?.let { previewShape(state, it.symbol) }
+                }
+                val shape = if (isPlaying) ear.libShape else idleShape
+                val marks = remember(shape, state.labelMode) {
+                    shape?.let { shapeMarks(it, state.labelMode) } ?: emptyMap()
+                }
+                Box(modifier = Modifier.fillMaxWidth().height(200.dp).padding(vertical = 4.dp)) {
+                    FretboardView(
+                        tuning = state.liveTuning,
+                        marks = marks,
+                        selectedPosition = null,
+                        onTap = { pos ->
+                            val midi = Fretboard.noteAt(state.liveTuning, pos).midi.value
+                            state.audio.playNote(midi, durationMillis = state.ringSustainMs)
+                        },
+                        numFrets = DISPLAY_FRETS,
+                        leftHanded = state.leftHanded,
+                    )
+                }
+            }
+            if (songs.isNotEmpty()) {
+                for (song in songs) {
+                    Text("•  ${song.title} — ${song.artist}", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface)
+                }
+            } else {
+                Text("No song examples for this one.", style = MaterialTheme.typography.bodySmall,
+                    fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

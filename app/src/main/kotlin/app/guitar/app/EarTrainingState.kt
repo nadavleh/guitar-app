@@ -245,6 +245,87 @@ class EarTrainingState(
             timbre = Timbre.Clarity)
     }
 
+    // ---------- Library preview player ----------
+    // A SEPARATE, self-contained looper for the progression-library dialog. It never
+    // touches the quiz looper's state (progResolved / currentBar / currentPlayingShape /
+    // prevPlayedShape), so previewing a library row can't corrupt an in-progress quiz.
+
+    /** Which library row is currently previewing (its key, e.g. "maj:1,5,6,4"), or null. */
+    var libPlayingId by mutableStateOf<String?>(null)
+        private set
+    /** Index of the bar the library preview is currently sounding. */
+    var libBar by mutableStateOf(0)
+        private set
+    /** The shape the library preview is currently sounding — drives the follow-along
+     *  fretboard in the expanded library row. Null for block-voiced (unvoiceable) chords. */
+    var libShape by mutableStateOf<app.guitar.theory.ChordShape?>(null)
+        private set
+
+    private var libLoopJob: Job? = null
+    private var libPrevShape: app.guitar.theory.ChordShape? = null
+
+    /** Loop [chords] as a library preview tagged [id] (fixed key baked into the passed-in
+     *  chords). Voice-leads like the quiz looper, with a block-tone fallback for exotic
+     *  chords, but on its own independent state. Loops until [libraryStop]. Calling this
+     *  while another row plays cleanly switches to the new row. */
+    fun libraryPlay(id: String, chords: List<ResolvedChord>) {
+        libraryStop()
+        if (chords.isEmpty()) return
+        libPlayingId = id
+        libPrevShape = null
+        libBar = 0
+        libLoopJob = scope.launch {
+            val beatMs = (60_000L / progBpm.coerceAtLeast(10))
+            val barMs = beatMs * 4
+            while (libPlayingId == id) {
+                for (i in chords.indices) {
+                    if (libPlayingId != id) break
+                    libBar = i
+                    libPlayChordOnce(chords[i].symbol, barMs)
+                    delay(barMs)
+                }
+            }
+        }
+    }
+
+    /** Stop the library preview loop and silence its notes. */
+    fun libraryStop() {
+        libPlayingId = null
+        libLoopJob?.cancel()
+        libLoopJob = null
+        libShape = null
+        libPrevShape = null
+        audio.stop()
+    }
+
+    private fun libPlayChordOnce(symbol: String, barMs: Long) {
+        val parsed = ChordLibrary.parse(symbol) ?: return
+        val (root, q) = parsed
+        val tuning = tuningProvider()
+        val shapes = ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
+        val sustain = (barMs * 0.9).toInt().coerceAtLeast(200)
+        if (shapes.isEmpty()) {
+            // Exotic chord with no playable guitar voicing: sound the chord tones as a block.
+            libShape = null
+            val rootMidi = 52 + root.value
+            val midis = q.intervals.map { rootMidi + it.semitones }
+            audio.playChord(midis, strumDelayMillis = strumProvider(), sustainMillis = sustain,
+                timbre = Timbre.Clarity)
+            return
+        }
+        val shape = if (libPrevShape == null) {
+            shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.first()
+        } else {
+            shapes[app.guitar.theory.VoiceLeading.pickMinMovement(libPrevShape!!, shapes)]
+        }
+        libPrevShape = shape
+        libShape = shape
+        val midis = shape.notes.mapNotNull { it?.midi?.value }
+        if (midis.isEmpty()) return
+        audio.playChord(midis, strumDelayMillis = strumProvider(), sustainMillis = sustain,
+            timbre = Timbre.Clarity)
+    }
+
     private var cadenceJob: Job? = null
 
     /** Cadence label for the progression key. Plain DIGITS ("1–5–1") on purpose:

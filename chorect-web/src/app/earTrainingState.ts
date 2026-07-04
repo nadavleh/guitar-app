@@ -291,6 +291,81 @@ export class EarTrainingState {
     this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), Timbres.Clarity);
   }
 
+  // ---------- Library preview player ----------
+  // A SEPARATE, self-contained looper for the progression-library overlay. It never
+  // touches the quiz looper's state, so previewing a library row can't corrupt a quiz.
+
+  /** Which library row is currently previewing (its key), or null. */
+  libPlayingId: string | null = null;
+  /** Bar index the library preview is currently sounding. */
+  libBar = 0;
+  /** Shape the library preview is currently sounding — drives the follow-along fretboard. */
+  libShape: ChordShape | null = null;
+  private libToken = 0;
+  private libPrevShape: ChordShape | null = null;
+
+  /** Loop `chords` as a library preview tagged `id` (fixed key baked into the chords).
+   *  Voice-leads like the quiz looper with a block-tone fallback, on its own state.
+   *  Loops until libraryStop(). Calling it while another row plays switches cleanly. */
+  libraryPlay(id: string, chords: ResolvedChord[]) {
+    this.libraryStop();
+    if (chords.length === 0) return;
+    this.libPlayingId = id;
+    this.libPrevShape = null;
+    this.libBar = 0;
+    this.libToken++;
+    const token = this.libToken;
+    this.notify();
+    void (async () => {
+      const beatMs = 60000 / Math.max(this.progBpm, 10);
+      const barMs = beatMs * 4;
+      while (this.libPlayingId === id && token === this.libToken) {
+        for (let i = 0; i < chords.length; i++) {
+          if (this.libPlayingId !== id || token !== this.libToken) break;
+          this.libBar = i;
+          this.libPlayChordOnce(chords[i].symbol, barMs);
+          this.notify();
+          await sleep(barMs);
+        }
+      }
+    })();
+  }
+
+  /** Stop the library preview loop and silence its notes. */
+  libraryStop() {
+    if (this.libPlayingId === null && this.libShape === null) { return; }
+    this.libPlayingId = null;
+    this.libToken++;
+    this.libShape = null;
+    this.libPrevShape = null;
+    this.deps.audio.stop();
+    this.notify();
+  }
+
+  private libPlayChordOnce(symbol: string, barMs: number) {
+    const parsed = parseChord(symbol);
+    if (!parsed) return;
+    const [root, q] = parsed;
+    const tuning = this.deps.tuningProvider();
+    const shapes = this.gen(this.earStyle()).shapesFor(root, q, tuning, DISPLAY_FRETS);
+    const sustain = Math.max(Math.floor(barMs * 0.9), 200);
+    if (shapes.length === 0) {
+      this.libShape = null;
+      const rootMidi = 52 + root;
+      const midis = q.intervals.map((iv) => rootMidi + iv);
+      this.deps.audio.playChord(midis, this.deps.strumProvider(), sustain, Timbres.Clarity);
+      return;
+    }
+    const shape = this.libPrevShape == null
+      ? (shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0])
+      : shapes[pickMinMovement(this.libPrevShape, shapes)];
+    this.libPrevShape = shape;
+    this.libShape = shape;
+    const midis = shape.notes.filter((n) => n !== null).map((n) => n!.midi);
+    if (midis.length === 0) return;
+    this.deps.audio.playChord(midis, this.deps.strumProvider(), sustain, Timbres.Clarity);
+  }
+
   // ---------- Note2Chord ----------
 
   n2cChallenge: N2cChallenge | null = null;
@@ -1254,6 +1329,7 @@ export class EarTrainingState {
 
   release() {
     this.stopLoop();
+    this.libraryStop();
     this.cadenceToken++; this.flavorToken++; this.n2cToken++; this.invToken++; this.adToken++;
     this.intervalToken++;
   }

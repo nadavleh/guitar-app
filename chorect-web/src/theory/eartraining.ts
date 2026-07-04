@@ -253,17 +253,26 @@ export function randomCircleOfFifths(rng: Rng = defaultRng): NamedProgression {
 }
 
 /** One draw-able 4-chord window of the diatonic circle of fifths, for the
- *  progression-library viewer. `id` ("W1".."W7") keys its song list. */
-export interface CircleWindow { id: string; romanLine: string; }
+ *  progression-library viewer. `id` ("W1".."W7") keys its song list. Carries its
+ *  `chords` so the library's preview player can sound and voice it. */
+export interface CircleWindow { id: string; romanLine: string; chords: AdvChord[]; }
 
 /** The seven 4-chord windows randomCircleOfFifths can draw, in cycle order. */
 export const CIRCLE_WINDOWS: CircleWindow[] = (() => {
   const n = CIRCLE_OF_FIFTHS.length;
   return Array.from({ length: n }, (_, start) => {
     const w = Array.from({ length: 4 }, (_, i) => CIRCLE_OF_FIFTHS[(start + i) % n]);
-    return { id: `W${start + 1}`, romanLine: w.map((ch) => ch.roman).join("  –  ") };
+    return { id: `W${start + 1}`, romanLine: w.map((ch) => ch.roman).join("  –  "), chords: w };
   });
 })();
+
+/** Realise a circle window in `key` as concrete, playable chords (major-key spelling). */
+export function resolveCircleWindow(win: CircleWindow, key: PitchClass): ResolvedChord[] {
+  return win.chords.map((ch) => {
+    const root = pcOf(key + ch.semitone);
+    return { symbol: spellPc(root) + ch.quality, romanLabel: ch.roman, root };
+  });
+}
 
 /** Roman-numeral line for a diatonic progression, e.g. "I – V – vi – IV". */
 export function romanLineFor(prog: Progression): string {

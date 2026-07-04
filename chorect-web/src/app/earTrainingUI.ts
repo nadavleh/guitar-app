@@ -15,6 +15,7 @@ import {
   IntervalDirection, INTERVAL_CHOICES, intervalChoiceFor,
   MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, ADVANCED_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor,
   SongExample, songsForDiatonic, songsForAdvanced, songsForCircleWindow,
+  ResolvedChord, ChordShape, resolveProgression, resolveNamed, resolveCircleWindow,
 } from "../theory";
 
 const DISPLAY_FRETS = 14;
@@ -78,8 +79,16 @@ export class EarTrainingUI {
 
   private statsOpen = false;
   private libraryOpen = false;
-  /** Keys of progression-library rows whose song list is expanded. */
-  private libExpanded = new Set<string>();
+  /** Which progression-library row is expanded (single-open accordion), or null. */
+  private libExpandedKey: string | null = null;
+  /** Whether the expanded row's follow-along fretboard is shown. */
+  private libShowFb = false;
+  /** Preserved scrollTop of the library overlay across rerenders (fixes the jump-to-top). */
+  private libScrollTop = 0;
+  /** Dedicated fretboard canvas for the library overlay (kept separate from the main
+   *  view's shared canvas, which stays mounted behind the scrim). */
+  private libFbEl: HTMLCanvasElement | null = null;
+  private libFb: FretboardCanvas | null = null;
 
   constructor(private ear: EarTrainingState, private state: AppState, private onBack: () => void, private onToLooper: (symbols: string[]) => void) {}
 
@@ -197,35 +206,62 @@ export class EarTrainingUI {
     if (this.libraryOpen) container.appendChild(this.libraryOverlay());
   }
 
-  /** Progression-library popup: the pools the trainer draws from. Each row with
-   *  song examples is clickable (▸/▾) and expands an indented "Title — Artist" list. */
+  /** Progression-library popup: the pools the trainer draws from. Every row is clickable
+   *  (▸/▾, single-open accordion) and expands to a Play/Stop button that loops the
+   *  progression in a fixed key via the preview player, an optional follow-along
+   *  fretboard, and the "Title — Artist" list. Scroll position is preserved across the
+   *  full-subtree rerender (see [libScrollTop]). */
   private libraryOverlay(): HTMLElement {
-    const close = () => { this.libraryOpen = false; this.rerender(); };
+    const ear = this.ear;
+    // The scrollable card — captured so handlers can save its scrollTop before a rerender.
+    const body = el("div", { class: "et-card", style: "max-width:520px;max-height:75vh;overflow:auto;margin:auto" }, [
+      el("div", { style: "font-weight:700;font-size:16px;margin-bottom:8px" }, ["Progression library"]),
+    ]);
+    const close = () => { this.libScrollTop = 0; ear.libraryStop(); this.libraryOpen = false; this.rerender(); };
+    const saveScroll = () => { this.libScrollTop = body.scrollTop; };
 
-    // One progression row: label + chevron when songs exist; tap toggles expansion.
-    const row = (key: string, label: string, songs: SongExample[]): HTMLElement => {
-      const hasSongs = songs.length > 0;
-      const open = this.libExpanded.has(key);
-      const head = el("div", {
-        class: "et-muted",
-        style: `font-size:13px;display:flex;gap:8px;align-items:baseline;${hasSongs ? "cursor:pointer" : ""}`,
-      }, [
-        el("span", { style: "flex:1" }, [label]),
-        ...(hasSongs ? [el("span", { style: `color:${Colors.primary}` }, [open ? "▾" : "▸"])] : []),
-      ]);
-      if (hasSongs) {
-        head.addEventListener("click", () => {
-          if (this.libExpanded.has(key)) this.libExpanded.delete(key);
-          else this.libExpanded.add(key);
-          this.rerender();
-        });
-      }
-      const children: HTMLElement[] = [head];
-      if (hasSongs && open) {
+    // Expanded detail: play/stop, fretboard toggle + follow-along board, then songs.
+    const detail = (key: string, songs: SongExample[], chords: ResolvedChord[]): HTMLElement => {
+      const playing = ear.libPlayingId === key;
+      const playBtn = btn(playing ? "Stop ■" : "Play ▶", () => {
+        saveScroll();
+        if (playing) ear.libraryStop(); else ear.libraryPlay(key, chords);
+        this.rerender();
+      }, "btn primary");
+      const children: HTMLElement[] = [
+        el("div", { style: "margin:4px 0" }, [playBtn]),
+        switchRow("Show fretboard", null, this.libShowFb, (v) => { saveScroll(); this.libShowFb = v; this.rerender(); }),
+      ];
+      if (this.libShowFb) children.push(this.libFretboard(playing ? ear.libShape : this.previewShapeWeb(chords[0]?.symbol)));
+      if (songs.length) {
         children.push(el("div", { style: "padding:2px 0 6px 14px" },
           songs.map((sg) => el("div", { style: "font-size:13px" }, [`•  ${sg.title} — ${sg.artist}`]))));
+      } else {
+        children.push(el("div", { class: "et-muted", style: "font-size:13px;font-style:italic;padding:2px 0 6px 14px" },
+          ["No song examples for this one."]));
       }
-      return el("div", {}, children);
+      return el("div", { style: "padding-left:8px" }, children);
+    };
+
+    // One progression row: label + chevron; tap toggles expansion (single-open).
+    const row = (key: string, label: string, songs: SongExample[], chords: ResolvedChord[]): HTMLElement => {
+      const open = this.libExpandedKey === key;
+      const head = el("div", {
+        class: "et-muted",
+        style: `font-size:13px;display:flex;gap:8px;align-items:baseline;cursor:pointer`,
+      }, [
+        el("span", { style: "flex:1" }, [label]),
+        el("span", { style: `color:${Colors.primary}` }, [open ? "▾" : "▸"]),
+      ]);
+      head.addEventListener("click", () => {
+        saveScroll();
+        // Changing which row is open stops any preview and resets the fretboard toggle.
+        ear.libraryStop();
+        this.libExpandedKey = open ? null : key;
+        this.libShowFb = false;
+        this.rerender();
+      });
+      return el("div", {}, open ? [head, detail(key, songs, chords)] : [head]);
     };
 
     const section = (title: string, caption: string | null, rows: HTMLElement[]): HTMLElement =>
@@ -235,22 +271,56 @@ export class EarTrainingUI {
         ...rows,
       ]);
 
-    const body = el("div", { class: "et-card", style: "max-width:520px;max-height:75vh;overflow:auto;margin:auto" }, [
-      el("div", { style: "font-weight:700;font-size:16px;margin-bottom:8px" }, ["Progression library"]),
-      section("Major (diatonic)", "Tap a progression for famous songs built on it.",
-        MAJOR_PROGRESSIONS.map((p) => row(`maj:${p.degrees.join(",")}`, romanLineFor(p), songsForDiatonic(p)))),
-      section("Minor (diatonic)", null,
-        MINOR_PROGRESSIONS.map((p) => row(`min:${p.degrees.join(",")}`, romanLineFor(p), songsForDiatonic(p)))),
-      section("Advanced (non-diatonic)", "Characteristic examples — the signature harmonic move, not always note-for-note.",
-        ADVANCED_PROGRESSIONS.map((p) => row(`adv:${p.name}`, `${p.name}:  ${namedRomanLine(p)}`, songsForAdvanced(p.name)))),
-      section("Circle of fifths", "Draws 4 adjacent chords; the 2nd may become a dominant 7th (except vii°). Characteristic examples.",
-        CIRCLE_WINDOWS.map((w) => row(`cof:${w.id}`, w.romanLine, songsForCircleWindow(w.id)))),
-      el("div", { style: "text-align:right;margin-top:8px" }, [btn("Close", close, "btn primary")]),
-    ]);
+    body.appendChild(section("Major (diatonic)", "Tap a progression for songs + to hear it (fixed key C major).",
+      MAJOR_PROGRESSIONS.map((p) => row(`maj:${p.degrees.join(",")}`, romanLineFor(p), songsForDiatonic(p),
+        resolveProgression(p, 0, ChordTypeLevel.Triads)))));
+    body.appendChild(section("Minor (diatonic)", "Fixed key A minor.",
+      MINOR_PROGRESSIONS.map((p) => row(`min:${p.degrees.join(",")}`, romanLineFor(p), songsForDiatonic(p),
+        resolveProgression(p, 9, ChordTypeLevel.Triads)))));
+    body.appendChild(section("Advanced (non-diatonic)", "Characteristic examples — the signature harmonic move, not always note-for-note.",
+      ADVANCED_PROGRESSIONS.map((p) => row(`adv:${p.name}`, `${p.name}:  ${namedRomanLine(p)}`, songsForAdvanced(p.name),
+        resolveNamed(p, p.tonicMode === TrainingMode.Major ? 0 : 9)))));
+    body.appendChild(section("Circle of fifths", "Draws 4 adjacent chords; the 2nd may become a dominant 7th (except vii°). Characteristic examples.",
+      CIRCLE_WINDOWS.map((w) => row(`cof:${w.id}`, w.romanLine, songsForCircleWindow(w.id),
+        resolveCircleWindow(w, 0)))));
+    body.appendChild(el("div", { style: "text-align:right;margin-top:8px" }, [btn("Close", close, "btn primary")]));
+
     body.addEventListener("click", (e) => e.stopPropagation());
+    // Restore the preserved scroll position after this freshly-built card is mounted.
+    requestAnimationFrame(() => { body.scrollTop = this.libScrollTop; });
     const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:50" }, [body]);
     scrim.addEventListener("click", close);
     return scrim;
+  }
+
+  /** Best-effort E-shape (or first) voicing for a chord symbol, for the idle fretboard
+   *  preview before playback starts. Null for unvoiceable/exotic chords or empty input. */
+  private previewShapeWeb(symbol: string | undefined): ChordShape | null {
+    if (!symbol) return null;
+    const parsed = parseChord(symbol);
+    if (!parsed) return null;
+    const [root, q] = parsed;
+    const shapes = new ChordShapeGenerator().shapesFor(root, q, this.state.liveTuning, DISPLAY_FRETS);
+    return shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0] ?? null;
+  }
+
+  /** The library overlay's own follow-along fretboard (separate canvas from the main
+   *  view's). Renders [shape] (the live preview shape while playing, else the idle one). */
+  private libFretboard(shape: ChordShape | null): HTMLElement {
+    const s = this.state;
+    if (!this.libFbEl) {
+      this.libFbEl = el("canvas", { class: "fretboard" });
+      this.libFb = new FretboardCanvas(this.libFbEl);
+    }
+    const wrap = el("div", { style: "height:200px;position:relative;margin:6px 0" });
+    wrap.appendChild(this.libFbEl);
+    const marks = shape ? shapeMarks(shape, s.labelMode) : new Map();
+    this.libFb!.setData({
+      tuning: s.liveTuning, marks, selectedPosition: null, leftHanded: s.leftHanded,
+      numFrets: DISPLAY_FRETS, playOnTouchDown: false, mutedStrings: new Set<number>(),
+      onTap: (pos) => s.audio.playNote(noteAt(s.liveTuning, pos).midi, s.ringSustainMs),
+    });
+    return wrap;
   }
 
   // ---------- shared widgets ----------
