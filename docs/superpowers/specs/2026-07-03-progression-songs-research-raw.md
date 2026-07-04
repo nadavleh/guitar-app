@@ -10,8 +10,8 @@ Collected 2026-07-03. **Not yet integrated into code.** Statuses below track wha
 | Minor (diatonic, 6) | ✅ collected | below |
 | Circle of fifths (7 windows + 4 minor-sub variants) | ✅ collected | below |
 | Major (diatonic, 9) | ❌ RE-RUN NEEDED | research agent hit a `400 content filtering` API error twice. Re-dispatch tomorrow (a song title/lyric in results likely tripped the filter — instruct agent to return titles/artists only, no lyrics, and to skip any track it can't name cleanly). |
-| Advanced batch 1 (1–12) | ⏳ re-run / check | was still running in background at wrap-up; treat as not captured — re-dispatch tomorrow. |
-| Advanced batch 2 (13–24) | ⏳ re-run / check | same. |
+| Advanced batch 1 (1–12) | ❌ RE-RUN NEEDED | still running at wrap-up; not captured — re-dispatch tomorrow. |
+| Advanced batch 2 (13–24) | ✅ collected | below |
 
 Design decisions already locked: all four sections get clickable song lists; advanced/circle
 labeled "characteristic examples"; circle section becomes 7 clickable windows plus a minor-chord
@@ -171,6 +171,83 @@ labeled "characteristic examples"; circle section becomes 7 clickable windows pl
 - Autumn Leaves — Nat King Cole
 - Still Got the Blues — Gary Moore
 - I Will Survive — Gloria Gaynor
+
+---
+
+## Advanced (non-diatonic) — batch 2 (13–24)
+
+### Broadway Lift  (I – III7 – IV – ii7 – V7)
+- On the Sunny Side of the Street — Louis Armstrong
+- Georgia on My Mind — Ray Charles
+- Someday My Prince Will Come — Snow White (Disney)
+- Just a Closer Walk with Thee — Traditional
+
+### Minor-Key Swing  (i – III7 – iv – ii7 – V7)
+- Bei Mir Bist Du Schön — The Andrews Sisters
+- Bésame Mucho — Dean Martin
+- Minor Swing — Django Reinhardt
+
+### Extended Pop Ballad  (I – III7 – vi – IV – ii7 – V7)
+- Come Rain or Come Shine — Ray Charles
+- There Will Never Be Another You — Chet Baker
+- Eternal Flame — The Bangles
+- The Shoop Shoop Song (It's in His Kiss) — Cher
+- One Call Away — Charlie Puth
+
+### Tritone Substitution  (ii7 – bII7 – Imaj7)
+- The Girl from Ipanema — Antônio Carlos Jobim
+- Body and Soul — Coleman Hawkins
+- Night and Day — Cole Porter
+- Autumn Leaves — Nat King Cole
+
+### Minor Line Cliché  (i – i(maj7) – i7 – i6)
+- My Funny Valentine — Chet Baker
+- James Bond Theme — Monty Norman
+- Michelle — The Beatles
+- Stairway to Heaven — Led Zeppelin
+- This Masquerade — George Benson
+
+### Romantic Plaintive  (I – Imaj7 – I7 – IV)
+- Something — The Beatles
+- Can't Take My Eyes Off You — Frankie Valli
+- I Just Called to Say I Love You — Stevie Wonder
+- Kiss Me — Sixpence None the Richer
+
+### Church Cadence  (I – IV – I – bVII – IV)
+- Hey Jude — The Beatles
+- Sweet Home Alabama — Lynyrd Skynyrd
+- Takin' Care of Business — Bachman-Turner Overdrive
+- Fortunate Son — Creedence Clearwater Revival
+
+### Gospel Walk-Up  (I – I/III – IV – #IV°7 – V)
+- On the Sunny Side of the Street — Louis Armstrong
+- Embraceable You — Ella Fitzgerald
+- The Song Is You — Frank Sinatra
+
+### Mario Cadence  (bVI – bVII – I)
+- Super Mario Bros. (Level Complete fanfare) — Koji Kondo
+- The Legend of Zelda: Ocarina of Time — Koji Kondo
+- Final Fantasy (Victory Fanfare) — Nobuo Uematsu
+- Star Wars (Main Title) — John Williams
+
+### Royal Road  (IV – V – iii – vi)
+- Never Gonna Give You Up — Rick Astley
+- Titanium — David Guetta & Sia
+- Leave the Door Open — Silk Sonic
+- Fortnight — Taylor Swift & Post Malone
+- Heavy Rotation — AKB48
+- Yoru ni Kakeru — YOASOBI
+
+### Bird Blues Turnaround  (Imaj7 – #IV°7 – iii7 – VI7 – ii7 – V7)
+- Blues for Alice — Charlie Parker
+- Au Privave — Charlie Parker
+- Chi Chi — Charlie Parker
+- Bloomdido — Charlie Parker
+
+### Montgomery Turnaround  (Imaj7 – bIII7 – bVI7 – bII7)
+- Lady Bird — Tadd Dameron
+- Half Nelson — Miles Davis
+- Israel — Miles Davis
 
 ---
 
