@@ -44,6 +44,14 @@ import re
 import sys
 from pathlib import Path
 
+# Windows consoles default to cp1252, which can't encode many matched track names
+# (Greek, accented, CJK…). Force UTF-8 so a print() never crashes the run.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 # --------------------------------------------------------------------------- #
 # CONFIG — fill these in here, OR leave blank and use the SPOTIPY_* env vars.
 # --------------------------------------------------------------------------- #
@@ -66,7 +74,9 @@ PLAYLIST_DESC = {
     "earTraining#3": "Circle-of-fifths progression songs (characteristic examples).",
 }
 
-SCOPE = "playlist-modify-public playlist-modify-private"
+# read-private lets us find & remove same-named playlists from a previous run so
+# re-running replaces them instead of piling up duplicates.
+SCOPE = "playlist-modify-public playlist-modify-private playlist-read-private"
 
 # Song lines look like:  "- Autumn Leaves — Nat King Cole"  (em dash separator).
 SONG_RE = re.compile(r"^-\s+(.+?)\s+—\s+(.+?)\s*$")
@@ -148,6 +158,21 @@ def chunked(seq, n):
         yield seq[i:i + n]
 
 
+def unfollow_existing(sp, user_id: str, names: set[str]) -> None:
+    """Remove (unfollow) any of the user's own playlists whose name is in `names`,
+    so a re-run replaces prior runs instead of leaving duplicates/empties behind."""
+    to_remove: list[tuple[str, str]] = []
+    results = sp.current_user_playlists(limit=50)
+    while results:
+        for pl in results.get("items", []):
+            if pl and pl["owner"]["id"] == user_id and pl["name"] in names:
+                to_remove.append((pl["name"], pl["id"]))
+        results = sp.next(results) if results.get("next") else None
+    for nm, pid in to_remove:
+        sp.current_user_unfollow_playlist(pid)
+        print(f"   (removed a previous '{nm}')")
+
+
 def main() -> int:
     try:
         import spotipy
@@ -183,6 +208,9 @@ def main() -> int:
     user_id = me["id"]
     print(f"\nAuthorized as: {me.get('display_name') or user_id}\n")
 
+    print("Removing any same-named playlists from a previous run...")
+    unfollow_existing(sp, user_id, set(PLAYLIST_SECTIONS))
+
     unmatched_report: list[str] = []
 
     for name, section_keys in PLAYLIST_SECTIONS.items():
@@ -197,10 +225,15 @@ def main() -> int:
                     songs.append((title, artist))
 
         print(f"== {name}  ({'+'.join(section_keys)}): {len(songs)} songs ==")
-        pl = sp.user_playlist_create(
-            user_id, name, public=PLAYLISTS_PUBLIC,
-            description=PLAYLIST_DESC.get(name, ""),
-        )
+        # Spotify's Feb-2026 Web API migration retired POST /users/{id}/playlists
+        # (what spotipy's user_playlist_create() calls) — it now 403s for everyone in
+        # Development mode. The replacement is POST /me/playlists. spotipy has no wrapper
+        # yet, so call the endpoint directly via its internal _post().
+        pl = sp._post("me/playlists", payload={
+            "name": name,
+            "public": PLAYLISTS_PUBLIC,
+            "description": PLAYLIST_DESC.get(name, ""),
+        })
         uris: list[str] = []
         for title, artist in songs:
             uri, disp = find_track_uri(sp, title, artist)

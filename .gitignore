@@ -25,3 +25,9 @@ v*_small.png
 v*_med.png
 
 /dist/
+
+# Spotify OAuth token cache (contains an access token — never commit)
+.cache
+
+# Python bytecode cache
+__pycache__/
