@@ -74,6 +74,19 @@ PLAYLIST_DESC = {
     "earTraining#3": "Circle-of-fifths progression songs (characteristic examples).",
 }
 
+# Manual overrides: source (title, artist) -> exact Spotify track URI. Fuzzy search
+# occasionally picks the wrong track (a cover/karaoke, a medley, the wrong artist, or
+# something unrelated); pin those here so a re-run stays correct.
+TRACK_OVERRIDES = {
+    ("Baby", "Justin Bieber"): "spotify:track:0GUOuy3DhaFdr7YgAxslOE",             # was "GO BABY"
+    ("Boulevard of Broken Dreams", "Green Day"): "spotify:track:1hwJKpe0BPUsq6UUrwBWTw",  # was a "Holiday / …" medley
+    ("Love the Way You Lie", "Eminem ft. Rihanna"): "spotify:track:15JINEqzVMv3SvJTAXAKED",  # was a karaoke cover
+    ("Summertime", "Miles Davis"): "spotify:track:25H0Wd1ugPRXGM2LlpjVXM",         # was listed under "George Gershwin"
+    ("Cocaine", "Eric Clapton"): "spotify:track:2udGjDmpK1dH9VGyw7nrei",           # was J.J. Cale's version
+    ("Salty Dog Blues", "Rev. Gary Davis"): "spotify:track:2OWLg4tyw9J50G49pS9hsa",  # was an unrelated song; Mississippi John Hurt (live)
+    ("Super Mario Bros. (Level Complete)", "Koji Kondo"): "spotify:track:03fijJ2GEzZ92Zl5fuTxI7",  # was "Tabula Rasa"; Main Theme (fanfare isn't a track)
+}
+
 # read-private lets us find & remove same-named playlists from a previous run so
 # re-running replaces them instead of piling up duplicates.
 SCOPE = "playlist-modify-public playlist-modify-private playlist-read-private"
@@ -130,6 +143,10 @@ def parse_songs(md_path: Path) -> dict[str, list[tuple[str, str]]]:
 
 def find_track_uri(sp, title: str, artist: str):
     """Search Spotify for the best match. Returns (uri, display) or (None, None)."""
+    ov = TRACK_OVERRIDES.get((title, artist))
+    if ov:
+        return ov, "(manual override)"
+
     def esc(s: str) -> str:
         return s.replace('"', "")
 
