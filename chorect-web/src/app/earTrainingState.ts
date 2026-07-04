@@ -301,6 +301,9 @@ export class EarTrainingState {
   libBar = 0;
   /** Shape the library preview is currently sounding — drives the follow-along fretboard. */
   libShape: ChordShape | null = null;
+  /** Lightweight per-bar hook: the UI updates ONLY the fretboard canvas here, avoiding a
+   *  full-screen rerender (which would flash the whole overlay on every chord change). */
+  libOnBar: (() => void) | null = null;
   private libToken = 0;
   private libPrevShape: ChordShape | null = null;
 
@@ -324,7 +327,8 @@ export class EarTrainingState {
           if (this.libPlayingId !== id || token !== this.libToken) break;
           this.libBar = i;
           this.libPlayChordOnce(chords[i].symbol, barMs);
-          this.notify();
+          // Per-bar: nudge ONLY the fretboard canvas (no full rerender → no flash).
+          this.libOnBar?.();
           await sleep(barMs);
         }
       }

@@ -213,6 +213,9 @@ export class EarTrainingUI {
    *  full-subtree rerender (see [libScrollTop]). */
   private libraryOverlay(): HTMLElement {
     const ear = this.ear;
+    // Cleared each build; re-armed by libFretboard() only when a board is actually shown,
+    // so the per-bar hook never fires against a hidden/stale canvas.
+    ear.libOnBar = null;
     // The scrollable card — captured so handlers can save its scrollTop before a rerender.
     const body = el("div", { class: "et-card", style: "max-width:520px;max-height:75vh;overflow:auto;margin:auto" }, [
       el("div", { style: "font-weight:700;font-size:16px;margin-bottom:8px" }, ["Progression library"]),
@@ -232,7 +235,7 @@ export class EarTrainingUI {
         el("div", { style: "margin:4px 0" }, [playBtn]),
         switchRow("Show fretboard", null, this.libShowFb, (v) => { saveScroll(); this.libShowFb = v; this.rerender(); }),
       ];
-      if (this.libShowFb) children.push(this.libFretboard(playing ? ear.libShape : this.previewShapeWeb(chords[0]?.symbol)));
+      if (this.libShowFb) children.push(this.libFretboard(key, this.previewShapeWeb(chords[0]?.symbol)));
       if (songs.length) {
         children.push(el("div", { style: "padding:2px 0 6px 14px" },
           songs.map((sg) => el("div", { style: "font-size:13px" }, [`•  ${sg.title} — ${sg.artist}`]))));
@@ -305,21 +308,28 @@ export class EarTrainingUI {
   }
 
   /** The library overlay's own follow-along fretboard (separate canvas from the main
-   *  view's). Renders [shape] (the live preview shape while playing, else the idle one). */
-  private libFretboard(shape: ChordShape | null): HTMLElement {
-    const s = this.state;
+   *  view's). While row [key] is playing it tracks `ear.libShape` live; otherwise it shows
+   *  [idleShape]. The draw runs imperatively via `ear.libOnBar` on each preview bar, so the
+   *  board follows playback WITHOUT a full-screen rerender (which would flash the overlay). */
+  private libFretboard(key: string, idleShape: ChordShape | null): HTMLElement {
+    const s = this.state, ear = this.ear;
     if (!this.libFbEl) {
       this.libFbEl = el("canvas", { class: "fretboard" });
       this.libFb = new FretboardCanvas(this.libFbEl);
     }
     const wrap = el("div", { style: "height:200px;position:relative;margin:6px 0" });
     wrap.appendChild(this.libFbEl);
-    const marks = shape ? shapeMarks(shape, s.labelMode) : new Map();
-    this.libFb!.setData({
-      tuning: s.liveTuning, marks, selectedPosition: null, leftHanded: s.leftHanded,
-      numFrets: DISPLAY_FRETS, playOnTouchDown: false, mutedStrings: new Set<number>(),
-      onTap: (pos) => s.audio.playNote(noteAt(s.liveTuning, pos).midi, s.ringSustainMs),
-    });
+    const draw = () => {
+      const shape = ear.libPlayingId === key ? ear.libShape : idleShape;
+      const marks = shape ? shapeMarks(shape, s.labelMode) : new Map();
+      this.libFb!.setData({
+        tuning: s.liveTuning, marks, selectedPosition: null, leftHanded: s.leftHanded,
+        numFrets: DISPLAY_FRETS, playOnTouchDown: false, mutedStrings: new Set<number>(),
+        onTap: (pos) => s.audio.playNote(noteAt(s.liveTuning, pos).midi, s.ringSustainMs),
+      });
+    };
+    draw();
+    ear.libOnBar = draw;  // re-armed here (cleared at the top of libraryOverlay each build)
     return wrap;
   }
 
