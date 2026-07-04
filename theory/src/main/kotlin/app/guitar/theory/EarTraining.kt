@@ -347,6 +347,20 @@ object EarTraining {
         return NamedProgression("Circle of 5ths", note, TrainingMode.Major, window)
     }
 
+    /** One draw-able 4-chord window of the diatonic circle of fifths, for the
+     *  progression-library viewer. [id] ("W1".."W7") keys its song list. */
+    data class CircleWindow(val id: String, val romanLine: String)
+
+    /** The seven 4-chord windows the [randomCircleOfFifths] trainer can draw, in
+     *  cycle order starting from each diatonic chord. Used by the library viewer. */
+    val CIRCLE_WINDOWS: List<CircleWindow> = run {
+        val n = CIRCLE_OF_FIFTHS.size
+        (0 until n).map { start ->
+            val w = (0 until 4).map { CIRCLE_OF_FIFTHS[(start + it) % n] }
+            CircleWindow("W${start + 1}", w.joinToString("  –  ") { it.roman })
+        }
+    }
+
     /** Roman-numeral line for a diatonic [Progression], e.g. "I – V – vi – IV". Used
      *  by the progression-library viewer. */
     fun romanLineFor(prog: Progression): String {

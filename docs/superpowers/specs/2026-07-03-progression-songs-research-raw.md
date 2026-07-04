@@ -7,11 +7,23 @@ Collected 2026-07-03. **Not yet integrated into code.** Statuses below track wha
 
 | Section | Status | Notes |
 |---|---|---|
-| Minor (diatonic, 6) | ✅ collected | below |
-| Circle of fifths (7 windows + 4 minor-sub variants) | ✅ collected | below |
-| Major (diatonic, 9) | ❌ RE-RUN NEEDED | research agent hit a `400 content filtering` API error twice. Re-dispatch tomorrow (a song title/lyric in results likely tripped the filter — instruct agent to return titles/artists only, no lyrics, and to skip any track it can't name cleanly). |
-| Advanced batch 1 (1–12) | ❌ RE-RUN NEEDED | still running at wrap-up; not captured — re-dispatch tomorrow. |
-| Advanced batch 2 (13–24) | ✅ collected | below |
+| Minor (diatonic, 6) | ✅ integrated | below |
+| Circle of fifths (7 windows) | ✅ integrated | curated per-window; see decision note below |
+| Major (diatonic, 9) | ✅ integrated | re-run succeeded (titles/artists-only prompt avoided the content filter) |
+| Advanced batch 1 (1–12) | ✅ integrated | re-run succeeded |
+| Advanced batch 2 (13–24) | ✅ integrated | below |
+
+**All batches shipped in v1.19.0** — data lives in `theory/.../ProgressionSongs.kt`
+(mirrored in `chorect-web/src/theory/progressionSongs.ts`), wired into both progression-
+library UIs, and exported to `docs/progression_songs.md`.
+
+**Circle-variant decision (changed from the plan):** the 4 planned "vii° → vii"
+minor-substitution rows were dropped. The trainer's `randomCircleOfFifths` never
+generates a vii-minor chord (it only optionally domifies the 2nd chord, and skips vii°),
+and this dialog documents "the pools the trainer draws from" — so those rows would
+misrepresent it. Only the 7 real windows ship; min-variant songs folded into their
+parent window. The per-window lists were curated to reduce the heavy standard-repetition
+the cleanup note flagged.
 
 Design decisions already locked: all four sections get clickable song lists; advanced/circle
 labeled "characteristic examples"; circle section becomes 7 clickable windows plus a minor-chord

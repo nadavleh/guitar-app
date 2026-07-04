@@ -252,6 +252,19 @@ export function randomCircleOfFifths(rng: Rng = defaultRng): NamedProgression {
   return { name: "Circle of 5ths", explanation: note, tonicMode: TrainingMode.Major, chords: window };
 }
 
+/** One draw-able 4-chord window of the diatonic circle of fifths, for the
+ *  progression-library viewer. `id` ("W1".."W7") keys its song list. */
+export interface CircleWindow { id: string; romanLine: string; }
+
+/** The seven 4-chord windows randomCircleOfFifths can draw, in cycle order. */
+export const CIRCLE_WINDOWS: CircleWindow[] = (() => {
+  const n = CIRCLE_OF_FIFTHS.length;
+  return Array.from({ length: n }, (_, start) => {
+    const w = Array.from({ length: 4 }, (_, i) => CIRCLE_OF_FIFTHS[(start + i) % n]);
+    return { id: `W${start + 1}`, romanLine: w.map((ch) => ch.roman).join("  –  ") };
+  });
+})();
+
 /** Roman-numeral line for a diatonic progression, e.g. "I – V – vi – IV". */
 export function romanLineFor(prog: Progression): string {
   const map = degreesMapFor(prog.mode);

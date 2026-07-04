@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,6 +56,8 @@ import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
+import app.guitar.theory.ProgressionSongs
+import app.guitar.theory.SongExample
 import app.guitar.theory.TrainingMode
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -2236,6 +2239,11 @@ private fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
 
 @Composable
 private fun ProgressionLibraryDialog(onDismiss: () -> Unit) {
+    // Keys of rows whose song list is expanded; multiple may be open at once.
+    var expanded by remember { mutableStateOf(setOf<String>()) }
+    val toggle: (String) -> Unit = { key ->
+        expanded = if (key in expanded) expanded - key else expanded + key
+    }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
@@ -2244,30 +2252,79 @@ private fun ProgressionLibraryDialog(onDismiss: () -> Unit) {
             Column(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState()),
             ) {
-                LibrarySection("Major (diatonic)",
-                    EarTraining.MAJOR_PROGRESSIONS.map { EarTraining.romanLineFor(it) })
-                LibrarySection("Minor (diatonic)",
-                    EarTraining.MINOR_PROGRESSIONS.map { EarTraining.romanLineFor(it) })
+                LibrarySection("Major (diatonic)", "Tap a progression for famous songs built on it.") {
+                    EarTraining.MAJOR_PROGRESSIONS.forEach { p ->
+                        LibraryRow("maj:${p.degrees}", EarTraining.romanLineFor(p),
+                            ProgressionSongs.forDiatonic(p), expanded, toggle)
+                    }
+                }
+                LibrarySection("Minor (diatonic)", null) {
+                    EarTraining.MINOR_PROGRESSIONS.forEach { p ->
+                        LibraryRow("min:${p.degrees}", EarTraining.romanLineFor(p),
+                            ProgressionSongs.forDiatonic(p), expanded, toggle)
+                    }
+                }
                 LibrarySection("Advanced (non-diatonic)",
-                    EarTraining.ADVANCED_PROGRESSIONS.map { "${it.name}:  ${it.romanLine}" })
+                    "Characteristic examples — the signature harmonic move, not always note-for-note.") {
+                    EarTraining.ADVANCED_PROGRESSIONS.forEach { np ->
+                        LibraryRow("adv:${np.name}", "${np.name}:  ${np.romanLine}",
+                            ProgressionSongs.forAdvanced(np.name), expanded, toggle)
+                    }
+                }
                 LibrarySection("Circle of fifths",
-                    listOf(
-                        EarTraining.CIRCLE_OF_FIFTHS.joinToString("  →  ") { it.roman } + "  → (repeat)",
-                        "Draws 4 adjacent chords; the 2nd may become a dominant 7th (except vii°).",
-                    ))
+                    "Draws 4 adjacent chords; the 2nd may become a dominant 7th (except vii°). Characteristic examples.") {
+                    EarTraining.CIRCLE_WINDOWS.forEach { w ->
+                        LibraryRow("cof:${w.id}", w.romanLine,
+                            ProgressionSongs.forCircleWindow(w.id), expanded, toggle)
+                    }
+                }
             }
         },
     )
 }
 
 @Composable
-private fun LibrarySection(title: String, lines: List<String>) {
+private fun LibrarySection(title: String, caption: String?, content: @Composable () -> Unit) {
     Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary)
-    Spacer(Modifier.height(2.dp))
-    for (line in lines) {
-        Text(line, style = MaterialTheme.typography.bodySmall,
+    if (caption != null) {
+        Text(caption, style = MaterialTheme.typography.labelSmall, fontStyle = FontStyle.Italic,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+    Spacer(Modifier.height(2.dp))
+    content()
     Spacer(Modifier.height(10.dp))
+}
+
+/** A progression row in the library. Clickable (with a ▸/▾ chevron) when it has
+ *  song examples; tapping toggles an indented list of "Title — Artist" lines. */
+@Composable
+private fun LibraryRow(
+    key: String,
+    label: String,
+    songs: List<SongExample>,
+    expanded: Set<String>,
+    onToggle: (String) -> Unit,
+) {
+    val hasSongs = songs.isNotEmpty()
+    val isOpen = key in expanded
+    Row(
+        modifier = if (hasSongs) Modifier.fillMaxWidth().clickable { onToggle(key) } else Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        if (hasSongs) {
+            Text(if (isOpen) "▾" else "▸", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary)
+        }
+    }
+    if (hasSongs && isOpen) {
+        Column(modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 2.dp, bottom = 4.dp)) {
+            for (song in songs) {
+                Text("•  ${song.title} — ${song.artist}", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+    }
 }

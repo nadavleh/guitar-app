@@ -13,7 +13,8 @@ import {
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
   parseChord, ChordShapeGenerator, CagedShape, notesFrom, midiPitchClass, fp, fpKey,
   IntervalDirection, INTERVAL_CHOICES, intervalChoiceFor,
-  MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, ADVANCED_PROGRESSIONS, CIRCLE_OF_FIFTHS, romanLineFor,
+  MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, ADVANCED_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor,
+  SongExample, songsForDiatonic, songsForAdvanced, songsForCircleWindow,
 } from "../theory";
 
 const DISPLAY_FRETS = 14;
@@ -77,6 +78,8 @@ export class EarTrainingUI {
 
   private statsOpen = false;
   private libraryOpen = false;
+  /** Keys of progression-library rows whose song list is expanded. */
+  private libExpanded = new Set<string>();
 
   constructor(private ear: EarTrainingState, private state: AppState, private onBack: () => void, private onToLooper: (symbols: string[]) => void) {}
 
@@ -194,23 +197,54 @@ export class EarTrainingUI {
     if (this.libraryOpen) container.appendChild(this.libraryOverlay());
   }
 
-  /** Progression-library popup: the pools the trainer draws from. */
+  /** Progression-library popup: the pools the trainer draws from. Each row with
+   *  song examples is clickable (▸/▾) and expands an indented "Title — Artist" list. */
   private libraryOverlay(): HTMLElement {
     const close = () => { this.libraryOpen = false; this.rerender(); };
-    const section = (title: string, lines: string[]): HTMLElement =>
+
+    // One progression row: label + chevron when songs exist; tap toggles expansion.
+    const row = (key: string, label: string, songs: SongExample[]): HTMLElement => {
+      const hasSongs = songs.length > 0;
+      const open = this.libExpanded.has(key);
+      const head = el("div", {
+        class: "et-muted",
+        style: `font-size:13px;display:flex;gap:8px;align-items:baseline;${hasSongs ? "cursor:pointer" : ""}`,
+      }, [
+        el("span", { style: "flex:1" }, [label]),
+        ...(hasSongs ? [el("span", { style: `color:${Colors.primary}` }, [open ? "▾" : "▸"])] : []),
+      ]);
+      if (hasSongs) {
+        head.addEventListener("click", () => {
+          if (this.libExpanded.has(key)) this.libExpanded.delete(key);
+          else this.libExpanded.add(key);
+          this.rerender();
+        });
+      }
+      const children: HTMLElement[] = [head];
+      if (hasSongs && open) {
+        children.push(el("div", { style: "padding:2px 0 6px 14px" },
+          songs.map((sg) => el("div", { style: "font-size:13px" }, [`•  ${sg.title} — ${sg.artist}`]))));
+      }
+      return el("div", {}, children);
+    };
+
+    const section = (title: string, caption: string | null, rows: HTMLElement[]): HTMLElement =>
       el("div", { style: "margin-bottom:10px" }, [
         el("div", { style: `font-weight:700;color:${Colors.primary}` }, [title]),
-        ...lines.map((l) => el("div", { class: "et-muted", style: "font-size:13px" }, [l])),
+        ...(caption ? [el("div", { class: "et-muted", style: "font-size:12px;font-style:italic" }, [caption])] : []),
+        ...rows,
       ]);
+
     const body = el("div", { class: "et-card", style: "max-width:520px;max-height:75vh;overflow:auto;margin:auto" }, [
       el("div", { style: "font-weight:700;font-size:16px;margin-bottom:8px" }, ["Progression library"]),
-      section("Major (diatonic)", MAJOR_PROGRESSIONS.map((p) => romanLineFor(p))),
-      section("Minor (diatonic)", MINOR_PROGRESSIONS.map((p) => romanLineFor(p))),
-      section("Advanced (non-diatonic)", ADVANCED_PROGRESSIONS.map((p) => `${p.name}:  ${namedRomanLine(p)}`)),
-      section("Circle of fifths", [
-        CIRCLE_OF_FIFTHS.map((ch) => ch.roman).join("  →  ") + "  → (repeat)",
-        "Draws 4 adjacent chords; the 2nd may become a dominant 7th (except vii°).",
-      ]),
+      section("Major (diatonic)", "Tap a progression for famous songs built on it.",
+        MAJOR_PROGRESSIONS.map((p) => row(`maj:${p.degrees.join(",")}`, romanLineFor(p), songsForDiatonic(p)))),
+      section("Minor (diatonic)", null,
+        MINOR_PROGRESSIONS.map((p) => row(`min:${p.degrees.join(",")}`, romanLineFor(p), songsForDiatonic(p)))),
+      section("Advanced (non-diatonic)", "Characteristic examples — the signature harmonic move, not always note-for-note.",
+        ADVANCED_PROGRESSIONS.map((p) => row(`adv:${p.name}`, `${p.name}:  ${namedRomanLine(p)}`, songsForAdvanced(p.name)))),
+      section("Circle of fifths", "Draws 4 adjacent chords; the 2nd may become a dominant 7th (except vii°). Characteristic examples.",
+        CIRCLE_WINDOWS.map((w) => row(`cof:${w.id}`, w.romanLine, songsForCircleWindow(w.id)))),
       el("div", { style: "text-align:right;margin-top:8px" }, [btn("Close", close, "btn primary")]),
     ]);
     body.addEventListener("click", (e) => e.stopPropagation());
