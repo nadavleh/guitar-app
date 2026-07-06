@@ -26,6 +26,7 @@ class MixVoice(
 class VoiceMixer(val sampleRate: Int) {
     private val voices = ArrayList<MixVoice>()
     private val scratch = FloatArray(4096)
+    private val limiter = SoftLimiter(sampleRate)
 
     val activeCount: Int get() = voices.size
 
@@ -89,5 +90,6 @@ class VoiceMixer(val sampleRate: Int) {
             if (produced) v.lastPeak = peak
             if (v.envelope.isSilent || (v.source.isFinished && v.remainingDelay == 0)) it.remove()
         }
+        limiter.process(outL, outR, count)
     }
 }

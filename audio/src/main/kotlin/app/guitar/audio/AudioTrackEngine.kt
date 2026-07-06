@@ -104,9 +104,8 @@ class AudioTrackEngine(
             if (mixer.activeCount == 0) { try { Thread.sleep(3) } catch (_: InterruptedException) { return }; continue }
             mixer.mixBlock(l, r, chunkFrames)
             for (i in 0 until chunkFrames) {
-                val sl = l[i].coerceIn(-1f, 1f); val sr = r[i].coerceIn(-1f, 1f)
-                chunk[2 * i] = (sl * 32767f).toInt().coerceIn(-32768, 32767).toShort()
-                chunk[2 * i + 1] = (sr * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+                chunk[2 * i] = (l[i] * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+                chunk[2 * i + 1] = (r[i] * 32767f).toInt().coerceIn(-32768, 32767).toShort()
             }
             try {
                 if (track.write(chunk, 0, chunkFrames * 2, AudioTrack.WRITE_BLOCKING) < 0) break
