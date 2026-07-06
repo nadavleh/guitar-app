@@ -11,8 +11,10 @@ class MixVoice(
 ) {
     /** Frames still to wait before this voice starts sounding (mixer clock). */
     var remainingDelay: Int = delayFrames.coerceAtLeast(0)
-    /** Running peak of the last block, for quietest-voice stealing. */
-    var lastPeak: Float = 0f
+    /** Peak |post-gain sample| of the most recent block this voice contributed to,
+     *  for quietest-voice stealing. Initialized high so a freshly-added voice (not
+     *  yet mixed) is never chosen as the [VoiceMixer.capVoices] steal target. */
+    var lastPeak: Float = Float.MAX_VALUE
 }
 
 /** Headless real-time mixer: sums active voices into stereo L/R blocks. No Android
@@ -63,22 +65,24 @@ class VoiceMixer(val sampleRate: Int) {
                 v.remainingDelay -= d
                 i = d
             }
+            var produced = false
+            var peak = 0f
             while (i < count) {
                 val want = minOf(count - i, scratch.size)
                 val n = v.source.render(scratch, want)
                 if (n <= 0) break
+                produced = true
                 v.envelope.applyInPlace(scratch, n)     // scratch now enveloped
-                var peak = v.lastPeak
                 for (j in 0 until n) {
                     val s = scratch[j] * v.gain
                     if (kotlin.math.abs(s) > peak) peak = kotlin.math.abs(s)
                     outL[i + j] += s
                     outR[i + j] += s
                 }
-                v.lastPeak = peak
                 i += n
                 if (n < want) break
             }
+            if (produced) v.lastPeak = peak
             if (v.envelope.isSilent || (v.source.isFinished && v.remainingDelay == 0)) it.remove()
         }
     }

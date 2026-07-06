@@ -49,4 +49,23 @@ class VoiceMixerTest {
         assertEquals(0f, l2[95], 1e-4f)
         assertEquals(0, m.activeCount, "silent voice removed")
     }
+
+    @Test
+    fun `lastPeak is per-block and a fresh voice is not the steal target`() {
+        val m = VoiceMixer(sampleRate = 48000)
+        val loud = MixVoice(BufferSource(FloatArray(1000) { 0.9f }))
+        val quiet = MixVoice(BufferSource(FloatArray(1000) { 0.02f }))
+        m.add(loud); m.add(quiet)
+        val l = FloatArray(128); val r = FloatArray(128)
+        m.mixBlock(l, r, 128)
+        // per-block peak reflects actual current loudness, not a historical max
+        assertTrue(quiet.lastPeak < loud.lastPeak, "quiet=${quiet.lastPeak} loud=${loud.lastPeak}")
+        assertTrue(quiet.lastPeak > 0f, "quiet voice did sound this block")
+        // a freshly-added, not-yet-mixed voice stays at the high sentinel so it won't be stolen
+        val fresh = MixVoice(BufferSource(FloatArray(1000) { 0.9f }))
+        m.add(fresh)
+        assertEquals(Float.MAX_VALUE, fresh.lastPeak)
+        // therefore the quietest actually-sounding voice is the steal target, not the fresh one
+        assertTrue(quiet.lastPeak < fresh.lastPeak)
+    }
 }
