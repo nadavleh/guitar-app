@@ -24,6 +24,13 @@ class VoiceMixer(val sampleRate: Int) {
     @Synchronized fun clear() { voices.clear() }
     @Synchronized fun capVoices(max: Int) { while (voices.size > max) voices.removeAt(0) }
 
+    /** Add a voice and atomically trim to the cap in one synchronized block,
+     *  preventing the output thread from briefly seeing voices over the max. */
+    @Synchronized fun addAndCap(v: MixVoice, max: Int) {
+        voices.add(v)
+        while (voices.size > max) voices.removeAt(0)
+    }
+
     /** Mix [count] frames. outL/outR must be >= count. */
     @Synchronized fun mixBlock(outL: FloatArray, outR: FloatArray, count: Int) {
         for (i in 0 until count) { outL[i] = 0f; outR[i] = 0f }

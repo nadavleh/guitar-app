@@ -19,10 +19,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  *   - One **synthesis worker** (single-thread executor) that turns playNote /
  *     playChord requests into FloatArray voices and pushes them into the mixer.
  *     Decouples synthesis cost from UI taps.
- *   - `voices`: list of active voices, each a FloatArray + read position.
- *     The output thread mixes them sample-by-sample, removing exhausted voices.
+ *   - **Voice storage and mixing** are managed by [VoiceMixer]. The output thread
+ *     pulls fixed-size blocks (~128 frames per iteration) via [mixer.mixBlock],
+ *     which sums active [VoiceSource]s (e.g. [BufferSource]) and removes exhausted voices.
  *   - **Polyphonic**: tapping a new note doesn't cut the previous — they ring
- *     together. Cap at MAX_VOICES to prevent overload.
+ *     together. Polyphony and [MAX_VOICES] cap are enforced by the mixer.
  *
  * This eliminates the per-tap pause/flush/play cycle that was causing glitches.
  */
@@ -184,10 +185,7 @@ class AudioTrackEngine(
 
     private fun addVoice(samples: FloatArray, gain: Float = 1f, delayFrames: Int = 0) {
         if (samples.isEmpty()) return
-        mixer.add(MixVoice(BufferSource(samples), gain, delayFrames))
-        // MAX_VOICES enforcement moves into the mixer in M2 (release-quietest); M1 keeps
-        // the simple cap to preserve behavior:
-        mixer.capVoices(MAX_VOICES)
+        mixer.addAndCap(MixVoice(BufferSource(samples), gain, delayFrames), MAX_VOICES)
     }
 
     override fun stop() { mixer.clear() }
