@@ -116,38 +116,23 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
             ModeDropdown(ear, modifier = Modifier.weight(1f))
         }
 
-        // Progression sub-mode gets two mutually-exclusive generator toggles that
-        // swap the diatonic generator for a special one, plus a "Library" button.
+        // Progression sub-mode: the generator (diatonic / advanced / circle-of-fifths)
+        // is a single compact dropdown instead of two full description rows, so it no
+        // longer eats fixed-header space above the scrollable body. A one-line caption
+        // preserves the teaching text for the current choice; the Library sits beside it.
         if (ear.progSubMode == EarSubMode.Progression) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Advanced (non-diatonic) progressions",
-                        style = MaterialTheme.typography.bodyMedium)
-                    Text("Borrowed chords, secondary dominants & jazz turnarounds, each with a note.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = ear.advancedMode, onCheckedChange = { ear.chooseAdvancedMode(it) })
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Circle of fifths", style = MaterialTheme.typography.bodyMedium)
-                    Text("Four adjacent diatonic chords around the circle (roots falling by a fifth).",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = ear.circleMode, onCheckedChange = { ear.chooseCircleMode(it) })
-            }
             var libOpen by remember { mutableStateOf(false) }
-            OutlinedButton(onClick = { libOpen = true }, modifier = Modifier.padding(bottom = 8.dp)) {
-                Text("Progression library")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                GeneratorDropdown(ear, modifier = Modifier.weight(1f))
+                OutlinedButton(onClick = { libOpen = true }) { Text("Library") }
             }
+            Text(generatorCaption(ear), style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
             if (libOpen) ProgressionLibraryDialog(state, onDismiss = { libOpen = false })
         }
 
@@ -202,6 +187,40 @@ private fun SubModeDropdown(ear: EarTrainingState, modifier: Modifier = Modifier
                     onClick = { ear.switchTab(s); open = false },
                 )
             }
+        }
+    }
+}
+
+/** Short label for the current progression generator. */
+private fun generatorLabel(ear: EarTrainingState): String = when {
+    ear.advancedMode -> "Advanced"
+    ear.circleMode -> "Circle of 5ths"
+    else -> "Diatonic"
+}
+
+/** One-line teaching caption for the current progression generator. */
+private fun generatorCaption(ear: EarTrainingState): String = when {
+    ear.advancedMode -> "Borrowed chords, secondary dominants & jazz turnarounds, each with a note."
+    ear.circleMode -> "Four adjacent diatonic chords around the circle (roots falling by a fifth)."
+    else -> "Standard diatonic progressions in the chosen key & mode."
+}
+
+/** Compact generator picker — collapses the former Advanced / Circle-of-fifths toggle
+ *  rows into one dropdown (Diatonic / Advanced / Circle) so the fixed header stays small. */
+@Composable
+private fun GeneratorDropdown(ear: EarTrainingState, modifier: Modifier = Modifier) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+            Text("Generator: ${generatorLabel(ear)}  ▾", maxLines = 1)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text("Diatonic") },
+                onClick = { ear.chooseAdvancedMode(false); ear.chooseCircleMode(false); open = false })
+            DropdownMenuItem(text = { Text("Advanced (non-diatonic)") },
+                onClick = { ear.chooseAdvancedMode(true); open = false })
+            DropdownMenuItem(text = { Text("Circle of fifths") },
+                onClick = { ear.chooseCircleMode(true); open = false })
         }
     }
 }

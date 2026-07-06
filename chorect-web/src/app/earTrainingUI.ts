@@ -162,18 +162,34 @@ export class EarTrainingUI {
     ]));
 
     if (ear.progSubMode === EarSubMode.Progression) {
-      screen.appendChild(switchRow(
-        "Advanced (non-diatonic) progressions",
-        "Borrowed chords, secondary dominants & jazz turnarounds, each with a note.",
-        ear.advancedMode, (v) => ear.setAdvancedMode(v),
-      ));
-      screen.appendChild(switchRow(
-        "Circle of fifths",
-        "Four adjacent diatonic chords around the circle (roots falling by a fifth).",
-        ear.circleMode, (v) => ear.setCircleMode(v),
-      ));
-      const libBtn = btn("Progression library", () => { this.libraryOpen = true; this.rerender(); });
-      screen.appendChild(el("div", { style: "margin:4px 0" }, [libBtn]));
+      // Generator (diatonic / advanced / circle-of-fifths) is one compact dropdown
+      // instead of two full switch rows, so it no longer eats fixed-header space above
+      // the scrollable body. A one-line caption preserves the teaching text.
+      const gen = ear.advancedMode ? "advanced" : ear.circleMode ? "circle" : "diatonic";
+      const genCaption = ear.advancedMode
+        ? "Borrowed chords, secondary dominants & jazz turnarounds, each with a note."
+        : ear.circleMode
+        ? "Four adjacent diatonic chords around the circle (roots falling by a fifth)."
+        : "Standard diatonic progressions in the chosen key & mode.";
+      const genSelect = select(
+        [
+          { value: "diatonic", label: "Generator: Diatonic" },
+          { value: "advanced", label: "Generator: Advanced (non-diatonic)" },
+          { value: "circle", label: "Generator: Circle of fifths" },
+        ],
+        gen,
+        (v) => {
+          if (v === "advanced") ear.setAdvancedMode(true);
+          else if (v === "circle") ear.setCircleMode(true);
+          else { ear.setAdvancedMode(false); ear.setCircleMode(false); }
+        },
+      );
+      const libBtn = btn("Library", () => { this.libraryOpen = true; this.rerender(); });
+      screen.appendChild(el("div", { style: "display:flex;gap:8px;align-items:center;margin:4px 0" }, [
+        el("div", { style: "flex:1" }, [genSelect]),
+        libBtn,
+      ]));
+      screen.appendChild(el("div", { class: "et-muted", style: "font-size:12px;font-style:italic;margin-bottom:6px" }, [genCaption]));
     }
 
     const body = el("div", { class: "et-scroll" });
