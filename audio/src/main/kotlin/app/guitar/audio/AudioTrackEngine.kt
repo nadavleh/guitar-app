@@ -66,14 +66,7 @@ class AudioTrackEngine(
             }
         }
 
-    /** An active voice. [pos] < 0 is a scheduling delay: the mixer advances it one
-     *  frame per output frame but emits nothing until it reaches 0 — so a voice
-     *  inserted with pos = -delayFrames starts exactly delayFrames later on the
-     *  mixer clock. */
-    private class Voice(val samples: FloatArray, val gain: Float = 1f, @Volatile var pos: Int = 0)
-
-    private val voicesLock = Any()
-    private val voices = ArrayList<Voice>()
+    private val mixer = VoiceMixer(sampleRate)
 
     private val synthesizer = Executors.newSingleThreadExecutor { r ->
         Thread(r, "GuitarAudio-synth").apply { isDaemon = true }
@@ -98,48 +91,25 @@ class AudioTrackEngine(
     }
 
     private fun runOutputLoop() {
-        val chunkFrames = 256        // ~6 ms at 44.1 kHz — smaller chunk = quicker first-sound
+        // Idle: don't write silence — that would keep the AudioTrack ring buffer full
+        // of nothing, adding ~buffer_size of latency to the next note. Park briefly;
+        // when a voice is added we'll fall through and write immediately into a
+        // mostly-empty buffer.
+        val chunkFrames = 128
+        val l = FloatArray(chunkFrames)
+        val r = FloatArray(chunkFrames)
         val chunk = ShortArray(chunkFrames)
         while (running.get() && !Thread.currentThread().isInterrupted) {
-            val hasVoices = synchronized(voicesLock) { voices.isNotEmpty() }
-            if (!hasVoices) {
-                // Idle. Don't write silence — that would keep the AudioTrack ring buffer
-                // full of nothing, adding ~buffer_size of latency to the next note.
-                // Park briefly; when a voice is added we'll fall through and write
-                // immediately into a mostly-empty buffer.
-                try { Thread.sleep(3) } catch (_: InterruptedException) { return }
-                continue
-            }
-            // Mix this chunk
+            if (mixer.activeCount == 0) { try { Thread.sleep(3) } catch (_: InterruptedException) { return }; continue }
+            mixer.mixBlock(l, r, chunkFrames)
             for (i in 0 until chunkFrames) {
-                var sample = 0f
-                synchronized(voicesLock) {
-                    val iter = voices.iterator()
-                    while (iter.hasNext()) {
-                        val v = iter.next()
-                        if (v.pos < 0) {
-                            v.pos++              // scheduled voice: consume its delay silently
-                        } else if (v.pos < v.samples.size) {
-                            sample += v.samples[v.pos] * v.gain
-                            v.pos++
-                        } else {
-                            iter.remove()
-                        }
-                    }
-                }
-                val s = if (sample > 1f) 1f else if (sample < -1f) -1f else sample
-                chunk[i] = (s * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+                val s = l[i]                       // M1: mono — L only
+                val c = if (s > 1f) 1f else if (s < -1f) -1f else s
+                chunk[i] = (c * 32767f).toInt().coerceIn(-32768, 32767).toShort()
             }
             try {
-                val r = track.write(chunk, 0, chunkFrames, AudioTrack.WRITE_BLOCKING)
-                if (r < 0) {
-                    Log.w(TAG, "output write returned $r — stopping output loop")
-                    break
-                }
-            } catch (e: Exception) {
-                if (running.get()) Log.e(TAG, "output write threw", e)
-                break
-            }
+                if (track.write(chunk, 0, chunkFrames, AudioTrack.WRITE_BLOCKING) < 0) break
+            } catch (e: Exception) { if (running.get()) Log.e(TAG, "output write threw", e); break }
         }
     }
 
@@ -213,16 +183,14 @@ class AudioTrackEngine(
     }
 
     private fun addVoice(samples: FloatArray, gain: Float = 1f, delayFrames: Int = 0) {
-        synchronized(voicesLock) {
-            voices.add(Voice(samples, gain, pos = -delayFrames))
-            // Cap concurrent voices; oldest dropped first.
-            while (voices.size > MAX_VOICES) voices.removeAt(0)
-        }
+        if (samples.isEmpty()) return
+        mixer.add(MixVoice(BufferSource(samples), gain, delayFrames))
+        // MAX_VOICES enforcement moves into the mixer in M2 (release-quietest); M1 keeps
+        // the simple cap to preserve behavior:
+        mixer.capVoices(MAX_VOICES)
     }
 
-    override fun stop() {
-        synchronized(voicesLock) { voices.clear() }
-    }
+    override fun stop() { mixer.clear() }
 
     override fun close() {
         running.set(false)
