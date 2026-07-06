@@ -183,12 +183,25 @@ class AudioTrackEngine(
         addVoice(samples, gain, delayFrames.coerceAtLeast(0))
     }
 
-    private fun addVoice(samples: FloatArray, gain: Float = 1f, delayFrames: Int = 0) {
+    private fun addVoice(
+        samples: FloatArray,
+        gain: Float = 1f,
+        delayFrames: Int = 0,
+        attackMs: Double = 3.0,
+        releaseMs: Double = 20.0,
+    ) {
         if (samples.isEmpty()) return
-        mixer.addAndCap(MixVoice(BufferSource(samples), gain, delayFrames), MAX_VOICES)
+        mixer.addAndCap(
+            MixVoice(BufferSource(samples), gain, delayFrames, AmpEnvelope(sampleRate, attackMs, releaseMs)),
+            MAX_VOICES,
+        )
     }
 
-    override fun stop() { mixer.clear() }
+    // Fade out rather than hard-cut: releaseAll() ramps every voice's envelope to
+    // silence; mixBlock removes each once its envelope reports isSilent, so the
+    // idle-park `activeCount == 0` check in runOutputLoop naturally waits for the
+    // release tail to finish before the output thread stops writing.
+    override fun stop() { mixer.releaseAll() }
 
     override fun close() {
         running.set(false)

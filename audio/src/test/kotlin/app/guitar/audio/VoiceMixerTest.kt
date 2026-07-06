@@ -35,4 +35,18 @@ class VoiceMixerTest {
         m.mixBlock(l, r, 2)
         assertEquals(0, m.activeCount)
     }
+
+    @Test
+    fun `releaseAll fades voices instead of cutting`() {
+        val m = VoiceMixer(sampleRate = 48000)
+        m.add(MixVoice(BufferSource(FloatArray(48000) { 1f }), envelope = AmpEnvelope(48000, 0.0, 1.0)))
+        val l = FloatArray(48); val r = FloatArray(48)
+        m.mixBlock(l, r, 48)                 // sustain ~1
+        m.releaseAll()
+        val l2 = FloatArray(96); val r2 = FloatArray(96)
+        m.mixBlock(l2, r2, 96)
+        assertTrue(l2[0] > 0f, "release should fade, not instantly zero")
+        assertEquals(0f, l2[95], 1e-4f)
+        assertEquals(0, m.activeCount, "silent voice removed")
+    }
 }
