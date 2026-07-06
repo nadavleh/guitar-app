@@ -35,7 +35,7 @@ class AudioTrackEngine(
     private val running = AtomicBoolean(true)
 
     private val systemMinBufferBytes: Int = AudioTrack.getMinBufferSize(
-        sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
+        sampleRate, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT
     ).coerceAtLeast(2048)
 
     // Use exactly the system min — anything bigger just adds latency in idle-skip mode.
@@ -52,7 +52,7 @@ class AudioTrackEngine(
             AudioFormat.Builder()
                 .setSampleRate(sampleRate)
                 .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
                 .build()
         )
         .setBufferSizeInBytes(bufferSizeBytes)
@@ -99,17 +99,17 @@ class AudioTrackEngine(
         val chunkFrames = 128
         val l = FloatArray(chunkFrames)
         val r = FloatArray(chunkFrames)
-        val chunk = ShortArray(chunkFrames)
+        val chunk = ShortArray(chunkFrames * 2)
         while (running.get() && !Thread.currentThread().isInterrupted) {
             if (mixer.activeCount == 0) { try { Thread.sleep(3) } catch (_: InterruptedException) { return }; continue }
             mixer.mixBlock(l, r, chunkFrames)
             for (i in 0 until chunkFrames) {
-                val s = l[i]                       // M1: mono — L only
-                val c = if (s > 1f) 1f else if (s < -1f) -1f else s
-                chunk[i] = (c * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+                val sl = l[i].coerceIn(-1f, 1f); val sr = r[i].coerceIn(-1f, 1f)
+                chunk[2 * i] = (sl * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+                chunk[2 * i + 1] = (sr * 32767f).toInt().coerceIn(-32768, 32767).toShort()
             }
             try {
-                if (track.write(chunk, 0, chunkFrames, AudioTrack.WRITE_BLOCKING) < 0) break
+                if (track.write(chunk, 0, chunkFrames * 2, AudioTrack.WRITE_BLOCKING) < 0) break
             } catch (e: Exception) { if (running.get()) Log.e(TAG, "output write threw", e); break }
         }
     }
@@ -128,7 +128,7 @@ class AudioTrackEngine(
                 amplitude = timbre.amplitude,
             )
             val tEnd = System.nanoTime()
-            addVoice(samples)
+            addVoice(samples, pan = Panner.forMidi(midiNote))
             val tAdded = System.nanoTime()
             Log.i(
                 TAG,
@@ -189,10 +189,11 @@ class AudioTrackEngine(
         delayFrames: Int = 0,
         attackMs: Double = 3.0,
         releaseMs: Double = 20.0,
+        pan: Double = 0.0,
     ) {
         if (samples.isEmpty()) return
         mixer.addAndCap(
-            MixVoice(BufferSource(samples), gain, delayFrames, AmpEnvelope(sampleRate, attackMs, releaseMs)),
+            MixVoice(BufferSource(samples), gain, delayFrames, AmpEnvelope(sampleRate, attackMs, releaseMs), pan),
             MAX_VOICES,
         )
     }

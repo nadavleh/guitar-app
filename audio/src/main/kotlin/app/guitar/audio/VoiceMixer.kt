@@ -2,12 +2,14 @@ package app.guitar.audio
 
 /** One active voice in the mixer: a pull [source] plus per-voice controls. In M1
  *  only [gain] and [delayFrames] were used; M2 adds [envelope] (attack declick +
- *  release-based stop/steal). [pan] arrives in M3. */
+ *  release-based stop/steal). [pan] arrives in M3: -1 = hard left, 0 = center,
+ *  1 = hard right (constant-power via [Panner.gains]). */
 class MixVoice(
     val source: VoiceSource,
     var gain: Float = 1f,
     delayFrames: Int = 0,
     val envelope: AmpEnvelope = AmpEnvelope(48000, attackMs = 0.0, releaseMs = 0.0),
+    var pan: Double = 0.0,
 ) {
     /** Frames still to wait before this voice starts sounding (mixer clock). */
     var remainingDelay: Int = delayFrames.coerceAtLeast(0)
@@ -18,8 +20,9 @@ class MixVoice(
 }
 
 /** Headless real-time mixer: sums active voices into stereo L/R blocks. No Android
- *  API — unit-testable on the JVM. In M1 it produces a plain mono sum (L == R).
- *  Master bus (pan/reverb/limiter) is layered on in M3–M5. */
+ *  API — unit-testable on the JVM. Each voice is split into L/R via constant-power
+ *  [Panner.gains] on [MixVoice.pan] (M3); center pan (0.0) still yields L == R.
+ *  Remaining master-bus stages (reverb/limiter) are layered on in M4–M5. */
 class VoiceMixer(val sampleRate: Int) {
     private val voices = ArrayList<MixVoice>()
     private val scratch = FloatArray(4096)
@@ -67,6 +70,7 @@ class VoiceMixer(val sampleRate: Int) {
             }
             var produced = false
             var peak = 0f
+            val (gL, gR) = Panner.gains(v.pan)
             while (i < count) {
                 val want = minOf(count - i, scratch.size)
                 val n = v.source.render(scratch, want)
@@ -75,9 +79,9 @@ class VoiceMixer(val sampleRate: Int) {
                 v.envelope.applyInPlace(scratch, n)     // scratch now enveloped
                 for (j in 0 until n) {
                     val s = scratch[j] * v.gain
-                    if (kotlin.math.abs(s) > peak) peak = kotlin.math.abs(s)
-                    outL[i + j] += s
-                    outR[i + j] += s
+                    val a = kotlin.math.abs(s); if (a > peak) peak = a
+                    outL[i + j] += s * gL
+                    outR[i + j] += s * gR
                 }
                 i += n
                 if (n < want) break

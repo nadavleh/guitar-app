@@ -5,6 +5,10 @@ import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 
 class VoiceMixerTest {
+    // Center pan (default 0.0) applies constant-power gL = gR = cos(pi/4) to every
+    // voice (Task 7). Values below are the M1 raw sums scaled by this factor.
+    private val centerGain = 0.70710678f
+
     @Test
     fun `sums two voices sample-accurately (mono, L equals R in M1)`() {
         val m = VoiceMixer(sampleRate = 48000)
@@ -12,9 +16,9 @@ class VoiceMixerTest {
         m.add(MixVoice(BufferSource(floatArrayOf(0.1f, 0.1f))))
         val l = FloatArray(3); val r = FloatArray(3)
         m.mixBlock(l, r, 3)
-        assertEquals(0.3f, l[0], 1e-6f)
-        assertEquals(0.3f, l[1], 1e-6f)
-        assertEquals(0.2f, l[2], 1e-6f)   // 2nd voice drained
+        assertEquals(0.3f * centerGain, l[0], 1e-5f)
+        assertEquals(0.3f * centerGain, l[1], 1e-5f)
+        assertEquals(0.2f * centerGain, l[2], 1e-5f)   // 2nd voice drained
         assertEquals(l.toList(), r.toList())
     }
 
@@ -24,7 +28,17 @@ class VoiceMixerTest {
         m.add(MixVoice(BufferSource(floatArrayOf(1f, 1f)), delayFrames = 2))
         val l = FloatArray(4); val r = FloatArray(4)
         m.mixBlock(l, r, 4)
-        assertEquals(listOf(0f, 0f, 1f, 1f), l.toList())
+        val expected = listOf(0f, 0f, centerGain, centerGain)
+        for (idx in expected.indices) assertEquals(expected[idx], l[idx], 1e-5f)
+    }
+
+    @Test
+    fun `hard-left pan routes signal to L only`() {
+        val m = VoiceMixer(sampleRate = 48000)
+        m.add(MixVoice(BufferSource(floatArrayOf(0.8f)), pan = -1.0))
+        val l = FloatArray(1); val r = FloatArray(1)
+        m.mixBlock(l, r, 1)
+        assertTrue(l[0] > 0.79f && r[0] < 0.01f, "L=${l[0]} R=${r[0]}")
     }
 
     @Test
