@@ -107,42 +107,4 @@ class PluckedSynthTest {
         assertThrows<IllegalArgumentException> { synth.synthesize(60, -1.0) }
     }
 
-    @Test
-    fun `synthesizeChord length accounts for strum delay`() {
-        val synth = PluckedSynth(sampleRate = 48000)
-        val sustainSec = 1.0
-        val strumDelaySamples = 1920  // 40 ms
-        val notes = listOf(40, 45, 50, 55, 59, 64)   // standard tuning open strings
-        val buf = synth.synthesizeChord(notes, sustainSec, strumDelaySamples)
-        val perVoice = (48000 * sustainSec).toInt()
-        val expected = perVoice + (notes.size - 1) * strumDelaySamples
-        assertEquals(expected, buf.size)
-    }
-
-    @Test
-    fun `synthesizeChord with empty notes yields empty buffer`() {
-        val synth = PluckedSynth()
-        assertEquals(0, synth.synthesizeChord(emptyList(), 1.0, 1920).size)
-    }
-
-    @Test
-    fun `synthesizeChord stays bounded`() {
-        val synth = PluckedSynth(sampleRate = 48000)
-        val notes = listOf(40, 45, 50, 55, 59, 64)
-        val buf = synth.synthesizeChord(notes, 0.5, 1920)
-        for (s in buf) {
-            assertTrue(s in -1f..1f, "chord sample $s out of [-1, 1]")
-        }
-    }
-
-    @Test
-    fun `synthesizeChord skips out-of-range MIDI notes`() {
-        val synth = PluckedSynth()
-        val valid = listOf(60, 64, 67)
-        val mixed = listOf(60, -5, 64, 200, 67)
-        val a = synth.synthesizeChord(valid, 0.2, 960, seedBase = 1L)
-        val b = synth.synthesizeChord(mixed, 0.2, 960, seedBase = 1L)
-        // Should produce the same buffer (invalid notes silently dropped)
-        assertTrue(a.contentEquals(b))
-    }
 }

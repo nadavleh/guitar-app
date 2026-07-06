@@ -158,18 +158,23 @@ class AudioTrackEngine(
     }
 
     override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre) {
-        if (midiNotes.isEmpty() || sustainMillis <= 0) return
-        if (!running.get()) return
+        if (midiNotes.isEmpty() || sustainMillis <= 0 || !running.get()) return
+        val notes = midiNotes.filter { it in 0..127 }
+        if (notes.isEmpty()) return
+        val strumFrames = (sampleRate * strumDelayMillis / 1000).coerceAtLeast(0)
+        val gain = (1.0 / kotlin.math.sqrt(notes.size.toDouble())).toFloat()
         synthesizer.execute {
-            val mix = synth.synthesizeChord(
-                midiNotes = midiNotes,
-                sustainSec = sustainMillis / 1000.0,
-                strumDelaySamples = (sampleRate * strumDelayMillis / 1000).coerceAtLeast(0),
-                seedBase = System.nanoTime(),
-                damping = timbre.damping,
-                amplitude = timbre.amplitude,
-            )
-            if (mix.isNotEmpty()) addVoice(mix)
+            notes.forEachIndexed { i, midi ->
+                val samples = synth.synthesize(
+                    midi, sustainMillis / 1000.0, System.nanoTime() + i,
+                    timbre.damping, timbre.amplitude,
+                )
+                mixer.addAndCap(
+                    MixVoice(BufferSource(samples), gain, strumFrames * i, AmpEnvelope(sampleRate, 3.0, 20.0))
+                        .also { it.pan = Panner.forMidi(midi) },
+                    MAX_VOICES,
+                )
+            }
         }
     }
 

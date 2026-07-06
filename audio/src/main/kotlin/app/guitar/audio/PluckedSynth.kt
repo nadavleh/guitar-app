@@ -107,44 +107,6 @@ class PluckedSynth(val sampleRate: Int = 48000) {
         return output
     }
 
-    /**
-     * Synthesize a strummed chord: each note is offset by [strumDelaySamples]
-     * relative to the previous one and mixed into a single buffer.
-     * The mix is attenuated by 1/sqrt(N) to keep the peak amplitude bounded.
-     */
-    fun synthesizeChord(
-        midiNotes: List<Int>,
-        sustainSec: Double,
-        strumDelaySamples: Int,
-        seedBase: Long = 1L,
-        damping: Double = 0.997,
-        amplitude: Double = 0.6,
-    ): FloatArray {
-        require(sustainSec > 0.0)
-        require(strumDelaySamples >= 0)
-        val voices = midiNotes.filter { it in 0..127 }
-        if (voices.isEmpty()) return FloatArray(0)
-        val perVoiceLen = (sampleRate * sustainSec).toInt().coerceAtLeast(1)
-        val totalLen = perVoiceLen + (voices.size - 1) * strumDelaySamples
-        val mix = FloatArray(totalLen)
-        val scale = (1.0 / kotlin.math.sqrt(voices.size.toDouble())).toFloat()
-        voices.forEachIndexed { i, midi ->
-            val voice = synthesize(
-                midiNote = midi,
-                durationSec = sustainSec,
-                seed = seedBase + i,
-                damping = damping,
-                amplitude = amplitude,
-            )
-            val offset = i * strumDelaySamples
-            val end = minOf(offset + voice.size, totalLen)
-            for (j in 0 until (end - offset)) {
-                mix[offset + j] += voice[j] * scale
-            }
-        }
-        return mix
-    }
-
     companion object {
         fun midiToFreq(midiNote: Int): Double = 440.0 * 2.0.pow((midiNote - 69) / 12.0)
     }
