@@ -25,8 +25,8 @@ class SoftLimiter(
             var sl = l[i] * gain
             var sr = r[i] * gain
             // Safety clamp (guarantees the invariant even during release lag).
-            if (sl > ceiling) sl = ceiling else if (sl < -ceiling) sl = -ceiling
-            if (sr > ceiling) sr = ceiling else if (sr < -ceiling) sr = -ceiling
+            sl = if (!sl.isFinite()) 0f else if (sl > ceiling) ceiling else if (sl < -ceiling) -ceiling else sl
+            sr = if (!sr.isFinite()) 0f else if (sr > ceiling) ceiling else if (sr < -ceiling) -ceiling else sr
             l[i] = sl; r[i] = sr
         }
     }
