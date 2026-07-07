@@ -82,4 +82,35 @@ class VoiceMixerTest {
         // therefore the quietest actually-sounding voice is the steal target, not the fresh one
         assertTrue(quiet.lastPeak < fresh.lastPeak)
     }
+
+    @Test
+    fun `reverb send produces a decaying tail after the source ends and isRingingOut flips`() {
+        val m = VoiceMixer(sampleRate = 48000)
+        m.add(MixVoice(BufferSource(FloatArray(64) { 0.8f }), reverbSend = 0.5f))
+        val l = FloatArray(64); val r = FloatArray(64)
+        m.mixBlock(l, r, 64)                 // source plays; feeds reverb
+        assertEquals(0, m.activeCount)       // dry source drained + removed
+
+        // The comb delay lines (~1100+ samples, per FreeverbTest) haven't cycled yet at
+        // this point, so isRingingOut() may still read true for a few more blocks before
+        // the wet tail actually arrives at the output. Pump silence and track the same
+        // develop-then-decay shape FreeverbTest verifies directly: the tail becomes
+        // audible and isRingingOut() reads false while it rings, then flips back to
+        // true once it has fully decayed.
+        var heardTail = false
+        var sawRinging = false
+        var rangOut = false
+        var iterations = 0
+        while (iterations < 8000) {
+            val bl = FloatArray(64); val br = FloatArray(64)
+            m.mixBlock(bl, br, 64)
+            if (bl.any { kotlin.math.abs(it) > 1e-4f }) heardTail = true
+            if (!m.isRingingOut()) sawRinging = true
+            if (sawRinging && m.isRingingOut()) { rangOut = true; break }
+            iterations++
+        }
+        assertTrue(heardTail, "expected an audible reverb tail after the source ended")
+        assertTrue(sawRinging, "expected isRingingOut() to read false while the tail was ringing")
+        assertTrue(rangOut, "expected isRingingOut() to flip back to true once the tail decayed (ran $iterations blocks)")
+    }
 }

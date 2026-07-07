@@ -101,7 +101,7 @@ class AudioTrackEngine(
         val r = FloatArray(chunkFrames)
         val chunk = ShortArray(chunkFrames * 2)
         while (running.get() && !Thread.currentThread().isInterrupted) {
-            if (mixer.activeCount == 0) { try { Thread.sleep(3) } catch (_: InterruptedException) { return }; continue }
+            if (mixer.activeCount == 0 && mixer.isRingingOut()) { try { Thread.sleep(3) } catch (_: InterruptedException) { return }; continue }
             mixer.mixBlock(l, r, chunkFrames)
             for (i in 0 until chunkFrames) {
                 chunk[2 * i] = (l[i] * 32767f).toInt().coerceIn(-32768, 32767).toShort()
@@ -127,7 +127,12 @@ class AudioTrackEngine(
                 amplitude = timbre.amplitude,
             )
             val tEnd = System.nanoTime()
-            addVoice(samples, pan = Panner.forMidi(midiNote))
+            addVoice(
+                samples,
+                pan = Panner.forMidi(midiNote),
+                reverbSend = timbre.reverbSend.toFloat(),
+                releaseMs = timbre.releaseMs,
+            )
             val tAdded = System.nanoTime()
             Log.i(
                 TAG,
@@ -152,7 +157,7 @@ class AudioTrackEngine(
                 damping = timbre.damping,
                 amplitude = timbre.amplitude,
             )
-            addVoice(samples)
+            addVoice(samples, reverbSend = timbre.reverbSend.toFloat(), releaseMs = timbre.releaseMs)
         }
     }
 
@@ -169,8 +174,13 @@ class AudioTrackEngine(
                     timbre.damping, timbre.amplitude,
                 )
                 mixer.addAndCap(
-                    MixVoice(BufferSource(samples), gain, strumFrames * i, AmpEnvelope(sampleRate, 3.0, 20.0))
-                        .also { it.pan = Panner.forMidi(midi) },
+                    MixVoice(
+                        BufferSource(samples),
+                        gain,
+                        strumFrames * i,
+                        AmpEnvelope(sampleRate, 3.0, timbre.releaseMs.toDouble()),
+                        reverbSend = timbre.reverbSend.toFloat(),
+                    ).also { it.pan = Panner.forMidi(midi) },
                     MAX_VOICES,
                 )
             }
@@ -192,12 +202,20 @@ class AudioTrackEngine(
         gain: Float = 1f,
         delayFrames: Int = 0,
         attackMs: Double = 3.0,
-        releaseMs: Double = 20.0,
+        releaseMs: Int = 20,
         pan: Double = 0.0,
+        reverbSend: Float = 0f,
     ) {
         if (samples.isEmpty()) return
         mixer.addAndCap(
-            MixVoice(BufferSource(samples), gain, delayFrames, AmpEnvelope(sampleRate, attackMs, releaseMs), pan),
+            MixVoice(
+                BufferSource(samples),
+                gain,
+                delayFrames,
+                AmpEnvelope(sampleRate, attackMs, releaseMs.toDouble()),
+                pan,
+                reverbSend,
+            ),
             MAX_VOICES,
         )
     }

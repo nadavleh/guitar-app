@@ -10,6 +10,7 @@ class MixVoice(
     delayFrames: Int = 0,
     val envelope: AmpEnvelope = AmpEnvelope(48000, attackMs = 0.0, releaseMs = 0.0),
     var pan: Double = 0.0,
+    var reverbSend: Float = 0f,
 ) {
     /** Frames still to wait before this voice starts sounding (mixer clock). */
     var remainingDelay: Int = delayFrames.coerceAtLeast(0)
@@ -27,8 +28,16 @@ class VoiceMixer(val sampleRate: Int) {
     private val voices = ArrayList<MixVoice>()
     private val scratch = FloatArray(4096)
     private val limiter = SoftLimiter(sampleRate)
+    private val freeverb = Freeverb(sampleRate)
+    private val sendL = FloatArray(4096)
+    private val sendR = FloatArray(4096)
 
     val activeCount: Int get() = voices.size
+
+    /** True once every voice has finished AND the reverb send bus has decayed below
+     *  its ringing-out threshold — used by the output loop to know it's safe to park
+     *  without truncating a held-chord's reverb tail. */
+    fun isRingingOut(): Boolean = voices.isEmpty() && freeverb.isRingingOut()
 
     @Synchronized fun add(v: MixVoice) { voices.add(v) }
     @Synchronized fun clear() { voices.clear() }
@@ -58,7 +67,7 @@ class VoiceMixer(val sampleRate: Int) {
 
     /** Mix [count] frames. outL/outR must be >= count. */
     @Synchronized fun mixBlock(outL: FloatArray, outR: FloatArray, count: Int) {
-        for (i in 0 until count) { outL[i] = 0f; outR[i] = 0f }
+        for (i in 0 until count) { outL[i] = 0f; outR[i] = 0f; sendL[i] = 0f; sendR[i] = 0f }
         val it = voices.iterator()
         while (it.hasNext()) {
             val v = it.next()
@@ -83,6 +92,8 @@ class VoiceMixer(val sampleRate: Int) {
                     val a = kotlin.math.abs(s); if (a > peak) peak = a
                     outL[i + j] += s * gL
                     outR[i + j] += s * gR
+                    sendL[i + j] += s * gL * v.reverbSend
+                    sendR[i + j] += s * gR * v.reverbSend
                 }
                 i += n
                 if (n < want) break
@@ -90,6 +101,8 @@ class VoiceMixer(val sampleRate: Int) {
             if (produced) v.lastPeak = peak
             if (v.envelope.isSilent || (v.source.isFinished && v.remainingDelay == 0)) it.remove()
         }
+        freeverb.process(sendL, sendR, count)
+        for (i in 0 until count) { outL[i] += sendL[i]; outR[i] += sendR[i] }
         limiter.process(outL, outR, count)
     }
 }
