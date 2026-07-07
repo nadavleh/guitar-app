@@ -408,6 +408,13 @@ export class App {
         slider(0, 150, this.state.strumMs, (v) => this.state.setStrumMs(v)),
         el("div", {}, [`Ring sustain: ${(this.state.ringSustainMs / 1000).toFixed(1)} s`]),
         slider(300, 4000, this.state.ringSustainMs, (v) => this.state.setRingSustainMs(v)),
+        // A/B engine toggle (temporary scaffolding, kept through the overhaul).
+        switchRow(
+          "Audio engine (A/B)",
+          this.state.audio.useModern ? "New — voice graph + stereo bus + reverb" : "Old — legacy engine",
+          this.state.audio.useModern,
+          (v) => { this.state.audio.setUseModern(v); this.render(); },
+        ),
       ]);
       wrap.appendChild(panel);
     }
