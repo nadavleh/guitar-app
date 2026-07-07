@@ -45,7 +45,8 @@ export class WebAudioEngine {
   private reverbBus: GainNode | null = null;
 
   private active = new Set<ActiveVoice>();
-  private _useModern = false;
+  // Default to the MODERN (overhaul) engine, matching Android (AppState.useModernAudio = true).
+  private _useModern = true;
 
   /** Whether the MODERN (overhaul) output chain is currently selected. */
   get useModern(): boolean {
