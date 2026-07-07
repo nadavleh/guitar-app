@@ -1,0 +1,58 @@
+package app.guitar.audio
+
+/**
+ * A/B test scaffolding: forwards every [AudioEngine] call to either the [modern]
+ * voice-graph engine or the [legacy] pre-overhaul engine, chosen by [useModern] at
+ * call time. Lets the app switch engines live so the two can be compared by ear.
+ *
+ * Both engines are constructed up front and kept alive; only one produces sound at a
+ * time (the inactive one has no active voices). Switching stops BOTH so nothing from
+ * the previous engine keeps ringing across the change.
+ *
+ * TEMPORARY — remove (along with [LegacyAudioTrackEngine]) before shipping the overhaul.
+ */
+class SwitchableAudioEngine(
+    private val modern: AudioEngine,
+    private val legacy: AudioEngine,
+) : AudioEngine {
+
+    @Volatile
+    var useModern: Boolean = true
+        private set
+
+    /** Switch the active engine. No-op if unchanged; otherwise stops both first. */
+    fun setUseModern(value: Boolean) {
+        if (value == useModern) return
+        modern.stop()
+        legacy.stop()
+        useModern = value
+    }
+
+    private val active: AudioEngine get() = if (useModern) modern else legacy
+
+    override fun playNote(midiNote: Int, durationMillis: Int, timbre: Timbre) =
+        active.playNote(midiNote, durationMillis, timbre)
+
+    override fun playFrequency(freqHz: Float, durationMillis: Int, timbre: Timbre) =
+        active.playFrequency(freqHz, durationMillis, timbre)
+
+    override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre) =
+        active.playChord(midiNotes, strumDelayMillis, sustainMillis, timbre)
+
+    override fun playSamples(samples: FloatArray, gain: Float) =
+        active.playSamples(samples, gain)
+
+    override fun playSamplesAt(samples: FloatArray, gain: Float, delayFrames: Int) =
+        active.playSamplesAt(samples, gain, delayFrames)
+
+    /** Stop BOTH engines — safe regardless of which is active. */
+    override fun stop() {
+        modern.stop()
+        legacy.stop()
+    }
+
+    override fun close() {
+        modern.close()
+        legacy.close()
+    }
+}

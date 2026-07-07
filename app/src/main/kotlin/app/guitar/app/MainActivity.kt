@@ -53,6 +53,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import app.guitar.audio.AudioEngine
 import app.guitar.audio.AudioTrackEngine
+import app.guitar.audio.LegacyAudioTrackEngine
+import app.guitar.audio.SwitchableAudioEngine
 import app.guitar.theory.ChordLibrary
 import app.guitar.theory.ChordShape
 import app.guitar.theory.ChordShapeGenerator
@@ -64,7 +66,13 @@ import app.guitar.theory.ScalePositions
 import app.guitar.theory.Tunings
 
 class MainActivity : ComponentActivity() {
-    private val audioEngine: AudioEngine = AudioTrackEngine()
+    // A/B scaffolding: run the new voice-graph engine and the legacy engine side by
+    // side so the in-app toggle can compare them. Remove the legacy/switchable wrapper
+    // (revert to plain `AudioTrackEngine()`) before shipping the overhaul.
+    private val audioEngine: AudioEngine = SwitchableAudioEngine(
+        modern = AudioTrackEngine(),
+        legacy = LegacyAudioTrackEngine(),
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

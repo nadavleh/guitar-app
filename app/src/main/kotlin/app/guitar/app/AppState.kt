@@ -76,6 +76,18 @@ class AppState(
         }
     }
 
+    /** A/B test toggle: true = new voice-graph audio engine, false = legacy engine.
+     *  Backed by [SwitchableAudioEngine] when the app supplies one (a no-op otherwise,
+     *  e.g. under tests using a plain engine). Temporary — remove with the A/B scaffolding. */
+    var useModernAudio by mutableStateOf(true)
+        private set
+
+    @JvmName("applyUseModernAudio")
+    fun setUseModernAudio(value: Boolean) {
+        useModernAudio = value
+        (audio as? app.guitar.audio.SwitchableAudioEngine)?.setUseModern(value)
+    }
+
     var chordInput by mutableStateOf("Cmaj7")
     var chordFretRange by mutableStateOf(0..DISPLAY_FRETS)
     var selectedShapeIndex by mutableStateOf<Int?>(null)

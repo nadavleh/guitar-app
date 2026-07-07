@@ -83,5 +83,22 @@ fun AudioQuickSliders(state: AppState, modifier: Modifier = Modifier) {
             onValueChange = { state.setRingSustainMs(it.toInt()) },
             valueRange = 300f..4000f,
         )
+        // A/B engine toggle (temporary — remove with the A/B scaffolding before ship).
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Audio engine (A/B)", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    if (state.useModernAudio) "New — voice graph + stereo bus + reverb"
+                    else "Old — legacy mono engine",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            androidx.compose.material3.Switch(
+                checked = state.useModernAudio,
+                onCheckedChange = { state.setUseModernAudio(it) },
+            )
+        }
     }
 }
