@@ -29,6 +29,7 @@ class VoiceMixer(val sampleRate: Int) {
     private val scratch = FloatArray(4096)
     private val limiter = SoftLimiter(sampleRate)
     private val freeverb = Freeverb(sampleRate)
+    private val eq = ThreeBandEq(sampleRate)
     private val sendL = FloatArray(4096)
     private val sendR = FloatArray(4096)
 
@@ -45,6 +46,8 @@ class VoiceMixer(val sampleRate: Int) {
     /** Release every active voice (fade-out) instead of hard-cutting. Voices
      *  self-remove from [mixBlock] once their envelope reaches silence. */
     @Synchronized fun releaseAll() { for (v in voices) v.envelope.release() }
+
+    @Synchronized fun setEq(bassDb: Float, midDb: Float, trebleDb: Float) = eq.setGainsDb(bassDb, midDb, trebleDb)
 
     @Synchronized fun capVoices(max: Int) {
         while (voices.size > max) {
@@ -103,6 +106,7 @@ class VoiceMixer(val sampleRate: Int) {
         }
         freeverb.process(sendL, sendR, count)
         for (i in 0 until count) { outL[i] += sendL[i]; outR[i] += sendR[i] }
+        eq.process(outL, outR, count)
         limiter.process(outL, outR, count)
     }
 }
