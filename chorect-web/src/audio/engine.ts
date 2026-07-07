@@ -45,6 +45,13 @@ export class WebAudioEngine {
   private reverb: ConvolverNode | null = null;
   private reverbBus: GainNode | null = null;
 
+  // Per-instrument runtime EQ, inserted modernMaster -> eqLow -> eqMid -> eqHigh
+  // -> modernLimiter (reverb still feeds modernMaster, so it passes through the
+  // EQ too — mirrors the Kotlin AudioTrackEngine chain).
+  private eqLow: BiquadFilterNode | null = null;
+  private eqMid: BiquadFilterNode | null = null;
+  private eqHigh: BiquadFilterNode | null = null;
+
   private active = new Set<ActiveVoice>();
   // Default to the MODERN (overhaul) engine, matching Android (AppState.useModernAudio = true).
   private _useModern = true;
@@ -119,7 +126,21 @@ export class WebAudioEngine {
 
       this.modernMaster = this.ctx.createGain();
       this.modernMaster.gain.value = 1.0;
-      this.modernMaster.connect(this.modernLimiter);
+
+      this.eqLow = this.ctx.createBiquadFilter();
+      this.eqLow.type = "lowshelf";
+      this.eqLow.frequency.value = 120;
+      this.eqMid = this.ctx.createBiquadFilter();
+      this.eqMid.type = "peaking";
+      this.eqMid.frequency.value = 700;
+      this.eqMid.Q.value = 0.9;
+      this.eqHigh = this.ctx.createBiquadFilter();
+      this.eqHigh.type = "highshelf";
+      this.eqHigh.frequency.value = 3500;
+      this.modernMaster.connect(this.eqLow);
+      this.eqLow.connect(this.eqMid);
+      this.eqMid.connect(this.eqHigh);
+      this.eqHigh.connect(this.modernLimiter);
 
       this.reverb = this.ctx.createConvolver();
       this.reverb.buffer = buildReverbIR(this.ctx);
@@ -136,6 +157,17 @@ export class WebAudioEngine {
   /** The live AudioContext (creating it if needed) — used by the tuner's mic input. */
   context(): AudioContext {
     return this.ensure();
+  }
+
+  /** Set the modern-chain EQ (dB gain, ±12 typical): bass = low-shelf @120Hz,
+   *  mid = peaking @700Hz Q0.9, treble = high-shelf @3500Hz. Applies to
+   *  everything on modernMaster, including reverb. Mirrors AppState.EqSettings
+   *  on Android. */
+  setEq(bass: number, mid: number, treble: number): void {
+    if (!this.eqLow) this.ensure();
+    this.eqLow!.gain.value = bass;
+    this.eqMid!.gain.value = mid;
+    this.eqHigh!.gain.value = treble;
   }
 
   /** Decode an encoded audio file (WAV/MP3/…) to a mono Float32Array at the engine's

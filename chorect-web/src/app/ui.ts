@@ -419,6 +419,7 @@ export class App {
           (v) => v === this.state.sound,
           (v) => this.state.setSound(v),
         ),
+        this.eqControls(),
         // A/B engine toggle (temporary scaffolding, kept through the overhaul).
         switchRow(
           "Audio engine (A/B)",
@@ -430,6 +431,24 @@ export class App {
       wrap.appendChild(panel);
     }
     return wrap;
+  }
+
+  /** Bass/Mid/Treble sliders (±12 dB) for the currently selected Sound, plus a
+   *  Flat reset — mirrors the Android per-instrument runtime EQ. */
+  private eqControls(): HTMLElement {
+    const s = this.state;
+    const e = s.eqFor(s.sound);
+    const fmt = (db: number) => `${db > 0 ? "+" : ""}${db} dB`;
+    return el("div", {}, [
+      labelSm(`EQ — ${s.sound}`),
+      el("div", {}, [`Bass: ${fmt(e.bass)}`]),
+      slider(-12, 12, e.bass, (v) => s.setEqBand(s.sound, "bass", v)),
+      el("div", {}, [`Mid: ${fmt(e.mid)}`]),
+      slider(-12, 12, e.mid, (v) => s.setEqBand(s.sound, "mid", v)),
+      el("div", {}, [`Treble: ${fmt(e.treble)}`]),
+      slider(-12, 12, e.treble, (v) => s.setEqBand(s.sound, "treble", v)),
+      el("div", { class: "row end" }, [btn("Flat", () => s.resetEq(s.sound))]),
+    ]);
   }
 
   // ---------- control sheets ----------

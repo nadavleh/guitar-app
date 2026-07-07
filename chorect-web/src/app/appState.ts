@@ -41,6 +41,31 @@ export enum ChordScaleView { AllNotes = "AllNotes", Positions = "Positions" }
  *  not shipped yet, so those fetches currently fail and fall back to Synth). */
 export type SoundName = "Synth" | "Acoustic" | "Nylon" | "Electric";
 
+/** One EQ band's runtime gain, in dB (±12 typical range). */
+export type EqBand = "bass" | "mid" | "treble";
+
+/** Per-sound runtime EQ applied on the modern chain's biquad EQ (bass =
+ *  low-shelf, mid = peaking, treble = high-shelf). Mirrors AppState.EqSettings
+ *  on Android. */
+export interface EqSettings {
+  bass: number;
+  mid: number;
+  treble: number;
+}
+
+const FLAT_EQ: EqSettings = { bass: 0, mid: 0, treble: 0 };
+
+/** Default per-sound EQ map: flat for every sound except Nylon, which gets a
+ *  slight mid scoop (mirrors the Android default). */
+function defaultEq(): Record<SoundName, EqSettings> {
+  return {
+    Synth: { ...FLAT_EQ },
+    Acoustic: { ...FLAT_EQ },
+    Nylon: { bass: 0, mid: -4, treble: 0 },
+    Electric: { ...FLAT_EQ },
+  };
+}
+
 const LS_KEY = "chorect-web.v1";
 
 interface Persisted {
@@ -55,6 +80,7 @@ interface Persisted {
   strumMs: number;
   tapOnTouchDown: boolean;
   sound: string;
+  eq: Record<SoundName, EqSettings>;
   customTunings: Record<string, number[]>;
   challengeScores: ChallengeScore[];
   drumPatterns: Record<string, string>;
@@ -98,6 +124,9 @@ export class AppState {
   /** Selected guitar sound; "Synth" plays through the plucked-string synth,
    *  the rest through a fetched sampled bank (see `setSound`). */
   sound: SoundName = "Synth";
+  /** Per-sound runtime EQ (bass/mid/treble dB), applied to the modern chain's
+   *  biquad EQ whenever the matching sound is active. */
+  eq: Record<SoundName, EqSettings> = defaultEq();
   /** True while a sampled bank fetch triggered by `setSound` is in flight. */
   soundLoading = false;
   /** Sampled banks already fetched this session, keyed by lowercase id. */
@@ -114,7 +143,12 @@ export class AppState {
 
   constructor(public readonly audio: WebAudioEngine) {
     this.load();
-    if (this.sound !== "Synth") this.applySound(this.sound);
+    if (this.sound !== "Synth") {
+      this.applySound(this.sound);
+    } else {
+      const e = this.eq.Synth;
+      this.audio.setEq(e.bass, e.mid, e.treble);
+    }
   }
 
   // ---------- reactivity ----------
@@ -145,6 +179,14 @@ export class AppState {
       if (typeof p.strumMs === "number") this.strumMs = p.strumMs;
       if (typeof p.tapOnTouchDown === "boolean") this.tapOnTouchDown = p.tapOnTouchDown;
       if (p.sound === "Synth" || p.sound === "Acoustic" || p.sound === "Nylon" || p.sound === "Electric") this.sound = p.sound;
+      if (p.eq) {
+        for (const key of Object.keys(this.eq) as SoundName[]) {
+          const v = p.eq[key];
+          if (v && typeof v.bass === "number" && typeof v.mid === "number" && typeof v.treble === "number") {
+            this.eq[key] = { bass: v.bass, mid: v.mid, treble: v.treble };
+          }
+        }
+      }
       if (p.customTunings) {
         for (const [name, midis] of Object.entries(p.customTunings)) {
           this.customTunings.set(name, { openStrings: midis.map((m) => note(m)) });
@@ -180,6 +222,7 @@ export class AppState {
       strumMs: this.strumMs,
       tapOnTouchDown: this.tapOnTouchDown,
       sound: this.sound,
+      eq: this.eq,
       customTunings,
       challengeScores: this.challengeScores,
       drumPatterns: Object.fromEntries(this.drumPatterns),
@@ -317,20 +360,25 @@ export class AppState {
 
   /** Apply `s` to the audio engine: clear the bank for Synth, otherwise fetch
    *  (or reuse a cached) sampled bank. If the fetch fails — expected until the
-   *  sample assets ship — the engine falls back to synth voices. */
+   *  sample assets ship — the engine falls back to synth voices. Also pushes
+   *  `s`'s EQ settings, independent of whether the bank fetch succeeds. */
   private applySound(s: SoundName): void {
+    const e = this.eq[s];
     if (s === "Synth") {
       this.audio.setInstrument(null);
+      this.audio.setEq(e.bass, e.mid, e.treble);
       return;
     }
     const id = s.toLowerCase();
     const cached = this.bankCache.get(id);
     if (cached) {
       this.audio.setInstrument(cached);
+      this.audio.setEq(e.bass, e.mid, e.treble);
       return;
     }
     this.soundLoading = true;
     this.notify();
+    this.audio.setEq(e.bass, e.mid, e.treble);
     this.audio
       .loadBank(id)
       .then((bank) => {
@@ -345,6 +393,32 @@ export class AppState {
         if (this.sound === s) this.soundLoading = false;
         this.notify();
       });
+  }
+
+  // ---------- per-sound EQ ----------
+
+  /** `sound`'s current EQ (bass/mid/treble dB). */
+  eqFor(sound: SoundName): EqSettings {
+    return this.eq[sound];
+  }
+
+  /** Update one EQ band for `sound`, persist, and — if `sound` is the active
+   *  sound — push the new settings to the audio engine immediately. */
+  setEqBand(sound: SoundName, band: EqBand, db: number): void {
+    const clamped = Math.min(Math.max(Math.round(db), -12), 12);
+    const next: EqSettings = { ...this.eq[sound] };
+    if (band === "bass") next.bass = clamped;
+    else if (band === "mid") next.mid = clamped;
+    else next.treble = clamped;
+    this.commit(() => { this.eq[sound] = next; });
+    if (sound === this.sound) this.audio.setEq(next.bass, next.mid, next.treble);
+  }
+
+  /** Reset `sound`'s EQ to flat (0/0/0). */
+  resetEq(sound: SoundName): void {
+    const next: EqSettings = { ...FLAT_EQ };
+    this.commit(() => { this.eq[sound] = next; });
+    if (sound === this.sound) this.audio.setEq(next.bass, next.mid, next.treble);
   }
 
   // ---------- position scroller ----------
