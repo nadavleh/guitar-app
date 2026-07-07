@@ -196,7 +196,7 @@ class AppState(
             val raw = repo.guitarSound.first()
             val restored = runCatching { GuitarSound.valueOf(raw) }.getOrDefault(GuitarSound.Synth)
             val eqRaw = repo.guitarEq.first()
-            if (eqRaw.isNotBlank()) decodeEq(eqRaw)
+            if (eqRaw.isNotBlank()) { decodeEq(eqRaw); eqVersion++ }
             setSound(restored)   // also pushes the just-restored (or default) EQ for `restored`
         }
     }
