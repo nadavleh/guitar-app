@@ -120,7 +120,8 @@ class AppState(
         sound = s
         scope.launch { repo.setGuitarSound(s.name) }
         val modern = (audio as? app.guitar.audio.SwitchableAudioEngine)?.modernEngine
-        pushEq(s)   // (re)apply this sound's saved EQ whenever it becomes current
+        pushEq(s)       // (re)apply this sound's saved EQ whenever it becomes current
+        pushReverb(s)   // and its saved reverb amount
         if (modern == null) return
         if (s == GuitarSound.Synth) { modern.voiceInstrument = null; return }
         val id = s.name.lowercase()
@@ -188,6 +189,39 @@ class AppState(
         }
     }
 
+    // ---------- Per-sound reverb amount (0..1 send) ----------
+    private val reverb = java.util.EnumMap<GuitarSound, Float>(GuitarSound::class.java).apply {
+        GuitarSound.entries.forEach { put(it, 0.18f) }   // default matches the old fixed send
+    }
+
+    /** Bumped on every reverb change so the slider composable (keyed off it) recomposes. */
+    var reverbVersion by mutableStateOf(0)
+        private set
+
+    fun reverbFor(s: GuitarSound): Float = reverb[s] ?: 0.18f
+
+    /** Push [s]'s reverb amount to the live engine iff [s] is the currently-selected sound. */
+    private fun pushReverb(s: GuitarSound) {
+        if (s != sound) return
+        (audio as? app.guitar.audio.SwitchableAudioEngine)?.modernEngine?.setReverbSend(reverbFor(s))
+    }
+
+    fun setReverb(s: GuitarSound, amount: Float) {
+        reverb[s] = amount.coerceIn(0f, 1f)
+        reverbVersion++
+        pushReverb(s)
+        scope.launch { repo.setGuitarReverb(encodeReverb()) }
+    }
+
+    private fun encodeReverb(): String = GuitarSound.entries.joinToString(";") { "${it.name},${reverbFor(it)}" }
+
+    private fun decodeReverb(str: String) {
+        str.split(";").forEach { row ->
+            val p = row.split(",")
+            if (p.size == 2) runCatching { reverb[GuitarSound.valueOf(p[0])] = p[1].toFloat() }
+        }
+    }
+
     init {
         // Restore the persisted sound choice once on startup. Reads the flow's
         // current value a single time (rather than collecting in a composable),
@@ -197,7 +231,9 @@ class AppState(
             val restored = runCatching { GuitarSound.valueOf(raw) }.getOrDefault(GuitarSound.Synth)
             val eqRaw = repo.guitarEq.first()
             if (eqRaw.isNotBlank()) { decodeEq(eqRaw); eqVersion++ }
-            setSound(restored)   // also pushes the just-restored (or default) EQ for `restored`
+            val revRaw = repo.guitarReverb.first()
+            if (revRaw.isNotBlank()) { decodeReverb(revRaw); reverbVersion++ }
+            setSound(restored)   // also pushes the just-restored (or default) EQ + reverb for `restored`
         }
     }
 

@@ -59,6 +59,14 @@ export class WebAudioEngine {
   // Currently selected sampled-guitar bank (MODERN chain only); null = synth voices.
   private currentBank: SampleBank | null = null;
 
+  // Per-sound reverb send (0..1) for MODERN guitar voices; set per selected Sound.
+  private voiceReverbSend = 0.18;
+
+  /** Set the per-voice reverb send amount (0..1) for subsequently-played modern voices. */
+  setReverbSend(amount: number): void {
+    this.voiceReverbSend = Math.max(0, Math.min(1, amount));
+  }
+
   /** Select (or clear, with null) the sampled bank used by MODERN note/chord voices. */
   setInstrument(b: SampleBank | null): void {
     this.currentBank = b;
@@ -303,14 +311,14 @@ export class WebAudioEngine {
           this.currentBank.buffers.get(root)!,
           pitchRate(midiNote, root),
           panForMidi(midiNote),
-          timbre.reverbSend,
+          this.voiceReverbSend,
           1.0,
           timbre.releaseMs,
         );
         return;
       }
       const samples = synth.synthesize(midiNote, durationMillis / 1000, 1, timbre.damping, timbre.amplitude, 0.6);
-      this.playModernVoice(samples, panForMidi(midiNote), timbre.reverbSend, 1.0, timbre.releaseMs);
+      this.playModernVoice(samples, panForMidi(midiNote), this.voiceReverbSend, 1.0, timbre.releaseMs);
     } else {
       const samples = synth.synthesize(midiNote, durationMillis / 1000, 1, timbre.damping, timbre.amplitude);
       this.playLegacy(samples);
@@ -328,14 +336,14 @@ export class WebAudioEngine {
           this.currentBank.buffers.get(root)!,
           pitchRate(midiNote, root),
           0,
-          timbre.reverbSend,
+          this.voiceReverbSend,
           1.0,
           timbre.releaseMs,
         );
         return;
       }
       const samples = synth.synthesizeFrequency(freqHz, durationMillis / 1000, 1, timbre.damping, timbre.amplitude, 0.6);
-      this.playModernVoice(samples, 0, timbre.reverbSend, 1.0, timbre.releaseMs);
+      this.playModernVoice(samples, 0, this.voiceReverbSend, 1.0, timbre.releaseMs);
     } else {
       const samples = synth.synthesizeFrequency(freqHz, durationMillis / 1000, 1, timbre.damping, timbre.amplitude);
       this.playLegacy(samples);
@@ -361,7 +369,7 @@ export class WebAudioEngine {
             bank.buffers.get(root)!,
             pitchRate(midi, root),
             panForMidi(midi),
-            timbre.reverbSend,
+            this.voiceReverbSend,
             level,
             timbre.releaseMs,
             startAt,
@@ -369,7 +377,7 @@ export class WebAudioEngine {
           return;
         }
         const samples = synth.synthesize(midi, sustainMillis / 1000, seedBase + i, timbre.damping, timbre.amplitude, 0.6);
-        this.playModernVoice(samples, panForMidi(midi), timbre.reverbSend, level, timbre.releaseMs, startAt);
+        this.playModernVoice(samples, panForMidi(midi), this.voiceReverbSend, level, timbre.releaseMs, startAt);
       });
     } else {
       const strumDelaySamples = Math.round((strumDelayMillis / 1000) * synth.sampleRate);

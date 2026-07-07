@@ -130,6 +130,16 @@ fun AudioQuickSliders(state: AppState, modifier: Modifier = Modifier) {
         EqBandSlider(state, "Mid", e.midDb, Band.Mid)
         EqBandSlider(state, "Treble", e.trebleDb, Band.Treble)
         TextButton(onClick = { state.resetEq(state.sound) }) { Text("Flat") }
+
+        // Per-sound reverb amount. Reading reverbVersion keys it to recompose live.
+        state.reverbVersion
+        val rev = state.reverbFor(state.sound)
+        Text("Reverb: ${(rev * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+        Slider(
+            value = rev,
+            onValueChange = { state.setReverb(state.sound, it) },
+            valueRange = 0f..1f,
+        )
     }
 }
 

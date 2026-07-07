@@ -448,6 +448,8 @@ export class App {
       el("div", {}, [`Treble: ${fmt(e.treble)}`]),
       slider(-12, 12, e.treble, (v) => s.setEqBand(s.sound, "treble", v)),
       el("div", { class: "row end" }, [btn("Flat", () => s.resetEq(s.sound))]),
+      el("div", {}, [`Reverb: ${Math.round(s.reverbFor(s.sound) * 100)}%`]),
+      slider(0, 100, Math.round(s.reverbFor(s.sound) * 100), (v) => s.setReverb(s.sound, v / 100)),
     ]);
   }
 

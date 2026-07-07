@@ -128,7 +128,7 @@ class AudioTrackEngine(
                 addVoiceSource(
                     SampleSource(inst, midiNote),
                     pan = Panner.forMidi(midiNote),
-                    reverbSend = timbre.reverbSend.toFloat(),
+                    reverbSend = voiceReverbSend,
                     releaseMs = timbre.releaseMs,
                 )
                 return@execute
@@ -146,7 +146,7 @@ class AudioTrackEngine(
             addVoice(
                 samples,
                 pan = Panner.forMidi(midiNote),
-                reverbSend = timbre.reverbSend.toFloat(),
+                reverbSend = voiceReverbSend,
                 releaseMs = timbre.releaseMs,
             )
             val tAdded = System.nanoTime()
@@ -169,7 +169,7 @@ class AudioTrackEngine(
             val inst = voiceInstrument
             if (inst != null) {
                 val midi = Math.round(69 + 12 * (Math.log(freqHz.toDouble() / 440.0) / Math.log(2.0))).toInt().coerceIn(0, 127)
-                addVoiceSource(SampleSource(inst, midi), reverbSend = timbre.reverbSend.toFloat(), releaseMs = timbre.releaseMs)
+                addVoiceSource(SampleSource(inst, midi), reverbSend = voiceReverbSend, releaseMs = timbre.releaseMs)
                 return@execute
             }
             val samples = synth.synthesizeFrequency(
@@ -180,7 +180,7 @@ class AudioTrackEngine(
                 amplitude = timbre.amplitude,
                 brightnessDecay = GUITAR_BRIGHTNESS_DECAY,
             )
-            addVoice(samples, reverbSend = timbre.reverbSend.toFloat(), releaseMs = timbre.releaseMs)
+            addVoice(samples, reverbSend = voiceReverbSend, releaseMs = timbre.releaseMs)
         }
     }
 
@@ -205,7 +205,7 @@ class AudioTrackEngine(
                         gain,
                         strumFrames * i,
                         AmpEnvelope(sampleRate, 3.0, timbre.releaseMs.toDouble()),
-                        reverbSend = timbre.reverbSend.toFloat(),
+                        reverbSend = voiceReverbSend,
                     ).also { it.pan = Panner.forMidi(midi) },
                     MAX_VOICES,
                 )
@@ -270,6 +270,13 @@ class AudioTrackEngine(
 
     /** Set the modern-bus tone EQ gains (dB). */
     fun setEq(bassDb: Float, midDb: Float, trebleDb: Float) = mixer.setEq(bassDb, midDb, trebleDb)
+
+    /** Per-voice reverb send (0..1) for guitar note/chord voices — set per selected
+     *  Sound by the app. Drums (playSamples) stay dry regardless. */
+    @Volatile var voiceReverbSend: Float = 0.18f
+        private set
+
+    fun setReverbSend(amount: Float) { voiceReverbSend = amount.coerceIn(0f, 1f) }
 
     override fun close() {
         running.set(false)

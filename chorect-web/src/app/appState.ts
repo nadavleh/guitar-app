@@ -66,6 +66,10 @@ function defaultEq(): Record<SoundName, EqSettings> {
   };
 }
 
+function defaultReverb(): Record<SoundName, number> {
+  return { Synth: 0.18, Acoustic: 0.18, Nylon: 0.18, Electric: 0.18 };
+}
+
 const LS_KEY = "chorect-web.v1";
 
 interface Persisted {
@@ -81,6 +85,7 @@ interface Persisted {
   tapOnTouchDown: boolean;
   sound: string;
   eq: Record<SoundName, EqSettings>;
+  reverb: Record<SoundName, number>;
   customTunings: Record<string, number[]>;
   challengeScores: ChallengeScore[];
   drumPatterns: Record<string, string>;
@@ -127,6 +132,8 @@ export class AppState {
   /** Per-sound runtime EQ (bass/mid/treble dB), applied to the modern chain's
    *  biquad EQ whenever the matching sound is active. */
   eq: Record<SoundName, EqSettings> = defaultEq();
+  /** Per-sound reverb send (0..1), applied to the modern chain when the sound is active. */
+  reverb: Record<SoundName, number> = defaultReverb();
   /** True while a sampled bank fetch triggered by `setSound` is in flight. */
   soundLoading = false;
   /** Sampled banks already fetched this session, keyed by lowercase id. */
@@ -148,6 +155,7 @@ export class AppState {
     } else {
       const e = this.eq.Synth;
       this.audio.setEq(e.bass, e.mid, e.treble);
+      this.audio.setReverbSend(this.reverb.Synth);
     }
   }
 
@@ -187,6 +195,12 @@ export class AppState {
           }
         }
       }
+      if (p.reverb) {
+        for (const key of Object.keys(this.reverb) as SoundName[]) {
+          const v = p.reverb[key];
+          if (typeof v === "number") this.reverb[key] = Math.max(0, Math.min(1, v));
+        }
+      }
       if (p.customTunings) {
         for (const [name, midis] of Object.entries(p.customTunings)) {
           this.customTunings.set(name, { openStrings: midis.map((m) => note(m)) });
@@ -223,6 +237,7 @@ export class AppState {
       tapOnTouchDown: this.tapOnTouchDown,
       sound: this.sound,
       eq: this.eq,
+      reverb: this.reverb,
       customTunings,
       challengeScores: this.challengeScores,
       drumPatterns: Object.fromEntries(this.drumPatterns),
@@ -364,6 +379,7 @@ export class AppState {
    *  `s`'s EQ settings, independent of whether the bank fetch succeeds. */
   private applySound(s: SoundName): void {
     const e = this.eq[s];
+    this.audio.setReverbSend(this.reverb[s]);
     if (s === "Synth") {
       this.audio.setInstrument(null);
       this.audio.setEq(e.bass, e.mid, e.treble);
@@ -419,6 +435,20 @@ export class AppState {
     const next: EqSettings = { ...FLAT_EQ };
     this.commit(() => { this.eq[sound] = next; });
     if (sound === this.sound) this.audio.setEq(next.bass, next.mid, next.treble);
+  }
+
+  // ---------- per-sound reverb ----------
+
+  /** `sound`'s current reverb amount (0..1). */
+  reverbFor(sound: SoundName): number {
+    return this.reverb[sound];
+  }
+
+  /** Update `sound`'s reverb amount, persist, and — if active — push to the engine. */
+  setReverb(sound: SoundName, amount: number): void {
+    const clamped = Math.max(0, Math.min(1, amount));
+    this.commit(() => { this.reverb[sound] = clamped; });
+    if (sound === this.sound) this.audio.setReverbSend(clamped);
   }
 
   // ---------- position scroller ----------

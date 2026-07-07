@@ -197,6 +197,16 @@ class TuningRepository(private val context: Context) {
         context.tuningDataStore.edit { prefs -> prefs[keyGuitarEq] = value }
     }
 
+    private val keyGuitarReverb = stringPreferencesKey("guitar_reverb")
+
+    /** Encoded per-sound reverb amount ("Name,amount;..."). Empty = use code defaults. */
+    val guitarReverb: Flow<String> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyGuitarReverb] ?: "" }
+
+    suspend fun setGuitarReverb(value: String) {
+        context.tuningDataStore.edit { prefs -> prefs[keyGuitarReverb] = value }
+    }
+
     // ---------- Progression-challenge high scores ----------
 
     private val keyChallengeScores = stringPreferencesKey("challenge_scores")
