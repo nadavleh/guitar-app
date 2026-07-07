@@ -126,7 +126,7 @@ class AppState(
             val bank = guitarBankLoader(id)
             withContext(kotlinx.coroutines.Dispatchers.Main) {
                 if (bank != null) { bankCache[id] = bank; if (sound == s) modern.voiceInstrument = bank }
-                soundLoading = false
+                if (sound == s) soundLoading = false   // don't let a stale load clear a newer selection's spinner
             }
         }
     }

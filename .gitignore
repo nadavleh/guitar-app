@@ -31,3 +31,6 @@ v*_med.png
 
 # Python bytecode cache
 __pycache__/
+
+# Raw CC0 guitar sample sources (processed into assets/guitar by build_guitar_samples.py)
+tools/_guitar_src/

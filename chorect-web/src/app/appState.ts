@@ -338,10 +338,11 @@ export class AppState {
         if (this.sound === s) this.audio.setInstrument(bank);
       })
       .catch(() => {
-        if (this.sound === s) this.audio.setInstrument(null);
+        // Load failed: leave the previously-active bank in place (matches Android),
+        // rather than forcing playback back to synth.
       })
       .finally(() => {
-        this.soundLoading = false;
+        if (this.sound === s) this.soundLoading = false;
         this.notify();
       });
   }

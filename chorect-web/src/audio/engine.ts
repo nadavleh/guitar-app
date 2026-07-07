@@ -69,6 +69,7 @@ export class WebAudioEngine {
     const manifestRes = await fetch(`${base}guitar/${inst}.json`);
     if (!manifestRes.ok) throw new Error(`sample bank manifest missing: ${inst}`);
     const roots: number[] = await manifestRes.json();
+    if (!Array.isArray(roots) || roots.length === 0) throw new Error(`sample bank manifest empty/invalid: ${inst}`);
     const buffers = new Map<number, AudioBuffer>();
     const ctx = this.ensure();
     await Promise.all(

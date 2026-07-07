@@ -1,0 +1,5 @@
+Guitar sample banks — sources and licenses:
+
+acoustic (steel-string): FreePats FS Seagull Steel-String Guitar (FlameStudios) -- GPLv3+ with the FreePats instrument exception -- https://freepats.zenvoid.org/Guitar/steel-acoustic-guitar.html
+nylon (classical): FreePats Spanish Classical Guitar -- CC0-1.0 -- https://freepats.zenvoid.org/Guitar/acoustic-guitar.html
+electric (clean): FreePats FSBS Clean Electric Guitar -- CC0-1.0 -- https://freepats.zenvoid.org/ElectricGuitar/clean-electric-guitar.html

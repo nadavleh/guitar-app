@@ -11,7 +11,9 @@ import org.json.JSONArray
 object GuitarBankLoader {
     fun load(inst: String, openAsset: (String) -> ByteArray?): SampleInstrument? {
         val manifest = openAsset("guitar/$inst.json") ?: return null
-        val roots = JSONArray(String(manifest))
+        // A corrupt/malformed manifest is treated like a missing one (fall back to synth),
+        // not a crash out of the loader.
+        val roots = runCatching { JSONArray(String(manifest)) }.getOrNull() ?: return null
         val samples = ArrayList<GuitarSample>()
         for (k in 0 until roots.length()) {
             val midi = roots.getInt(k)
