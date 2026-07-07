@@ -69,6 +69,11 @@ class AudioTrackEngine(
 
     private val mixer = VoiceMixer(sampleRate)
 
+    /** When set, [playNote]/[playFrequency]/[playChord] play sampled voices from this
+     *  bank instead of Karplus-Strong synthesis (M3). Drums ([playSamples]/[playSamplesAt])
+     *  and the legacy engine are unaffected. Null = existing synth behavior (default). */
+    @Volatile var voiceInstrument: SampleInstrument? = null
+
     private val synthesizer = Executors.newSingleThreadExecutor { r ->
         Thread(r, "GuitarAudio-synth").apply { isDaemon = true }
     }
@@ -118,6 +123,16 @@ class AudioTrackEngine(
         if (!running.get()) return
         val tCall = System.nanoTime()
         synthesizer.execute {
+            val inst = voiceInstrument
+            if (inst != null) {
+                addVoiceSource(
+                    SampleSource(inst, midiNote),
+                    pan = Panner.forMidi(midiNote),
+                    reverbSend = timbre.reverbSend.toFloat(),
+                    releaseMs = timbre.releaseMs,
+                )
+                return@execute
+            }
             val tStart = System.nanoTime()
             val samples = synth.synthesize(
                 midiNote = midiNote,
@@ -151,6 +166,12 @@ class AudioTrackEngine(
         if (freqHz <= 0f || durationMillis <= 0) return
         if (!running.get()) return
         synthesizer.execute {
+            val inst = voiceInstrument
+            if (inst != null) {
+                val midi = Math.round(69 + 12 * (Math.log(freqHz.toDouble() / 440.0) / Math.log(2.0))).toInt().coerceIn(0, 127)
+                addVoiceSource(SampleSource(inst, midi), reverbSend = timbre.reverbSend.toFloat(), releaseMs = timbre.releaseMs)
+                return@execute
+            }
             val samples = synth.synthesizeFrequency(
                 freqHz = freqHz.toDouble(),
                 durationSec = durationMillis / 1000.0,
@@ -170,15 +191,17 @@ class AudioTrackEngine(
         val strumFrames = (sampleRate * strumDelayMillis / 1000).coerceAtLeast(0)
         val gain = (1.0 / kotlin.math.sqrt(notes.size.toDouble())).toFloat()
         synthesizer.execute {
+            val inst = voiceInstrument
             notes.forEachIndexed { i, midi ->
-                val samples = synth.synthesize(
-                    midi, sustainMillis / 1000.0, System.nanoTime() + i,
-                    timbre.damping, timbre.amplitude,
-                    brightnessDecay = GUITAR_BRIGHTNESS_DECAY,
-                )
+                val source: VoiceSource = if (inst != null) SampleSource(inst, midi)
+                    else BufferSource(synth.synthesize(
+                        midi, sustainMillis / 1000.0, System.nanoTime() + i,
+                        timbre.damping, timbre.amplitude,
+                        brightnessDecay = GUITAR_BRIGHTNESS_DECAY,
+                    ))
                 mixer.addAndCap(
                     MixVoice(
-                        BufferSource(samples),
+                        source,
                         gain,
                         strumFrames * i,
                         AmpEnvelope(sampleRate, 3.0, timbre.releaseMs.toDouble()),
@@ -198,6 +221,22 @@ class AudioTrackEngine(
     override fun playSamplesAt(samples: FloatArray, gain: Float, delayFrames: Int) {
         if (!running.get() || samples.isEmpty() || gain <= 0f) return
         addVoice(samples, gain, delayFrames.coerceAtLeast(0))
+    }
+
+    /** Add any VoiceSource as a modern voice (envelope + pan + reverb send). */
+    private fun addVoiceSource(
+        source: VoiceSource,
+        gain: Float = 1f,
+        delayFrames: Int = 0,
+        pan: Double = 0.0,
+        reverbSend: Float = 0f,
+        releaseMs: Int = 20,
+    ) {
+        mixer.addAndCap(
+            MixVoice(source, gain, delayFrames, AmpEnvelope(sampleRate, 3.0, releaseMs.toDouble()),
+                reverbSend = reverbSend).also { it.pan = pan },
+            MAX_VOICES,
+        )
     }
 
     private fun addVoice(
