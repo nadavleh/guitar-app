@@ -14,7 +14,7 @@ import {
   movementCost, pickMinMovement, BUILTIN_PATTERNS,
   INTERVAL_CHOICES, intervalTargetMidi, CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
 } from "../src/theory";
-import { PluckedSynth, PitchDetector, analyzePitch, PercussionSynth } from "../src/audio";
+import { PluckedSynth, PitchDetector, analyzePitch, PercussionSynth, panGains } from "../src/audio";
 
 let passed = 0;
 let failed = 0;
@@ -80,6 +80,21 @@ const buf = synth.synthesize(69, 0.5, 1, 0.997, 0.6);
 let bounded = true;
 for (const v of buf) if (!Number.isFinite(v) || Math.abs(v) > 0.61) bounded = false;
 check("synth output is finite & within amplitude", bounded && buf.length === 22050);
+
+// --- brightnessDecay default (1.0) is a provable no-op vs. the pre-existing 5-arg call ---
+const bufDefault = synth.synthesize(69, 0.5, 1, 0.997, 0.6, 1.0);
+check("brightnessDecay=1.0 is identical to omitting it", buf.length === bufDefault.length && buf.every((v, i) => v === bufDefault[i]));
+
+// --- Panner: constant-power stereo gains ---
+const [centerL, centerR] = panGains(0);
+check("panGains(0) center ≈ (0.7071, 0.7071)", Math.abs(centerL - 0.70710678) < 1e-6 && Math.abs(centerR - 0.70710678) < 1e-6);
+for (const p of [-1, -0.5, 0, 0.3, 1]) {
+  const [l, r] = panGains(p);
+  if (Math.abs(l * l + r * r - 1) >= 1e-9) { check(`panGains(${p}) constant power`, false); }
+  else { check(`panGains(${p}) constant power`, true); }
+}
+const [hardLeftL, hardLeftR] = panGains(-1);
+check("panGains(-1) hard-left = (1, 0)", Math.abs(hardLeftL - 1) < 1e-9 && Math.abs(hardLeftR - 0) < 1e-9);
 
 // --- YIN: detect a synthetic 220 Hz sine ---
 const sr = 44100;

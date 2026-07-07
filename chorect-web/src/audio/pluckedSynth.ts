@@ -22,11 +22,25 @@ export function midiToFreq(midiNote: number): number {
 export class PluckedSynth {
   constructor(public readonly sampleRate = 48000) {}
 
-  synthesize(midiNote: number, durationSec: number, seed = 1, damping = 0.997, amplitude = 0.6): Float32Array {
-    return this.synthesizeFrequency(midiToFreq(midiNote), durationSec, seed, damping, amplitude);
+  synthesize(
+    midiNote: number,
+    durationSec: number,
+    seed = 1,
+    damping = 0.997,
+    amplitude = 0.6,
+    brightnessDecay = 1.0,
+  ): Float32Array {
+    return this.synthesizeFrequency(midiToFreq(midiNote), durationSec, seed, damping, amplitude, brightnessDecay);
   }
 
-  synthesizeFrequency(freqHz: number, durationSec: number, seed = 1, damping = 0.997, amplitude = 0.6): Float32Array {
+  synthesizeFrequency(
+    freqHz: number,
+    durationSec: number,
+    seed = 1,
+    damping = 0.997,
+    amplitude = 0.6,
+    brightnessDecay = 1.0,
+  ): Float32Array {
     if (freqHz <= 0) throw new Error(`freq must be > 0, got ${freqHz}`);
     if (durationSec <= 0) throw new Error(`duration must be positive, got ${durationSec}`);
 
@@ -53,13 +67,24 @@ export class PluckedSynth {
     for (let i = 0; i < n; i++) buf[i] *= norm;
 
     // Karplus-Strong delay loop.
+    // Extra one-pole lowpass on top of the classic KS output: its smoothing coefficient
+    // (`extra`) increases over the note when brightnessDecay < 1.0, so high harmonics
+    // die faster than the fundamental (bright attack, warmer tail). At brightnessDecay
+    // = 1.0, `extra` is always 1.0, so `lp = cur` and the loop reproduces the original,
+    // undamped-extra behavior exactly.
     const numSamples = Math.max(Math.floor(this.sampleRate * durationSec), 1);
     const ks = new Float64Array(numSamples);
     let idx = 0;
+    let lp = 0.0;
+    const bright = Math.min(1, Math.max(0, brightnessDecay));
     for (let i = 0; i < numSamples; i++) {
       const cur = buf[idx];
       const nxt = buf[(idx + 1) % n];
-      ks[i] = cur;
+      // progress 0..1 across the note; more smoothing toward the end
+      const prog = i / numSamples;
+      const extra = bright + (1.0 - bright) * (1.0 - prog);
+      lp = extra * cur + (1.0 - extra) * lp;
+      ks[i] = lp;
       buf[idx] = damping * 0.5 * (cur + nxt);
       idx = (idx + 1) % n;
     }
