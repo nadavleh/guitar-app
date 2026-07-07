@@ -22,14 +22,34 @@ import os
 import re
 import sys
 
+import math
+
 import numpy as np
 import soundfile as sf
-from scipy.signal import resample_poly
+from scipy.signal import filtfilt, resample_poly
 
 SR = 44100
 TAIL_SEC = 2.5
 FADE_SEC = 0.03
 PEAK_DBFS = -1.0
+
+# Per-instrument tone shaping (baked into the samples — the app has no runtime EQ yet).
+# Each entry is a list of RBJ peaking filters (center_hz, Q, gain_dB).
+# nylon reads a touch muffled/boxy, so cut the low-mids to open it up.
+EQ = {
+    "nylon": [(600.0, 0.8, -4.0)],
+}
+
+
+def peaking(fc, q, gain_db):
+    """RBJ peaking-EQ biquad coefficients (b, a)."""
+    a_ = 10 ** (gain_db / 40.0)
+    w0 = 2 * math.pi * fc / SR
+    alpha = math.sin(w0) / (2 * q)
+    cw = math.cos(w0)
+    b = [1 + alpha * a_, -2 * cw, 1 - alpha * a_]
+    a = [1 + alpha / a_, -2 * cw, 1 - alpha / a_]
+    return b, a
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DL = os.path.join(HERE, "_guitar_src", "_dl")
@@ -41,7 +61,7 @@ OUT_DIRS = [
 # inst id -> (glob for its .sfz, license line)
 INSTRUMENTS = {
     "acoustic": (
-        os.path.join(DL, "steel_x", "**", "*.sfz"),
+        os.path.join(DL, "steel_full_x", "**", "*.sfz"),
         "acoustic (steel-string): FreePats FS Seagull Steel-String Guitar (FlameStudios) "
         "-- GPLv3+ with the FreePats instrument exception -- "
         "https://freepats.zenvoid.org/Guitar/steel-acoustic-guitar.html",
@@ -97,7 +117,7 @@ def parse_sfz(sfz_path):
     return roots
 
 
-def process(x, sr):
+def process(x, sr, eq=()):
     if x.ndim > 1:
         x = x.mean(axis=1)
     x = x.astype(np.float64)
@@ -112,6 +132,11 @@ def process(x, sr):
         if nz.size:
             x = x[nz[0]:]
     x = x[: int(TAIL_SEC * SR)]
+    # tone shaping (zero-phase, so no transient smearing)
+    for fc, q, gain_db in eq:
+        if x.size > 27:
+            b, a = peaking(fc, q, gain_db)
+            x = filtfilt(b, a, x)
     peak = np.max(np.abs(x)) or 1.0
     x = x * (10 ** (PEAK_DBFS / 20) / peak)          # normalize
     f = min(int(FADE_SEC * SR), x.size)
@@ -137,7 +162,7 @@ def main():
                 print(f"   {inst}: missing sample {path} (skip)", file=sys.stderr)
                 continue
             data, sr = sf.read(path, always_2d=False)
-            y = process(data, sr)
+            y = process(data, sr, EQ.get(inst, ()))
             for d in OUT_DIRS:
                 fp = os.path.join(d, f"{inst}_{root}.wav")
                 sf.write(fp, y, SR, subtype="PCM_16")
