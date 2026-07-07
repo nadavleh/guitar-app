@@ -25,6 +25,9 @@ import { buildReverbIR } from "./reverbIR";
 interface ActiveVoice {
   src: AudioBufferSourceNode;
   env?: GainNode;
+  /** Release time (ms) for the stop() ramp — set for MODERN voices only,
+   *  mirrors the owning Timbre's releaseMs. */
+  releaseMs?: number;
 }
 
 export class WebAudioEngine {
@@ -137,7 +140,7 @@ export class WebAudioEngine {
    *  modernMaster (dry) AND panner -> reverbSend -> reverbBus (wet).
    *  `startAt` (AudioContext seconds) defaults to "now" — used by playChord to
    *  stagger strum voices. */
-  private playModernVoice(samples: Float32Array, pan: number, reverbSend: number, level: number, startAt?: number): void {
+  private playModernVoice(samples: Float32Array, pan: number, reverbSend: number, level: number, releaseMs: number, startAt?: number): void {
     if (samples.length === 0) return;
     const ctx = this.ensure();
     const startT = startAt ?? ctx.currentTime;
@@ -163,7 +166,7 @@ export class WebAudioEngine {
     panner.connect(send);
     send.connect(this.reverbBus!);
 
-    const entry: ActiveVoice = { src, env };
+    const entry: ActiveVoice = { src, env, releaseMs };
     src.onended = () => {
       this.active.delete(entry);
       src.disconnect();
@@ -180,7 +183,7 @@ export class WebAudioEngine {
     const synth = this.ensureSynth();
     if (this._useModern) {
       const samples = synth.synthesize(midiNote, durationMillis / 1000, 1, timbre.damping, timbre.amplitude, 0.6);
-      this.playModernVoice(samples, panForMidi(midiNote), timbre.reverbSend, 1.0);
+      this.playModernVoice(samples, panForMidi(midiNote), timbre.reverbSend, 1.0, timbre.releaseMs);
     } else {
       const samples = synth.synthesize(midiNote, durationMillis / 1000, 1, timbre.damping, timbre.amplitude);
       this.playLegacy(samples);
@@ -192,7 +195,7 @@ export class WebAudioEngine {
     const synth = this.ensureSynth();
     if (this._useModern) {
       const samples = synth.synthesizeFrequency(freqHz, durationMillis / 1000, 1, timbre.damping, timbre.amplitude, 0.6);
-      this.playModernVoice(samples, 0, timbre.reverbSend, 1.0);
+      this.playModernVoice(samples, 0, timbre.reverbSend, 1.0, timbre.releaseMs);
     } else {
       const samples = synth.synthesizeFrequency(freqHz, durationMillis / 1000, 1, timbre.damping, timbre.amplitude);
       this.playLegacy(samples);
@@ -211,7 +214,7 @@ export class WebAudioEngine {
       const seedBase = 1;
       notes.forEach((midi, i) => {
         const samples = synth.synthesize(midi, sustainMillis / 1000, seedBase + i, timbre.damping, timbre.amplitude, 0.6);
-        this.playModernVoice(samples, panForMidi(midi), timbre.reverbSend, level, startNow + i * strumDelaySeconds);
+        this.playModernVoice(samples, panForMidi(midi), timbre.reverbSend, level, timbre.releaseMs, startNow + i * strumDelaySeconds);
       });
     } else {
       const strumDelaySamples = Math.round((strumDelayMillis / 1000) * synth.sampleRate);
@@ -258,17 +261,18 @@ export class WebAudioEngine {
     const now = this.ctx ? this.ctx.currentTime : 0;
     for (const v of this.active) {
       if (v.env) {
+        const rel = (v.releaseMs ?? 20) / 1000;
         try {
           const g = v.env.gain;
           const current = g.value;
           g.cancelScheduledValues(now);
           g.setValueAtTime(current, now);
-          g.linearRampToValueAtTime(0, now + 0.02);
+          g.linearRampToValueAtTime(0, now + rel);
         } catch {
           /* already stopped */
         }
         try {
-          v.src.stop(now + 0.025);
+          v.src.stop(now + rel + 0.005);
         } catch {
           /* already stopped */
         }
