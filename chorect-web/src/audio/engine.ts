@@ -3,15 +3,59 @@
 // Audio API. Where the Kotlin engine runs a continuous MODE_STREAM mixer thread,
 // the browser already mixes any number of concurrent AudioBufferSourceNodes for
 // us, so each note/chord is just a fire-and-forget buffer source.
+//
+// This is an A/B facade with two independent output chains, selected at
+// runtime via `useModern`/`setUseModern`:
+//   - LEGACY: the original behavior — buffer -> legacyMaster(0.9) -> destination,
+//     chords pre-mixed by `synth.synthesizeChord`, hard-stop on `stop()`. Kept
+//     byte-for-byte identical to the pre-overhaul engine.
+//   - MODERN: mirrors the Kotlin overhaul (AudioTrackEngine + VoiceMixer) —
+//     one voice per note with attack declick, constant-power pan, a shared
+//     reverb send/return bus, and a limiter on the master bus. `stop()` fades
+//     (release) modern voices instead of hard-cutting them.
 
 import { PluckedSynth } from "./pluckedSynth";
 import { Timbre, Timbres } from "./timbre";
+import { panForMidi } from "./panner";
+import { buildReverbIR } from "./reverbIR";
+
+/** A voice tracked for `stop()`. `env` is present only for MODERN note/chord
+ *  voices (which get a release ramp on stop); legacy voices and MODERN drum
+ *  voices (dry, no envelope) are hard-stopped. */
+interface ActiveVoice {
+  src: AudioBufferSourceNode;
+  env?: GainNode;
+}
 
 export class WebAudioEngine {
   private ctx: AudioContext | null = null;
   private synth: PluckedSynth | null = null;
-  private master: GainNode | null = null;
-  private active = new Set<AudioBufferSourceNode>();
+
+  // LEGACY chain.
+  private legacyMaster: GainNode | null = null;
+
+  // MODERN chain: reverbBus -> reverb -> modernMaster -> modernLimiter -> destination.
+  // Dry voices (and the dry side of wet voices) connect directly to modernMaster.
+  private modernMaster: GainNode | null = null;
+  private modernLimiter: DynamicsCompressorNode | null = null;
+  private reverb: ConvolverNode | null = null;
+  private reverbBus: GainNode | null = null;
+
+  private active = new Set<ActiveVoice>();
+  private _useModern = false;
+
+  /** Whether the MODERN (overhaul) output chain is currently selected. */
+  get useModern(): boolean {
+    return this._useModern;
+  }
+
+  /** Switch chains. Stops everything first (mirrors the Kotlin
+   *  SwitchableAudioEngine) so nothing rings across the switch. */
+  setUseModern(v: boolean): void {
+    if (v === this._useModern) return;
+    this.stop();
+    this._useModern = v;
+  }
 
   /** Lazily create + resume the AudioContext. Must be called from a user gesture
    *  the first time (browser autoplay policy), which our click/tap handlers satisfy. */
@@ -20,9 +64,31 @@ export class WebAudioEngine {
       const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new Ctor();
       this.synth = new PluckedSynth(this.ctx.sampleRate);
-      this.master = this.ctx.createGain();
-      this.master.gain.value = 0.9;
-      this.master.connect(this.ctx.destination);
+
+      this.legacyMaster = this.ctx.createGain();
+      this.legacyMaster.gain.value = 0.9;
+      this.legacyMaster.connect(this.ctx.destination);
+
+      // Brickwall-ish limiter guarding the modern master bus.
+      this.modernLimiter = this.ctx.createDynamicsCompressor();
+      this.modernLimiter.threshold.value = -1;
+      this.modernLimiter.knee.value = 0;
+      this.modernLimiter.ratio.value = 20;
+      this.modernLimiter.attack.value = 0.003;
+      this.modernLimiter.release.value = 0.08;
+      this.modernLimiter.connect(this.ctx.destination);
+
+      this.modernMaster = this.ctx.createGain();
+      this.modernMaster.gain.value = 1.0;
+      this.modernMaster.connect(this.modernLimiter);
+
+      this.reverb = this.ctx.createConvolver();
+      this.reverb.buffer = buildReverbIR(this.ctx);
+      this.reverb.connect(this.modernMaster);
+
+      this.reverbBus = this.ctx.createGain();
+      this.reverbBus.gain.value = 1.0;
+      this.reverbBus.connect(this.reverb);
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
     return this.ctx;
@@ -49,39 +115,109 @@ export class WebAudioEngine {
     return out;
   }
 
-  private play(samples: Float32Array): void {
+  /** LEGACY: one-shot buffer -> legacyMaster. Unchanged from the pre-overhaul engine. */
+  private playLegacy(samples: Float32Array): void {
     if (samples.length === 0) return;
     const ctx = this.ensure();
     const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
     buffer.getChannelData(0).set(samples);
     const src = ctx.createBufferSource();
     src.buffer = buffer;
-    src.connect(this.master!);
+    src.connect(this.legacyMaster!);
+    const entry: ActiveVoice = { src };
     src.onended = () => {
-      this.active.delete(src);
+      this.active.delete(entry);
       src.disconnect();
     };
-    this.active.add(src);
+    this.active.add(entry);
     src.start();
+  }
+
+  /** MODERN: one voice = bufferSource -> envGain (attack declick) -> panner ->
+   *  modernMaster (dry) AND panner -> reverbSend -> reverbBus (wet).
+   *  `startAt` (AudioContext seconds) defaults to "now" — used by playChord to
+   *  stagger strum voices. */
+  private playModernVoice(samples: Float32Array, pan: number, reverbSend: number, level: number, startAt?: number): void {
+    if (samples.length === 0) return;
+    const ctx = this.ensure();
+    const startT = startAt ?? ctx.currentTime;
+    const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+    buffer.getChannelData(0).set(samples);
+
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, startT);
+    env.gain.linearRampToValueAtTime(level, startT + 0.003);
+
+    const panner = ctx.createStereoPanner();
+    panner.pan.value = pan;
+
+    const send = ctx.createGain();
+    send.gain.value = reverbSend;
+
+    src.connect(env);
+    env.connect(panner);
+    panner.connect(this.modernMaster!);
+    panner.connect(send);
+    send.connect(this.reverbBus!);
+
+    const entry: ActiveVoice = { src, env };
+    src.onended = () => {
+      this.active.delete(entry);
+      src.disconnect();
+      env.disconnect();
+      panner.disconnect();
+      send.disconnect();
+    };
+    this.active.add(entry);
+    src.start(startT);
   }
 
   playNote(midiNote: number, durationMillis = 1500, timbre: Timbre = Timbres.Guitar): void {
     if (midiNote < 0 || midiNote > 127) return;
-    const samples = this.ensureSynth().synthesize(midiNote, durationMillis / 1000, 1, timbre.damping, timbre.amplitude);
-    this.play(samples);
+    const synth = this.ensureSynth();
+    if (this._useModern) {
+      const samples = synth.synthesize(midiNote, durationMillis / 1000, 1, timbre.damping, timbre.amplitude, 0.6);
+      this.playModernVoice(samples, panForMidi(midiNote), timbre.reverbSend, 1.0);
+    } else {
+      const samples = synth.synthesize(midiNote, durationMillis / 1000, 1, timbre.damping, timbre.amplitude);
+      this.playLegacy(samples);
+    }
   }
 
   playFrequency(freqHz: number, durationMillis = 1500, timbre: Timbre = Timbres.Guitar): void {
     if (freqHz <= 0) return;
-    const samples = this.ensureSynth().synthesizeFrequency(freqHz, durationMillis / 1000, 1, timbre.damping, timbre.amplitude);
-    this.play(samples);
+    const synth = this.ensureSynth();
+    if (this._useModern) {
+      const samples = synth.synthesizeFrequency(freqHz, durationMillis / 1000, 1, timbre.damping, timbre.amplitude, 0.6);
+      this.playModernVoice(samples, 0, timbre.reverbSend, 1.0);
+    } else {
+      const samples = synth.synthesizeFrequency(freqHz, durationMillis / 1000, 1, timbre.damping, timbre.amplitude);
+      this.playLegacy(samples);
+    }
   }
 
   playChord(midiNotes: number[], strumDelayMillis = 40, sustainMillis = 2000, timbre: Timbre = Timbres.Guitar): void {
     const synth = this.ensureSynth();
-    const strumDelaySamples = Math.round((strumDelayMillis / 1000) * synth.sampleRate);
-    const samples = synth.synthesizeChord(midiNotes, sustainMillis / 1000, strumDelaySamples, 1, timbre.damping, timbre.amplitude);
-    this.play(samples);
+    if (this._useModern) {
+      const notes = midiNotes.filter((m) => m >= 0 && m <= 127);
+      if (notes.length === 0) return;
+      const ctx = this.ensure();
+      const strumDelaySeconds = strumDelayMillis / 1000;
+      const level = 1 / Math.sqrt(notes.length);
+      const startNow = ctx.currentTime;
+      const seedBase = 1;
+      notes.forEach((midi, i) => {
+        const samples = synth.synthesize(midi, sustainMillis / 1000, seedBase + i, timbre.damping, timbre.amplitude, 0.6);
+        this.playModernVoice(samples, panForMidi(midi), timbre.reverbSend, level, startNow + i * strumDelaySeconds);
+      });
+    } else {
+      const strumDelaySamples = Math.round((strumDelayMillis / 1000) * synth.sampleRate);
+      const samples = synth.synthesizeChord(midiNotes, sustainMillis / 1000, strumDelaySamples, 1, timbre.damping, timbre.amplitude);
+      this.playLegacy(samples);
+    }
   }
 
   /** The AudioContext clock (seconds) — the timebase for [playSamples]' `when`. */
@@ -91,7 +227,9 @@ export class WebAudioEngine {
 
   /** Play a pre-rendered one-shot buffer (e.g. a percussion voice), scaled by [gain].
    *  [when] (AudioContext seconds, from [now]) schedules the start sample-accurately;
-   *  omitted/past values start immediately. */
+   *  omitted/past values start immediately. Always dry (no panner/reverb send) in
+   *  both chains — keeps drums punchy — but in MODERN mode still passes through the
+   *  limiter via modernMaster. */
   playSamples(samples: Float32Array, gain = 1, when = 0): void {
     if (samples.length === 0) return;
     const ctx = this.ensure();
@@ -102,24 +240,46 @@ export class WebAudioEngine {
     const g = ctx.createGain();
     g.gain.value = gain;
     src.connect(g);
-    g.connect(this.master!);
+    g.connect(this._useModern ? this.modernMaster! : this.legacyMaster!);
+    const entry: ActiveVoice = { src };
     src.onended = () => {
-      this.active.delete(src);
+      this.active.delete(entry);
       src.disconnect();
       g.disconnect();
     };
-    this.active.add(src);
+    this.active.add(entry);
     src.start(when > ctx.currentTime ? when : 0);
   }
 
+  /** Legacy voices (and MODERN drum voices) are hard-stopped. MODERN note/chord
+   *  voices (which carry an envelope) instead get a short release ramp so the
+   *  cutoff doesn't click — mirrors AudioTrackEngine.stop() -> VoiceMixer.releaseAll(). */
   stop(): void {
-    for (const src of this.active) {
-      try {
-        src.stop();
-      } catch {
-        /* already stopped */
+    const now = this.ctx ? this.ctx.currentTime : 0;
+    for (const v of this.active) {
+      if (v.env) {
+        try {
+          const g = v.env.gain;
+          const current = g.value;
+          g.cancelScheduledValues(now);
+          g.setValueAtTime(current, now);
+          g.linearRampToValueAtTime(0, now + 0.02);
+        } catch {
+          /* already stopped */
+        }
+        try {
+          v.src.stop(now + 0.025);
+        } catch {
+          /* already stopped */
+        }
+      } else {
+        try {
+          v.src.stop();
+        } catch {
+          /* already stopped */
+        }
+        v.src.disconnect();
       }
-      src.disconnect();
     }
     this.active.clear();
   }
