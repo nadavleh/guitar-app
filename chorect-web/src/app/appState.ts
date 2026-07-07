@@ -11,7 +11,7 @@ import {
   ChordShape, VoicingStyle, parseChord, ChordShapeGenerator,
 } from "../theory";
 import * as Tunings from "../theory/tunings";
-import { WebAudioEngine, Timbre, Timbres, midiToFreqA4 } from "../audio";
+import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../audio";
 
 export const DISPLAY_FRETS = 14;
 const MIDI_MIN = 28; // E1
@@ -36,6 +36,11 @@ export enum LabelMode { Notes = "Notes", Intervals = "Intervals", Empty = "Empty
 export enum Sheet { Fretboard = "Fretboard", Options = "Options", Tuner = "Tuner", Loop = "Loop", EarTraining = "EarTraining", SambaLooper = "SambaLooper", Decompose = "Decompose" }
 export enum ChordScaleView { AllNotes = "AllNotes", Positions = "Positions" }
 
+/** Selectable guitar sound: "Synth" is the Karplus-Strong synth voice (always
+ *  available); the others are sampled banks fetched on demand (Task 1 assets
+ *  not shipped yet, so those fetches currently fail and fall back to Synth). */
+export type SoundName = "Synth" | "Acoustic" | "Nylon" | "Electric";
+
 const LS_KEY = "chorect-web.v1";
 
 interface Persisted {
@@ -49,6 +54,7 @@ interface Persisted {
   ringSustainMs: number;
   strumMs: number;
   tapOnTouchDown: boolean;
+  sound: string;
   customTunings: Record<string, number[]>;
   challengeScores: ChallengeScore[];
   drumPatterns: Record<string, string>;
@@ -89,6 +95,14 @@ export class AppState {
   strumMs = 30;
   tapOnTouchDown = false;
 
+  /** Selected guitar sound; "Synth" plays through the plucked-string synth,
+   *  the rest through a fetched sampled bank (see `setSound`). */
+  sound: SoundName = "Synth";
+  /** True while a sampled bank fetch triggered by `setSound` is in flight. */
+  soundLoading = false;
+  /** Sampled banks already fetched this session, keyed by lowercase id. */
+  private bankCache = new Map<string, SampleBank>();
+
   customTunings = new Map<string, Tuning>();
   challengeScores: ChallengeScore[] = [];
   /** Saved drum beats: name → encoded PercussionPattern string (insertion order). */
@@ -100,6 +114,7 @@ export class AppState {
 
   constructor(public readonly audio: WebAudioEngine) {
     this.load();
+    if (this.sound !== "Synth") this.applySound(this.sound);
   }
 
   // ---------- reactivity ----------
@@ -129,6 +144,7 @@ export class AppState {
       if (typeof p.ringSustainMs === "number") this.ringSustainMs = p.ringSustainMs;
       if (typeof p.strumMs === "number") this.strumMs = p.strumMs;
       if (typeof p.tapOnTouchDown === "boolean") this.tapOnTouchDown = p.tapOnTouchDown;
+      if (p.sound === "Synth" || p.sound === "Acoustic" || p.sound === "Nylon" || p.sound === "Electric") this.sound = p.sound;
       if (p.customTunings) {
         for (const [name, midis] of Object.entries(p.customTunings)) {
           this.customTunings.set(name, { openStrings: midis.map((m) => note(m)) });
@@ -163,6 +179,7 @@ export class AppState {
       ringSustainMs: this.ringSustainMs,
       strumMs: this.strumMs,
       tapOnTouchDown: this.tapOnTouchDown,
+      sound: this.sound,
       customTunings,
       challengeScores: this.challengeScores,
       drumPatterns: Object.fromEntries(this.drumPatterns),
@@ -289,6 +306,45 @@ export class AppState {
   setRingSustainMs(v: number): void { this.commit(() => { this.ringSustainMs = Math.min(Math.max(Math.round(v), 300), 4000); }); }
   setStrumMs(v: number): void { this.commit(() => { this.strumMs = Math.min(Math.max(Math.round(v), 0), 150); }); }
   toggleVoicingStyle(shell: boolean): void { this.commit(() => { this.voicingStyle = shell ? VoicingStyle.Shell : VoicingStyle.Standard; this.chordPositionIndex = 0; }); }
+
+  // ---------- sound (sampled-guitar bank selection) ----------
+
+  setSound(s: SoundName): void {
+    if (this.sound === s) return;
+    this.commit(() => { this.sound = s; });
+    this.applySound(s);
+  }
+
+  /** Apply `s` to the audio engine: clear the bank for Synth, otherwise fetch
+   *  (or reuse a cached) sampled bank. If the fetch fails — expected until the
+   *  sample assets ship — the engine falls back to synth voices. */
+  private applySound(s: SoundName): void {
+    if (s === "Synth") {
+      this.audio.setInstrument(null);
+      return;
+    }
+    const id = s.toLowerCase();
+    const cached = this.bankCache.get(id);
+    if (cached) {
+      this.audio.setInstrument(cached);
+      return;
+    }
+    this.soundLoading = true;
+    this.notify();
+    this.audio
+      .loadBank(id)
+      .then((bank) => {
+        this.bankCache.set(id, bank);
+        if (this.sound === s) this.audio.setInstrument(bank);
+      })
+      .catch(() => {
+        if (this.sound === s) this.audio.setInstrument(null);
+      })
+      .finally(() => {
+        this.soundLoading = false;
+        this.notify();
+      });
+  }
 
   // ---------- position scroller ----------
 

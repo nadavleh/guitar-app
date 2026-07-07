@@ -7,3 +7,4 @@ export * from "./micInput";
 export * from "./percussionSynth";
 export * from "./panner";
 export * from "./reverbIR";
+export * from "./sampleInstrument";

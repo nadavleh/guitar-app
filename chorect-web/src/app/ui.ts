@@ -2,7 +2,7 @@
 // AudioQuick}.kt. Vanilla DOM, re-rendered on each state change. The fretboard
 // <canvas> element is persistent across renders so its zoom/pan survives.
 
-import { AppState, DisplayMode, LabelMode, Sheet, ChordScaleView, DISPLAY_FRETS } from "./appState";
+import { AppState, DisplayMode, LabelMode, Sheet, ChordScaleView, SoundName, DISPLAY_FRETS } from "./appState";
 import { FretboardCanvas, FretboardData } from "./fretboardCanvas";
 import { computeMarks, scaleInfo, intervalName, shapeMarks } from "./marks";
 import { TunerState } from "./tunerState";
@@ -408,6 +408,17 @@ export class App {
         slider(0, 150, this.state.strumMs, (v) => this.state.setStrumMs(v)),
         el("div", {}, [`Ring sustain: ${(this.state.ringSustainMs / 1000).toFixed(1)} s`]),
         slider(300, 4000, this.state.ringSustainMs, (v) => this.state.setRingSustainMs(v)),
+        labelSm(this.state.soundLoading ? "Sound (loading…)" : "Sound"),
+        chipRow<SoundName>(
+          [
+            { value: "Synth", label: "Synth" },
+            { value: "Acoustic", label: "Acoustic" },
+            { value: "Nylon", label: "Nylon" },
+            { value: "Electric", label: "Electric" },
+          ],
+          (v) => v === this.state.sound,
+          (v) => this.state.setSound(v),
+        ),
         // A/B engine toggle (temporary scaffolding, kept through the overhaul).
         switchRow(
           "Audio engine (A/B)",

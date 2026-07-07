@@ -18,6 +18,7 @@ import { PluckedSynth } from "./pluckedSynth";
 import { Timbre, Timbres } from "./timbre";
 import { panForMidi } from "./panner";
 import { buildReverbIR } from "./reverbIR";
+import { SampleBank, nearestRoot, pitchRate } from "./sampleInstrument";
 
 /** A voice tracked for `stop()`. `env` is present only for MODERN note/chord
  *  voices (which get a release ramp on stop); legacy voices and MODERN drum
@@ -47,6 +48,39 @@ export class WebAudioEngine {
   private active = new Set<ActiveVoice>();
   // Default to the MODERN (overhaul) engine, matching Android (AppState.useModernAudio = true).
   private _useModern = true;
+
+  // Currently selected sampled-guitar bank (MODERN chain only); null = synth voices.
+  private currentBank: SampleBank | null = null;
+
+  /** Select (or clear, with null) the sampled bank used by MODERN note/chord voices. */
+  setInstrument(b: SampleBank | null): void {
+    this.currentBank = b;
+  }
+
+  /** Fetch + decode a sampled-guitar bank: `guitar/<inst>.json` lists recorded
+   *  root MIDI notes; `guitar/<inst>_<midi>.wav` is each root's recording.
+   *  Paths are prefixed with Vite's BASE_URL (mirrors `loadDrumSample`) so this
+   *  resolves under the GitHub Pages subpath deploy, not just at `/`. Rejects
+   *  if the manifest or any sample is missing — the caller (AppState.setSound)
+   *  catches this and falls back to synth voices, which is expected until the
+   *  sample assets (Task 1) ship. */
+  async loadBank(inst: string): Promise<SampleBank> {
+    const base = import.meta.env.BASE_URL;
+    const manifestRes = await fetch(`${base}guitar/${inst}.json`);
+    if (!manifestRes.ok) throw new Error(`sample bank manifest missing: ${inst}`);
+    const roots: number[] = await manifestRes.json();
+    const buffers = new Map<number, AudioBuffer>();
+    const ctx = this.ensure();
+    await Promise.all(
+      roots.map(async (m) => {
+        const res = await fetch(`${base}guitar/${inst}_${m}.wav`);
+        if (!res.ok) throw new Error(`sample missing: ${inst}_${m}`);
+        const bytes = await res.arrayBuffer();
+        buffers.set(m, await ctx.decodeAudioData(bytes));
+      }),
+    );
+    return { id: inst, roots, buffers };
+  }
 
   /** Whether the MODERN (overhaul) output chain is currently selected. */
   get useModern(): boolean {
@@ -179,10 +213,69 @@ export class WebAudioEngine {
     src.start(startT);
   }
 
+  /** MODERN, sampled variant of `playModernVoice`: identical envelope/panner/
+   *  dry+reverb-send graph, but the source is a decoded sample buffer re-pitched
+   *  via `playbackRate` instead of a synth-rendered buffer. */
+  private playModernSampleVoice(
+    buffer: AudioBuffer,
+    rate: number,
+    pan: number,
+    reverbSend: number,
+    level: number,
+    releaseMs: number,
+    startAt?: number,
+  ): void {
+    const ctx = this.ensure();
+    const startT = startAt ?? ctx.currentTime;
+
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.playbackRate.value = rate;
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, startT);
+    env.gain.linearRampToValueAtTime(level, startT + 0.003);
+
+    const panner = ctx.createStereoPanner();
+    panner.pan.value = pan;
+
+    const send = ctx.createGain();
+    send.gain.value = reverbSend;
+
+    src.connect(env);
+    env.connect(panner);
+    panner.connect(this.modernMaster!);
+    panner.connect(send);
+    send.connect(this.reverbBus!);
+
+    const entry: ActiveVoice = { src, env, releaseMs };
+    src.onended = () => {
+      this.active.delete(entry);
+      src.disconnect();
+      env.disconnect();
+      panner.disconnect();
+      send.disconnect();
+    };
+    this.active.add(entry);
+    src.start(startT);
+  }
+
   playNote(midiNote: number, durationMillis = 1500, timbre: Timbre = Timbres.Guitar): void {
     if (midiNote < 0 || midiNote > 127) return;
     const synth = this.ensureSynth();
     if (this._useModern) {
+      if (this.currentBank) {
+        const root = nearestRoot(this.currentBank.roots, midiNote);
+        this.playModernSampleVoice(
+          this.currentBank.buffers.get(root)!,
+          pitchRate(midiNote, root),
+          panForMidi(midiNote),
+          timbre.reverbSend,
+          1.0,
+          timbre.releaseMs,
+        );
+        return;
+      }
       const samples = synth.synthesize(midiNote, durationMillis / 1000, 1, timbre.damping, timbre.amplitude, 0.6);
       this.playModernVoice(samples, panForMidi(midiNote), timbre.reverbSend, 1.0, timbre.releaseMs);
     } else {
@@ -195,6 +288,19 @@ export class WebAudioEngine {
     if (freqHz <= 0) return;
     const synth = this.ensureSynth();
     if (this._useModern) {
+      if (this.currentBank) {
+        const midiNote = Math.round(69 + 12 * Math.log2(freqHz / 440));
+        const root = nearestRoot(this.currentBank.roots, midiNote);
+        this.playModernSampleVoice(
+          this.currentBank.buffers.get(root)!,
+          pitchRate(midiNote, root),
+          0,
+          timbre.reverbSend,
+          1.0,
+          timbre.releaseMs,
+        );
+        return;
+      }
       const samples = synth.synthesizeFrequency(freqHz, durationMillis / 1000, 1, timbre.damping, timbre.amplitude, 0.6);
       this.playModernVoice(samples, 0, timbre.reverbSend, 1.0, timbre.releaseMs);
     } else {
@@ -213,9 +319,24 @@ export class WebAudioEngine {
       const level = 1 / Math.sqrt(notes.length);
       const startNow = ctx.currentTime;
       const seedBase = 1;
+      const bank = this.currentBank;
       notes.forEach((midi, i) => {
+        const startAt = startNow + i * strumDelaySeconds;
+        if (bank) {
+          const root = nearestRoot(bank.roots, midi);
+          this.playModernSampleVoice(
+            bank.buffers.get(root)!,
+            pitchRate(midi, root),
+            panForMidi(midi),
+            timbre.reverbSend,
+            level,
+            timbre.releaseMs,
+            startAt,
+          );
+          return;
+        }
         const samples = synth.synthesize(midi, sustainMillis / 1000, seedBase + i, timbre.damping, timbre.amplitude, 0.6);
-        this.playModernVoice(samples, panForMidi(midi), timbre.reverbSend, level, timbre.releaseMs, startNow + i * strumDelaySeconds);
+        this.playModernVoice(samples, panForMidi(midi), timbre.reverbSend, level, timbre.releaseMs, startAt);
       });
     } else {
       const strumDelaySamples = Math.round((strumDelayMillis / 1000) * synth.sampleRate);

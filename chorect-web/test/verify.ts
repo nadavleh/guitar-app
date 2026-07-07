@@ -14,7 +14,7 @@ import {
   movementCost, pickMinMovement, BUILTIN_PATTERNS,
   INTERVAL_CHOICES, intervalTargetMidi, CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
 } from "../src/theory";
-import { PluckedSynth, PitchDetector, analyzePitch, PercussionSynth, panGains } from "../src/audio";
+import { PluckedSynth, PitchDetector, analyzePitch, PercussionSynth, panGains, nearestRoot, pitchRate } from "../src/audio";
 
 let passed = 0;
 let failed = 0;
@@ -95,6 +95,10 @@ for (const p of [-1, -0.5, 0, 0.3, 1]) {
 }
 const [hardLeftL, hardLeftR] = panGains(-1);
 check("panGains(-1) hard-left = (1, 0)", Math.abs(hardLeftL - 1) < 1e-9 && Math.abs(hardLeftR - 0) < 1e-9);
+
+// --- Sampled guitar voices: nearest-root selection + playback-rate math ---
+check("nearestRoot ties lower", nearestRoot([40, 44, 48], 42) === 40);
+check("pitchRate octave", pitchRate(72, 60) === 2);
 
 // --- YIN: detect a synthetic 220 Hz sine ---
 const sr = 44100;
