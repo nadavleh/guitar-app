@@ -39,4 +39,15 @@ class FreeverbTest {
         rv.process(l, r, 48000)
         for (i in l.indices) assertTrue(abs(l[i]) < 4f && !l[i].isNaN(), "L[$i]=${l[i]}")
     }
+
+    @Test
+    fun `worst-case room and full-scale input stays finite and bounded`() {
+        val rv = Freeverb(sampleRate = 48000, roomSize = 1.0f, damp = 0.5f, wet = 0.5f)
+        val l = FloatArray(48000) { 1f }; val r = FloatArray(48000) { 1f }  // sustained full-scale
+        rv.process(l, r, 48000)
+        for (i in l.indices) {
+            assertTrue(l[i].isFinite() && r[i].isFinite(), "non-finite at $i: L=${l[i]} R=${r[i]}")
+            assertTrue(kotlin.math.abs(l[i]) < 12f, "L[$i]=${l[i]} exceeds expected bound")
+        }
+    }
 }

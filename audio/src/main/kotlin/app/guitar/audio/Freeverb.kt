@@ -54,7 +54,8 @@ class Freeverb(
     fun process(l: FloatArray, r: FloatArray, count: Int) {
         var tail = 0f
         for (i in 0 until count) {
-            val input = (l[i] + r[i]) * 0.015f      // gain into the reverb
+            var input = (l[i] + r[i]) * 0.015f      // gain into the reverb
+            if (!input.isFinite()) input = 0f       // never let NaN/Inf poison the feedback buffers
             var wl = 0f; var wr = 0f
             for (c in 0 until 8) { wl += combL[c].tick(input); wr += combR[c].tick(input) }
             for (a in 0 until 4) { wl = apL[a].tick(wl); wr = apR[a].tick(wr) }
