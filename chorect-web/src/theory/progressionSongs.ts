@@ -92,6 +92,18 @@ const MAJOR: Record<string, SongExample[]> = {
     s("Take It Easy", "Eagles"),
     s("Knockin' on Heaven's Door", "Bob Dylan"),
   ],
+  "1,3,6,4": [
+    s("Someone Like You", "Adele"),
+  ],
+  "6,2,5,1": [
+    s("Island in the Sun", "Weezer"),
+    s("It's My Life", "Talk Talk"),
+    s("Fly Me to the Moon", "Frank Sinatra"),
+  ],
+  "1,2,5,1": [
+    s("Cry Me a River", "Justin Timberlake"),
+    s("Sunday Morning", "Maroon 5"),
+  ],
 };
 
 /** Minor diatonic, keyed by `degrees.join(",")`. */
@@ -316,6 +328,109 @@ const ADVANCED: Record<string, SongExample[]> = {
     s("Lady Bird", "Tadd Dameron"),
     s("Half Nelson", "Miles Davis"),
     s("Israel", "Miles Davis"),
+  ],
+  "Deceptive Cadence": [
+    s("Every Breath You Take", "The Police"),
+    s("I Will", "The Beatles"),
+    s("Take Me to Church", "Hozier"),
+    s("Just Give Me a Reason", "Pink ft. Nate Ruess"),
+    s("Thinking Out Loud", "Ed Sheeran"),
+  ],
+  "Applied V of V": [
+    s("9 to 5", "Dolly Parton"),
+    s("Eternal Flame", "The Bangles"),
+    s("Fly Me to the Moon", "Frank Sinatra"),
+    s("Oh! Darling", "The Beatles"),
+  ],
+  "Tonicized Relative": [
+    s("Santeria", "Sublime"),
+  ],
+  "Applied V of ii": [
+    s("Fly Me to the Moon", "Frank Sinatra"),
+    s("Sweet Georgia Brown", "Ben Bernie & Maceo Pinkard"),
+  ],
+  "Long Applied Turnaround": [
+    s("Charleston", "James P. Johnson"),
+    s("Hello! Ma Baby", "Howard & Emerson"),
+    s("Alice's Restaurant", "Arlo Guthrie"),
+    s("Hey! Baby", "Bruce Channel"),
+    s("They're Red Hot", "Robert Johnson"),
+  ],
+  "Borrowed iv": [
+    s("Creep", "Radiohead"),
+    s("If I Fell", "The Beatles"),
+  ],
+  "Mixolydian Vamp": [
+    s("Sweet Home Alabama", "Lynyrd Skynyrd"),
+    s("Can't You See", "The Marshall Tucker Band"),
+    s("Werewolves of London", "Warren Zevon"),
+  ],
+  "bVI-bVII Climb": [
+    s("Lady Madonna", "The Beatles"),
+    s("I Was Made to Love Her", "Stevie Wonder"),
+  ],
+  "Flat-Six Color": [
+    s("I Saw Her Standing There", "The Beatles"),
+    s("What a Wonderful World", "Louis Armstrong"),
+    s("Peggy Sue", "Buddy Holly"),
+    s("More Than a Feeling", "Boston"),
+  ],
+  "Flat-Three Borrowed": [
+    s("Smells Like Teen Spirit", "Nirvana"),
+  ],
+  "Chromatic Descent": [
+    s("My Funny Valentine", "Chet Baker"),
+    s("Michelle", "The Beatles"),
+  ],
+  "Diminished to ii": [
+    s("I Got Rhythm", "George Gershwin"),
+    s("Oleo", "Sonny Rollins"),
+    s("Rhythm-a-ning", "Thelonious Monk"),
+  ],
+  "Diminished to iii": [
+    s("Sweet Georgia Brown", "Ben Bernie & Maceo Pinkard"),
+    s("Bill Bailey, Won't You Please Come Home", "Hughie Cannon"),
+  ],
+  "Minor #iv° to V": [
+    s("'Round Midnight", "Thelonious Monk"),
+    s("Libertango", "Astor Piazzolla"),
+  ],
+  "Minor Plagal Diminished": [
+    s("Bésame Mucho", "Consuelo Velázquez"),
+    s("Summertime", "George Gershwin"),
+  ],
+  "iii-VI-ii-V Turnaround": [
+    s("There Will Never Be Another You", "Harry Warren"),
+    s("Have You Met Miss Jones?", "Richard Rodgers"),
+    s("All the Things You Are", "Jerome Kern"),
+  ],
+  "Rhythm-Changes Turnaround": [
+    s("I Got Rhythm", "George Gershwin"),
+    s("Anthropology", "Charlie Parker"),
+    s("Cotton Tail", "Duke Ellington"),
+    s("Salt Peanuts", "Dizzy Gillespie"),
+  ],
+  "Bossa Minor Diminished": [
+    s("Corcovado (Quiet Nights of Quiet Stars)", "Antônio Carlos Jobim"),
+    s("Manhã de Carnaval (Black Orpheus)", "Luiz Bonfá"),
+  ],
+  "Ragtime Return": [
+    s("Ain't Misbehavin'", "Fats Waller"),
+    s("Bill Bailey, Won't You Please Come Home", "Hughie Cannon"),
+    s("Five Foot Two, Eyes of Blue", "Ray Henderson"),
+  ],
+  "Bossa Chromatic": [
+    s("The Girl from Ipanema", "Antônio Carlos Jobim"),
+    s("Desafinado", "Antônio Carlos Jobim"),
+    s("Só Danço Samba", "Antônio Carlos Jobim"),
+  ],
+  "Extended vi Turnaround": [
+    s("This Boy", "The Beatles"),
+    s("Since I Don't Have You", "The Skyliners"),
+  ],
+  "Full Turnaround": [
+    s("Blue Moon", "Rodgers & Hart"),
+    s("Heart and Soul", "Hoagy Carmichael & Frank Loesser"),
   ],
 };
 

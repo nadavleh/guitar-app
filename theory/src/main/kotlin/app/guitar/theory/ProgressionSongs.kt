@@ -105,6 +105,18 @@ object ProgressionSongs {
             s("Take It Easy", "Eagles"),
             s("Knockin' on Heaven's Door", "Bob Dylan"),
         ),
+        listOf(1, 3, 6, 4) to listOf(   // I–iii–vi–IV (soft tonic family)
+            s("Someone Like You", "Adele"),
+        ),
+        listOf(6, 2, 5, 1) to listOf(   // vi–ii–V–I
+            s("Island in the Sun", "Weezer"),
+            s("It's My Life", "Talk Talk"),
+            s("Fly Me to the Moon", "Frank Sinatra"),
+        ),
+        listOf(1, 2, 5, 1) to listOf(   // I–ii–V–I
+            s("Cry Me a River", "Justin Timberlake"),
+            s("Sunday Morning", "Maroon 5"),
+        ),
     )
 
     /** Minor diatonic, keyed by [Progression.degrees]. */
@@ -331,6 +343,109 @@ object ProgressionSongs {
             s("Lady Bird", "Tadd Dameron"),
             s("Half Nelson", "Miles Davis"),
             s("Israel", "Miles Davis"),
+        ),
+        "Deceptive Cadence" to listOf(   // I–ii–V–vi
+            s("Every Breath You Take", "The Police"),
+            s("I Will", "The Beatles"),
+            s("Take Me to Church", "Hozier"),
+            s("Just Give Me a Reason", "Pink ft. Nate Ruess"),
+            s("Thinking Out Loud", "Ed Sheeran"),
+        ),
+        "Applied V of V" to listOf(   // I–II7–V–I
+            s("9 to 5", "Dolly Parton"),
+            s("Eternal Flame", "The Bangles"),
+            s("Fly Me to the Moon", "Frank Sinatra"),
+            s("Oh! Darling", "The Beatles"),
+        ),
+        "Tonicized Relative" to listOf(   // I–III7–vi–I
+            s("Santeria", "Sublime"),
+        ),
+        "Applied V of ii" to listOf(   // I–VI7–ii–V–I
+            s("Fly Me to the Moon", "Frank Sinatra"),
+            s("Sweet Georgia Brown", "Ben Bernie & Maceo Pinkard"),
+        ),
+        "Long Applied Turnaround" to listOf(   // I–III7–vi–II7–V–I
+            s("Charleston", "James P. Johnson"),
+            s("Hello! Ma Baby", "Howard & Emerson"),
+            s("Alice's Restaurant", "Arlo Guthrie"),
+            s("Hey! Baby", "Bruce Channel"),
+            s("They're Red Hot", "Robert Johnson"),
+        ),
+        "Borrowed iv" to listOf(   // I–IV–iv–I
+            s("Creep", "Radiohead"),
+            s("If I Fell", "The Beatles"),
+        ),
+        "Mixolydian Vamp" to listOf(   // I–V–bVII–IV
+            s("Sweet Home Alabama", "Lynyrd Skynyrd"),
+            s("Can't You See", "The Marshall Tucker Band"),
+            s("Werewolves of London", "Warren Zevon"),
+        ),
+        "bVI-bVII Climb" to listOf(   // I–bVI–bVII–I
+            s("Lady Madonna", "The Beatles"),
+            s("I Was Made to Love Her", "Stevie Wonder"),
+        ),
+        "Flat-Six Color" to listOf(   // I–bVI–IV–V
+            s("I Saw Her Standing There", "The Beatles"),
+            s("What a Wonderful World", "Louis Armstrong"),
+            s("Peggy Sue", "Buddy Holly"),
+            s("More Than a Feeling", "Boston"),
+        ),
+        "Flat-Three Borrowed" to listOf(   // I–bIII–IV–I
+            s("Smells Like Teen Spirit", "Nirvana"),
+        ),
+        "Chromatic Descent" to listOf(   // I–iii–bIII–ii–V (characteristic descending-bass examples)
+            s("My Funny Valentine", "Chet Baker"),
+            s("Michelle", "The Beatles"),
+        ),
+        "Diminished to ii" to listOf(   // I–#I°–ii–V
+            s("I Got Rhythm", "George Gershwin"),
+            s("Oleo", "Sonny Rollins"),
+            s("Rhythm-a-ning", "Thelonious Monk"),
+        ),
+        "Diminished to iii" to listOf(   // ii–#ii°–iii–VI7 (characteristic passing-diminished examples)
+            s("Sweet Georgia Brown", "Ben Bernie & Maceo Pinkard"),
+            s("Bill Bailey, Won't You Please Come Home", "Hughie Cannon"),
+        ),
+        "Minor #iv° to V" to listOf(   // i–#iv°–V–i (characteristic chromatic-approach examples)
+            s("'Round Midnight", "Thelonious Monk"),
+            s("Libertango", "Astor Piazzolla"),
+        ),
+        "Minor Plagal Diminished" to listOf(   // i–iv–#iv°–i (characteristic examples)
+            s("Bésame Mucho", "Consuelo Velázquez"),
+            s("Summertime", "George Gershwin"),
+        ),
+        "iii-VI-ii-V Turnaround" to listOf(   // iii7–VI7–ii7–V7
+            s("There Will Never Be Another You", "Harry Warren"),
+            s("Have You Met Miss Jones?", "Richard Rodgers"),
+            s("All the Things You Are", "Jerome Kern"),
+        ),
+        "Rhythm-Changes Turnaround" to listOf(   // Imaj7–VI7–ii7–V7
+            s("I Got Rhythm", "George Gershwin"),
+            s("Anthropology", "Charlie Parker"),
+            s("Cotton Tail", "Duke Ellington"),
+            s("Salt Peanuts", "Dizzy Gillespie"),
+        ),
+        "Bossa Minor Diminished" to listOf(   // i–iv–#iv°–V7
+            s("Corcovado (Quiet Nights of Quiet Stars)", "Antônio Carlos Jobim"),
+            s("Manhã de Carnaval (Black Orpheus)", "Luiz Bonfá"),
+        ),
+        "Ragtime Return" to listOf(   // I–I7–IV–iv–I (characteristic ragtime/trad-jazz examples)
+            s("Ain't Misbehavin'", "Fats Waller"),
+            s("Bill Bailey, Won't You Please Come Home", "Hughie Cannon"),
+            s("Five Foot Two, Eyes of Blue", "Ray Henderson"),
+        ),
+        "Bossa Chromatic" to listOf(   // Imaj7–#I°–ii7–V7
+            s("The Girl from Ipanema", "Antônio Carlos Jobim"),
+            s("Desafinado", "Antônio Carlos Jobim"),
+            s("Só Danço Samba", "Antônio Carlos Jobim"),
+        ),
+        "Extended vi Turnaround" to listOf(   // I–vi–IV–iv–I (characteristic doo-wop + borrowed-iv examples)
+            s("This Boy", "The Beatles"),
+            s("Since I Don't Have You", "The Skyliners"),
+        ),
+        "Full Turnaround" to listOf(   // I–vi–ii–V–I
+            s("Blue Moon", "Rodgers & Hart"),
+            s("Heart and Soul", "Hoagy Carmichael & Frank Loesser"),
         ),
     )
 
