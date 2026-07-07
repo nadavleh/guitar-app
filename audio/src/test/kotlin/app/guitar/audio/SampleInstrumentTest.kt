@@ -54,4 +54,14 @@ class SampleInstrumentTest {
         val n = src.render(out, 512)
         for (i in 0 until n) assertTrue(abs(out[i]) <= 0.8001f, "out[$i]=${out[i]}")
     }
+
+    @Test fun `octave down produces ~twice the length with no tail duplication`() {
+        val inst = SampleInstrument("t", listOf(GuitarSample(60, ramp(100))))
+        val src = SampleSource(inst, 48)   // rate 0.5 -> ~199 output frames
+        val out = FloatArray(4096)
+        var total = 0
+        while (true) { val n = src.render(out, 4096); if (n == 0) break; total += n }
+        assertTrue(total in 198..200, "expected ~199 output frames, got $total")
+        assertTrue(src.isFinished)
+    }
 }

@@ -33,8 +33,10 @@ class SampleSource(inst: SampleInstrument, targetMidi: Int) : VoiceSource {
         while (produced < count) {
             val i = pos.toInt()
             if (i >= buf.size - 1) {
-                // last sample (no next to interpolate) then done
-                if (i == buf.size - 1) { out[produced++] = buf[i]; pos += rate }
+                // Emit the final sample at most once, then finish. (Setting pos to the end
+                // avoids re-emitting the tail on sub-unity rates, i.e. notes below the root.)
+                if (i == buf.size - 1) out[produced++] = buf[buf.size - 1]
+                pos = buf.size.toDouble()
                 break
             }
             val frac = (pos - i).toFloat()
