@@ -107,4 +107,15 @@ class PluckedSynthTest {
         assertThrows<IllegalArgumentException> { synth.synthesize(60, -1.0) }
     }
 
+    @Test
+    fun `high harmonics decay faster than the fundamental (brighter attack, warmer tail)`() {
+        val synth = PluckedSynth(sampleRate = 48000)
+        val out = synth.synthesize(midiNote = 52, durationSec = 1.5, brightnessDecay = 0.6)
+        // Zero-crossing rate is a cheap brightness proxy: compare first 100ms vs last 100ms.
+        fun zcr(from: Int, to: Int): Int { var z = 0; for (i in from + 1 until to) if ((out[i] >= 0) != (out[i-1] >= 0)) z++; return z }
+        val early = zcr(0, 4800)
+        val late = zcr(out.size - 4800, out.size)
+        assertTrue(late < early, "tail ($late) should be less bright than attack ($early)")
+    }
+
 }

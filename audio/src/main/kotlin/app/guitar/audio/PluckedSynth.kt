@@ -26,9 +26,10 @@ class PluckedSynth(val sampleRate: Int = 48000) {
         seed: Long = 1L,
         damping: Double = 0.997,
         amplitude: Double = 0.6,
+        brightnessDecay: Double = 1.0,
     ): FloatArray {
         require(midiNote in 0..127) { "MIDI note must be 0..127, got $midiNote" }
-        return synthesizeFrequency(midiToFreq(midiNote), durationSec, seed, damping, amplitude)
+        return synthesizeFrequency(midiToFreq(midiNote), durationSec, seed, damping, amplitude, brightnessDecay)
     }
 
     /** Synthesize a plucked tone at an arbitrary frequency. Lets the tuner play a reference
@@ -39,6 +40,7 @@ class PluckedSynth(val sampleRate: Int = 48000) {
         seed: Long = 1L,
         damping: Double = 0.997,
         amplitude: Double = 0.6,
+        brightnessDecay: Double = 1.0,
     ): FloatArray {
         require(freqHz > 0.0) { "freq must be > 0, got $freqHz" }
         require(durationSec > 0.0) { "duration must be positive, got $durationSec" }
@@ -72,13 +74,24 @@ class PluckedSynth(val sampleRate: Int = 48000) {
         for (i in 0 until n) buf[i] *= norm
 
         // --- Karplus-Strong delay loop ---
+        // Extra one-pole lowpass on top of the classic KS output: its smoothing coefficient
+        // (`extra`) increases over the note when brightnessDecay < 1.0, so high harmonics
+        // die faster than the fundamental (bright attack, warmer tail). At brightnessDecay
+        // = 1.0, `extra` is always 1.0, so `lp = cur` and the loop reproduces the original,
+        // undamped-extra behavior exactly.
         val numSamples = (sampleRate * durationSec).toInt().coerceAtLeast(1)
         val ks = DoubleArray(numSamples)
         var idx = 0
+        var lp = 0.0
+        val bright = brightnessDecay.coerceIn(0.0, 1.0)
         for (i in 0 until numSamples) {
             val cur = buf[idx]
             val nxt = buf[(idx + 1) % n]
-            ks[i] = cur
+            // progress 0..1 across the note; more smoothing toward the end
+            val prog = i.toDouble() / numSamples
+            val extra = bright + (1.0 - bright) * (1.0 - prog)
+            lp = extra * cur + (1.0 - extra) * lp
+            ks[i] = lp
             buf[idx] = damping * 0.5 * (cur + nxt)
             idx = (idx + 1) % n
         }

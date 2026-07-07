@@ -125,6 +125,7 @@ class AudioTrackEngine(
                 seed = System.nanoTime(),
                 damping = timbre.damping,
                 amplitude = timbre.amplitude,
+                brightnessDecay = GUITAR_BRIGHTNESS_DECAY,
             )
             val tEnd = System.nanoTime()
             addVoice(
@@ -156,6 +157,7 @@ class AudioTrackEngine(
                 seed = System.nanoTime(),
                 damping = timbre.damping,
                 amplitude = timbre.amplitude,
+                brightnessDecay = GUITAR_BRIGHTNESS_DECAY,
             )
             addVoice(samples, reverbSend = timbre.reverbSend.toFloat(), releaseMs = timbre.releaseMs)
         }
@@ -172,6 +174,7 @@ class AudioTrackEngine(
                 val samples = synth.synthesize(
                     midi, sustainMillis / 1000.0, System.nanoTime() + i,
                     timbre.damping, timbre.amplitude,
+                    brightnessDecay = GUITAR_BRIGHTNESS_DECAY,
                 )
                 mixer.addAndCap(
                     MixVoice(
@@ -243,5 +246,9 @@ class AudioTrackEngine(
         private const val TAG = "GuitarAudio"
         // Headroom for a 4-instrument percussion loop ringing over guitar plucks.
         private const val MAX_VOICES = 16
+        // Dual-rate KS damping (M6): < 1.0 makes high harmonics decay faster than the
+        // fundamental over the note — bright attack, warmer tail. 1.0 = uniform decay
+        // (PluckedSynth's own default, used by tests that need reproducible behavior).
+        private const val GUITAR_BRIGHTNESS_DECAY = 0.6
     }
 }
