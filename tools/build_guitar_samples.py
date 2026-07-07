@@ -33,12 +33,11 @@ TAIL_SEC = 2.5
 FADE_SEC = 0.03
 PEAK_DBFS = -1.0
 
-# Per-instrument tone shaping (baked into the samples — the app has no runtime EQ yet).
+# Per-instrument tone shaping baked into the samples (mechanism kept for future use).
 # Each entry is a list of RBJ peaking filters (center_hz, Q, gain_dB).
-# nylon reads a touch muffled/boxy, so cut the low-mids to open it up.
-EQ = {
-    "nylon": [(600.0, 0.8, -4.0)],
-}
+# nylon's boxy low-mid used to be cut here; that's now a runtime EQ default
+# (AppState.eq[Nylon] = midDb -4) instead, so samples are built flat.
+EQ = {}
 
 
 def peaking(fc, q, gain_db):

@@ -51,6 +51,9 @@ enum class ChordScaleView { AllNotes, Positions }
  *  bank is missing (e.g. no assets bundled yet). */
 enum class GuitarSound { Synth, Acoustic, Nylon, Electric }
 
+/** Runtime 3-band EQ, one band per slider in the 🎚 Audio panel. */
+enum class Band { Bass, Mid, Treble }
+
 @Stable
 class AppState(
     private val repo: TuningRepository,
@@ -117,7 +120,8 @@ class AppState(
         sound = s
         scope.launch { repo.setGuitarSound(s.name) }
         val modern = (audio as? app.guitar.audio.SwitchableAudioEngine)?.modernEngine
-            ?: return
+        pushEq(s)   // (re)apply this sound's saved EQ whenever it becomes current
+        if (modern == null) return
         if (s == GuitarSound.Synth) { modern.voiceInstrument = null; return }
         val id = s.name.lowercase()
         bankCache[id]?.let { modern.voiceInstrument = it; return }
@@ -131,6 +135,59 @@ class AppState(
         }
     }
 
+    // ---------- Per-sound runtime EQ (Task 3) ----------
+    // Default: all flat except Nylon mid = -4 (migrated from the now-removed baked cut
+    // in tools/build_guitar_samples.py so the sound doesn't jump on upgrade).
+    private val eq = java.util.EnumMap<GuitarSound, app.guitar.audio.EqSettings>(GuitarSound::class.java).apply {
+        GuitarSound.entries.forEach { put(it, app.guitar.audio.EqSettings()) }
+        put(GuitarSound.Nylon, app.guitar.audio.EqSettings(midDb = -4f))
+    }
+
+    /** Bumped on every EQ change so slider composables (keyed off it) recompose. */
+    var eqVersion by mutableStateOf(0)
+        private set
+
+    fun eqFor(s: GuitarSound): app.guitar.audio.EqSettings = eq[s] ?: app.guitar.audio.EqSettings()
+
+    /** Push [s]'s EQ to the live engine iff [s] is the currently-selected sound. */
+    private fun pushEq(s: GuitarSound) {
+        if (s != sound) return
+        val e = eqFor(s)
+        (audio as? app.guitar.audio.SwitchableAudioEngine)?.modernEngine?.setEq(e.bassDb, e.midDb, e.trebleDb)
+    }
+
+    fun setEqBand(s: GuitarSound, band: Band, db: Float) {
+        val e = eqFor(s)
+        eq[s] = when (band) {
+            Band.Bass -> e.copy(bassDb = db)
+            Band.Mid -> e.copy(midDb = db)
+            Band.Treble -> e.copy(trebleDb = db)
+        }
+        eqVersion++
+        pushEq(s)
+        scope.launch { repo.setGuitarEq(encodeEq()) }
+    }
+
+    fun resetEq(s: GuitarSound) {
+        eq[s] = app.guitar.audio.EqSettings()
+        eqVersion++
+        pushEq(s)
+        scope.launch { repo.setGuitarEq(encodeEq()) }
+    }
+
+    private fun encodeEq(): String = GuitarSound.entries.joinToString(";") {
+        val e = eqFor(it); "${it.name},${e.bassDb},${e.midDb},${e.trebleDb}"
+    }
+
+    private fun decodeEq(s: String) {
+        s.split(";").forEach { row ->
+            val p = row.split(",")
+            if (p.size == 4) runCatching {
+                eq[GuitarSound.valueOf(p[0])] = app.guitar.audio.EqSettings(p[1].toFloat(), p[2].toFloat(), p[3].toFloat())
+            }
+        }
+    }
+
     init {
         // Restore the persisted sound choice once on startup. Reads the flow's
         // current value a single time (rather than collecting in a composable),
@@ -138,7 +195,9 @@ class AppState(
         scope.launch {
             val raw = repo.guitarSound.first()
             val restored = runCatching { GuitarSound.valueOf(raw) }.getOrDefault(GuitarSound.Synth)
-            setSound(restored)
+            val eqRaw = repo.guitarEq.first()
+            if (eqRaw.isNotBlank()) decodeEq(eqRaw)
+            setSound(restored)   // also pushes the just-restored (or default) EQ for `restored`
         }
     }
 

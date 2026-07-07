@@ -119,5 +119,26 @@ fun AudioQuickSliders(state: AppState, modifier: Modifier = Modifier) {
                 )
             }
         }
+        // Per-sound 3-band EQ (Task 3). Reading eqVersion keys this block to every
+        // EQ change so the sliders (and their labels) recompose live.
+        state.eqVersion
+        val e = state.eqFor(state.sound)
+        Spacer(Modifier.height(8.dp))
+        Text("Tone — ${state.sound.name}", style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        EqBandSlider(state, "Bass", e.bassDb, Band.Bass)
+        EqBandSlider(state, "Mid", e.midDb, Band.Mid)
+        EqBandSlider(state, "Treble", e.trebleDb, Band.Treble)
+        TextButton(onClick = { state.resetEq(state.sound) }) { Text("Flat") }
     }
+}
+
+@Composable
+private fun EqBandSlider(state: AppState, label: String, value: Float, band: Band) {
+    Text("$label: ${value.toInt()} dB", style = MaterialTheme.typography.bodySmall)
+    Slider(
+        value = value,
+        onValueChange = { state.setEqBand(state.sound, band, it) },
+        valueRange = -12f..12f,
+    )
 }
