@@ -111,7 +111,16 @@ fun App(audio: AudioEngine) {
             }.getOrNull()?.let { app.guitar.audio.WavDecoder.decode(it) }
         }
     }
-    val state = remember { AppState(repo, scope, audio, drumSampleLoader) }
+    // Loads a bundled guitar sample bank (assets/guitar/<inst>.json + wavs) for the
+    // Sound picker; null → GuitarBankLoader falls back and AppState keeps the synth.
+    val guitarBankLoader = remember(context) {
+        loader@{ inst: String ->
+            GuitarBankLoader.load(inst) { path ->
+                runCatching { context.applicationContext.assets.open(path).use { it.readBytes() } }.getOrNull()
+            }
+        }
+    }
+    val state = remember { AppState(repo, scope, audio, drumSampleLoader, guitarBankLoader) }
 
     val customTunings by state.customTunings.collectAsState(initial = emptyMap())
     val savedSelected by state.savedSelectedName.collectAsState(initial = "Standard")

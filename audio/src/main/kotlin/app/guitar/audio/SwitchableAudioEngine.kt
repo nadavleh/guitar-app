@@ -12,9 +12,14 @@ package app.guitar.audio
  * TEMPORARY — remove (along with [LegacyAudioTrackEngine]) before shipping the overhaul.
  */
 class SwitchableAudioEngine(
-    private val modern: AudioEngine,
+    private val modern: AudioTrackEngine,
     private val legacy: AudioEngine,
 ) : AudioEngine {
+
+    /** The modern voice-graph engine, exposed so callers can reach engine-specific
+     *  knobs (e.g. [AudioTrackEngine.voiceInstrument]) that aren't part of the
+     *  generic [AudioEngine] surface. */
+    val modernEngine: AudioTrackEngine get() = modern
 
     @Volatile
     var useModern: Boolean = true

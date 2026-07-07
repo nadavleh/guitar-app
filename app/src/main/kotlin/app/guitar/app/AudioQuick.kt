@@ -1,6 +1,7 @@
 package app.guitar.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -99,6 +100,24 @@ fun AudioQuickSliders(state: AppState, modifier: Modifier = Modifier) {
                 checked = state.useModernAudio,
                 onCheckedChange = { state.setUseModernAudio(it) },
             )
+        }
+        // Guitar voice picker (Task 4). Sampled sounds fall back to the synth
+        // until sample banks are bundled in assets/guitar/.
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Sound" + if (state.soundLoading) " (loading…)" else "",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            GuitarSound.entries.forEach { gs ->
+                val sel = state.sound == gs
+                androidx.compose.material3.FilterChip(
+                    selected = sel,
+                    onClick = { state.setSound(gs) },
+                    label = { Text(gs.name) },
+                )
+            }
         }
     }
 }

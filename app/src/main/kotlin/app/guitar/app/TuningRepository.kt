@@ -177,6 +177,16 @@ class TuningRepository(private val context: Context) {
         context.tuningDataStore.edit { prefs -> prefs[keyInstrument] = value }
     }
 
+    private val keyGuitarSound = stringPreferencesKey("guitar_sound")
+
+    /** Selected guitar voice/timbre (GuitarSound enum name). Default "Synth". */
+    val guitarSound: Flow<String> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyGuitarSound] ?: "Synth" }
+
+    suspend fun setGuitarSound(value: String) {
+        context.tuningDataStore.edit { prefs -> prefs[keyGuitarSound] = value }
+    }
+
     // ---------- Progression-challenge high scores ----------
 
     private val keyChallengeScores = stringPreferencesKey("challenge_scores")

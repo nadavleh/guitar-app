@@ -25,7 +25,9 @@ import app.guitar.theory.VoicingStyle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 const val MIDI_MIN = 28   // E1
 const val MIDI_MAX = 84   // C6
@@ -44,6 +46,11 @@ enum class Sheet { Fretboard, Options, Loop, Tuner, EarTraining, SambaLooper, De
 /** All-notes vs single-position view, for chord & scale display. */
 enum class ChordScaleView { AllNotes, Positions }
 
+/** Selectable guitar voice/timbre. Synth = Karplus-Strong (no sample bank needed);
+ *  the others load a bundled sample bank (Task 3/4) and fall back to Synth if the
+ *  bank is missing (e.g. no assets bundled yet). */
+enum class GuitarSound { Synth, Acoustic, Nylon, Electric }
+
 @Stable
 class AppState(
     private val repo: TuningRepository,
@@ -53,6 +60,9 @@ class AppState(
      *  to the synth. Supplied by the Activity (needs asset access). */
     private val drumSampleLoader: (app.guitar.theory.PercussionInstrument, Int) -> FloatArray? =
         { _, _ -> null },
+    /** Loads a bundled guitar sample bank for a [GuitarSound] id (lowercase name),
+     *  or null to fall back to the synth. Supplied by the Activity (needs asset access). */
+    private val guitarBankLoader: (String) -> app.guitar.audio.SampleInstrument? = { null },
 ) {
     var instrument by mutableStateOf(Instrument.Guitar)
     var tuningName by mutableStateOf("Standard")
@@ -86,6 +96,50 @@ class AppState(
     fun setUseModernAudio(value: Boolean) {
         useModernAudio = value
         (audio as? app.guitar.audio.SwitchableAudioEngine)?.setUseModern(value)
+    }
+
+    /** Selected guitar voice (Task 4). Synth = Karplus-Strong; the others load a
+     *  sample bank onto the modern engine's [app.guitar.audio.AudioTrackEngine.voiceInstrument]
+     *  (falls back to Synth if no bank is bundled). Persisted. */
+    var sound by mutableStateOf(GuitarSound.Synth)
+        private set
+
+    /** True while a sample bank is being decoded off-thread for a just-selected sound. */
+    var soundLoading by mutableStateOf(false)
+        private set
+
+    /** Decoded banks, keyed by lowercase [GuitarSound] name, so switching back to an
+     *  already-loaded sound is instant. */
+    private val bankCache = HashMap<String, app.guitar.audio.SampleInstrument>()
+
+    @JvmName("applySound")
+    fun setSound(s: GuitarSound) {
+        sound = s
+        scope.launch { repo.setGuitarSound(s.name) }
+        val modern = (audio as? app.guitar.audio.SwitchableAudioEngine)?.modernEngine
+            ?: return
+        if (s == GuitarSound.Synth) { modern.voiceInstrument = null; return }
+        val id = s.name.lowercase()
+        bankCache[id]?.let { modern.voiceInstrument = it; return }
+        soundLoading = true
+        scope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            val bank = guitarBankLoader(id)
+            withContext(kotlinx.coroutines.Dispatchers.Main) {
+                if (bank != null) { bankCache[id] = bank; if (sound == s) modern.voiceInstrument = bank }
+                soundLoading = false
+            }
+        }
+    }
+
+    init {
+        // Restore the persisted sound choice once on startup. Reads the flow's
+        // current value a single time (rather than collecting in a composable),
+        // so this can't race a stale UI default into overwriting the saved pref.
+        scope.launch {
+            val raw = repo.guitarSound.first()
+            val restored = runCatching { GuitarSound.valueOf(raw) }.getOrDefault(GuitarSound.Synth)
+            setSound(restored)
+        }
     }
 
     var chordInput by mutableStateOf("Cmaj7")
