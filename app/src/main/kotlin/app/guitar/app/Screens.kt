@@ -541,11 +541,14 @@ fun LoopScreen(state: AppState) {
                 }
             }
             Spacer(Modifier.width(8.dp))
-            // Don't stop the loop when navigating away — the user wants to watch
-            // the chords sound on the main fretboard live. The Stop button above
-            // is the explicit way to halt playback.
-            OutlinedButton(onClick = { state.closeSheet() }) {
-                Text(if (state.isLooping) "Watch on neck ▶" else "Back")
+            // "Watch on neck": start playback (if not already) and jump to the main
+            // fretboard so the sounding chords light up live. Don't stop the loop when
+            // navigating away — the Stop button above is the explicit way to halt it.
+            OutlinedButton(onClick = {
+                if (!state.isLooping && state.loopHasChords) state.startLoop()
+                state.closeSheet()
+            }) {
+                Text(if (state.isLooping || state.loopHasChords) "Watch on neck ▶" else "Back")
             }
         }
 
@@ -556,7 +559,7 @@ fun LoopScreen(state: AppState) {
         androidx.compose.material3.Slider(
             value = state.bpm.toFloat(),
             onValueChange = { state.bpm = it.toInt() },
-            valueRange = 10f..200f,
+            valueRange = 10f..300f,
         )
         Spacer(Modifier.height(4.dp))
         FlowRow(

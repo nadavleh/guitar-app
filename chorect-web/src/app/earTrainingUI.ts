@@ -79,6 +79,7 @@ export class EarTrainingUI {
 
   private statsOpen = false;
   private libraryOpen = false;
+  private playbackOpen = false;
   /** Which progression-library row is expanded (single-open accordion), or null. */
   private libExpandedKey: string | null = null;
   /** Whether the expanded row's follow-along fretboard is shown. */
@@ -185,8 +186,18 @@ export class EarTrainingUI {
         },
       );
       const libBtn = btn("Library", () => { this.libraryOpen = true; this.rerender(); });
+      // "Playback ▾" disclosure holding Tempo + Strum — shared by every generator and
+      // both modes (tasks #4/#10). A native <details> keeps its open state across
+      // rerenders via this.playbackOpen so dragging a slider doesn't collapse it.
+      const playback = el("details", { class: "et-playback" }, [
+        el("summary", {}, ["Playback ▾"]),
+      ]) as HTMLDetailsElement;
+      playback.open = this.playbackOpen;
+      playback.addEventListener("toggle", () => { this.playbackOpen = playback.open; });
+      this.tempoStrumSliders(playback);
       screen.appendChild(el("div", { style: "display:flex;gap:8px;align-items:center;margin:4px 0" }, [
         el("div", { style: "flex:1" }, [genSelect]),
+        playback,
         libBtn,
       ]));
       screen.appendChild(el("div", { class: "et-muted", style: "font-size:12px;font-style:italic;margin-bottom:6px" }, [genCaption]));
@@ -398,7 +409,7 @@ export class EarTrainingUI {
   private tempoStrumSliders(parent: HTMLElement): void {
     const ear = this.ear, s = this.state;
     parent.appendChild(el("div", { style: "margin-top:8px" }, [`Tempo: ${ear.progBpm} BPM`]));
-    parent.appendChild(slider(10, 200, ear.progBpm, (v) => { ear.progBpm = Math.round(v); this.rerender(); }));
+    parent.appendChild(slider(10, 300, ear.progBpm, (v) => { ear.progBpm = Math.round(v); this.rerender(); }));
     parent.appendChild(el("div", { class: "et-muted" }, [s.strumMs === 0 ? "Strum: struck at once" : `Strum: ${s.strumMs} ms`]));
     parent.appendChild(slider(0, 150, s.strumMs, (v) => s.setStrumMs(v)));
   }
@@ -497,7 +508,7 @@ export class EarTrainingUI {
   private progressionView(parent: HTMLElement): void {
     const ear = this.ear, s = this.state;
     this.progressionSettings(parent);
-    this.tempoStrumSliders(parent);
+    // Tempo + strum now live in the header "Playback ▾" dropdown (tasks #4/#10).
     parent.appendChild(el("div", { class: "v-gap-12" }));
 
     if (!ear.hasGenerated) {
@@ -581,8 +592,7 @@ export class EarTrainingUI {
     ]));
     // Transpose shifts the key/chords but not the degrees, so it's safe in the challenge.
     parent.appendChild(this.transposeRow());
-    parent.appendChild(el("div", { style: "margin-top:8px" }, [`BPM: ${ear.progBpm}`]));
-    parent.appendChild(slider(10, 200, ear.progBpm, (v) => { ear.progBpm = Math.round(v); this.rerender(); }));
+    // BPM + strum now live in the header "Playback ▾" dropdown (tasks #4/#10).
     parent.appendChild(this.revealCard("Key & Mode (hint)", !ear.keyRevealed,
       spellPc(ear.progKey) + "  " + (ear.progMode === TrainingMode.Major ? "Major" : "Minor"),
       () => ear.toggleKeyModeReveal(), false));

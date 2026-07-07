@@ -63,7 +63,7 @@ export class SambaLooperUI {
       btn("Tap", () => s.tapTempo()),
       btn(s.metronome ? "Metro ✓" : "Metro", () => s.toggleMetronome(), s.metronome ? "btn primary" : "btn"),
     ]));
-    body.appendChild(slider(10, 200, s.bpm, (v) => s.setBpm(v)));
+    body.appendChild(slider(10, 300, s.bpm, (v) => s.setBpm(v)));
     // Swing only acts on a 1/16 grid (a quarter-note split into four 16ths): it
     // holds the 1st & 3rd 16ths, delays the 2nd, and pulls the 4th early. On any
     // other division it does nothing, so the slider is disabled and says why.
@@ -227,24 +227,31 @@ export class SambaLooperUI {
     const slots = s.pattern.slots;
     const { slotsPerBeat, slotsPerBar } = s.meter;
     const cells = el("div", { class: audible ? "drum-cells" : "drum-cells dim" });
+    const perBeat = Math.max(slotsPerBeat, 1);
     for (let slot = 0; slot < slots; slot++) {
-      cells.appendChild(this.cell(inst, slot));
+      cells.appendChild(this.cell(inst, slot, Math.floor(slot / perBeat), slot % perBeat === 0));
       // Beat separators: a gap after each beat; a wider gap at each bar line.
       if ((slot + 1) % slotsPerBeat === 0 && slot !== slots - 1) {
         const w = (slot + 1) % slotsPerBar === 0 ? 6 : 3;
-        cells.appendChild(el("div", { style: `flex:0 0 ${w}px` }));
+        cells.appendChild(el("div", { class: "drum-gap", style: `flex:0 0 ${w}px` }));
       }
     }
 
     return el("div", { class: "drum-row" }, [label, cells]);
   }
 
-  private cell(inst: PercussionInstrument, slot: number): HTMLElement {
+  private cell(inst: PercussionInstrument, slot: number, beatIndex: number, isBeatStart: boolean): HTMLElement {
     const s = this.samba;
     const voice = s.pattern.voiceAt(inst, slot);
     const accented = s.pattern.isAccented(inst, slot);
     const isPlayhead = s.currentSlot === slot;
-    const fill = voice === null ? "rgba(120,128,144,0.25)"
+    // Empty cells brightened (were near-invisible on black) and tinted per beat-group
+    // so the quarter-note grouping reads at a glance (#7): first 16th of each beat is
+    // brightest; alternating beats step between two shades.
+    const emptyFill = isBeatStart ? "rgba(120,128,144,0.55)"
+      : beatIndex % 2 === 0 ? "rgba(120,128,144,0.42)"
+      : "rgba(120,128,144,0.30)";
+    const fill = voice === null ? emptyFill
       : voice === 0 ? Colors.primary
       : voice === 1 ? Colors.scaleTone
       : Colors.chordTone;

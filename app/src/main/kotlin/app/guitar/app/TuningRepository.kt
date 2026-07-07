@@ -159,7 +159,7 @@ class TuningRepository(private val context: Context) {
     /** Whether tapping the fretboard plays on touch-down (true) or tap-release
      *  (false, default — lets horizontal swipes scroll without sounding a note). */
     val tapOnTouchDown: Flow<Boolean> =
-        context.tuningDataStore.data.map { prefs -> prefs[keyTapOnTouchDown] ?: false }
+        context.tuningDataStore.data.map { prefs -> prefs[keyTapOnTouchDown] ?: true }
 
     suspend fun setTapOnTouchDown(value: Boolean) {
         context.tuningDataStore.edit { prefs -> prefs[keyTapOnTouchDown] = value }

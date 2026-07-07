@@ -9,6 +9,7 @@ import app.guitar.audio.PercussionSynth
 import app.guitar.theory.PercussionCatalog
 import app.guitar.theory.PercussionInstrument
 import app.guitar.theory.PercussionMeter
+import app.guitar.theory.PercussionBuiltins
 import app.guitar.theory.PercussionPattern
 import app.guitar.theory.PercussionTiming
 import app.guitar.theory.PercussionVoices
@@ -38,9 +39,12 @@ class SambaLooperState(
      *  back to the built-in synth. Injected so the pure state stays Context-free. */
     private val sampleLoader: (PercussionInstrument, Int) -> FloatArray? = { _, _ -> null },
 ) {
-    var pattern by mutableStateOf(PercussionPattern.empty())
+    // Default-load the "teleco-teco 1" groove so the machine opens with a musical
+    // starting point instead of a blank grid (#11). The user can Clear all or Load
+    // another beat from there.
+    var pattern by mutableStateOf(PercussionBuiltins.TELECOTECO_1)
         private set
-    var bpm by mutableStateOf(140)
+    var bpm by mutableStateOf(70)
     /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
     var swing by mutableStateOf(0)
     /** Metronome click on each beat (accented on bar downbeats). */
@@ -56,7 +60,7 @@ class SambaLooperState(
         while (tapTimes.size > 6) tapTimes.removeAt(0)
         if (tapTimes.size >= 2) {
             val avg = (tapTimes.last() - tapTimes.first()).toDouble() / (tapTimes.size - 1)
-            bpm = (60_000.0 / avg).toInt().coerceIn(10, 200)
+            bpm = (60_000.0 / avg).toInt().coerceIn(10, 300)
         }
     }
     /** Slot currently sounding (0..15), or -1 when stopped. Drives the playhead. */

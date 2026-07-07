@@ -94,6 +94,7 @@ const MAJOR: Record<string, SongExample[]> = {
   ],
   "1,3,6,4": [
     s("Someone Like You", "Adele"),
+    s("The Greatest Show", "The Greatest Showman Cast"),
   ],
   "6,2,5,1": [
     s("Island in the Sun", "Weezer"),
@@ -344,6 +345,7 @@ const ADVANCED: Record<string, SongExample[]> = {
   ],
   "Tonicized Relative": [
     s("Santeria", "Sublime"),
+    s("Georgia on My Mind", "Ray Charles"),
   ],
   "Applied V of ii": [
     s("Fly Me to the Moon", "Frank Sinatra"),
@@ -377,6 +379,10 @@ const ADVANCED: Record<string, SongExample[]> = {
   ],
   "Flat-Three Borrowed": [
     s("Smells Like Teen Spirit", "Nirvana"),
+    s("Purple Haze", "Jimi Hendrix"),
+    s("After Midnight", "J.J. Cale"),
+    s("Thank You (Falettinme Be Mice Elf Agin)", "Sly & the Family Stone"),
+    s("Will It Go Round in Circles", "Billy Preston"),
   ],
   "Chromatic Descent": [
     s("My Funny Valentine", "Chet Baker"),

@@ -2,6 +2,8 @@ package app.guitar.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -40,8 +41,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -49,7 +50,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -75,6 +78,14 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     var eraseMode by remember { mutableStateOf(false) }
     // Accent tool: when on, tapping a non-silent cell toggles its accent (louder hit).
     var accentMode by remember { mutableStateOf(false) }
+    // Free-transform state for the drum-loop grid (#6). scaleX/scaleY are INDEPENDENT so
+    // you can stretch just the width (widen narrow cells) or just the height. Two-finger
+    // pinch zooms + pans; single-finger drag pans once zoomed. Pure render-layer effect
+    // (graphicsLayer) over a grid whose 16 cells fit the width at 1× by default.
+    var scaleX by remember { mutableFloatStateOf(1f) }
+    var scaleY by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
 
     Column(
         modifier = Modifier
@@ -118,7 +129,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             Slider(
                 value = samba.bpm.toFloat(),
                 onValueChange = { samba.bpm = it.toInt() },
-                valueRange = 10f..200f,
+                valueRange = 10f..300f,
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(8.dp))
@@ -165,55 +176,108 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
         Spacer(Modifier.height(8.dp))
 
         // ----- Grid -----
-        // The grid has a FIXED height (not weight) so each instrument row always has
-        // room for its name, the ▾ voice popup, and the M/S toggles — nothing gets
-        // clipped in short-height (landscape) layouts. Height scales with the current
-        // kit size; the whole screen scrolls vertically when the kit is large.
+        // All 16 (× bars) step cells fit the width at 1× (fill-width, no horizontal
+        // scroll) so the whole cycle is visible at a glance in landscape. Pinch to
+        // zoom in (independent X/Y) and pan for a closer look; a subtle beat-group
+        // tint + wider bar gaps make the quarter-note grouping easy to read (#6/#7).
         val kit = samba.pattern.instruments
-        // Cells are a FIXED size and the step lane scrolls horizontally (shared
-        // across all rows), so each cell looks the same regardless of orientation /
-        // aspect ratio — instead of stretching to fill the width. The instrument
-        // label column stays pinned on the left while the lane scrolls.
-        val cellScroll = rememberScrollState()
-        // Auto-follow the playhead: while playing, keep the sounding column visible
-        // by centering the shared lane scroll on it (fixed cells → position is
-        // computable: k cells + beat/bar separator gaps before slot k).
-        val density = androidx.compose.ui.platform.LocalDensity.current
-        LaunchedEffect(samba.currentSlot, samba.isPlaying) {
-            val slot = samba.currentSlot
-            if (!samba.isPlaying || slot < 0) return@LaunchedEffect
-            val perBeat = samba.meter.slotsPerBeat
-            val perBar = samba.meter.slotsPerBar
-            val beatGaps = if (perBeat > 0) slot / perBeat else 0
-            val barGaps = if (perBar > 0) slot / perBar else 0
-            val xDp = slot * CELL_DP + beatGaps * 3 + barGaps * 3   // bar gap = 6 (3 extra)
-            val xPx = with(density) { xDp.dp.toPx() }.toInt()
-            val target = (xPx - cellScroll.viewportSize / 2).coerceAtLeast(0)
-            cellScroll.scrollTo(target)
-        }
-        Column(modifier = Modifier.fillMaxWidth()) {
-            for ((i, inst) in kit.withIndex()) {
-                InstrumentRow(
-                    samba = samba,
-                    instrument = inst,
-                    eraseMode = eraseMode,
-                    accentMode = accentMode,
-                    cellScroll = cellScroll,
-                    modifier = Modifier.height(ROW_HEIGHT_DP.dp).fillMaxWidth(),
-                )
-                if (i != kit.lastIndex) {
-                    Spacer(Modifier.height(6.dp))
+        val rowCount = kit.size.coerceAtLeast(1)
+        val gridHeight = (rowCount * ROW_HEIGHT_DP + (rowCount - 1) * 6 + CAPTION_DP).dp
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(gridHeight)
+                .clipToBounds()
+                // Gestures on the CONTAINER (never on a cell, so cell taps still hit):
+                //  • 2 fingers → independent X/Y zoom (aspect ratio) + pan.
+                //  • 1 finger, when zoomed → drag-pan the grid.
+                //  • 1 finger, when NOT zoomed → not consumed, so it falls through to
+                //    the page scroll and to the per-cell tap/long-press handlers.
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        var dragging = false
+                        var totalDrag = 0f
+                        val slop = viewConfiguration.touchSlop
+                        do {
+                            val event = awaitPointerEvent()
+                            val pressed = event.changes.filter { it.pressed }
+                            if (pressed.size >= 2) {
+                                val a = pressed[0]; val b = pressed[1]
+                                val curDx = kotlin.math.abs(a.position.x - b.position.x)
+                                val curDy = kotlin.math.abs(a.position.y - b.position.y)
+                                val preDx = kotlin.math.abs(a.previousPosition.x - b.previousPosition.x)
+                                val preDy = kotlin.math.abs(a.previousPosition.y - b.previousPosition.y)
+                                val zx = if (preDx > 10f) curDx / preDx else 1f
+                                val zy = if (preDy > 10f) curDy / preDy else 1f
+                                val cenX = (a.position.x + b.position.x) / 2f
+                                val cenY = (a.position.y + b.position.y) / 2f
+                                val panX = cenX - (a.previousPosition.x + b.previousPosition.x) / 2f
+                                val panY = cenY - (a.previousPosition.y + b.previousPosition.y) / 2f
+                                val oldSx = scaleX; val oldSy = scaleY
+                                scaleX = (scaleX * zx).coerceIn(0.4f, 4f)
+                                scaleY = (scaleY * zy).coerceIn(0.4f, 4f)
+                                val mx = kotlin.math.max(0f, size.width * (scaleX - 1f) / 2f)
+                                val my = kotlin.math.max(0f, size.height * (scaleY - 1f) / 2f)
+                                offsetX = (offsetX + panX + (cenX - size.width / 2f) * (oldSx - scaleX)).coerceIn(-mx, mx)
+                                offsetY = (offsetY + panY + (cenY - size.height / 2f) * (oldSy - scaleY)).coerceIn(-my, my)
+                                event.changes.forEach { it.consume() }
+                                dragging = true
+                            } else if (pressed.size == 1 && (scaleX > 1.001f || scaleY > 1.001f)) {
+                                val ch = pressed[0]
+                                val dx = ch.position.x - ch.previousPosition.x
+                                val dy = ch.position.y - ch.previousPosition.y
+                                totalDrag += kotlin.math.abs(dx) + kotlin.math.abs(dy)
+                                if (dragging || totalDrag > slop) {
+                                    dragging = true
+                                    val mx = kotlin.math.max(0f, size.width * (scaleX - 1f) / 2f)
+                                    val my = kotlin.math.max(0f, size.height * (scaleY - 1f) / 2f)
+                                    offsetX = (offsetX + dx).coerceIn(-mx, mx)
+                                    offsetY = (offsetY + dy).coerceIn(-my, my)
+                                    ch.consume()
+                                }
+                            }
+                        } while (event.changes.any { it.pressed })
+                    }
+                },
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        this.scaleX = scaleX
+                        this.scaleY = scaleY
+                        translationX = offsetX
+                        translationY = offsetY
+                    },
+            ) {
+                for ((i, inst) in kit.withIndex()) {
+                    InstrumentRow(
+                        samba = samba,
+                        instrument = inst,
+                        eraseMode = eraseMode,
+                        accentMode = accentMode,
+                        modifier = Modifier.height(ROW_HEIGHT_DP.dp).fillMaxWidth(),
+                    )
+                    if (i != kit.lastIndex) {
+                        Spacer(Modifier.height(6.dp))
+                    }
+                }
+                // Beat / bar caption
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.width(ROW_LABEL_DP.dp))
+                    Text(
+                        samba.meter.describe(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
                 }
             }
-            // Beat / bar caption
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Spacer(Modifier.width(ROW_LABEL_DP.dp))
-                Text(
-                    samba.meter.describe(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
+        }
+        if (scaleX > 1.001f || scaleY > 1.001f || offsetX != 0f || offsetY != 0f) {
+            TextButton(onClick = { scaleX = 1f; scaleY = 1f; offsetX = 0f; offsetY = 0f }) {
+                Text("Reset zoom")
             }
         }
 
@@ -320,7 +384,6 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
 private const val ROW_LABEL_DP = 128
 private const val ROW_HEIGHT_DP = 70   // per-instrument row: name + ▾ + M/S all fit
 private const val CAPTION_DP = 18      // bar/beat caption strip below the rows
-private const val CELL_DP = 34         // fixed step-cell width → consistent across orientations
 
 private val STEP_PAD = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp)
 
@@ -418,7 +481,6 @@ private fun InstrumentRow(
     instrument: PercussionInstrument,
     eraseMode: Boolean,
     accentMode: Boolean,
-    cellScroll: androidx.compose.foundation.ScrollState,
     modifier: Modifier = Modifier,
 ) {
     val voices = PercussionVoices.voicesFor(instrument)
@@ -510,14 +572,16 @@ private fun InstrumentRow(
             }
         }
         // ---- step cells (dimmed when the track isn't audible) ----
+        // Fill-width (weight per cell) so the whole cycle fits at 1×; pinch-zoom the
+        // container to enlarge. Beat-group index drives an alternating tint so the
+        // quarter-note groups (4 sixteenths each) are easy to count.
         val slots = samba.pattern.slots
-        val slotsPerBeat = samba.meter.slotsPerBeat
-        val slotsPerBar = samba.meter.slotsPerBar
+        val slotsPerBeat = samba.meter.slotsPerBeat.coerceAtLeast(1)
+        val slotsPerBar = samba.meter.slotsPerBar.coerceAtLeast(1)
         Row(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .horizontalScroll(cellScroll)
                 .alpha(if (audible) 1f else 0.4f),
         ) {
             for (slot in 0 until slots) {
@@ -525,11 +589,11 @@ private fun InstrumentRow(
                     samba = samba,
                     instrument = instrument,
                     slot = slot,
+                    beatIndex = slot / slotsPerBeat,
+                    isBeatStart = slot % slotsPerBeat == 0,
                     eraseMode = eraseMode,
                     accentMode = accentMode,
-                    // Fixed cell size → consistent "resolution" in any orientation;
-                    // the lane scrolls horizontally instead of squishing.
-                    modifier = Modifier.width(CELL_DP.dp).fillMaxHeight().padding(1.dp),
+                    modifier = Modifier.weight(1f).fillMaxHeight().padding(1.dp),
                 )
                 // Beat separators: a gap after each beat; a wider gap at each bar line.
                 if ((slot + 1) % slotsPerBeat == 0 && slot != slots - 1) {
@@ -572,6 +636,8 @@ private fun Cell(
     samba: SambaLooperState,
     instrument: PercussionInstrument,
     slot: Int,
+    beatIndex: Int,
+    isBeatStart: Boolean,
     eraseMode: Boolean,
     accentMode: Boolean,
     modifier: Modifier = Modifier,
@@ -580,8 +646,16 @@ private fun Cell(
     val accented = samba.pattern.isAccented(instrument, slot)
     val isPlayhead = samba.currentSlot == slot
     val base = MaterialTheme.colorScheme.surfaceVariant
+    // Empty cells are brightened (were near-invisible on the black background) and
+    // tinted per beat-group so the quarter-note grouping reads at a glance: the first
+    // 16th of each beat is brightest, and alternating beats step between two shades.
+    val emptyFill = when {
+        isBeatStart -> base.copy(alpha = 0.95f)
+        beatIndex % 2 == 0 -> base.copy(alpha = 0.75f)
+        else -> base.copy(alpha = 0.6f)
+    }
     val fill = when (voice) {
-        null -> base.copy(alpha = 0.4f)
+        null -> emptyFill
         0 -> MaterialTheme.colorScheme.primary
         1 -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.secondary

@@ -326,7 +326,9 @@ export const TELECOTECO_1 = builtin(
   "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
   "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
   "pandeiro=0,3,2,0,0,3,2,0,0,3,2,0,0,3,2,0" + "|" +
-  "agogo=-,0,-,1,-,-,0,-,0,-,0,-,1,-,-,0",
+  // Agogô (#12): low bell ▼ (voice 0) on steps 1,7,9,16; high bell ▲ (voice 1)
+  // on steps 4,5,11,13,14 — 0-indexed slots below.
+  "agogo=0,-,-,1,1,-,0,-,0,-,1,-,1,1,-,0",
 );
 
 export const TELECOTECO_2 = builtin(

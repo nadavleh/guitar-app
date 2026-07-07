@@ -124,7 +124,7 @@ export class AppState {
   a4Hz = 440;
   ringSustainMs = 1500;
   strumMs = 30;
-  tapOnTouchDown = false;
+  tapOnTouchDown = true;
 
   /** Selected guitar sound; "Synth" plays through the plucked-string synth,
    *  the rest through a fetched sampled bank (see `setSound`). */

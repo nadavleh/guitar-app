@@ -24,7 +24,10 @@ export class LoopUI {
       el("div", { class: "tool-title" }, ["LOOP"]),
       L.isLooping ? btn("Stop ⏹", () => L.stopLoop(), "btn primary")
         : (() => { const b = btn("Play ▶", () => L.startLoop(), "btn primary"); if (!L.hasAnyChord()) b.disabled = true; return b; })(),
-      btn(L.isLooping ? "Watch on neck ▶" : "Back", () => this.onBack()),
+      btn(L.isLooping || L.hasAnyChord() ? "Watch on neck ▶" : "Back", () => {
+        if (!L.isLooping && L.hasAnyChord()) L.startLoop();
+        this.onBack();
+      }),
     ]));
 
     const body = el("div", { class: "et-scroll" });
@@ -32,7 +35,7 @@ export class LoopUI {
 
     // tempo
     body.appendChild(el("div", {}, [`Tempo: ${L.bpm} BPM`]));
-    body.appendChild(slider(10, 200, L.bpm, (v) => L.setBpm(v)));
+    body.appendChild(slider(10, 300, L.bpm, (v) => L.setBpm(v)));
 
     // slots/bar + bars
     body.appendChild(el("div", { class: "et-row-gap", style: "margin-top:6px" }, [

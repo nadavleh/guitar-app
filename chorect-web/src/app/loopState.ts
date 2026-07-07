@@ -45,7 +45,7 @@ export interface LoopDeps {
 }
 
 export class LoopState {
-  bpm = 80;
+  bpm = 150;
   slotsPerBar = 1;
   progression: LoopSlot[][] = defaultProgression();
   isLooping = false;
@@ -166,10 +166,28 @@ export class LoopState {
 
   // ---- transport ----
 
+  /** First playable chord shape in the progression, or null if empty. Lights the
+   *  neck immediately on "Watch on neck" without waiting for the first sounding slot. */
+  private firstLoopShape(): ChordShape | null {
+    for (const bar of this.progression) {
+      for (const s of bar) {
+        const parsed = s.chordSymbol ? parseChord(s.chordSymbol) : null;
+        if (!parsed) continue;
+        const shapes = this.gen().shapesFor(parsed[0], parsed[1], this.deps.tuningProvider(), DISPLAY_FRETS);
+        if (shapes.length === 0) continue;
+        return shapes[s.voicingIndex] ?? shapes[0];
+      }
+    }
+    return null;
+  }
+
   startLoop() {
     if (this.isLooping) return;
     this.ensureNormalized();
     this.isLooping = true;
+    // Seed the neck with the first chord's shape so "Watch on neck" shows notes
+    // immediately, instead of a blank neck until the first slot plays.
+    this.playingShape = this.firstLoopShape() ?? this.playingShape;
     this.token++;
     const token = this.token;
     this.notify();

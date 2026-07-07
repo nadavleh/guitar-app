@@ -5,7 +5,7 @@
 import {
   PercussionInstrument, PercussionCatalog,
   PercussionMeter, PercussionPattern, swungSlotMs, voiceCount,
-  BEAT_UNITS, DIVISIONS,
+  BEAT_UNITS, DIVISIONS, TELECOTECO_1,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
 
@@ -25,8 +25,10 @@ export interface SambaDeps {
 }
 
 export class SambaLooperState {
-  pattern: PercussionPattern = PercussionPattern.empty();
-  bpm = 140;
+  // Default-load "teleco-teco 1" so the machine opens with a musical starting point
+  // instead of a blank grid (#11). Clear all / Load swaps it out.
+  pattern: PercussionPattern = TELECOTECO_1;
+  bpm = 70;
   swing = 0;
   /** Metronome click on each beat (accented on bar downbeats). */
   metronome = false;
@@ -41,7 +43,7 @@ export class SambaLooperState {
     while (this.tapTimes.length > 6) this.tapTimes.shift();
     if (this.tapTimes.length >= 2) {
       const avg = (this.tapTimes[this.tapTimes.length - 1] - this.tapTimes[0]) / (this.tapTimes.length - 1);
-      this.bpm = Math.min(Math.max(Math.round(60000 / avg), 10), 200);
+      this.bpm = Math.min(Math.max(Math.round(60000 / avg), 10), 300);
     }
     this.notify();
   }

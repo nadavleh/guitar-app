@@ -285,7 +285,7 @@ class AppState(
 
     /** Fretboard tap behaviour. false (default) = play on tap-release so a swipe
      *  scrolls the neck without sounding a note; true = play on touch-down. */
-    var tapOnTouchDown by mutableStateOf(false)
+    var tapOnTouchDown by mutableStateOf(true)
 
     @JvmName("applyTapOnTouchDown")
     fun setTapOnTouchDown(value: Boolean) {
@@ -369,7 +369,7 @@ class AppState(
     // Loop builder state.
     // The progression is a List<List<LoopSlot>>: each inner list is one bar; each slot is one beat.
     // slotsPerBar lets the user split a bar into 1 (whole-note), 2 (half-note), or 4 (quarter-note).
-    var bpm by mutableStateOf(80)
+    var bpm by mutableStateOf(150)
     var slotsPerBar by mutableStateOf(1)   // start with one chord per bar (whole-bar slots)
     var loopProgression by mutableStateOf(DEFAULT_PROGRESSION)
     var isLooping by mutableStateOf(false)
@@ -727,9 +727,32 @@ class AppState(
         loopProgression = (0 until clamped).map { loopProgression.getOrNull(it) ?: empty }
     }
 
+    /** First playable chord shape in the progression, or null if the loop is empty.
+     *  Used to light the neck immediately when "Watch on neck" is pressed, without
+     *  waiting for the playback coroutine to reach the first sounding slot. */
+    private fun firstLoopShape(): app.guitar.theory.ChordShape? {
+        for (bar in loopProgression) {
+            for (slot in bar) {
+                val parsed = slot.chordSymbol?.let { ChordLibrary.parse(it) } ?: continue
+                val (root, q) = parsed
+                val shapes = loopShapeGen.shapesFor(root, q, liveTuning, frets = DISPLAY_FRETS)
+                if (shapes.isEmpty()) continue
+                return shapes.getOrNull(slot.voicingIndex) ?: shapes.first()
+            }
+        }
+        return null
+    }
+
+    /** True when the progression has at least one chord to play. */
+    val loopHasChords: Boolean
+        get() = loopProgression.any { bar -> bar.any { it.chordSymbol != null } }
+
     fun startLoop() {
         if (isLooping) return
         isLooping = true
+        // Seed the neck with the first chord's shape so "Watch on neck" shows notes
+        // the instant the user navigates, instead of a blank neck until the first slot.
+        loopPlayingShape = firstLoopShape() ?: loopPlayingShape
         loopJob = scope.launch {
             while (isLooping) {
                 for (barIdx in loopProgression.indices) {

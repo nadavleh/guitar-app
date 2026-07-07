@@ -130,7 +130,7 @@ fun App(audio: AudioEngine) {
     val persistedA4 by repo.a4Hz.collectAsState(initial = 440f)
     val persistedSustain by repo.ringSustainMs.collectAsState(initial = 1500)
     val persistedStrum by repo.strumMs.collectAsState(initial = 30)
-    val persistedTapOnTouchDown by repo.tapOnTouchDown.collectAsState(initial = false)
+    val persistedTapOnTouchDown by repo.tapOnTouchDown.collectAsState(initial = true)
     val persistedInstrument by repo.instrument.collectAsState(initial = app.guitar.theory.Instrument.Guitar.name)
 
     LaunchedEffect(savedSelected, customTunings) {

@@ -107,6 +107,7 @@ object ProgressionSongs {
         ),
         listOf(1, 3, 6, 4) to listOf(   // I–iii–vi–IV (soft tonic family)
             s("Someone Like You", "Adele"),
+            s("The Greatest Show", "The Greatest Showman Cast"),
         ),
         listOf(6, 2, 5, 1) to listOf(   // vi–ii–V–I
             s("Island in the Sun", "Weezer"),
@@ -359,6 +360,7 @@ object ProgressionSongs {
         ),
         "Tonicized Relative" to listOf(   // I–III7–vi–I
             s("Santeria", "Sublime"),
+            s("Georgia on My Mind", "Ray Charles"),
         ),
         "Applied V of ii" to listOf(   // I–VI7–ii–V–I
             s("Fly Me to the Moon", "Frank Sinatra"),
@@ -392,6 +394,10 @@ object ProgressionSongs {
         ),
         "Flat-Three Borrowed" to listOf(   // I–bIII–IV–I
             s("Smells Like Teen Spirit", "Nirvana"),
+            s("Purple Haze", "Jimi Hendrix"),
+            s("After Midnight", "J.J. Cale"),
+            s("Thank You (Falettinme Be Mice Elf Agin)", "Sly & the Family Stone"),
+            s("Will It Go Round in Circles", "Billy Preston"),
         ),
         "Chromatic Descent" to listOf(   // I–iii–bIII–ii–V (characteristic descending-bass examples)
             s("My Funny Valentine", "Chet Baker"),

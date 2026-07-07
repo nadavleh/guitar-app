@@ -128,6 +128,7 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 GeneratorDropdown(ear, modifier = Modifier.weight(1f))
+                PlaybackControlsDropdown(state, ear)
                 OutlinedButton(onClick = { libOpen = true }) { Text("Library") }
             }
             Text(generatorCaption(ear), style = MaterialTheme.typography.labelSmall,
@@ -256,12 +257,9 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
     ) {
         ProgressionSettings(ear)
 
-        Spacer(Modifier.height(12.dp))
-
-        // Tempo + strum — full-width sliders so labels never get squeezed.
-        TempoStrumSliders(state, ear)
-
         Spacer(Modifier.height(10.dp))
+        // Tempo + strum now live in the "Playback ▾" dropdown in the section header
+        // (shared by all generators & modes — tasks #4/#10).
 
         if (!ear.hasGenerated) {
             // Initial state: prominent CTA. The user adjusts settings above, then
@@ -484,7 +482,7 @@ private fun TempoStrumSliders(state: AppState, ear: EarTrainingState) {
         androidx.compose.material3.Slider(
             value = ear.progBpm.toFloat(),
             onValueChange = { ear.progBpm = it.toInt() },
-            valueRange = 10f..200f,
+            valueRange = 10f..300f,
         )
         Text(
             if (state.strumMs == 0) "Strum: struck at once" else "Strum: ${state.strumMs} ms",
@@ -496,6 +494,23 @@ private fun TempoStrumSliders(state: AppState, ear: EarTrainingState) {
             onValueChange = { state.setStrumMs(it.toInt()) },
             valueRange = 0f..150f,
         )
+    }
+}
+
+/** Top-of-section "Playback ▾" dropdown holding the Tempo + Strum sliders (task #10).
+ *  Rendered once in the progression header so every generator (diatonic / advanced /
+ *  circle) and both modes (practice / challenge) share the same BPM + strum controls
+ *  (task #4 — advanced & circle previously had no tempo control). */
+@Composable
+private fun PlaybackControlsDropdown(state: AppState, ear: EarTrainingState, modifier: Modifier = Modifier) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        OutlinedButton(onClick = { open = true }) { Text("Playback ▾", maxLines = 1) }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            Column(modifier = Modifier.width(280.dp).padding(horizontal = 14.dp, vertical = 6.dp)) {
+                TempoStrumSliders(state, ear)
+            }
+        }
     }
 }
 
@@ -1214,18 +1229,10 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         TransposeClicker(ear)
 
         Spacer(Modifier.height(8.dp))
+        // BPM + strum now live in the "Playback ▾" dropdown in the section header
+        // (shared by all generators & modes — tasks #4/#10).
 
-        // #1: BPM control inside the challenge (mirrors the Practice transport).
-        Column {
-            Text("BPM: ${ear.progBpm}", style = MaterialTheme.typography.bodySmall)
-            androidx.compose.material3.Slider(
-                value = ear.progBpm.toFloat(),
-                onValueChange = { ear.progBpm = it.toInt() },
-                valueRange = 10f..200f,
-            )
-        }
-
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(4.dp))
 
         // Small optional key/mode hint (same low-emphasis chip as the trainer).
         RevealCard(
