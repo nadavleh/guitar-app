@@ -2,7 +2,7 @@
 // AudioQuick}.kt. Vanilla DOM, re-rendered on each state change. The fretboard
 // <canvas> element is persistent across renders so its zoom/pan survives.
 
-import { AppState, DisplayMode, LabelMode, Sheet, ChordScaleView, SoundName, DISPLAY_FRETS } from "./appState";
+import { AppState, DisplayMode, LabelMode, Sheet, ChordScaleView, DISPLAY_FRETS } from "./appState";
 import { FretboardCanvas, FretboardData } from "./fretboardCanvas";
 import { computeMarks, scaleInfo, intervalName, shapeMarks } from "./marks";
 import { TunerState } from "./tunerState";
@@ -17,6 +17,7 @@ import { loadDrumSample } from "./drumSamples";
 import { Timbres } from "../audio";
 import { Colors, withAlpha } from "./theme";
 import { el, clear, btn, segmented, chipRow, slider, switchRow, labelSm } from "./dom";
+import { audioControlButton } from "./audioControl";
 import {
   PC, Instrument, InstrumentInfo, ChordShape, ScalePosition, VoicingStyle,
   spellPc, spellNote, midiPitchClass, midiOctave, noteAt, stringCount, suggestFingering,
@@ -395,62 +396,12 @@ export class App {
   // ---------- audio quick popup ----------
 
   private audioQuickButton(): HTMLElement {
-    const wrap = el("div", { style: "position:relative" });
-    const b = btn("🎚 Audio", () => { this.audioPopupOpen = !this.audioPopupOpen; this.render(); }, "btn text");
-    wrap.appendChild(b);
-    if (this.audioPopupOpen) {
-      const panel = el("div", {
-        style: "position:absolute;right:0;top:36px;z-index:20;background:" + Colors.surface +
-          ";border:1px solid " + Colors.divider + ";border-radius:12px;padding:12px;width:260px;box-shadow:0 8px 30px rgba(0,0,0,0.5)",
-      }, [
-        labelSm("Audio feel"),
-        el("div", {}, [this.state.strumMs === 0 ? "Strum spread: struck at once" : `Strum spread: ${this.state.strumMs} ms`]),
-        slider(0, 150, this.state.strumMs, (v) => this.state.setStrumMs(v)),
-        el("div", {}, [`Ring sustain: ${(this.state.ringSustainMs / 1000).toFixed(1)} s`]),
-        slider(300, 4000, this.state.ringSustainMs, (v) => this.state.setRingSustainMs(v)),
-        labelSm(this.state.soundLoading ? "Sound (loading…)" : "Sound"),
-        chipRow<SoundName>(
-          [
-            { value: "Synth", label: "Synth" },
-            { value: "Acoustic", label: "Acoustic" },
-            { value: "Nylon", label: "Nylon" },
-            { value: "Electric", label: "Electric" },
-          ],
-          (v) => v === this.state.sound,
-          (v) => this.state.setSound(v),
-        ),
-        this.eqControls(),
-        // A/B engine toggle (temporary scaffolding, kept through the overhaul).
-        switchRow(
-          "Audio engine (A/B)",
-          this.state.audio.useModern ? "New — voice graph + stereo bus + reverb" : "Old — legacy engine",
-          this.state.audio.useModern,
-          (v) => { this.state.audio.setUseModern(v); this.render(); },
-        ),
-      ]);
-      wrap.appendChild(panel);
-    }
-    return wrap;
-  }
-
-  /** Bass/Mid/Treble sliders (±12 dB) for the currently selected Sound, plus a
-   *  Flat reset — mirrors the Android per-instrument runtime EQ. */
-  private eqControls(): HTMLElement {
-    const s = this.state;
-    const e = s.eqFor(s.sound);
-    const fmt = (db: number) => `${db > 0 ? "+" : ""}${db} dB`;
-    return el("div", {}, [
-      labelSm(`EQ — ${s.sound}`),
-      el("div", {}, [`Bass: ${fmt(e.bass)}`]),
-      slider(-12, 12, e.bass, (v) => s.setEqBand(s.sound, "bass", v)),
-      el("div", {}, [`Mid: ${fmt(e.mid)}`]),
-      slider(-12, 12, e.mid, (v) => s.setEqBand(s.sound, "mid", v)),
-      el("div", {}, [`Treble: ${fmt(e.treble)}`]),
-      slider(-12, 12, e.treble, (v) => s.setEqBand(s.sound, "treble", v)),
-      el("div", { class: "row end" }, [btn("Flat", () => s.resetEq(s.sound))]),
-      el("div", {}, [`Reverb: ${Math.round(s.reverbFor(s.sound) * 100)}%`]),
-      slider(0, 100, Math.round(s.reverbFor(s.sound) * 100), (v) => s.setReverb(s.sound, v / 100)),
-    ]);
+    return audioControlButton(
+      this.state,
+      this.audioPopupOpen,
+      () => { this.audioPopupOpen = !this.audioPopupOpen; this.render(); },
+      () => this.render(),
+    );
   }
 
   // ---------- control sheets ----------

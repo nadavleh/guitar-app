@@ -8,6 +8,7 @@ import { FretboardCanvas } from "./fretboardCanvas";
 import { shapeMarks } from "./marks";
 import { Colors, withAlpha } from "./theme";
 import { el, btn, slider, switchRow, labelSm } from "./dom";
+import { audioControlButton } from "./audioControl";
 import {
   spellPc, noteAt, TrainingMode, ChordTypeLevel, ChordTypeLevelName,
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
@@ -80,6 +81,7 @@ export class EarTrainingUI {
   private statsOpen = false;
   private libraryOpen = false;
   private playbackOpen = false;
+  private audioPopupOpen = false;
   /** Which progression-library row is expanded (single-open accordion), or null. */
   private libExpandedKey: string | null = null;
   /** Whether the expanded row's follow-along fretboard is shown. */
@@ -137,6 +139,13 @@ export class EarTrainingUI {
     // header
     screen.appendChild(el("div", { class: "tool-topbar" }, [
       el("div", { class: "tool-title" }, ["EAR TRAINING"]),
+      // Sound menu (guitar sound + tone/reverb) reachable here too, like every section.
+      audioControlButton(
+        this.state,
+        this.audioPopupOpen,
+        () => { this.audioPopupOpen = !this.audioPopupOpen; this.rerender(); },
+        () => this.rerender(),
+      ),
       btn("Stats", () => { this.statsOpen = true; this.rerender(); }),
       btn("Back", () => { ear.release(); this.onBack(); }),
     ]));
@@ -166,23 +175,27 @@ export class EarTrainingUI {
       // Generator (diatonic / advanced / circle-of-fifths) is one compact dropdown
       // instead of two full switch rows, so it no longer eats fixed-header space above
       // the scrollable body. A one-line caption preserves the teaching text.
-      const gen = ear.advancedMode ? "advanced" : ear.circleMode ? "circle" : "diatonic";
+      const gen = ear.advancedMode ? "advanced" : ear.circleMode ? "circle" : ear.iiiFocusMode ? "iiifocus" : "diatonic";
       const genCaption = ear.advancedMode
         ? "Borrowed chords, secondary dominants & jazz turnarounds, each with a note."
         : ear.circleMode
-        ? "Four adjacent diatonic chords around the circle (roots falling by a fifth)."
+        ? "Circle-of-fifths windows built around secondary dominants (V7 of the next chord)."
+        : ear.iiiFocusMode
+        ? "Drill for hearing the I→iii move — every progression opens with I then iii (major)."
         : "Standard diatonic progressions in the chosen key & mode.";
       const genSelect = select(
         [
           { value: "diatonic", label: "Generator: Diatonic" },
+          { value: "iiifocus", label: "Generator: I → iii focus" },
           { value: "advanced", label: "Generator: Advanced (non-diatonic)" },
-          { value: "circle", label: "Generator: Circle of fifths" },
+          { value: "circle", label: "Generator: Circle — secondary dominants" },
         ],
         gen,
         (v) => {
           if (v === "advanced") ear.setAdvancedMode(true);
           else if (v === "circle") ear.setCircleMode(true);
-          else { ear.setAdvancedMode(false); ear.setCircleMode(false); }
+          else if (v === "iiifocus") ear.setIiiFocusMode(true);
+          else { ear.setAdvancedMode(false); ear.setCircleMode(false); ear.setIiiFocusMode(false); }
         },
       );
       const libBtn = btn("Library", () => { this.libraryOpen = true; this.rerender(); });

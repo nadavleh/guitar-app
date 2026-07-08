@@ -187,8 +187,28 @@ object EarTraining {
         Progression(TrainingMode.Minor, listOf(1, 4, 7, 3)),   // i-iv-VII-III
     )
 
-    /** Pick a random progression for [mode], using [rng]. */
-    fun randomProgression(mode: TrainingMode, rng: kotlin.random.Random): Progression {
+    /** Focused drill for hearing the I→iii move (the "soft" mediant, which shares
+     *  two notes with the tonic and is easy to miss). Every entry opens with I–iii so
+     *  the ear gets repeated exposure to that transition. Major-only (iii is the minor
+     *  mediant of a major key). NOT part of [MAJOR_PROGRESSIONS] — it's a practice
+     *  drill, not a library entry, so it needs no song examples. */
+    val III_FOCUS_PROGRESSIONS: List<Progression> = listOf(
+        Progression(TrainingMode.Major, listOf(1, 3, 4, 5)),   // I–iii–IV–V
+        Progression(TrainingMode.Major, listOf(1, 3, 6, 4)),   // I–iii–vi–IV
+        Progression(TrainingMode.Major, listOf(1, 3, 4, 1)),   // I–iii–IV–I
+        Progression(TrainingMode.Major, listOf(1, 3, 2, 5)),   // I–iii–ii–V
+        Progression(TrainingMode.Major, listOf(1, 3, 6, 5)),   // I–iii–vi–V
+        Progression(TrainingMode.Major, listOf(1, 3, 1, 4)),   // I–iii–I–IV (back-and-forth)
+    )
+
+    /** Pick a random progression for [mode], using [rng]. When [focusIiii] is set,
+     *  draw from the [III_FOCUS_PROGRESSIONS] drill (always major) instead. */
+    fun randomProgression(
+        mode: TrainingMode,
+        rng: kotlin.random.Random,
+        focusIiii: Boolean = false,
+    ): Progression {
+        if (focusIiii) return III_FOCUS_PROGRESSIONS[rng.nextInt(III_FOCUS_PROGRESSIONS.size)]
         val pool = if (mode == TrainingMode.Major) MAJOR_PROGRESSIONS else MINOR_PROGRESSIONS
         return pool[rng.nextInt(pool.size)]
     }
@@ -395,24 +415,41 @@ object EarTraining {
 
     /**
      * Four adjacent chords of the diatonic [CIRCLE_OF_FIFTHS], starting at a random
-     * point and moving along the cycle (roots falling by a fifth). The 2nd chord may
-     * be sounded as a dominant 7th (a secondary dominant intensifying the pull to the
-     * 3rd), UNLESS it is the diminished chord. Realised as a [NamedProgression] so it
-     * reuses the advanced-progression play/reveal flow.
+     * point and moving along the cycle (roots falling by a fifth). Because each root
+     * is a fifth above the next, sounding any non-final, non-diminished chord as a
+     * dominant 7th turns it into a SECONDARY DOMINANT (V7) of the chord that follows.
+     * This trains the ear on applied/secondary dominants "through the circle": each
+     * eligible chord is domified with high probability, and at least one always is,
+     * so every draw features a secondary dominant (often a whole applied-dominant
+     * chain). Realised as a [NamedProgression] so it reuses the advanced play/reveal
+     * flow.
      */
     fun randomCircleOfFifths(rng: kotlin.random.Random): NamedProgression {
         val n = CIRCLE_OF_FIFTHS.size
         val start = rng.nextInt(n)
         val window = (0 until 4).map { CIRCLE_OF_FIFTHS[(start + it) % n] }.toMutableList()
-        val second = window[1]
-        val domified = second.quality != "dim" && rng.nextBoolean()
-        if (domified) {
-            // Same root, dominant-7 quality → a secondary dominant of the 3rd chord.
-            window[1] = AdvChord(second.semitone, "7", second.roman.uppercase() + "7")
+        // A chord is eligible to become a secondary dominant if it isn't the last one
+        // (needs a target to resolve to) and isn't diminished (vii° can't be a V7).
+        val eligible = (0 until 3).filter { window[it].quality != "dim" }
+        var domCount = 0
+        for (i in eligible) {
+            if (rng.nextInt(100) < 75) {
+                val c = window[i]
+                window[i] = AdvChord(c.semitone, "7", c.roman.uppercase() + "7")
+                domCount++
+            }
         }
-        val note = "Four chords along the diatonic circle of fifths (roots falling by a fifth) — " +
-            "a strong pull back toward the tonic." +
-            if (domified) " The 2nd chord is a secondary dominant (7th)." else ""
+        // Guarantee at least one secondary dominant per draw so the drill always
+        // delivers what it promises.
+        if (domCount == 0 && eligible.isNotEmpty()) {
+            val i = eligible[rng.nextInt(eligible.size)]
+            val c = window[i]
+            window[i] = AdvChord(c.semitone, "7", c.roman.uppercase() + "7")
+            domCount = 1
+        }
+        val note = "Four chords along the circle of fifths (roots falling by a fifth). " +
+            (if (domCount > 1) "Several chords are secondary dominants (V7 of the next), forming an applied-dominant chain that pulls hard toward the tonic."
+             else "One chord is a secondary dominant (V7 of the next), intensifying the pull toward the tonic.")
         return NamedProgression("Circle of 5ths", note, TrainingMode.Major, window)
     }
 

@@ -196,13 +196,15 @@ private fun SubModeDropdown(ear: EarTrainingState, modifier: Modifier = Modifier
 private fun generatorLabel(ear: EarTrainingState): String = when {
     ear.advancedMode -> "Advanced"
     ear.circleMode -> "Circle of 5ths"
+    ear.iiiFocusMode -> "I → iii focus"
     else -> "Diatonic"
 }
 
 /** One-line teaching caption for the current progression generator. */
 private fun generatorCaption(ear: EarTrainingState): String = when {
     ear.advancedMode -> "Borrowed chords, secondary dominants & jazz turnarounds, each with a note."
-    ear.circleMode -> "Four adjacent diatonic chords around the circle (roots falling by a fifth)."
+    ear.circleMode -> "Circle-of-fifths windows built around secondary dominants (V7 of the next chord)."
+    ear.iiiFocusMode -> "Drill for hearing the I→iii move — every progression opens with I then iii (major)."
     else -> "Standard diatonic progressions in the chosen key & mode."
 }
 
@@ -217,10 +219,12 @@ private fun GeneratorDropdown(ear: EarTrainingState, modifier: Modifier = Modifi
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(text = { Text("Diatonic") },
-                onClick = { ear.chooseAdvancedMode(false); ear.chooseCircleMode(false); open = false })
+                onClick = { ear.chooseAdvancedMode(false); ear.chooseCircleMode(false); ear.chooseIiiFocusMode(false); open = false })
+            DropdownMenuItem(text = { Text("I → iii focus") },
+                onClick = { ear.chooseIiiFocusMode(true); open = false })
             DropdownMenuItem(text = { Text("Advanced (non-diatonic)") },
                 onClick = { ear.chooseAdvancedMode(true); open = false })
-            DropdownMenuItem(text = { Text("Circle of fifths") },
+            DropdownMenuItem(text = { Text("Circle of fifths — secondary dominants") },
                 onClick = { ear.chooseCircleMode(true); open = false })
         }
     }

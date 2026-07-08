@@ -276,6 +276,12 @@ export class SambaLooperUI {
     });
     c.addEventListener("pointerleave", cancel);
     c.addEventListener("pointercancel", cancel);
+    // Right-click clears the slot (desktop convenience; mirrors the long-press).
+    c.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      cancel();
+      s.clearCell(inst, slot);
+    });
     return c;
   }
 

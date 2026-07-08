@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -384,6 +386,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
 private const val ROW_LABEL_DP = 128
 private const val ROW_HEIGHT_DP = 70   // per-instrument row: name + ▾ + M/S all fit
 private const val CAPTION_DP = 18      // bar/beat caption strip below the rows
+private const val LONG_PRESS_CLEAR_MS = 1500L  // hold this long on a cell to clear it
 
 private val STEP_PAD = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp)
 
@@ -673,16 +676,29 @@ private fun Cell(
             .background(fill)
             .border(borderWidth, borderColor, RoundedCornerShape(4.dp))
             .pointerInput(instrument, slot, eraseMode, accentMode) {
-                detectTapGestures(
-                    onTap = {
+                // Tap = cycle/erase/accent. A DELIBERATE long press (≥1.5 s) clears the
+                // cell — long enough that it won't fire by accident while tapping.
+                awaitEachGesture {
+                    awaitFirstDown()
+                    var heldLongEnough = false
+                    val up = try {
+                        withTimeout(LONG_PRESS_CLEAR_MS) { waitForUpOrCancellation() }
+                    } catch (_: PointerEventTimeoutCancellationException) {
+                        heldLongEnough = true
+                        null
+                    }
+                    if (heldLongEnough) {
+                        samba.clearCell(instrument, slot)
+                        waitForUpOrCancellation()   // swallow the eventual release
+                    } else if (up != null) {
                         when {
                             eraseMode -> samba.clearCell(instrument, slot)
                             accentMode -> samba.toggleAccent(instrument, slot)
                             else -> samba.toggleSlot(instrument, slot)
                         }
-                    },
-                    onLongPress = { samba.clearCell(instrument, slot) },
-                )
+                    }
+                    // up == null && !heldLongEnough → gesture cancelled; do nothing.
+                }
             },
         contentAlignment = Alignment.Center,
     ) {

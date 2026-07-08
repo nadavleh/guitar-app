@@ -146,7 +146,20 @@ export const MINOR_PROGRESSIONS: Progression[] = [
   { mode: TrainingMode.Minor, degrees: [1, 4, 7, 3] },
 ];
 
-export function randomProgression(mode: TrainingMode, rng: Rng = defaultRng): Progression {
+/** Focused drill for hearing the I→iii move (the "soft" mediant that shares two
+ *  notes with the tonic). Every entry opens with I–iii. Major-only, and NOT part of
+ *  MAJOR_PROGRESSIONS (it's a drill, not a library entry, so needs no song list). */
+export const III_FOCUS_PROGRESSIONS: Progression[] = [
+  { mode: TrainingMode.Major, degrees: [1, 3, 4, 5] },   // I–iii–IV–V
+  { mode: TrainingMode.Major, degrees: [1, 3, 6, 4] },   // I–iii–vi–IV
+  { mode: TrainingMode.Major, degrees: [1, 3, 4, 1] },   // I–iii–IV–I
+  { mode: TrainingMode.Major, degrees: [1, 3, 2, 5] },   // I–iii–ii–V
+  { mode: TrainingMode.Major, degrees: [1, 3, 6, 5] },   // I–iii–vi–V
+  { mode: TrainingMode.Major, degrees: [1, 3, 1, 4] },   // I–iii–I–IV
+];
+
+export function randomProgression(mode: TrainingMode, rng: Rng = defaultRng, focusIiii = false): Progression {
+  if (focusIiii) return III_FOCUS_PROGRESSIONS[rng.int(III_FOCUS_PROGRESSIONS.length)];
   const pool = mode === TrainingMode.Major ? MAJOR_PROGRESSIONS : MINOR_PROGRESSIONS;
   return pool[rng.int(pool.length)];
 }
@@ -285,17 +298,29 @@ export const CIRCLE_OF_FIFTHS: AdvChord[] = [
 ];
 
 /** Four adjacent chords of CIRCLE_OF_FIFTHS from a random start (roots falling by a
- *  fifth). The 2nd may sound as a dominant 7th (secondary dominant), unless it's vii°. */
+ *  fifth). Because each root is a fifth above the next, sounding any non-final,
+ *  non-diminished chord as a dominant 7th makes it a SECONDARY DOMINANT (V7) of the
+ *  following chord. Each eligible chord is domified with high probability and at least
+ *  one always is, so every draw trains secondary dominants "through the circle". */
 export function randomCircleOfFifths(rng: Rng = defaultRng): NamedProgression {
   const n = CIRCLE_OF_FIFTHS.length;
   const start = rng.int(n);
   const window = Array.from({ length: 4 }, (_, i) => ({ ...CIRCLE_OF_FIFTHS[(start + i) % n] }));
-  const second = window[1];
-  const domified = second.quality !== "dim" && rng.int(2) === 0;
-  if (domified) window[1] = c(second.semitone, "7", second.roman.toUpperCase() + "7");
-  const note = "Four chords along the diatonic circle of fifths (roots falling by a fifth) — "
-    + "a strong pull back toward the tonic."
-    + (domified ? " The 2nd chord is a secondary dominant (7th)." : "");
+  // Eligible: not the last chord (needs a target) and not diminished (vii° can't be V7).
+  const eligible = [0, 1, 2].filter((i) => window[i].quality !== "dim");
+  let domCount = 0;
+  for (const i of eligible) {
+    if (rng.int(100) < 75) { window[i] = c(window[i].semitone, "7", window[i].roman.toUpperCase() + "7"); domCount++; }
+  }
+  if (domCount === 0 && eligible.length > 0) {
+    const i = eligible[rng.int(eligible.length)];
+    window[i] = c(window[i].semitone, "7", window[i].roman.toUpperCase() + "7");
+    domCount = 1;
+  }
+  const note = "Four chords along the circle of fifths (roots falling by a fifth). "
+    + (domCount > 1
+      ? "Several chords are secondary dominants (V7 of the next), forming an applied-dominant chain that pulls hard toward the tonic."
+      : "One chord is a secondary dominant (V7 of the next), intensifying the pull toward the tonic.");
   return { name: "Circle of 5ths", explanation: note, tonicMode: TrainingMode.Major, chords: window };
 }
 

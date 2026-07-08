@@ -230,18 +230,24 @@ class EarTrainingTest {
         repeat(30) {
             val p = EarTraining.randomCircleOfFifths(rng)
             assertEquals(4, p.chords.size)
-            // The 4 chords are a contiguous window of the cycle (ignoring a possible
-            // dom-7 recolouring of the 2nd chord's quality).
-            val startRoman = p.chords[0].roman
-            val start = cycle.indexOfFirst { it.roman == startRoman }
+            // The 4 chords are a contiguous window of the cycle. Identify the start by
+            // root semitone (robust to any dom-7 recolouring of a chord's quality).
+            val start = cycle.indexOfFirst { it.semitone == p.chords[0].semitone }
             assertTrue(start >= 0)
+            var doms = 0
             for (k in 0 until 4) {
                 val expected = cycle[(start + k) % cycle.size]
                 assertEquals(expected.semitone, p.chords[k].semitone, "window position $k root")
+                if (p.chords[k].quality == "7") {
+                    doms++
+                    // A secondary dominant never sits on the diminished cycle chord and
+                    // never on the last window chord (it needs a following target).
+                    assertTrue(expected.quality != "dim", "diminished chord domified at $k")
+                    assertTrue(k < 3, "last window chord domified (no resolution target)")
+                }
             }
-            // A domified 2nd chord is a 7th and never the diminished chord.
-            val second = p.chords[1]
-            if (second.quality == "7") assertTrue(cycle[(start + 1) % cycle.size].quality != "dim")
+            // Every draw features at least one secondary dominant (the drill's promise).
+            assertTrue(doms >= 1, "circle-of-fifths draw had no secondary dominant")
         }
     }
 

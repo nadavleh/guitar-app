@@ -45,7 +45,9 @@ fun AudioQuickButton(state: AppState, compact: Boolean = false) {
             ),
         ) {
             Text(
-                if (compact) "🎚" else "🎚 Audio",
+                // Label the sound/tone menu clearly so it's discoverable in every
+                // section (it was a bare 🎚 icon before). Opens Sound + EQ + reverb.
+                if (compact) "🎚 Sound ▾" else "🎚 Audio ▾",
                 color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.titleSmall,
             )

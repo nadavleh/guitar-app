@@ -158,9 +158,10 @@ class EarTrainingState(
             if (includeMajor) add(TrainingMode.Major)
             if (includeMinor) add(TrainingMode.Minor)
         }.ifEmpty { listOf(TrainingMode.Major) }
-        val mode = candidates[rng.nextInt(candidates.size)]
+        // The I→iii drill is major-only; otherwise honor the Major/Minor include flags.
+        val mode = if (iiiFocusMode) TrainingMode.Major else candidates[rng.nextInt(candidates.size)]
         val key = fixedKey ?: PitchClass(rng.nextInt(12))
-        val prog = EarTraining.randomProgression(mode, rng)
+        val prog = EarTraining.randomProgression(mode, rng, focusIiii = iiiFocusMode)
         progKey = key
         progMode = mode
         progProgression = prog
@@ -583,7 +584,7 @@ class EarTrainingState(
     // ---------- Progression Challenge (15-question quiz) ----------
 
     /** Length of one challenge session. */
-    val challengeTotal: Int = 15
+    val challengeTotal: Int = 10
 
     /** Per-question answer state: null = not yet marked, true = right, false = wrong. */
     var challengeAnswers by mutableStateOf<List<Boolean?>>(emptyList())
@@ -730,9 +731,10 @@ class EarTrainingState(
             if (includeMajor) add(TrainingMode.Major)
             if (includeMinor) add(TrainingMode.Minor)
         }.ifEmpty { listOf(TrainingMode.Major) }
-        val mode = candidates[rng.nextInt(candidates.size)]
+        // The I→iii drill is major-only; otherwise honor the Major/Minor include flags.
+        val mode = if (iiiFocusMode) TrainingMode.Major else candidates[rng.nextInt(candidates.size)]
         val key = fixedKey ?: PitchClass(rng.nextInt(12))
-        val prog = EarTraining.randomProgression(mode, rng)
+        val prog = EarTraining.randomProgression(mode, rng, focusIiii = iiiFocusMode)
         return QState(key, mode, prog, resolveCurrent(prog, key),
             List(4) { null }, List(4) { null }, List(4) { null })
     }
@@ -1178,12 +1180,23 @@ class EarTrainingState(
     /** Whether the Progression sub-mode is drawing 4-chord circle-of-fifths windows.
      *  Reuses the advanced play/reveal flow; mutually exclusive with [advancedMode]. */
     var circleMode by mutableStateOf(false)
-    /** True when either special generator (advanced or circle) is active — both use
-     *  the advanced-style views. */
+    /** Whether the Progression sub-mode is running the I→iii recognition drill. Unlike
+     *  advanced/circle, this stays in the DIATONIC multiple-choice flow (best for ear
+     *  recognition) — it just swaps the draw pool to [EarTraining.III_FOCUS_PROGRESSIONS]. */
+    var iiiFocusMode by mutableStateOf(false)
+    /** True when a "special" generator (advanced or circle) is active — both use the
+     *  advanced-style self-marked views. The I→iii drill is NOT special (diatonic view). */
     val specialProgMode: Boolean get() = advancedMode || circleMode
 
-    fun chooseAdvancedMode(on: Boolean) { advancedMode = on; if (on) circleMode = false; stopLoop() }
-    fun chooseCircleMode(on: Boolean) { circleMode = on; if (on) advancedMode = false; stopLoop() }
+    fun chooseAdvancedMode(on: Boolean) { advancedMode = on; if (on) { circleMode = false; iiiFocusMode = false }; stopLoop() }
+    fun chooseCircleMode(on: Boolean) { circleMode = on; if (on) { advancedMode = false; iiiFocusMode = false }; stopLoop() }
+    /** Enter/leave the I→iii drill; clears the special generators and returns to the
+     *  diatonic view. */
+    fun chooseIiiFocusMode(on: Boolean) {
+        iiiFocusMode = on
+        if (on) { advancedMode = false; circleMode = false }
+        stopLoop()
+    }
 
     /** The currently-drawn advanced progression (null until generated). */
     var advProg by mutableStateOf<app.guitar.theory.EarTraining.NamedProgression?>(null)

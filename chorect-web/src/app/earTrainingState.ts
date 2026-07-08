@@ -126,9 +126,10 @@ export class EarTrainingState {
     if (this.includeMajor) candidates.push(TrainingMode.Major);
     if (this.includeMinor) candidates.push(TrainingMode.Minor);
     if (candidates.length === 0) candidates.push(TrainingMode.Major);
-    const mode = candidates[this.rng.int(candidates.length)];
+    // The I→iii drill is major-only; otherwise honor the Major/Minor include flags.
+    const mode = this.iiiFocusMode ? TrainingMode.Major : candidates[this.rng.int(candidates.length)];
     const key = this.fixedKey ?? this.rng.int(12);
-    const prog = randomProgression(mode, this.rng);
+    const prog = randomProgression(mode, this.rng, this.iiiFocusMode);
     this.progKey = key;
     this.progMode = mode;
     this.progProgression = prog;
@@ -488,7 +489,7 @@ export class EarTrainingState {
 
   // ---------- Progression Challenge ----------
 
-  challengeTotal = 15;
+  challengeTotal = 10;
   challengeAnswers: (boolean | null)[] = [];
   challengeBarsCorrect: number[] = [];
   challengeIndex = 0;
@@ -580,9 +581,10 @@ export class EarTrainingState {
     if (this.includeMajor) candidates.push(TrainingMode.Major);
     if (this.includeMinor) candidates.push(TrainingMode.Minor);
     if (candidates.length === 0) candidates.push(TrainingMode.Major);
-    const mode = candidates[this.rng.int(candidates.length)];
+    // The I→iii drill is major-only; otherwise honor the Major/Minor include flags.
+    const mode = this.iiiFocusMode ? TrainingMode.Major : candidates[this.rng.int(candidates.length)];
     const key = this.fixedKey ?? this.rng.int(12);
-    const prog = randomProgression(mode, this.rng);
+    const prog = randomProgression(mode, this.rng, this.iiiFocusMode);
     return {
       key, mode, prog, resolved: this.resolveCurrent(prog, key),
       guessDeg: [null, null, null, null],
@@ -945,13 +947,18 @@ export class EarTrainingState {
   advancedMode = false;
   /** 4-chord circle-of-fifths windows; reuses the advanced flow, mutually exclusive. */
   circleMode = false;
+  /** I→iii recognition drill — stays in the DIATONIC multiple-choice flow, just swaps
+   *  the draw pool to III_FOCUS_PROGRESSIONS. NOT "special". */
+  iiiFocusMode = false;
   advProg: NamedProgression | null = null;
   advRevealed = false;
 
-  /** True when either special generator (advanced or circle) is active. */
+  /** True when a "special" generator (advanced or circle) is active. The I→iii drill
+   *  is NOT special — it uses the diatonic view. */
   get specialProgMode(): boolean { return this.advancedMode || this.circleMode; }
-  setAdvancedMode(v: boolean) { this.advancedMode = v; if (v) this.circleMode = false; this.stopLoop(); this.notify(); }
-  setCircleMode(v: boolean) { this.circleMode = v; if (v) this.advancedMode = false; this.stopLoop(); this.notify(); }
+  setAdvancedMode(v: boolean) { this.advancedMode = v; if (v) { this.circleMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
+  setCircleMode(v: boolean) { this.circleMode = v; if (v) { this.advancedMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
+  setIiiFocusMode(v: boolean) { this.iiiFocusMode = v; if (v) { this.advancedMode = false; this.circleMode = false; } this.stopLoop(); this.notify(); }
 
   nextAdvancedProgression() {
     const np = this.circleMode ? randomCircleOfFifths(this.rng) : randomAdvanced(this.rng);
