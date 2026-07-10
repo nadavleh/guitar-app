@@ -96,6 +96,21 @@ class TuningRepository(private val context: Context) {
         context.tuningDataStore.edit { prefs -> prefs[keyDarkTheme] = value }
     }
 
+    private val keyThemeMode = stringPreferencesKey("theme_mode")
+
+    /** UI theme mode: "dark" / "light" / "auto" (Settings → Personalize). Migration-
+     *  safe: if `theme_mode` was never written (installs from before this pref
+     *  existed), fall back to the old [keyDarkTheme] boolean mapped onto "dark"/
+     *  "light" rather than defaulting blindly to dark. */
+    val themeMode: Flow<String> =
+        context.tuningDataStore.data.map { prefs ->
+            prefs[keyThemeMode] ?: if (prefs[keyDarkTheme] ?: true) "dark" else "light"
+        }
+
+    suspend fun setThemeMode(value: String) {
+        context.tuningDataStore.edit { prefs -> prefs[keyThemeMode] = value }
+    }
+
     private val keyVoicingShell = booleanPreferencesKey("voicing_shell")
 
     val voicingShell: Flow<Boolean> =

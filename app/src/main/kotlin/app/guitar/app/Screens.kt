@@ -15,15 +15,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -303,7 +309,106 @@ private fun PickControls(state: AppState) {
     }
 }
 
-// ---------- OPTIONS SHEET ----------
+// ---------- SETTINGS SHEET (Sheet.Options) ----------
+
+/** Settings → Personalize: the 5 ACT-accent swatches. Each circle is the
+ *  [Accent]'s dark-theme color (the palette always shows dark swatches — same
+ *  approach as a paint-chip picker — even though the live app may be in light
+ *  theme); the selected swatch gets a ring so selection isn't color-only.
+ *  Applies immediately via [AppState.setAccent] (no "Done" step). */
+@Composable
+private fun AccentRow(state: AppState) {
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Accent.entries.forEach { a ->
+            val selected = a == state.accent
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .clickable { state.setAccent(a) },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Box(
+                        Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .border(2.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                    )
+                }
+                Box(
+                    Modifier
+                        .size(if (selected) 34.dp else 40.dp)
+                        .clip(CircleShape)
+                        .background(a.dark)
+                )
+            }
+        }
+    }
+}
+
+private fun <T> List<T>.swapped(i: Int, j: Int): List<T> =
+    toMutableList().also { val tmp = it[i]; it[i] = it[j]; it[j] = tmp }
+
+/** Settings → Personalize: pick exactly 4 of the 6 [TabDest] candidates for the
+ *  bottom tab bar/rail, and reorder the picked ones with up/down arrows.
+ *
+ * Editing happens on a *local* pending list, only committed to [AppState.setTabOrder]
+ * (and thus persisted) once it holds exactly 4 entries — unchecking one of the 4
+ * picked tabs is allowed (drops the local list to 3, "freeing a slot" per the
+ * design) without ever pushing an invalid <4 set to the live tab bar; checking a
+ * 5th candidate is simply disabled. `remember(state.tabOrder)` re-seeds the
+ * pending list from the real order whenever it changes elsewhere (or on first
+ * open), and quietly drops any transient 3-item edit if the sheet is dismissed
+ * before a 4th is picked. */
+@Composable
+private fun TabOrderEditor(state: AppState) {
+    var pending by remember(state.tabOrder) { mutableStateOf(state.tabOrder) }
+    fun commit(next: List<TabDest>) {
+        pending = next
+        if (next.size == 4) state.setTabOrder(next)
+    }
+
+    Column {
+        pending.forEachIndexed { idx, dest ->
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Checkbox(checked = true, onCheckedChange = { commit(pending - dest) })
+                Icon(dest.icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(dest.label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                IconButton(onClick = { commit(pending.swapped(idx, idx - 1)) }, enabled = idx > 0,
+                    modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = "Move ${dest.label} up")
+                }
+                IconButton(onClick = { commit(pending.swapped(idx, idx + 1)) }, enabled = idx < pending.size - 1,
+                    modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = "Move ${dest.label} down")
+                }
+            }
+        }
+        val unpicked = TabDest.entries.filter { it !in pending }
+        if (unpicked.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            unpicked.forEach { dest ->
+                val canAdd = pending.size < 4
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Checkbox(checked = false, enabled = canAdd, onCheckedChange = { if (canAdd) commit(pending + dest) })
+                    Icon(dest.icon, contentDescription = null,
+                        tint = if (canAdd) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        dest.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (canAdd) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -312,10 +417,49 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
     var saveName by remember { mutableStateOf("") }
 
     SheetBody {
-        SheetHeader("Options", state)
+        SheetHeader("Settings", state)
 
-        Text("Instrument", style = MaterialTheme.typography.titleSmall)
+        // ----- Personalize -----
+        SectionLabel("Personalize")
+        Spacer(Modifier.height(8.dp))
+
+        Text("Theme", style = MaterialTheme.typography.labelMedium)
         Spacer(Modifier.height(6.dp))
+        SegmentedRow(
+            options = ThemeMode.entries,
+            selected = state.themeMode,
+            onSelect = { state.setThemeMode(it) },
+            label = { it.name },
+        )
+
+        Spacer(Modifier.height(14.dp))
+        Text("Accent", style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.height(6.dp))
+        AccentRow(state)
+
+        Spacer(Modifier.height(14.dp))
+        Text("Tabs & order", style = MaterialTheme.typography.labelMedium)
+        Text(
+            "Pick 4 tabs; everything else lives in More",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(4.dp))
+        TabOrderEditor(state)
+
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Left-handed", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Switch(checked = state.leftHanded, onCheckedChange = { state.toggleLeftHanded(it) })
+        }
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(8.dp))
+
+        // ----- Instrument (unchanged) -----
+        SectionLabel("Instrument")
+        Spacer(Modifier.height(8.dp))
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             app.guitar.theory.Instrument.entries.forEachIndexed { i, inst ->
                 SegmentedButton(
@@ -414,8 +558,8 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
 
-        Text("Display", style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.height(6.dp))
+        SectionLabel("Behavior")
+        Spacer(Modifier.height(8.dp))
         Text("Labels on dots", style = MaterialTheme.typography.labelMedium)
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             LabelMode.entries.forEachIndexed { i, m ->
@@ -426,17 +570,6 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
                     label = { Text(m.name) }
                 )
             }
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Left-handed", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            Switch(checked = state.leftHanded, onCheckedChange = { state.toggleLeftHanded(it) })
-        }
-
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Dark theme", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            Switch(checked = state.darkTheme, onCheckedChange = { state.toggleDarkTheme(it) })
         }
 
         Spacer(Modifier.height(10.dp))
@@ -479,9 +612,9 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
 
-        // ----- Tuner / audio configuration -----
-        Text("Tuner", style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.height(6.dp))
+        // ----- Tuner (A4 reference; unchanged) -----
+        SectionLabel("Tuner")
+        Spacer(Modifier.height(8.dp))
         Text("A4 reference: ${state.a4Hz.toInt()} Hz",
             style = MaterialTheme.typography.bodyMedium)
         androidx.compose.material3.Slider(

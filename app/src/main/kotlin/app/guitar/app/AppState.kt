@@ -43,6 +43,12 @@ enum class DisplayMode { None, Chord, Scale, Pick }
  *  Loop and Tuner are full-screen; the others are bottom sheets. */
 enum class Sheet { Fretboard, Options, Loop, Tuner, EarTraining, SambaLooper, Decompose }
 
+/** UI theme mode (Settings → Personalize). Auto follows the system light/dark
+ *  setting (resolved in MainActivity via `isSystemInDarkTheme()`); Dark/Light
+ *  are explicit. Replaces the old dark-only boolean pref, which is kept around
+ *  purely as a migration fallback (see [TuningRepository.themeMode]). */
+enum class ThemeMode { Dark, Light, Auto }
+
 /** All-notes vs single-position view, for chord & scale display. */
 enum class ChordScaleView { AllNotes, Positions }
 
@@ -286,6 +292,31 @@ class AppState(
                 .mapNotNull { name -> runCatching { TabDest.valueOf(name) }.getOrNull() }
                 .distinct()
             tabOrder = if (parsed.size >= 4) parsed.take(4) else DEFAULT_TAB_ORDER
+        }
+    }
+
+    /** UI theme mode (persisted). Like [accent]/[tabOrder], MainActivity reads the
+     *  repo flow directly too so the outer [GuitarTheme] wrap has it resolved
+     *  before this AppState even exists; this mirror keeps the Settings screen's
+     *  segmented control in sync with the same value. */
+    var themeMode by mutableStateOf(ThemeMode.Dark)
+        private set
+
+    @JvmName("applyThemeMode")
+    fun setThemeMode(mode: ThemeMode) {
+        themeMode = mode
+        scope.launch { repo.setThemeMode(mode.name.lowercase()) }
+    }
+
+    init {
+        // Restore the persisted theme mode once on startup (repo.themeMode already
+        // handles migration from the old dark-only boolean pref — see there).
+        scope.launch {
+            themeMode = when (repo.themeMode.first()) {
+                "light" -> ThemeMode.Light
+                "auto" -> ThemeMode.Auto
+                else -> ThemeMode.Dark
+            }
         }
     }
 

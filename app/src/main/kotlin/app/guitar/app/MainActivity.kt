@@ -88,7 +88,16 @@ class MainActivity : ComponentActivity() {
             // Theme flag read straight from the repository so the theme wraps the
             // whole app (AppState is created inside App()).
             val repo = androidx.compose.runtime.remember { TuningRepository(applicationContext) }
-            val dark by repo.darkTheme.collectAsState(initial = true)
+            // Theme resolution: theme_mode is the source of truth ("dark"/"light"/
+            // "auto"); repo.themeMode itself falls back to the old dark-only boolean
+            // pref for installs that predate this setting (see TuningRepository).
+            val themeMode by repo.themeMode.collectAsState(initial = "dark")
+            val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val dark = when (themeMode) {
+                "light" -> false
+                "auto" -> systemDark
+                else -> true // "dark" (or an unrecognized value) — explicit dark
+            }
             val accentName by repo.accent.collectAsState(initial = Accent.Coral.name)
             val accent = androidx.compose.runtime.remember(accentName) {
                 runCatching { Accent.valueOf(accentName) }.getOrDefault(Accent.Coral)
@@ -366,7 +375,7 @@ fun App(audio: AudioEngine) {
 private fun sheetLabel(s: Sheet): String = when (s) {
     Sheet.Fretboard -> "Fretboard"
     Sheet.Loop -> "Loop"
-    Sheet.Options -> "Options"
+    Sheet.Options -> "Settings"
     Sheet.Tuner -> "Tuner"
     Sheet.EarTraining -> "Ear Training"
     Sheet.SambaLooper -> "Drums"
