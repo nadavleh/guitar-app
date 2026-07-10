@@ -135,7 +135,15 @@ export class App {
     });
     const header = el("div", { class: "app-header" }, [
       el("span", { class: "app-brand" }, ["chorect"]),
-      el("span", { class: "app-byline" }, ["made by Nadavileh"]),
+      el("span", { class: "app-byline" }, [
+        "made by ",
+        el("a", {
+          class: "app-byline-link",
+          href: "https://www.instagram.com/nadavileh",
+          target: "_blank",
+          rel: "noopener",
+        }, ["@nadavileh"]),
+      ]),
     ]);
     const appRoot = el("div", { class: "app-root" }, [this.railEl, this.contentEl]);
     const shell = el("div", { class: "app-shell" }, [header, appRoot]);

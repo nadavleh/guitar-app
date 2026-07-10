@@ -132,6 +132,8 @@ body {
   color: var(--primary);
 }
 .app-byline { font-size: 11px; color: var(--text-secondary); }
+.app-byline-link { color: var(--act); font-weight: 600; text-decoration: none; }
+.app-byline-link:hover, .app-byline-link:focus-visible { text-decoration: underline; }
 
 .app-root {
   display: flex;
