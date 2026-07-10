@@ -81,7 +81,11 @@ class MainActivity : ComponentActivity() {
             // whole app (AppState is created inside App()).
             val repo = androidx.compose.runtime.remember { TuningRepository(applicationContext) }
             val dark by repo.darkTheme.collectAsState(initial = true)
-            GuitarTheme(dark = dark) {
+            val accentName by repo.accent.collectAsState(initial = Accent.Coral.name)
+            val accent = androidx.compose.runtime.remember(accentName) {
+                runCatching { Accent.valueOf(accentName) }.getOrDefault(Accent.Coral)
+            }
+            GuitarTheme(dark = dark, accent = accent) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     App(audioEngine)
                 }

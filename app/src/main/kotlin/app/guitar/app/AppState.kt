@@ -237,6 +237,29 @@ class AppState(
         }
     }
 
+    /** Signal ACT accent (persisted). MainActivity reads the repo flow directly too
+     *  (like [darkTheme]) so the outer [GuitarTheme] wrap has it before this
+     *  AppState even exists; this mirror keeps a future Settings accent-picker in
+     *  sync with the same value. */
+    var accent by mutableStateOf(Accent.Coral)
+        private set
+
+    @JvmName("applyAccent")
+    fun setAccent(a: Accent) {
+        accent = a
+        scope.launch { repo.setAccent(a.name) }
+    }
+
+    init {
+        // Restore the persisted accent once on startup; an unrecognized/invalid
+        // stored name (e.g. from a future enum entry the app doesn't know about
+        // yet) falls back to the default Coral rather than crashing.
+        scope.launch {
+            val raw = repo.accent.first()
+            accent = runCatching { Accent.valueOf(raw) }.getOrDefault(Accent.Coral)
+        }
+    }
+
     var chordInput by mutableStateOf("Cmaj7")
     var chordFretRange by mutableStateOf(0..DISPLAY_FRETS)
     var selectedShapeIndex by mutableStateOf<Int?>(null)

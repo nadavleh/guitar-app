@@ -1,37 +1,139 @@
 package app.guitar.app
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// ---------- Brand palette (see GUI_DESIGN.md §2.1) ----------
+// ---------- "Signal" design tokens ----------
+// See docs/superpowers/specs/2026-07-10-signal-gui-redesign-design.md §"Design tokens".
+// Indigo ground, dual accents with fixed semantics: coral (default) = ACT (play,
+// primary actions, selection, destructive); teal = FEEDBACK (correct/in-tune/
+// current tone/accents). The user can swap the ACT accent among 5 swatches
+// ([Accent]); feedback stays teal unless the chosen accent IS teal, in which case
+// it falls back to blue so the two roles never collide (see [signalPalette]).
 
+object SignalColors {
+    // Dark (default theme)
+    val bgDark        = Color(0xFF10141E)   // screen ground
+    val surfaceDark    = Color(0xFF191F2E)  // cards
+    val surface2Dark   = Color(0xFF20283C)  // inset cards, answer keys, transport
+    val textDark       = Color(0xFFEAEEF7)  // primary text
+    val mutedDark      = Color(0xFF7C86A2)  // secondary text, labels
+    val lineDark       = Color(0xFF273049)  // hairlines, borders
+    val onActDark      = Color(0xFF2A0A09)  // text on the (default coral) act fill
+    val feedbackDark   = Color(0xFF3DDCC8)  // teal
+    val errorDark      = Color(0xFFD34D52)  // reddish, kept distinct from any act accent
+
+    // Light
+    val bgLight        = Color(0xFFF4F6FB)
+    val surfaceLight   = Color(0xFFFFFFFF)
+    val surface2Light  = Color(0xFFE9EDF6)
+    val textLight      = Color(0xFF1C2233)
+    val mutedLight     = Color(0xFF5D6782)
+    val lineLight      = Color(0xFFD8DEED)
+    val onActLight     = Color(0xFFFFFFFF)
+    val feedbackLight  = Color(0xFF159C8B)  // darkened teal, contrast on light ground
+    val errorLight     = Color(0xFFB3282E)
+}
+
+/**
+ * User-swappable ACT accent (play / primary actions / selection). Each entry
+ * carries a dark-theme and a light-theme value; the light value is darkened /
+ * saturated for contrast against the light ground, per the design's accent-picker
+ * section. Coral and Teal's light values are spelled out in the spec exactly
+ * (`#E03E39`, `#159C8B`); Amber/Blue/Purple's light values aren't given explicitly
+ * there and were derived here the same way (darkened, same hue family).
+ */
+enum class Accent(val dark: Color, val light: Color, val label: String) {
+    Coral(Color(0xFFFF5C57), Color(0xFFE03E39), "Coral"),
+    Amber(Color(0xFFFFB454), Color(0xFFB8720E), "Amber"),
+    Teal(Color(0xFF3DDCC8), Color(0xFF159C8B), "Teal"),
+    Blue(Color(0xFF8AA3FF), Color(0xFF3D5CC7), "Blue"),
+    Purple(Color(0xFFC98ADF), Color(0xFF9C4FBD), "Purple"),
+}
+
+/** Resolved Signal palette for the current (dark/light × accent) combination.
+ *  Provided down the tree via [LocalSignal] — this is what restyled screens read;
+ *  it reacts live to the theme + accent choice (unlike the static [GuitarColors]
+ *  compatibility layer below). */
+data class SignalPalette(
+    val bg: Color,
+    val surface: Color,
+    val surface2: Color,
+    val text: Color,
+    val muted: Color,
+    val line: Color,
+    val act: Color,
+    val onAct: Color,
+    val feedback: Color,
+)
+
+val LocalSignal = staticCompositionLocalOf<SignalPalette> {
+    error("LocalSignal not provided — wrap content in GuitarTheme")
+}
+
+private fun signalPalette(dark: Boolean, accent: Accent): SignalPalette {
+    // Feedback fallback: teal is FEEDBACK's home color, so if the user's ACT
+    // accent IS teal, feedback would collide with it visually — fall back to blue.
+    val feedback = if (accent == Accent.Teal) {
+        if (dark) Accent.Blue.dark else Accent.Blue.light
+    } else {
+        if (dark) SignalColors.feedbackDark else SignalColors.feedbackLight
+    }
+    return if (dark) {
+        SignalPalette(
+            bg = SignalColors.bgDark, surface = SignalColors.surfaceDark, surface2 = SignalColors.surface2Dark,
+            text = SignalColors.textDark, muted = SignalColors.mutedDark, line = SignalColors.lineDark,
+            act = accent.dark, onAct = SignalColors.onActDark, feedback = feedback,
+        )
+    } else {
+        SignalPalette(
+            bg = SignalColors.bgLight, surface = SignalColors.surfaceLight, surface2 = SignalColors.surface2Light,
+            text = SignalColors.textLight, muted = SignalColors.mutedLight, line = SignalColors.lineLight,
+            act = accent.light, onAct = SignalColors.onActLight, feedback = feedback,
+        )
+    }
+}
+
+// ---------- Brand-palette compatibility layer ----------
+// GuitarColors is a plain `object` — fixed vals that can't react to the live
+// theme/accent selection — kept so every call site that hasn't been restructured
+// onto LocalSignal/MaterialTheme yet still compiles AND inherits the Signal ground
+// immediately (the whole point of this foundation task). It always reflects the
+// DEFAULT combination (dark theme, Coral accent); the LIVE accent flows through
+// MaterialTheme.colorScheme + [LocalSignal] instead (see [GuitarTheme]), which is
+// what restyled screens should read.
 object GuitarColors {
-    val background     = Color(0xFF0E1014)
-    val surface        = Color(0xFF181B22)
-    val surfaceElev    = Color(0xFF20242E)
-    val divider        = Color(0xFF262A33)
+    val background     = SignalColors.bgDark
+    val surface        = SignalColors.surfaceDark
+    val surfaceElev    = SignalColors.surface2Dark
+    val divider        = SignalColors.lineDark
 
-    val textPrimary    = Color(0xFFF5F0E6)
-    val textSecondary  = Color(0xFF9098A6)
-    val textDisabled   = Color(0xFF4A5060)
+    val textPrimary    = SignalColors.textDark
+    val textSecondary  = SignalColors.mutedDark
+    val textDisabled   = Color(0xFF454E64)
 
-    val primary        = Color(0xFFF2A93B)   // amber
-    val onPrimary      = Color(0xFF1A1206)
+    val primary        = Accent.Coral.dark          // act (default accent)
+    val onPrimary      = SignalColors.onActDark
 
-    val rootTone       = Color(0xFFD34D52)   // crimson
-    val chordTone      = Color(0xFF3FB8AF)   // teal
-    val scaleTone      = Color(0xFF9B7BF7)   // lavender
-    val pickSelect     = Color(0xFFF2A93B)   // amber
+    val rootTone       = Accent.Coral.dark          // root marks: act
+    val chordTone      = SignalColors.feedbackDark  // chord-tone marks: feedback (teal)
+    val scaleTone      = Color(0xFF8AA3FF)          // scale-tone marks: blue
+    val pickSelect     = Accent.Coral.dark
 
+    // Physical fretboard-wood colors — not Signal tokens; the neck keeps its
+    // current wood-grain rendering (geometry AND these colors untouched here).
     val wood           = Color(0xFF3D2817)
     val woodGrain      = Color(0xFF2C1C10)
     val nut            = Color(0xFF0A0A0B)
@@ -60,74 +162,92 @@ private val GuitarTypography = Typography(
 
 // ---------- Color scheme bound to Material3 ----------
 
-private val GuitarColorScheme = darkColorScheme(
-    primary           = GuitarColors.primary,
-    onPrimary         = GuitarColors.onPrimary,
-    primaryContainer  = GuitarColors.primary.copy(alpha = 0.20f),
-    onPrimaryContainer = GuitarColors.textPrimary,
+/** Builds the M3 [ColorScheme] from Signal tokens for the given theme + resolved
+ *  palette. `error` stays a fixed reddish, deliberately NOT tied to `act` — the
+ *  user might set act to teal/blue/purple/amber, and errors must still read as
+ *  "danger" regardless of the accent choice. */
+private fun signalColorScheme(dark: Boolean, palette: SignalPalette): ColorScheme {
+    val error = if (dark) SignalColors.errorDark else SignalColors.errorLight
+    val onError = if (dark) SignalColors.textDark else Color(0xFFFFFFFF)
+    val onSecondary = if (dark) palette.text else Color(0xFFFFFFFF)
+    // Tertiary keeps playing the old "scaleTone" role (now the blue token) so any
+    // consumer reading MaterialTheme.colorScheme.tertiary still gets a sensible,
+    // distinct-from-act-and-feedback color.
+    val tertiary = if (dark) Accent.Blue.dark else Accent.Blue.light
 
-    secondary         = GuitarColors.chordTone,
-    onSecondary       = GuitarColors.textPrimary,
-    secondaryContainer = GuitarColors.surfaceElev,
-    onSecondaryContainer = GuitarColors.textPrimary,
+    return if (dark) {
+        darkColorScheme(
+            primary             = palette.act,
+            onPrimary           = palette.onAct,
+            primaryContainer    = palette.act.copy(alpha = 0.20f),
+            onPrimaryContainer  = palette.text,
 
-    tertiary          = GuitarColors.scaleTone,
-    onTertiary        = GuitarColors.textPrimary,
+            secondary           = palette.feedback,
+            onSecondary         = onSecondary,
+            secondaryContainer  = palette.surface2,
+            onSecondaryContainer = palette.text,
 
-    background        = GuitarColors.background,
-    onBackground      = GuitarColors.textPrimary,
+            tertiary            = tertiary,
+            onTertiary          = onSecondary,
 
-    surface           = GuitarColors.surface,
-    onSurface         = GuitarColors.textPrimary,
-    surfaceVariant    = GuitarColors.surfaceElev,
-    onSurfaceVariant  = GuitarColors.textSecondary,
+            background          = palette.bg,
+            onBackground        = palette.text,
 
-    outline           = GuitarColors.divider,
-    outlineVariant    = GuitarColors.divider,
+            surface             = palette.surface,
+            onSurface           = palette.text,
+            surfaceVariant      = palette.surface2,
+            onSurfaceVariant    = palette.muted,
 
-    error             = GuitarColors.rootTone,
-    onError           = GuitarColors.textPrimary,
-)
+            outline             = palette.line,
+            outlineVariant      = palette.line,
 
-// Light variant: warm paper background, same brand accents (the wooden fretboard
-// canvas keeps its own GuitarColors regardless of theme).
-private val GuitarLightColorScheme = lightColorScheme(
-    primary           = Color(0xFFB57612),          // deeper amber for contrast on light
-    onPrimary         = Color(0xFFFFFFFF),
-    primaryContainer  = Color(0xFFB57612).copy(alpha = 0.18f),
-    onPrimaryContainer = Color(0xFF221A0A),
+            error               = error,
+            onError             = onError,
+        )
+    } else {
+        lightColorScheme(
+            primary             = palette.act,
+            onPrimary           = palette.onAct,
+            primaryContainer    = palette.act.copy(alpha = 0.18f),
+            onPrimaryContainer  = palette.text,
 
-    secondary         = Color(0xFF16766F),          // deeper teal
-    onSecondary       = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFE9E4D8),
-    onSecondaryContainer = Color(0xFF1E222A),
+            secondary           = palette.feedback,
+            onSecondary         = onSecondary,
+            secondaryContainer  = palette.surface2,
+            onSecondaryContainer = palette.text,
 
-    tertiary          = Color(0xFF6B47C9),          // deeper lavender
-    onTertiary        = Color(0xFFFFFFFF),
+            tertiary            = tertiary,
+            onTertiary          = onSecondary,
 
-    background        = Color(0xFFF6F3EC),
-    onBackground      = Color(0xFF1E222A),
+            background          = palette.bg,
+            onBackground        = palette.text,
 
-    surface           = Color(0xFFFFFDF7),
-    onSurface         = Color(0xFF1E222A),
-    surfaceVariant    = Color(0xFFECE7DB),
-    onSurfaceVariant  = Color(0xFF5A6070),
+            surface             = palette.surface,
+            onSurface           = palette.text,
+            surfaceVariant      = palette.surface2,
+            onSurfaceVariant    = palette.muted,
 
-    outline           = Color(0xFFCFC9BB),
-    outlineVariant    = Color(0xFFCFC9BB),
+            outline             = palette.line,
+            outlineVariant      = palette.line,
 
-    error             = Color(0xFFB3282E),
-    onError           = Color(0xFFFFFFFF),
-)
+            error               = error,
+            onError             = onError,
+        )
+    }
+}
 
 @Composable
 fun GuitarTheme(
     dark: Boolean = isSystemInDarkTheme(),
+    accent: Accent = Accent.Coral,
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = if (dark) GuitarColorScheme else GuitarLightColorScheme,
-        typography  = GuitarTypography,
-        content     = content,
-    )
+    val palette = signalPalette(dark, accent)
+    CompositionLocalProvider(LocalSignal provides palette) {
+        MaterialTheme(
+            colorScheme = signalColorScheme(dark, palette),
+            typography  = GuitarTypography,
+            content     = content,
+        )
+    }
 }

@@ -197,6 +197,27 @@ class TuningRepository(private val context: Context) {
         context.tuningDataStore.edit { prefs -> prefs[keyGuitarEq] = value }
     }
 
+    private val keyAccent = stringPreferencesKey("accent")
+
+    /** Selected ACT accent (Accent enum name). Default "Coral". */
+    val accent: Flow<String> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyAccent] ?: Accent.Coral.name }
+
+    suspend fun setAccent(value: String) {
+        context.tuningDataStore.edit { prefs -> prefs[keyAccent] = value }
+    }
+
+    private val keyTabOrder = stringPreferencesKey("tab_order")
+
+    /** Configured bottom-tab set + order, comma-joined (e.g. "Neck,Ear,Rhythm,Loop").
+     *  "More" is fixed and not part of this list. Consumed by the Signal tab bar (M3). */
+    val tabOrder: Flow<String> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyTabOrder] ?: "Neck,Ear,Rhythm,Loop" }
+
+    suspend fun setTabOrder(value: String) {
+        context.tuningDataStore.edit { prefs -> prefs[keyTabOrder] = value }
+    }
+
     private val keyGuitarReverb = stringPreferencesKey("guitar_reverb")
 
     /** Encoded per-sound reverb amount ("Name,amount;..."). Empty = use code defaults. */
