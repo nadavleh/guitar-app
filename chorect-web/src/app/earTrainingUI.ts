@@ -7,8 +7,9 @@ import { EarTrainingState, EarSubMode, EarMode } from "./earTrainingState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { shapeMarks } from "./marks";
 import { Colors, withAlpha } from "./theme";
-import { el, btn, switchRow, labelSm } from "./dom";
+import { el, btn, segmented, switchRow, labelSm } from "./dom";
 import { transportDock, toneSheet } from "./transport";
+import { icon } from "./icons";
 import { renderChallengeStatsOverlay } from "./statsOverlay";
 import {
   spellPc, noteAt, TrainingMode, ChordTypeLevel, ChordTypeLevelName,
@@ -69,15 +70,33 @@ function formatScoreDate(ms: number): string {
 export class EarTrainingUI {
   private fbCanvasEl: HTMLCanvasElement | null = null;
   private fb: FretboardCanvas | null = null;
-  /** Which bar's degree-keyboard popup is open (null = none). */
-  private keyboardBar: number | null = null;
-  /** Pending picks inside the open keyboard popup (extended/mix mode needs OK). */
-  private kbPickedDeg: number | null = null;
-  private kbPickedRoman: string | null = null;
-  private kbPickedExt: string | null = null;
-  /** Physical-keyboard handler active while the degree popup is open (1..7 pick a
-   *  degree, Enter commits in extension mode, Esc closes). */
-  private kbKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  /** Signal restructure (T9): which bar the fixed Challenge answer pad currently
+   *  targets (replaces the old per-bar popup keyboard — see [challengeAnswerPad]). */
+  private challengeSelectedBar = 0;
+  private lastChallengeIndexForPad = -1;
+  /** Pending picks for [challengeSelectedBar] (extended/mix mode needs an
+   *  extension tap before the guess commits) — reset whenever the target bar
+   *  changes, mirroring Android's `remember(bar)` keying. */
+  private padPickedBar: number | null = null;
+  private padPickedDeg: number | null = null;
+  private padPickedRoman: string | null = null;
+  private padPickedExt: string | null = null;
+  private padExtOpen = false;
+  /** Physical-keyboard handler for the fixed answer pad (1..7 pick a degree,
+   *  Enter commits in extension mode, Esc cancels the pending pick) — attached
+   *  once for the screen's lifetime and self-guards on whether a Progression
+   *  challenge question is actually in flight. */
+  private challengeKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  /** Sub-mode chip row's "More ▾" overflow (Flavor/Inversions/AugDim). */
+  private subModeMoreOpen = false;
+  private subModeOutsideCloser: ((e: Event) => void) | null = null;
+
+  /** One shared bottom sheet for the Progression generator/key/level settings
+   *  (Signal move — replaces the always-expanded settings block with a
+   *  GeneratorSummaryCard → sheet, same content, mirrors GeneratorSettingsSheet). */
+  private settingsSheetOpen = false;
 
   private statsOpen = false;
   private libraryOpen = false;
@@ -93,7 +112,9 @@ export class EarTrainingUI {
   private libFbEl: HTMLCanvasElement | null = null;
   private libFb: FretboardCanvas | null = null;
 
-  constructor(private ear: EarTrainingState, private state: AppState, private onBack: () => void, private onToLooper: (symbols: string[]) => void) {}
+  constructor(private ear: EarTrainingState, private state: AppState, private onBack: () => void, private onToLooper: (symbols: string[]) => void) {
+    this.attachChallengeKeys();
+  }
 
   /** Per-kind challenge stats popup (scrim closes it) — shared with the More
    *  sheet's "Challenge stats" row; see statsOverlay.ts. */
@@ -101,75 +122,321 @@ export class EarTrainingUI {
     return renderChallengeStatsOverlay(this.state, () => { this.statsOpen = false; this.rerender(); });
   }
 
+  // ---------- Signal restructure (T9): sub-mode chips, generator summary/sheet,
+  // Challenge progress ring + dot strip + fixed answer pad ----------
+
+  private static readonly SUBMODE_LABEL: Record<EarSubMode, string> = {
+    [EarSubMode.Progression]: "Progressions",
+    [EarSubMode.Note2Chord]: "Note→Chord",
+    [EarSubMode.Flavor]: "Flavor",
+    [EarSubMode.Inversions]: "Inversions",
+    [EarSubMode.AugDim]: "Aug / Dim",
+    [EarSubMode.Intervals]: "Intervals",
+  };
+
+  /** Sub-mode chip row (Signal move — replaces the sub-mode <select>):
+   *  Progressions/Intervals/Note→Chord are always-visible chips; Flavor/
+   *  Inversions/AugDim live behind a "More ▾" overflow chip which shows the
+   *  active sub-mode's name when it IS one of the overflowed ones, so the
+   *  current mode is never hidden — mirrors Android's SubModeChipRow. */
+  private subModeChipRow(): HTMLElement {
+    const ear = this.ear;
+    const label = (s: EarSubMode) => EarTrainingUI.SUBMODE_LABEL[s];
+    const primary = [EarSubMode.Progression, EarSubMode.Intervals, EarSubMode.Note2Chord];
+    const overflow = [EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim];
+    const row = el("div", { class: "chip-row" });
+    for (const s of primary) row.appendChild(chip(label(s), ear.progSubMode === s, () => ear.switchTab(s)));
+
+    const inOverflow = overflow.includes(ear.progSubMode);
+    const wrap = el("div", { class: "et-submode-wrap", style: "position:relative" });
+    wrap.appendChild(chip((inOverflow ? label(ear.progSubMode) : "More") + "  ▾", inOverflow, () => {
+      this.subModeMoreOpen = !this.subModeMoreOpen;
+      this.rerender();
+    }));
+    if (this.subModeMoreOpen) {
+      const pop = el("div", { class: "et-submenu-pop" });
+      for (const s of overflow) {
+        const item = el("div", { class: "et-submenu-item" }, [label(s)]);
+        item.addEventListener("click", () => { this.subModeMoreOpen = false; ear.switchTab(s); });
+        pop.appendChild(item);
+      }
+      wrap.appendChild(pop);
+    }
+    row.appendChild(wrap);
+    return row;
+  }
+
+  /** Short label for the current progression generator. */
+  private generatorLabel(): string {
+    const ear = this.ear;
+    return ear.advancedMode ? "Advanced" : ear.circleMode ? "Circle of 5ths" : ear.iiiFocusMode ? "I → iii focus" : "Diatonic";
+  }
+
+  /** One-line teaching caption for the current progression generator. */
+  private generatorCaption(): string {
+    const ear = this.ear;
+    return ear.advancedMode
+      ? "Borrowed chords, secondary dominants & jazz turnarounds, each with a note."
+      : ear.circleMode
+      ? "Circle-of-fifths windows built around secondary dominants (V7 of the next chord)."
+      : ear.iiiFocusMode
+      ? "Drill for hearing the I→iii move — every progression opens with I then iii (major)."
+      : "Standard diatonic progressions in the chosen key & mode.";
+  }
+
+  private generatorSelect(): HTMLSelectElement {
+    const ear = this.ear;
+    const gen = ear.advancedMode ? "advanced" : ear.circleMode ? "circle" : ear.iiiFocusMode ? "iiifocus" : "diatonic";
+    return select(
+      [
+        { value: "diatonic", label: "Generator: Diatonic" },
+        { value: "iiifocus", label: "Generator: I → iii focus" },
+        { value: "advanced", label: "Generator: Advanced (non-diatonic)" },
+        { value: "circle", label: "Generator: Circle — secondary dominants" },
+      ],
+      gen,
+      (v) => {
+        if (v === "advanced") ear.setAdvancedMode(true);
+        else if (v === "circle") ear.setCircleMode(true);
+        else if (v === "iiifocus") ear.setIiiFocusMode(true);
+        else { ear.setAdvancedMode(false); ear.setCircleMode(false); ear.setIiiFocusMode(false); }
+      },
+    );
+  }
+
+  /** Short label for the current chord-type/level pool ("Mix" when Mix-all is on). */
+  private levelLabel(): string {
+    const ear = this.ear;
+    return ear.earMixAll ? "Mix" : ChordTypeLevelName[ear.chordTypeLevel];
+  }
+
+  /** One-line "‹Generator› · ‹key/Random› · ‹level› — tap to configure" summary
+   *  card (Signal move): replaces the always-expanded generator/key/level block
+   *  with a single tappable card opening [generatorSettingsSheet]. Shown by
+   *  every Progression sub-mode view (diatonic + advanced/circle), both
+   *  Practice and Challenge — mirrors Android's GeneratorSummaryCard. */
+  private generatorSummaryCard(onClick: () => void): HTMLElement {
+    const ear = this.ear;
+    const keyLabel = ear.fixedKey == null ? "Random key" : spellPc(ear.fixedKey);
+    const summary = this.generatorLabel() + "  ·  " + keyLabel + (!ear.specialProgMode ? "  ·  " + this.levelLabel() : "");
+    const card = el("div", { class: "et-card et-summary-card", style: `background:${Colors.surfaceElev}` }, [
+      el("div", { style: "flex:1;min-width:0" }, [
+        el("div", { style: "font-weight:600" }, [summary]),
+        el("div", { class: "ans-label" }, ["tap to configure"]),
+      ]),
+      icon("tune", 20),
+    ]);
+    card.addEventListener("click", onClick);
+    return card;
+  }
+
+  /** Settings sheet opened by [generatorSummaryCard]: hosts the generator
+   *  select + caption + Library button (always), plus — for the diatonic
+   *  generator — the full [progressionSettings] (key/modes/level/voicing), or
+   *  — for the advanced/circle generators, which don't use those pools — just
+   *  the key picker. Mirrors Android's GeneratorSettingsSheet. */
+  private generatorSettingsSheet(onClose: () => void): HTMLElement {
+    const ear = this.ear;
+    const sheet = el("div", { class: "sheet" });
+    sheet.appendChild(el("div", { class: "sheet-grabber" }));
+    sheet.appendChild(el("div", { class: "sheet-header" }, [el("h2", {}, ["Progression settings"]), btn("Done", onClose, "btn text")]));
+    sheet.appendChild(el("div", { style: "display:flex;gap:8px;align-items:center;margin:4px 0" }, [
+      el("div", { style: "flex:1" }, [this.generatorSelect()]),
+      btn("Library", () => { this.libraryOpen = true; this.rerender(); }),
+    ]));
+    sheet.appendChild(el("div", { class: "et-muted", style: "font-size:12px;font-style:italic;margin-bottom:10px" }, [this.generatorCaption()]));
+    if (ear.specialProgMode) {
+      sheet.appendChild(el("div", { class: "et-row-gap" }, [el("span", { class: "ans-label" }, ["Key"]), this.keySelectInline()]));
+    } else {
+      this.progressionSettings(sheet);
+    }
+    const scrim = el("div", { class: "sheet-scrim" }, [sheet]);
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) onClose(); });
+    return scrim;
+  }
+
+  private openSettingsSheet(): void { this.settingsSheetOpen = true; this.rerender(); }
+
+  /** Plain "‹label› · Score: ‹score›" row for the Progression/Advanced
+   *  Challenge in-flight screens — Restart/Quit are pinned in the screen
+   *  header instead (see render()'s progChallengeInFlight). Other challenge
+   *  sub-modes (Note→Chord/Flavor/Inversions/AugDim) keep the inline
+   *  [challengeHeader] with its own Restart/Quit buttons. */
+  private challengeScoreRow(label: string, score: string): HTMLElement {
+    return el("div", { class: "row" }, [
+      el("div", { style: "flex:1;font-weight:600" }, [label]),
+      el("div", { style: `color:${Colors.primary};font-weight:600` }, [score]),
+    ]);
+  }
+
+  /** 64px progress ring for the Progression Challenge: a muted track with an
+   *  act-colored arc swept to the answered fraction (CSS conic-gradient donut —
+   *  an inner surface-colored circle masks the middle so only a ring shows),
+   *  "Q n/N" centered. Mirrors Android's ChallengeProgressRing (Canvas arcs). */
+  private challengeProgressRing(index: number, total: number): HTMLElement {
+    const fraction = Math.min(Math.max(total > 0 ? index / total : 0, 0), 1);
+    const deg = Math.round(fraction * 360);
+    const ring = el("div", {
+      class: "et-ring",
+      style: `background: conic-gradient(var(--act) ${deg}deg, var(--divider) ${deg}deg)`,
+    }, [el("div", { class: "et-ring-inner" }, [`Q ${index + 1}/${total}`])]);
+    return ring;
+  }
+
+  /** Per-question dot strip for the Progression Challenge: feedback(teal) =
+   *  right, act(coral/error) = wrong, act-filled+ring = current, muted =
+   *  upcoming/unanswered. Mirrors Android's ChallengeDotStrip. */
+  private challengeDotStrip(): HTMLElement {
+    const ear = this.ear;
+    const row = el("div", { class: "chip-row" });
+    for (let i = 0; i < ear.challengeTotal; i++) {
+      const isCurrent = i === ear.challengeIndex;
+      const answer = ear.challengeAnswers[i];
+      const cls = isCurrent ? "et-dotc current" : answer === true ? "et-dotc right" : answer === false ? "et-dotc wrong" : "et-dotc muted";
+      row.appendChild(el("div", { class: cls }));
+    }
+    return row;
+  }
+
+  private resetPad(): void {
+    this.padPickedDeg = null; this.padPickedRoman = null; this.padPickedExt = null; this.padExtOpen = false;
+  }
+
+  /** Physical 1..7 keys pick a degree in [challengeSelectedBar]'s pad (Enter
+   *  commits in extension mode; Esc cancels the pending pick). Attached once
+   *  for the UI's lifetime — self-guards on whether a Progression challenge
+   *  question is actually in flight, so it's a no-op the rest of the time
+   *  (mirrors the always-attached spacebar shortcut in ui.ts). Rewired from
+   *  the old popup keyboard's handler onto the same [guessChallengeKeyboard]/
+   *  [clearChallengeBar] commit calls the fixed answer pad now uses. */
+  private attachChallengeKeys(): void {
+    if (this.challengeKeyHandler) return;
+    const handler = (e: KeyboardEvent) => {
+      const ear = this.ear;
+      const active = ear.progSubMode === EarSubMode.Progression && ear.earMode === EarMode.Challenge &&
+        !ear.specialProgMode && ear.challengeActive && ear.challengeIndex < ear.challengeTotal;
+      if (!active) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      const bar = this.challengeSelectedBar;
+      if (this.padPickedBar !== bar) { this.padPickedBar = bar; this.resetPad(); }
+      const needsExt = ear.challengeNeedsExt && !ear.challengeCombinedMode;
+      if (e.key >= "1" && e.key <= "7") {
+        const idx = parseInt(e.key, 10) - 1;
+        const keys = ear.keyboardKeys();
+        if (idx >= keys.length) return;
+        e.preventDefault();
+        const [majDeg, roman] = keys[idx];
+        if (this.padPickedDeg !== majDeg) { this.padPickedExt = null; this.padExtOpen = false; }
+        this.padPickedDeg = majDeg; this.padPickedRoman = roman;
+        if (!needsExt) { ear.guessChallengeKeyboard(bar, majDeg, roman, null); this.resetPad(); }
+        this.rerender();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        this.resetPad();
+        this.rerender();
+      } else if (e.key === "Enter" && needsExt && this.padPickedDeg != null) {
+        e.preventDefault();
+        ear.guessChallengeKeyboard(bar, this.padPickedDeg, this.padPickedRoman ?? String(this.padPickedDeg), this.padPickedExt);
+        this.resetPad();
+        this.rerender();
+      }
+    };
+    this.challengeKeyHandler = handler;
+    document.addEventListener("keydown", handler);
+  }
+
+  /** The fixed Challenge answer pad for [bar] (Signal move — replaces the old
+   *  popup keyboard): a Major/Minor shift, a grid of 7 degree keys (I ii iii
+   *  IV V vi vii°), and — when the level uses them, and not fixed-7ths
+   *  (combined) mode — a "7th ▾" expander revealing that degree's diatonic
+   *  extensions. Triads/fixed-7ths commit on the degree tap; extended/mix
+   *  waits for an extension tap. Reuses the exact same
+   *  [EarTrainingState.guessChallengeKeyboard]/[EarTrainingState.clearChallengeBar]
+   *  commit logic the popup used — only the placement changed. */
+  private challengeAnswerPad(bar: number): HTMLElement {
+    const ear = this.ear;
+    if (this.padPickedBar !== bar) { this.padPickedBar = bar; this.resetPad(); }
+    const needsExt = ear.challengeNeedsExt && !ear.challengeCombinedMode;
+    const extOptions = this.padPickedDeg != null ? ear.challengeExtOptionsForDegree(this.padPickedDeg) : [];
+
+    const commit = (ext: string | null) => {
+      if (this.padPickedDeg == null) return;
+      ear.guessChallengeKeyboard(bar, this.padPickedDeg, this.padPickedRoman ?? String(this.padPickedDeg), ext);
+      this.resetPad();
+      this.rerender();
+    };
+
+    const header = el("div", { class: "row" }, [
+      el("span", { class: "ans-label", style: "flex:1" }, [`Bar ${bar + 1} answer`]),
+      chip("Major", !ear.keyboardMinor, () => { if (ear.keyboardMinor) ear.toggleKeyboardShift(); }),
+      chip("⇧ Minor", ear.keyboardMinor, () => { if (!ear.keyboardMinor) ear.toggleKeyboardShift(); }),
+    ]);
+
+    const grid = el("div", { class: "et-pad-grid" }, ear.keyboardKeys().map(([majDeg, roman]) =>
+      chip(roman, this.padPickedDeg === majDeg, () => {
+        if (this.padPickedDeg !== majDeg) { this.padPickedExt = null; this.padExtOpen = false; }
+        this.padPickedDeg = majDeg; this.padPickedRoman = roman;
+        if (!needsExt) commit(null); else this.rerender();
+      })));
+    if (needsExt) grid.appendChild(chip("7th ▾", this.padExtOpen, () => { this.padExtOpen = !this.padExtOpen; this.rerender(); }));
+
+    const children: HTMLElement[] = [header, el("div", { class: "v-gap-8" }), grid];
+    if (needsExt && this.padExtOpen) {
+      if (this.padPickedDeg == null) {
+        children.push(el("div", { class: "et-muted", style: "margin-top:8px" }, ["Pick a degree first — its valid extensions appear here."]));
+      } else {
+        children.push(el("div", { class: "chip-row", style: "margin-top:8px" }, extOptions.map((ext) =>
+          chip(ext === "" ? "triad" : ext, this.padPickedExt === ext, () => { this.padPickedExt = ext; commit(ext); }))));
+      }
+    }
+    children.push(el("div", { style: "margin-top:6px" }, [
+      btn(`Clear bar ${bar + 1}`, () => { ear.clearChallengeBar(bar); this.resetPad(); this.rerender(); }, "btn text"),
+    ]));
+
+    return el("div", { class: "et-card", style: `background:${withAlpha(Colors.surfaceElev, 0.7)}` }, children);
+  }
+
   render(container: HTMLElement): void {
     const ear = this.ear;
     const screen = el("div", { class: "tool-screen" });
 
-    // header
-    screen.appendChild(el("div", { class: "tool-topbar" }, [
-      el("div", { class: "tool-title" }, ["EAR TRAINING"]),
+    // header: title + (while a Progression/Advanced challenge is in flight)
+    // pinned Restart/Quit icons + Stats + Tune + Back — mirrors Android's
+    // header Row in EarTrainingScreen() exactly (Signal restructure T9).
+    const progChallengeInFlight = ear.progSubMode === EarSubMode.Progression && ear.earMode === EarMode.Challenge &&
+      (ear.specialProgMode
+        ? ear.advChActive && ear.advChIndex < ear.advChallengeTotal
+        : ear.challengeActive && ear.challengeIndex < ear.challengeTotal);
+    const topbarChildren: HTMLElement[] = [el("div", { class: "tool-title" }, ["EAR TRAINING"])];
+    if (progChallengeInFlight) {
+      const restartBtn = el("button", { class: "tune-btn", "aria-label": "Restart challenge" }, [icon("restart", 18)]);
+      restartBtn.addEventListener("click", () => { if (ear.specialProgMode) ear.startAdvChallenge(); else ear.startChallenge(); });
+      const quitBtn = el("button", { class: "tune-btn", "aria-label": "Quit challenge" }, [icon("close", 18)]);
+      quitBtn.addEventListener("click", () => { if (ear.specialProgMode) ear.exitAdvChallenge(); else ear.exitChallenge(); });
+      topbarChildren.push(restartBtn, quitBtn);
+    }
+    topbarChildren.push(
       btn("Stats", () => { this.statsOpen = true; this.rerender(); }),
+      (() => {
+        const b = el("button", { class: "tune-btn", "aria-label": "Tone" }, [icon("tune", 18)]);
+        b.addEventListener("click", () => { this.toneSheetOpen = true; this.rerender(); });
+        return b;
+      })(),
       btn("Back", () => { ear.release(); this.onBack(); }),
-    ]));
+    );
+    screen.appendChild(el("div", { class: "tool-topbar" }, topbarChildren));
 
-    // sub-mode + mode selectors
-    screen.appendChild(el("div", { class: "row", style: "gap:8px;margin-top:8px" }, [
-      select(
-        [
-          { value: EarSubMode.Progression, label: "Progressions" },
-          { value: EarSubMode.Note2Chord, label: "Note→Chord" },
-          { value: EarSubMode.Flavor, label: "Flavor" },
-          { value: EarSubMode.Inversions, label: "Inversions" },
-          { value: EarSubMode.AugDim, label: "Aug / Dim" },
-          { value: EarSubMode.Intervals, label: "Intervals" },
-        ],
-        ear.progSubMode,
-        (v) => ear.switchTab(v as EarSubMode),
-      ),
-      select(
+    // Practice/Challenge segmented control (Signal move — replaces the mode
+    // <select>) + sub-mode chip row (replaces the sub-mode <select>).
+    screen.appendChild(el("div", { style: "margin-top:8px" }, [
+      segmented(
         [{ value: EarMode.Practice, label: "Practice" }, { value: EarMode.Challenge, label: "Challenge" }],
         ear.earMode,
-        (v) => ear.setEarMode(v as EarMode),
+        (v) => ear.setEarMode(v),
       ),
     ]));
-
-    if (ear.progSubMode === EarSubMode.Progression) {
-      // Generator (diatonic / advanced / circle-of-fifths) is one compact dropdown
-      // instead of two full switch rows, so it no longer eats fixed-header space above
-      // the scrollable body. A one-line caption preserves the teaching text.
-      const gen = ear.advancedMode ? "advanced" : ear.circleMode ? "circle" : ear.iiiFocusMode ? "iiifocus" : "diatonic";
-      const genCaption = ear.advancedMode
-        ? "Borrowed chords, secondary dominants & jazz turnarounds, each with a note."
-        : ear.circleMode
-        ? "Circle-of-fifths windows built around secondary dominants (V7 of the next chord)."
-        : ear.iiiFocusMode
-        ? "Drill for hearing the I→iii move — every progression opens with I then iii (major)."
-        : "Standard diatonic progressions in the chosen key & mode.";
-      const genSelect = select(
-        [
-          { value: "diatonic", label: "Generator: Diatonic" },
-          { value: "iiifocus", label: "Generator: I → iii focus" },
-          { value: "advanced", label: "Generator: Advanced (non-diatonic)" },
-          { value: "circle", label: "Generator: Circle — secondary dominants" },
-        ],
-        gen,
-        (v) => {
-          if (v === "advanced") ear.setAdvancedMode(true);
-          else if (v === "circle") ear.setCircleMode(true);
-          else if (v === "iiifocus") ear.setIiiFocusMode(true);
-          else { ear.setAdvancedMode(false); ear.setCircleMode(false); ear.setIiiFocusMode(false); }
-        },
-      );
-      const libBtn = btn("Library", () => { this.libraryOpen = true; this.rerender(); });
-      // Tempo + Strum + Boost-root now live in the transport dock / Tone sheet
-      // (Signal moves #2/#3), pinned below the body — see the dock appended at
-      // the end of render().
-      screen.appendChild(el("div", { style: "display:flex;gap:8px;align-items:center;margin:4px 0" }, [
-        el("div", { style: "flex:1" }, [genSelect]),
-        libBtn,
-      ]));
-      screen.appendChild(el("div", { class: "et-muted", style: "font-size:12px;font-style:italic;margin-bottom:6px" }, [genCaption]));
-    }
+    screen.appendChild(el("div", { style: "margin:8px 0" }, [this.subModeChipRow()]));
 
     const body = el("div", { class: "et-scroll" });
     screen.appendChild(body);
@@ -219,7 +486,27 @@ export class EarTrainingUI {
     container.appendChild(screen);
     if (this.statsOpen) container.appendChild(this.statsOverlay());
     if (this.libraryOpen) container.appendChild(this.libraryOverlay());
+    if (this.settingsSheetOpen) container.appendChild(this.generatorSettingsSheet(() => { this.settingsSheetOpen = false; this.rerender(); }));
     if (this.toneSheetOpen) container.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.rerender(); }));
+
+    // Close the sub-mode "More ▾" overflow when the next tap lands outside it
+    // (same single-tracked-listener pattern as SambaLooperUI's popups).
+    if (this.subModeOutsideCloser) {
+      document.removeEventListener("pointerdown", this.subModeOutsideCloser, true);
+      this.subModeOutsideCloser = null;
+    }
+    if (this.subModeMoreOpen) {
+      const onDoc = (e: Event) => {
+        if (!(e.target as HTMLElement).closest(".et-submode-wrap")) {
+          document.removeEventListener("pointerdown", onDoc, true);
+          if (this.subModeOutsideCloser === onDoc) this.subModeOutsideCloser = null;
+          this.subModeMoreOpen = false;
+          this.rerender();
+        }
+      };
+      this.subModeOutsideCloser = onDoc;
+      setTimeout(() => { if (this.subModeOutsideCloser === onDoc) document.addEventListener("pointerdown", onDoc, true); }, 0);
+    }
   }
 
   /** Progression-library popup: the pools the trainer draws from. Every row is clickable
@@ -486,17 +773,29 @@ export class EarTrainingUI {
     ]);
   }
 
+  /** Signal move: reveal cards first, then the action strip, then the
+   *  generator summary card (tap to configure) — mirrors Android's
+   *  ProgressionView ordering exactly. */
   private progressionView(parent: HTMLElement): void {
-    const ear = this.ear, s = this.state;
-    this.progressionSettings(parent);
-    // Tempo + strum now live in the header "Playback ▾" dropdown (tasks #4/#10).
-    parent.appendChild(el("div", { class: "v-gap-12" }));
-
+    const ear = this.ear;
     if (!ear.hasGenerated) {
+      // Initial state: the summary card lets you dial in settings before the
+      // first progression is generated (so it honors them from the start).
+      parent.appendChild(this.generatorSummaryCard(() => this.openSettingsSheet()));
+      parent.appendChild(el("div", { class: "v-gap-12" }));
       parent.appendChild(btn("Generate progression ▶", () => ear.nextProgression(), "btn primary"));
       return;
     }
 
+    // ---- Reveal cards first: Key & Mode hint, then the 4 bars ----
+    parent.appendChild(this.revealCard("Key & Mode", !ear.keyRevealed,
+      spellPc(ear.progKey) + "  " + (ear.progMode === TrainingMode.Major ? "Major" : "Minor"),
+      () => ear.toggleKeyModeReveal(), false));
+    parent.appendChild(el("div", { class: "v-gap-12" }));
+    parent.appendChild(this.chordSlots());
+    parent.appendChild(el("div", { class: "v-gap-8" }));
+
+    // ---- Action strip directly under the cards ----
     // #7: ← Prev (left of Next) restores the previously generated progression.
     const prevBtn = btn("← Prev", () => ear.previousProgression());
     prevBtn.disabled = !ear.canGoPrevProgression;
@@ -510,15 +809,10 @@ export class EarTrainingUI {
     parent.appendChild(this.transposeRow());
 
     parent.appendChild(el("div", { class: "v-gap-12" }));
-    parent.appendChild(this.revealCard("Key & Mode", !ear.keyRevealed,
-      spellPc(ear.progKey) + "  " + (ear.progMode === TrainingMode.Major ? "Major" : "Minor"),
-      () => ear.toggleKeyModeReveal(), false));
+    parent.appendChild(this.generatorSummaryCard(() => this.openSettingsSheet()));
 
-    parent.appendChild(el("div", { class: "v-gap-8" }));
-    parent.appendChild(this.chordSlots());
-    parent.appendChild(el("div", { class: "v-gap-8" }));
+    parent.appendChild(el("div", { class: "v-gap-12" }));
     this.fretboardPanel(parent);
-    void s;
   }
 
   private chordSlots(): HTMLElement {
@@ -544,11 +838,11 @@ export class EarTrainingUI {
   // ---------- Progression Challenge ----------
 
   private progressionChallenge(parent: HTMLElement): void {
-    const ear = this.ear, s = this.state;
+    const ear = this.ear;
     if (!ear.challengeActive) {
       parent.appendChild(el("div", { class: "et-muted" }, [`A challenge is ${ear.challengeTotal} progressions in a row. Listen, then tap the correct Roman numeral for each bar (and its extension when shown). Each question auto-scores; your total appears at the end.`]));
       parent.appendChild(el("div", { class: "v-gap-12" }));
-      this.progressionSettings(parent);
+      parent.appendChild(this.generatorSummaryCard(() => this.openSettingsSheet()));
       parent.appendChild(el("div", { class: "v-gap-12" }));
       parent.appendChild(btn("Start challenge ▶", () => ear.startChallenge(), "btn primary"));
       return;
@@ -557,8 +851,27 @@ export class EarTrainingUI {
       this.challengeDone(parent);
       return;
     }
-    this.challengeHeader(parent, `Question ${ear.challengeIndex + 1} / ${ear.challengeTotal}`, `Score: ${ear.challengeBarScore()} bars`,
-      () => ear.startChallenge(), () => ear.exitChallenge());
+
+    // A fresh question lands the fixed answer pad back on bar 1.
+    if (this.lastChallengeIndexForPad !== ear.challengeIndex) {
+      this.lastChallengeIndexForPad = ear.challengeIndex;
+      this.challengeSelectedBar = 0;
+      this.padPickedBar = null;
+    }
+
+    // ---- Progress ring + per-question dot strip (Signal move — replaces the
+    // old "Question n/N · Score · Restart · Quit" row; Restart/Quit are now
+    // pinned icon buttons in the screen header, and "Q n/N" lives in the ring). ----
+    parent.appendChild(el("div", { class: "row", style: "align-items:center;gap:14px" }, [
+      this.challengeProgressRing(ear.challengeIndex, ear.challengeTotal),
+      el("div", { style: "flex:1;min-width:0" }, [
+        el("div", { style: `font-weight:600;color:${Colors.primary}` }, [`Score: ${ear.challengeBarScore()} / ${ear.challengeBarTotal()} bars`]),
+        el("div", { class: "v-gap-8" }),
+        this.challengeDotStrip(),
+      ]),
+    ]));
+
+    parent.appendChild(el("div", { class: "v-gap-8" }));
 
     // Question navigation pinned up top: an accidental "Next" can be undone
     // (← Prev restores that question's saved answers) without scrolling down.
@@ -569,13 +882,13 @@ export class EarTrainingUI {
     nextTopBtn.style.flex = "1";
     parent.appendChild(el("div", { class: "row", style: "gap:8px" }, [prevBtn, nextTopBtn]));
 
+    // Tools row: Hear the cadence · Re-roll · Transpose (Signal move — one row).
     parent.appendChild(el("div", { class: "et-row-gap" }, [
       btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
       btn("Re-roll", () => ear.rerollChallengeQuestion()),
     ]));
     // Transpose shifts the key/chords but not the degrees, so it's safe in the challenge.
     parent.appendChild(this.transposeRow());
-    // BPM + strum now live in the header "Playback ▾" dropdown (tasks #4/#10).
     parent.appendChild(this.revealCard("Key & Mode (hint)", !ear.keyRevealed,
       spellPc(ear.progKey) + "  " + (ear.progMode === TrainingMode.Major ? "Major" : "Minor"),
       () => ear.toggleKeyModeReveal(), false));
@@ -583,38 +896,38 @@ export class EarTrainingUI {
     parent.appendChild(labelSm("Hear the degrees  (reference — plays in the hidden key)"));
     parent.appendChild(el("div", { class: "et-row-gap" }, ear.challengeReferenceLabels().map(([deg, label]) => btn(`▶ ${label}`, () => ear.auditionProgDegree(deg)))));
 
-    // Degree-keyboard answering: each bar is a square the user fills by tapping it
-    // and choosing from a degree "keyboard" (Major/Minor shift, plus an extensions
-    // row when the level uses them). The per-bar ▶ and the reference palette above
-    // are the only things that sound; selecting is silent.
-    parent.appendChild(labelSm("Fill each bar  (tap a square to choose its chord)"));
+    // #6/Signal: fixed answer pad — tap a bar square to target it, then answer
+    // it from the always-visible pad below (replaces the old popup keyboard;
+    // the per-bar ▶ Play and reference palette above are the only things that
+    // sound — selecting a bar / a key is silent).
+    parent.appendChild(labelSm("Fill each bar  (tap a square to select it, then tap its chord below)"));
     const sqRow = el("div", { class: "et-slot-row" });
-    for (let i = 0; i < 4; i++) {
-      sqRow.appendChild(this.barSquare(i));
-    }
+    for (let i = 0; i < 4; i++) sqRow.appendChild(this.barSquare(i, this.challengeSelectedBar, () => { this.challengeSelectedBar = i; this.rerender(); }));
     parent.appendChild(sqRow);
-    if (this.keyboardBar !== null) parent.appendChild(this.degreeKeyboardDialog(this.keyboardBar));
+    parent.appendChild(el("div", { class: "v-gap-8" }));
+    parent.appendChild(this.challengeAnswerPad(this.challengeSelectedBar));
 
     parent.appendChild(el("div", { class: "v-gap-8" }));
     parent.appendChild(btn(ear.challengeIndex === ear.challengeTotal - 1 ? "See score →" : "Next question →", () => ear.advanceChallenge(), "btn primary"));
     parent.appendChild(el("div", { class: "et-muted", style: "margin-top:2px" }, ["Unanswered bars count as correct."]));
     parent.appendChild(el("div", { class: "v-gap-12" }));
     this.fretboardPanel(parent);
-    void s;
   }
 
-  /** One bar's answer square: a tappable tile showing the chosen label (or "?"),
-   *  a ▶ to hear the bar, and a ✔/✘+answer once scored. */
-  private barSquare(i: number): HTMLElement {
+  /** One bar's answer square: a tappable tile targeting the fixed answer pad
+   *  below it, showing the chosen chord label (or "?") plus a ▶ to hear the
+   *  bar. [selected] marks the bar the pad currently answers for. */
+  private barSquare(i: number, selectedBar: number, onSelect: () => void): HTMLElement {
     const ear = this.ear;
     const verdict = ear.challengeBarCorrect(i);
+    const selected = selectedBar === i;
     const label = ear.challengeGuessLabel[i];
-    const border = verdict === true ? Colors.primary : verdict === false ? Colors.rootTone : Colors.divider;
+    const border = verdict === true ? Colors.primary : verdict === false ? Colors.rootTone : selected ? Colors.primary : Colors.divider;
     const box = el("div", {
       class: "et-barsq",
-      style: `border-color:${border};background:${label == null ? BG_HIDDEN : Colors.surfaceElev}`,
+      style: `border-color:${border};border-width:${selected && verdict === null ? "3px" : "2px"};background:${label == null ? BG_HIDDEN : Colors.surfaceElev}`,
     }, [label ?? "?"]);
-    box.addEventListener("click", () => { this.keyboardBar = i; this.resetKbPicks(); this.rerender(); });
+    box.addEventListener("click", onSelect);
     const col = el("div", { class: "et-slot" }, [
       el("div", { class: "ans-label" }, [`Bar ${i + 1}`]),
       box,
@@ -627,115 +940,6 @@ export class EarTrainingUI {
       }, [verdict ? "✔" : `✘ ${answer}`]));
     }
     return col;
-  }
-
-  private resetKbPicks(): void {
-    this.kbPickedDeg = null; this.kbPickedRoman = null; this.kbPickedExt = null;
-  }
-
-  /** Item #2: let the physical number keys 1..7 pick a degree while the popup is
-   *  open (Enter commits in extension mode; Esc closes). Attached on open only. */
-  private attachKbKeys(): void {
-    if (this.kbKeyHandler) return;
-    const handler = (e: KeyboardEvent) => {
-      const bar = this.keyboardBar;
-      if (bar === null) return;
-      const ear = this.ear;
-      const needsExt = ear.challengeNeedsExt && !ear.challengeCombinedMode;
-      const finish = () => { this.keyboardBar = null; this.resetKbPicks(); this.detachKbKeys(); this.rerender(); };
-      if (e.key >= "1" && e.key <= "7") {
-        const idx = parseInt(e.key, 10) - 1;
-        const keys = ear.keyboardKeys();
-        if (idx >= keys.length) return;
-        e.preventDefault();
-        const [majDeg, roman] = keys[idx];
-        if (this.kbPickedDeg !== majDeg) this.kbPickedExt = null;   // ext depends on degree
-        this.kbPickedDeg = majDeg; this.kbPickedRoman = roman;
-        if (!needsExt) { ear.guessChallengeKeyboard(bar, majDeg, roman, null); finish(); }
-        else this.rerender();
-      } else if (e.key === "Escape") {
-        e.preventDefault(); finish();
-      } else if (e.key === "Enter" && needsExt && this.kbPickedDeg != null) {
-        e.preventDefault();
-        ear.guessChallengeKeyboard(bar, this.kbPickedDeg, this.kbPickedRoman ?? String(this.kbPickedDeg), this.kbPickedExt);
-        finish();
-      }
-    };
-    this.kbKeyHandler = handler;
-    document.addEventListener("keydown", handler);
-  }
-
-  private detachKbKeys(): void {
-    if (this.kbKeyHandler) {
-      document.removeEventListener("keydown", this.kbKeyHandler);
-      this.kbKeyHandler = null;
-    }
-  }
-
-  /** The answer "keyboard" popup for one bar: a Major/Minor shift, a row of 7 degree
-   *  keys, and (when the level uses them, and not fixed-7ths mode) an extensions row.
-   *  Triads / fixed-7ths commit on the degree tap; extended/mix wait for OK. */
-  private degreeKeyboardDialog(bar: number): HTMLElement {
-    const ear = this.ear;
-    const needsExt = ear.challengeNeedsExt && !ear.challengeCombinedMode;
-    // Extension options depend on the picked degree (only its diatonic extensions).
-    const extOptions = this.kbPickedDeg != null ? ear.challengeExtOptionsForDegree(this.kbPickedDeg) : [];
-
-    // Physical 1..7 keys select degrees while this popup is open.
-    this.attachKbKeys();
-
-    const commit = () => {
-      if (this.kbPickedDeg == null) return;
-      ear.guessChallengeKeyboard(bar, this.kbPickedDeg, this.kbPickedRoman ?? String(this.kbPickedDeg), needsExt ? this.kbPickedExt : null);
-      this.keyboardBar = null;
-      this.resetKbPicks();
-      this.detachKbKeys();
-      this.rerender();
-    };
-    const close = () => { this.keyboardBar = null; this.resetKbPicks(); this.detachKbKeys(); this.rerender(); };
-
-    const body = el("div", {});
-    // Major / Minor shift
-    body.appendChild(el("div", { class: "et-row-gap" }, [
-      el("span", { class: "ans-label" }, ["Numerals"]),
-      chip("Major", !ear.keyboardMinor, () => { if (ear.keyboardMinor) ear.toggleKeyboardShift(); }),
-      chip("⇧ Minor", ear.keyboardMinor, () => { if (!ear.keyboardMinor) ear.toggleKeyboardShift(); }),
-    ]));
-    body.appendChild(labelSm("Degree"));
-    body.appendChild(chipsRow(ear.keyboardKeys().map(([majDeg, roman]) =>
-      chip(roman, this.kbPickedDeg === majDeg, () => {
-        // Changing the degree invalidates the chosen extension.
-        if (this.kbPickedDeg !== majDeg) this.kbPickedExt = null;
-        this.kbPickedDeg = majDeg; this.kbPickedRoman = roman;
-        if (!needsExt) commit(); else this.rerender();
-      }))));
-    if (needsExt) {
-      body.appendChild(labelSm("Extension"));
-      if (this.kbPickedDeg == null) {
-        body.appendChild(el("div", { class: "et-muted" }, ["Pick a degree first — its valid extensions appear here."]));
-      } else {
-        body.appendChild(chipsRow(extOptions.map((ext) =>
-          chip(ext === "" ? "triad" : ext, this.kbPickedExt === ext, () => { this.kbPickedExt = ext; this.rerender(); }))));
-      }
-    }
-
-    const footer = el("div", { class: "row", style: "gap:8px;justify-content:flex-end;margin-top:12px" });
-    footer.appendChild(btn("Clear", () => { ear.clearChallengeBar(bar); close(); }));
-    if (needsExt) {
-      const ok = btn("OK", commit, "btn primary");
-      if (this.kbPickedDeg == null || this.kbPickedExt == null) ok.disabled = true;
-      footer.appendChild(ok);
-    } else {
-      footer.appendChild(btn("Close", close));
-    }
-
-    const card = el("div", { class: "et-kb-card" }, [
-      el("div", { style: "font-weight:600;margin-bottom:8px" }, [`Bar ${bar + 1}`]),
-      body, footer,
-    ]);
-    const backdrop = el("div", { class: "et-kb-backdrop" }, [card]);
-    backdrop.addEventListener("click", (e) => { if (e.target === backdrop) close(); });
-    return backdrop;
   }
 
   private challengeDone(parent: HTMLElement): void {
@@ -813,7 +1017,10 @@ export class EarTrainingUI {
   private advancedView(parent: HTMLElement): void {
     const ear = this.ear;
     parent.appendChild(el("div", { class: "et-muted" }, ["Borrowed chords, secondary dominants and chromatic moves. Pick a key, generate one, try to identify it, then reveal the name, Roman numerals and chords."]));
-    parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:8px" }, [el("span", { class: "ans-label" }, ["Key"]), this.keySelectInline()]));
+    // Key picker + generator choice + Library now live behind the summary card
+    // (Signal move — same treatment as the diatonic Progressions view).
+    parent.appendChild(el("div", { class: "v-gap-8" }));
+    parent.appendChild(this.generatorSummaryCard(() => this.openSettingsSheet()));
     if (!ear.advProg) {
       parent.appendChild(el("div", { class: "v-gap-8" }));
       parent.appendChild(btn("Generate progression ▶", () => ear.nextAdvancedProgression(), "btn primary"));
@@ -835,7 +1042,8 @@ export class EarTrainingUI {
     const ear = this.ear;
     if (!ear.advChActive) {
       parent.appendChild(el("div", { class: "et-muted" }, [`${ear.advChallengeTotal} advanced progressions in a row. Listen, try to identify each, then reveal and mark yourself. A teaching note is shown for every one.`]));
-      parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:8px" }, [el("span", { class: "ans-label" }, ["Key"]), this.keySelectInline()]));
+      parent.appendChild(el("div", { class: "v-gap-8" }));
+      parent.appendChild(this.generatorSummaryCard(() => this.openSettingsSheet()));
       parent.appendChild(el("div", { class: "v-gap-12" }));
       parent.appendChild(btn("Start challenge ▶", () => ear.startAdvChallenge(), "btn primary"));
       return;
@@ -844,8 +1052,9 @@ export class EarTrainingUI {
       this.simpleDone(parent, ear.advChScore, ear.advChallengeTotal, () => ear.startAdvChallenge(), () => ear.exitAdvChallenge());
       return;
     }
-    this.challengeHeader(parent, `Progression ${ear.advChIndex + 1} / ${ear.advChallengeTotal}`, `Score: ${ear.advChScore}`,
-      () => ear.startAdvChallenge(), () => ear.exitAdvChallenge());
+    // Restart/Quit are pinned in the screen header while this challenge is in
+    // flight (see render()'s progChallengeInFlight) — this row is just the label + score.
+    parent.appendChild(this.challengeScoreRow(`Progression ${ear.advChIndex + 1} / ${ear.advChallengeTotal}`, `Score: ${ear.advChScore}`));
     parent.appendChild(el("div", { class: "v-gap-8" }));
     this.advancedBody(parent);
     parent.appendChild(el("div", { class: "v-gap-8" }));

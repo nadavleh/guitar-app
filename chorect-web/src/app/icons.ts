@@ -27,7 +27,9 @@ export type IconName =
   | "spread"
   | "timer"
   | "note"
-  | "flask";
+  | "flask"
+  | "restart"
+  | "close";
 
 const PATH: Record<IconName, string> = {
   // Fretboard grid (was NAV_ICONS.fretboard).
@@ -61,6 +63,11 @@ const PATH: Record<IconName, string> = {
   timer: '<circle cx="12" cy="13" r="8"/><line x1="12" y1="13" x2="12" y2="9"/><line x1="12" y1="13" x2="15" y2="15"/><line x1="9" y1="3" x2="15" y2="3"/><line x1="12" y1="3" x2="12" y2="5"/>',
   note: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
   flask: '<path d="M9 2h6"/><path d="M10 2v6.5l-6 10.5a1.5 1.5 0 0 0 1.3 2.2h13.4a1.5 1.5 0 0 0 1.3-2.2l-6-10.5V2"/><line x1="7.5" y1="15" x2="16.5" y2="15"/>',
+  // Ear Training Signal restructure (T9): pinned header Restart/Quit icons for
+  // an in-flight Progression/Advanced challenge (replaces inline "Restart"/
+  // "Quit" text buttons — mirrors Android's Icons.Rounded.RestartAlt/Close).
+  restart: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+  close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
 };
 
 /**
