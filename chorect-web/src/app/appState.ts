@@ -78,6 +78,17 @@ const LS_KEY = "chorect-web.v1";
 export type AccentName = "coral" | "amber" | "teal" | "blue" | "purple";
 const ACCENT_NAMES: readonly AccentName[] = ["coral", "amber", "teal", "blue", "purple"];
 
+/** One user-configurable tab destination — names mirror Android's `TabDest`
+ *  enum (Shell.kt) EXACTLY, so a tab-order value round-trips identically on
+ *  both platforms. "More" is not a TabDest; it's the fixed 5th nav item. */
+export type TabDestName = "Neck" | "Ear" | "Rhythm" | "Loop" | "Tuner" | "Decompose";
+export const ALL_TAB_DESTS: readonly TabDestName[] = ["Neck", "Ear", "Rhythm", "Loop", "Tuner", "Decompose"];
+/** Default tab set/order for a fresh install (matches Android's DEFAULT_TAB_ORDER). */
+export const DEFAULT_TAB_ORDER: readonly TabDestName[] = ["Neck", "Ear", "Rhythm", "Loop"];
+function isTabDestName(v: unknown): v is TabDestName {
+  return typeof v === "string" && (ALL_TAB_DESTS as readonly string[]).includes(v);
+}
+
 interface Persisted {
   instrument: string;
   tuningName: string;
@@ -85,6 +96,7 @@ interface Persisted {
   leftHanded: boolean;
   darkTheme: boolean;
   accent: string;
+  tabOrder: string[];
   voicingShell: boolean;
   a4Hz: number;
   ringSustainMs: number;
@@ -116,6 +128,9 @@ export class AppState {
   darkTheme = true;
   /** ACT accent (Personalize / Settings). "coral" is the default. */
   accent: AccentName = "coral";
+  /** User-configurable tab set + order (Settings' "Tabs & order" editor); the
+   *  fixed 5th nav item ("More") isn't part of this list. */
+  tabOrder: TabDestName[] = [...DEFAULT_TAB_ORDER];
 
   displayMode = DisplayMode.None;
   currentSheet: Sheet | null = null;
@@ -193,6 +208,10 @@ export class AppState {
       if (typeof p.accent === "string" && (ACCENT_NAMES as readonly string[]).includes(p.accent)) {
         this.accent = p.accent as AccentName;
       }
+      if (Array.isArray(p.tabOrder)) {
+        const valid = p.tabOrder.filter(isTabDestName);
+        if (valid.length === 4 && new Set(valid).size === 4) this.tabOrder = valid;
+      }
       if (typeof p.voicingShell === "boolean") this.voicingStyle = p.voicingShell ? VoicingStyle.Shell : VoicingStyle.Standard;
       if (typeof p.a4Hz === "number") this.a4Hz = p.a4Hz;
       if (typeof p.ringSustainMs === "number") this.ringSustainMs = p.ringSustainMs;
@@ -243,6 +262,7 @@ export class AppState {
       leftHanded: this.leftHanded,
       darkTheme: this.darkTheme,
       accent: this.accent,
+      tabOrder: this.tabOrder,
       voicingShell: this.voicingStyle === VoicingStyle.Shell,
       a4Hz: this.a4Hz,
       ringSustainMs: this.ringSustainMs,
@@ -380,6 +400,15 @@ export class AppState {
     this.commit(() => { this.accent = a; });
     if (a === "coral") delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = a;
+  }
+  /** Persist the user's chosen tab set/order (Settings' "Tabs & order"
+   *  editor). Invalid input (wrong count, dupes, unknown names) resets to
+   *  the default 4 — mirrors Android's AppState.setTabOrder guard. */
+  setTabOrder(order: readonly string[]): void {
+    const valid = order.filter(isTabDestName);
+    const unique = [...new Set(valid)];
+    const next: TabDestName[] = unique.length === 4 ? unique : [...DEFAULT_TAB_ORDER];
+    this.commit(() => { this.tabOrder = next; });
   }
   setTapOnTouchDown(v: boolean): void { this.commit(() => { this.tapOnTouchDown = v; }); }
   setA4Hz(v: number): void { this.commit(() => { this.a4Hz = Math.min(Math.max(Math.round(v), 435), 445); }); }

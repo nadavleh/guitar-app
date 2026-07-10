@@ -2,7 +2,9 @@
 // AudioQuick}.kt. Vanilla DOM, re-rendered on each state change. The fretboard
 // <canvas> element is persistent across renders so its zoom/pan survives.
 
-import { AppState, DisplayMode, LabelMode, Sheet, ChordScaleView, DISPLAY_FRETS } from "./appState";
+import { AppState, DisplayMode, LabelMode, Sheet, ChordScaleView, DISPLAY_FRETS, TabDestName, ALL_TAB_DESTS } from "./appState";
+import { icon, IconName } from "./icons";
+import { renderChallengeStatsOverlay } from "./statsOverlay";
 import { FretboardCanvas, FretboardData } from "./fretboardCanvas";
 import { computeMarks, scaleInfo, intervalName, shapeMarks } from "./marks";
 import { TunerState } from "./tunerState";
@@ -29,33 +31,47 @@ const PITCH_CLASS_ROW = [PC.C, PC.Cs, PC.D, PC.Ds, PC.E, PC.F, PC.Fs, PC.G, PC.G
 const COMMON_QUALITY_SYMBOLS = ["", "m", "7", "maj7", "m7", "dim", "aug", "sus4", "sus2", "6", "m6", "m7b5", "dim7", "9", "add9", "13"];
 const qualityLabel = (sym: string) => (sym === "" ? "major" : sym);
 
-// White outlined (line) icons — no emoji. stroke=currentColor inherits the rail
-// colour. Tuner = gauge+needle (echoes the dial); Decompose = puzzle piece.
-const SVG = (inner: string) =>
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
-const NAV_ICONS: Record<string, string> = {
-  fretboard: SVG('<rect x="3" y="4" width="18" height="16" rx="1"/><line x1="3" y1="9.3" x2="21" y2="9.3"/><line x1="3" y1="14.6" x2="21" y2="14.6"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/>'),
-  loop: SVG('<polyline points="17 2 21 6 17 10"/><path d="M3 12V10a4 4 0 0 1 4-4h14"/><polyline points="7 22 3 18 7 14"/><path d="M21 12v2a4 4 0 0 1-4 4H3"/>'),
-  ear: SVG('<path d="M4 10v4h3l5 4V6L7 10H4z"/><path d="M16 8.5a4 4 0 0 1 0 7"/><path d="M18.5 6a7.5 7.5 0 0 1 0 12"/>'),
-  decompose: SVG('<path d="M9 4.5a2 2 0 1 1 4 0H16a1 1 0 0 1 1 1v3a2 2 0 1 1 0 4v3a1 1 0 0 1-1 1h-3a2 2 0 1 0-4 0H6a1 1 0 0 1-1-1v-3a2 2 0 1 1 0-4V5.5a1 1 0 0 1 1-1h3z"/>'),
-  drums: SVG('<line x1="5" y1="20" x2="5" y2="11"/><line x1="10" y1="20" x2="10" y2="4"/><line x1="15" y1="20" x2="15" y2="13"/><line x1="20" y1="20" x2="20" y2="8"/>'),
-  tuner: SVG('<path d="M4 18a8 8 0 1 1 16 0"/><line x1="12" y1="18" x2="15.5" y2="11.5"/><circle cx="12" cy="18" r="1.3" fill="currentColor" stroke="none"/>'),
-  options: SVG('<line x1="4" y1="8" x2="20" y2="8"/><circle cx="9" cy="8" r="2.1"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="15" cy="16" r="2.1"/>'),
+// 4+More shell (Signal M2/T4): the bottom tab bar (narrow) and left rail (wide)
+// render the SAME 4 user-configurable tabs + a fixed "More" item from one item
+// factory (see App.navItem/renderNav below) — mirrors Android's TabDest enum +
+// SignalTabBar/SignalTabRail (Shell.kt) exactly, just as chrome over the same
+// Sheet-based routing.
+const TAB_SHEET: Record<TabDestName, Sheet> = {
+  Neck: Sheet.Fretboard,
+  Ear: Sheet.EarTraining,
+  Rhythm: Sheet.SambaLooper,
+  Loop: Sheet.Loop,
+  Tuner: Sheet.Tuner,
+  Decompose: Sheet.Decompose,
 };
-const NAV_ITEMS: { sheet: Sheet; icon: string; label: string }[] = [
-  { sheet: Sheet.Fretboard, icon: NAV_ICONS.fretboard, label: "Fretboard" },
-  { sheet: Sheet.Loop, icon: NAV_ICONS.loop, label: "Loop" },
-  { sheet: Sheet.EarTraining, icon: NAV_ICONS.ear, label: "Ear Training" },
-  { sheet: Sheet.Decompose, icon: NAV_ICONS.decompose, label: "Decompose" },
-  { sheet: Sheet.SambaLooper, icon: NAV_ICONS.drums, label: "Drums" },
-  { sheet: Sheet.Tuner, icon: NAV_ICONS.tuner, label: "Tuner" },
-  { sheet: Sheet.Options, icon: NAV_ICONS.options, label: "Options" },
-];
+const TAB_ICON: Record<TabDestName, IconName> = {
+  Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose",
+};
+const TAB_LABEL: Record<TabDestName, string> = {
+  Neck: "Neck", Ear: "Ear", Rhythm: "Rhythm", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose",
+};
+/** One-line description shown under each destination's title in the More sheet. */
+const TAB_SUBTITLE: Record<TabDestName, string> = {
+  Neck: "Fretboard — chords, scales & pick mode",
+  Ear: "Progression, interval & chord ear training",
+  Rhythm: "Samba percussion drum-machine looper",
+  Loop: "Chord-progression looper",
+  Tuner: "Chromatic tuner with cents needle",
+  Decompose: "Chord-tone breakdown reference",
+};
 
 export class App {
   private railEl = el("div", { class: "nav-rail" });
+  private tabbarEl = el("div", { class: "tabbar" });
   private contentEl = el("div", { class: "content" });
   private sheetLayer = el("div", {});
+
+  /** Transient (unpersisted) "More" overlay state — mirrors Android's
+   *  AppState.moreOpen: purely a chrome flag, independent of currentSheet
+   *  routing, so More can be reached from any screen. */
+  private moreOpen = false;
+  /** Challenge-stats popup stacked on top of the More sheet. */
+  private moreStatsOpen = false;
 
   private fretCanvasEl = el("canvas", { class: "fretboard" });
   private fretboard: FretboardCanvas;
@@ -124,6 +140,7 @@ export class App {
     const appRoot = el("div", { class: "app-root" }, [this.railEl, this.contentEl]);
     const shell = el("div", { class: "app-shell" }, [header, appRoot]);
     root.appendChild(shell);
+    root.appendChild(this.tabbarEl);
     root.appendChild(this.sheetLayer);
     this.setupPressGuard();
     this.setupSpacebarShortcut();
@@ -236,7 +253,7 @@ export class App {
     if (route !== Sheet.EarTraining && this.ear.isLooping) this.ear.stopLoop();
     if (route !== Sheet.SambaLooper && this.samba.isPlaying) this.samba.stop();
 
-    this.renderRail();
+    this.renderNav();
     // Preserve the scroll position of any long scrollable pane across full rebuilds.
     const prevScroll = this.contentEl.querySelector(".et-scroll")?.scrollTop ?? 0;
     clear(this.contentEl);
@@ -251,28 +268,56 @@ export class App {
     const newScroll = this.contentEl.querySelector(".et-scroll");
     if (newScroll) newScroll.scrollTop = prevScroll;
 
-    this.renderSheet(route);
+    this.renderOverlays(route);
   }
 
-  private renderRail(): void {
+  // ---------- nav: 4 tabs + More, shared by the wide rail and narrow tab bar ----------
+
+  /** One tab is "selected" when it's the open sheet; the bare Fretboard screen
+   *  (currentSheet == null but the neck is lit) counts as the Neck tab being
+   *  selected — mirrors Android's Shell.kt isTabSelected. */
+  private isTabSelected(dest: TabDestName): boolean {
+    const sheet = this.state.currentSheet;
+    if (sheet !== null) return sheet === TAB_SHEET[dest];
+    return dest === "Neck" && this.state.displayMode !== DisplayMode.None;
+  }
+
+  /** "More" is selected whenever the open sheet isn't one of the current 4
+   *  tabs (e.g. Tuner/Decompose when not tabbed, or Options). */
+  private isMoreSelected(): boolean {
+    const sheet = this.state.currentSheet;
+    if (sheet === null) return false;
+    return !this.state.tabOrder.some((d) => TAB_SHEET[d] === sheet);
+  }
+
+  /** One rail/tab-bar item. A fresh element every call — the same item is
+   *  independently built for the rail and the tab bar (a DOM node can only
+   *  live in one parent), so renderNav() calls this twice per destination. */
+  private navItem(iconName: IconName, label: string, active: boolean, onClick: () => void): HTMLElement {
+    const b = el("button", { class: active ? "rail-btn active" : "rail-btn" }, [
+      icon(iconName),
+      el("span", { class: "label" }, [label]),
+    ]);
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  private renderNav(): void {
     clear(this.railEl);
-    for (const item of NAV_ITEMS) {
-      const active = this.isRailActive(item.sheet);
-      const glyph = el("span", { class: "glyph" });
-      glyph.innerHTML = item.icon;
-      const b = el("button", { class: active ? "rail-btn active" : "rail-btn" }, [
-        glyph,
-        el("span", { class: "label" }, [item.label]),
-      ]);
-      b.addEventListener("click", () => this.state.openSheet(item.sheet));
-      this.railEl.appendChild(b);
+    clear(this.tabbarEl);
+    for (const dest of this.state.tabOrder) {
+      const active = this.isTabSelected(dest);
+      const onClick = () => this.state.openSheet(TAB_SHEET[dest]);
+      this.railEl.appendChild(this.navItem(TAB_ICON[dest], TAB_LABEL[dest], active, onClick));
+      this.tabbarEl.appendChild(this.navItem(TAB_ICON[dest], TAB_LABEL[dest], active, onClick));
     }
+    const moreActive = this.isMoreSelected();
+    this.railEl.appendChild(this.navItem("more", "More", moreActive, () => this.openMore()));
+    this.tabbarEl.appendChild(this.navItem("more", "More", moreActive, () => this.openMore()));
   }
 
-  private isRailActive(sheet: Sheet): boolean {
-    if (this.state.currentSheet !== null) return this.state.currentSheet === sheet;
-    return sheet === Sheet.Fretboard && this.state.displayMode !== DisplayMode.None;
-  }
+  private openMore(): void { this.moreOpen = true; this.render(); }
+  private closeMore(): void { this.moreOpen = false; this.moreStatsOpen = false; this.render(); }
 
   // ---------- fretboard view ----------
 
@@ -431,10 +476,66 @@ export class App {
     );
   }
 
+  // ---------- More sheet ----------
+
+  /** More = a bottom sheet listing every TabDest NOT currently in the 4-tab
+   *  order, plus the two fixed rows Challenge Stats and Settings — mirrors
+   *  Android's MoreScreen (Shell.kt) exactly. Independent of the route-keyed
+   *  config sheet below: it can open over any screen. */
+  private moreSheet(): HTMLElement {
+    const sheet = el("div", { class: "sheet" });
+    sheet.appendChild(el("div", { class: "sheet-grabber" }));
+    sheet.appendChild(el("div", { class: "sheet-header" }, [
+      el("h2", {}, ["More"]),
+      btn("✕", () => this.closeMore(), "btn text"),
+    ]));
+    const extra = ALL_TAB_DESTS.filter((d) => !this.state.tabOrder.includes(d));
+    for (const dest of extra) {
+      sheet.appendChild(this.moreRow(TAB_ICON[dest], TAB_LABEL[dest], TAB_SUBTITLE[dest], () => {
+        this.state.openSheet(TAB_SHEET[dest]);
+        this.closeMore();
+      }));
+    }
+    sheet.appendChild(this.moreRow("stats", "Challenge stats", "Best scores across every ear-training challenge", () => {
+      this.moreStatsOpen = true;
+      this.render();
+    }));
+    sheet.appendChild(this.moreRow("settings", "Settings", "Theme, accent, tabs & order, tuning, instrument", () => {
+      this.state.openSheet(Sheet.Options);
+      this.closeMore();
+    }));
+    const scrim = el("div", { class: "sheet-scrim" }, [sheet]);
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) this.closeMore(); });
+    return scrim;
+  }
+
+  private moreRow(iconName: IconName, title: string, sub: string, onClick: () => void): HTMLElement {
+    const row = el("div", { class: "more-row" }, [
+      icon(iconName, 24),
+      el("div", { class: "more-row-text" }, [
+        el("div", { class: "more-row-title" }, [title]),
+        el("div", { class: "more-row-sub" }, [sub]),
+      ]),
+    ]);
+    row.addEventListener("click", onClick);
+    return row;
+  }
+
   // ---------- control sheets ----------
 
-  private renderSheet(route: Sheet | null): void {
+  /** Renders whichever overlay is active into the single sheet layer: the
+   *  More sheet (+ its stacked stats popup) takes priority over the
+   *  route-keyed Fretboard/Options config sheet, since More isn't tied to
+   *  currentSheet at all. */
+  private renderOverlays(route: Sheet | null): void {
     clear(this.sheetLayer);
+    if (this.moreOpen) {
+      this.sheetLayer.appendChild(this.moreSheet());
+      if (this.moreStatsOpen) {
+        this.sheetLayer.appendChild(renderChallengeStatsOverlay(this.state, () => { this.moreStatsOpen = false; this.render(); }));
+      }
+      return;
+    }
     if (route !== Sheet.Fretboard && route !== Sheet.Options) return;
     const sheet = el("div", { class: "sheet" });
     sheet.appendChild(el("div", { class: "sheet-grabber" }));
