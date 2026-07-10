@@ -1,6 +1,7 @@
 package app.guitar.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,10 +14,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -44,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Canvas
@@ -154,12 +159,15 @@ fun TunerScreen(state: AppState, onBack: () -> Unit) {
 
 @Composable
 private fun TunerDial(tuner: TunerState, state: AppState) {
+    val palette = LocalSignal.current
     val midi = tuner.midi
     val cents = tuner.cents
-    val inTune = cents != null && abs(cents) <= 10f
-    val tunedColor = Color(0xFF66BB6A)   // bright green; theme tertiary varies
+    // Signal spec: the needle/note turn FEEDBACK (teal) once within ±5 cents.
+    val inTune = cents != null && abs(cents) <= 5f
+    val tunedColor = palette.feedback
     val noteColor = if (inTune) tunedColor else MaterialTheme.colorScheme.onSurface
-    val ringColor = MaterialTheme.colorScheme.onSurfaceVariant
+    // Track = outline (the Signal "line" token); needle = act (primary) until in tune.
+    val ringColor = MaterialTheme.colorScheme.outline
     val needleColor = if (inTune) tunedColor else MaterialTheme.colorScheme.primary
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -168,7 +176,7 @@ private fun TunerDial(tuner: TunerState, state: AppState) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawDial(cents = cents, ringColor = ringColor, needleColor = needleColor, tunedColor = tunedColor)
         }
-        // Centered overlay: detected note + cents readout + tap-to-play hint.
+        // Centered overlay: detected note + Hz + cents readout + tap-to-play hint.
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             val (noteText, octText) = if (midi != null) noteLabel(midi) else "—" to ""
             // Make the note label tappable: tap → lock dial to spot-on + play reference.
@@ -188,18 +196,26 @@ private fun TunerDial(tuner: TunerState, state: AppState) {
                     Text(
                         noteText,
                         color = noteColor,
-                        fontSize = 96.sp,
-                        style = MaterialTheme.typography.displayLarge,
+                        fontSize = 56.sp,
+                        fontWeight = FontWeight.Bold,
                     )
                     if (octText.isNotEmpty()) {
                         Text(
                             octText,
                             color = noteColor.copy(alpha = 0.7f),
-                            fontSize = 28.sp,
-                            modifier = Modifier.padding(bottom = 14.dp),
+                            fontSize = 20.sp,
+                            modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
                 }
+            }
+            val hzText = tuner.freqHz?.let { "${"%.1f".format(it)} Hz" } ?: ""
+            if (hzText.isNotEmpty()) {
+                Text(
+                    hzText,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
             val centsText = cents?.let { "${if (it >= 0) "+" else ""}${"%.0f".format(it)} ¢" } ?: ""
             Text(
@@ -304,35 +320,52 @@ private fun polar(cx: Float, cy: Float, radius: Float, thetaDegFromNorth: Double
 
 @Composable
 private fun TuningRefRow(state: AppState, tuner: TunerState) {
+    // Highlight whichever open string is nearest the currently detected pitch (by
+    // pitch class first, tie-broken by absolute MIDI distance) — purely a display
+    // computation over the existing tuner reading, no new persisted state.
+    val nearestIdx = tuner.midi?.let { m ->
+        val pc = ((m % 12) + 12) % 12
+        val strings = state.liveTuning.openStrings
+        val samePc = strings.indices.filter { ((strings[it].midi.value % 12) + 12) % 12 == pc }
+        (samePc.ifEmpty { strings.indices.toList() })
+            .minByOrNull { abs(strings[it].midi.value - m) }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
             .padding(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            "Reference",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        // Each open string of the current tuning, low → high (left → right).
-        // Tapping a string plays its equal-tempered reference AND locks the dial to
-        // "spot on" for that note so the user can confirm their ear matches the display.
+        // Each open string of the current tuning, low → high (left → right), as an
+        // outlined circle (act border + text when it's the nearest string to what's
+        // currently being heard). Tapping a string plays its equal-tempered
+        // reference AND locks the dial to "spot on" for that note so the user can
+        // confirm their ear matches the display.
         for ((i, note) in state.liveTuning.openStrings.withIndex()) {
             val pcName = NoteSpeller.spell(note.pitchClass)
-            OutlinedButton(
-                onClick = {
-                    state.playReferencePitch(note.midi.value)
-                    tuner.lockTo(note.midi.value, holdMs = state.ringSustainMs.toLong())
-                },
-                modifier = Modifier.weight(1f),
+            val selected = i == nearestIdx
+            val ringColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+            val textColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .border(if (selected) 2.dp else 1.dp, ringColor, CircleShape)
+                    .clickable {
+                        state.playReferencePitch(note.midi.value)
+                        tuner.lockTo(note.midi.value, holdMs = state.ringSustainMs.toLong())
+                    },
+                contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("S${state.liveTuning.stringCount - i}", style = MaterialTheme.typography.labelSmall)
-                    Text("$pcName${noteOctave(note.midi.value)}",
-                        style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "S${state.liveTuning.stringCount - i}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(pcName, style = MaterialTheme.typography.bodyMedium, color = textColor)
                 }
             }
         }
@@ -348,8 +381,14 @@ private fun MicPermissionPanel(state: AppState, tuner: TunerState) {
         verticalArrangement = Arrangement.Center,
         modifier = Modifier.padding(24.dp),
     ) {
+        Icon(
+            Icons.Outlined.Mic,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(4.dp))
         Text(
-            "🎤 Microphone access required",
+            "Microphone access required",
             style = MaterialTheme.typography.titleMedium,
         )
         Spacer(Modifier.height(8.dp))

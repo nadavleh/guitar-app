@@ -9,15 +9,18 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -43,6 +46,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.guitar.theory.ChordLibrary
@@ -523,11 +528,34 @@ fun LoopScreen(state: AppState) {
                 if (!state.isLooping && state.loopHasChords) state.startLoop()
                 state.closeSheet()
             }) {
-                Text(if (state.isLooping || state.loopHasChords) "Watch on neck ▶" else "Back")
+                Text(if (state.isLooping || state.loopHasChords) "Watch on neck" else "Back")
             }
         }
 
         Spacer(Modifier.height(8.dp))
+
+        // ----- "Now playing / next" banner (purely derived from existing loop
+        // state — no new fields) — shown only while the loop is actually running. -----
+        if (state.isLooping) {
+            val (currentChord, nextChord) = currentAndNextLoopChord(state)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    currentChord ?: "·",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                if (nextChord != null) {
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "next: $nextChord",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
 
         // ----- Controls: slots/bar + bars (wrap). Tempo now lives in the TransportDock. -----
         FlowRow(
@@ -575,42 +603,40 @@ fun LoopScreen(state: AppState) {
 
         Spacer(Modifier.height(6.dp))
 
-        // ----- Main area: bars grid (left) + slot editor (right, when open) -----
+        // ----- Main area: bar lane (left) + slot editor (right, when open) -----
+        // Signal redesign: bars render as a horizontally-scrolling lane of chip/
+        // card tiles (rather than a wrapped grid) with a dashed "+" tile at the end
+        // that adds a bar via the exact same setBarCount() call the old "+" stepper
+        // used. Per-bar/per-slot editing (tap a slot → SlotEditor) is unchanged.
         Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            // Bars grid
-            Column(
+            val barWidth = (state.slotsPerBar.coerceAtLeast(1) * 46 + 20).dp
+            Row(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState()),
+                    .fillMaxHeight()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.Top,
             ) {
-                // 2 bars per row when each bar has 4 slots, otherwise 4 per row.
-                val barsPerRow = if (state.slotsPerBar >= 4) 2 else 4
-                val rows = state.loopProgression.withIndex().chunked(barsPerRow)
-                for (row in rows) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        for ((barIdx, bar) in row) {
-                            BarCard(
-                                barIdx = barIdx,
-                                bar = bar,
-                                isCurrentBar = state.isLooping && state.loopCurrentBar == barIdx,
-                                currentSlot = state.loopCurrentSlot,
-                                isLooping = state.isLooping,
-                                onSlotTap = { slotIdx -> state.loopEditingSlot = barIdx to slotIdx },
-                                editingSlot = state.loopEditingSlot,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        // Pad the row to keep widths equal
-                        repeat(barsPerRow - row.size) { Spacer(Modifier.weight(1f)) }
-                    }
-                    Spacer(Modifier.height(6.dp))
+                for ((barIdx, bar) in state.loopProgression.withIndex()) {
+                    BarCard(
+                        barIdx = barIdx,
+                        bar = bar,
+                        isCurrentBar = state.isLooping && state.loopCurrentBar == barIdx,
+                        currentSlot = state.loopCurrentSlot,
+                        isLooping = state.isLooping,
+                        onSlotTap = { slotIdx -> state.loopEditingSlot = barIdx to slotIdx },
+                        editingSlot = state.loopEditingSlot,
+                        modifier = Modifier.width(barWidth),
+                    )
                 }
+                AddBarTile(
+                    enabled = state.loopProgression.size < 16,
+                    onClick = { state.setBarCount(state.loopProgression.size + 1) },
+                    modifier = Modifier.width(barWidth),
+                )
             }
-            // Slot editor sits to the right of the bars grid when a slot is selected.
+            // Slot editor sits to the right of the bar lane when a slot is selected.
             state.loopEditingSlot?.let { (barIdx, slotIdx) ->
                 Spacer(Modifier.width(8.dp))
                 Column(
@@ -660,6 +686,10 @@ private fun BarCard(
         colors = if (isCurrentBar)
             androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
         else androidx.compose.material3.CardDefaults.cardColors(),
+        // Playhead bar: act-bordered (per Signal spec), on top of the existing tint.
+        border = if (isCurrentBar)
+            androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        else null,
     ) {
         Column(modifier = Modifier.padding(6.dp)) {
             Text("Bar ${barIdx + 1}",
@@ -704,6 +734,49 @@ private fun BarCard(
             }
         }
     }
+}
+
+/** Dashed "+" tile at the end of the bar lane — adds a bar via the exact same
+ *  [AppState.setBarCount] call the old "+" bars-stepper button used. */
+@Composable
+private fun AddBarTile(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val color = if (enabled) MaterialTheme.colorScheme.outline
+                else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+    Box(
+        modifier = modifier
+            .height(72.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .drawBehind {
+                drawRoundRect(
+                    color = color,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = 1.5.dp.toPx(),
+                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 8f), 0f),
+                    ),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx()),
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Rounded.Add, contentDescription = "Add bar", tint = color)
+    }
+}
+
+/** Current + next chord symbol for the "now playing" banner — a pure read of
+ *  [AppState.loopProgression]/[AppState.loopCurrentBar]/[AppState.loopCurrentSlot];
+ *  adds no new state. */
+private fun currentAndNextLoopChord(state: AppState): Pair<String?, String?> {
+    val bars = state.loopProgression
+    if (bars.isEmpty()) return null to null
+    val barIdx = state.loopCurrentBar.coerceIn(0, bars.lastIndex)
+    val bar = bars[barIdx]
+    if (bar.isEmpty()) return null to null
+    val slotIdx = state.loopCurrentSlot.coerceIn(0, bar.lastIndex)
+    val current = bar[slotIdx].chordSymbol
+    val next = bar.getOrNull(slotIdx + 1)?.chordSymbol
+        ?: bars[(barIdx + 1) % bars.size].firstOrNull()?.chordSymbol
+    return current to next
 }
 
 @OptIn(ExperimentalLayoutApi::class)

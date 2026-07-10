@@ -147,7 +147,7 @@ fun DecomposeScreen(state: AppState, onBack: () -> Unit) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
                 scope.launch { play(shellMidis); delay(700); play(upperMidis) }
-            }) { Text("Shell → triad ▶") }
+            }) { Text("Shell → triad") }
             OutlinedButton(onClick = { play(shellMidis) }) { Text("Shell") }
             OutlinedButton(onClick = { play(upperMidis) }) { Text("Triad") }
             OutlinedButton(onClick = { play(shellMidis + upperMidis) }) { Text("Full chord") }
