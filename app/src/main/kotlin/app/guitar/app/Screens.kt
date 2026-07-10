@@ -17,12 +17,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -523,27 +527,17 @@ fun LoopScreen(state: AppState) {
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        // ----- Top: title + transport + back -----
+        // ----- Top: title + back / watch-on-neck -----
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("LOOP",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
                 modifier = Modifier.weight(1f))
-            AudioQuickButton(state, compact = true)
-            Spacer(Modifier.width(4.dp))
-            if (state.isLooping) {
-                Button(onClick = { state.stopLoop() }) { Text("Stop ⏹") }
-            } else {
-                Button(onClick = { state.startLoop() },
-                    enabled = state.loopProgression.any { bar -> bar.any { it.chordSymbol != null } }) {
-                    Text("Play ▶")
-                }
-            }
-            Spacer(Modifier.width(8.dp))
             // "Watch on neck": start playback (if not already) and jump to the main
             // fretboard so the sounding chords light up live. Don't stop the loop when
-            // navigating away — the Stop button above is the explicit way to halt it.
+            // navigating away — the Stop button on the TransportDock below is the
+            // explicit way to halt it.
             OutlinedButton(onClick = {
                 if (!state.isLooping && state.loopHasChords) state.startLoop()
                 state.closeSheet()
@@ -554,14 +548,7 @@ fun LoopScreen(state: AppState) {
 
         Spacer(Modifier.height(8.dp))
 
-        // ----- Controls: full-width tempo, then slots/bar + bars (wrap) -----
-        Text("Tempo: ${state.bpm} BPM", style = MaterialTheme.typography.bodyMedium)
-        androidx.compose.material3.Slider(
-            value = state.bpm.toFloat(),
-            onValueChange = { state.bpm = it.toInt() },
-            valueRange = 10f..300f,
-        )
-        Spacer(Modifier.height(4.dp))
+        // ----- Controls: slots/bar + bars (wrap). Tempo now lives in the TransportDock. -----
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
@@ -655,6 +642,24 @@ fun LoopScreen(state: AppState) {
                 }
             }
         }
+
+        Spacer(Modifier.height(8.dp))
+        var toneSheetOpen by remember { mutableStateOf(false) }
+        TransportDock(
+            playing = state.isLooping,
+            onPlayStop = {
+                if (state.isLooping) state.stopLoop()
+                // Preserve the old Play button's guard: don't start an empty loop.
+                else if (state.loopHasChords) state.startLoop()
+            },
+            bpm = state.bpm,
+            // state.bpm is re-read live every bar (see AppState.playBar()), so no
+            // restart is needed here.
+            onBpm = { state.bpm = it },
+            toneLabel = state.sound.name,
+            onTone = { toneSheetOpen = true },
+        )
+        if (toneSheetOpen) ToneSheet(state, onDismiss = { toneSheetOpen = false })
     }
 }
 
@@ -972,6 +977,7 @@ private fun SheetBody(content: @Composable () -> Unit) {
 
 @Composable
 private fun SheetHeader(title: String, state: AppState) {
+    var toneSheetOpen by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Text(
             title.uppercase(),
@@ -979,7 +985,11 @@ private fun SheetHeader(title: String, state: AppState) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        AudioQuickButton(state)
+        // Sound/EQ/reverb settings, reachable everywhere — opens the shared ToneSheet.
+        IconButton(onClick = { toneSheetOpen = true }) {
+            Icon(Icons.Outlined.Tune, contentDescription = "Tone")
+        }
     }
     Spacer(Modifier.height(8.dp))
+    if (toneSheetOpen) ToneSheet(state, onDismiss = { toneSheetOpen = false })
 }

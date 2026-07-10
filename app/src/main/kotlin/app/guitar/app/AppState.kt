@@ -51,7 +51,7 @@ enum class ChordScaleView { AllNotes, Positions }
  *  bank is missing (e.g. no assets bundled yet). */
 enum class GuitarSound { Synth, Acoustic, Nylon, Electric }
 
-/** Runtime 3-band EQ, one band per slider in the 🎚 Audio panel. */
+/** Runtime 3-band EQ, one band per slider in the Tone sheet. */
 enum class Band { Bass, Mid, Treble }
 
 @Stable

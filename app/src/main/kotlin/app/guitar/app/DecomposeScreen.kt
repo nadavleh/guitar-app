@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -23,6 +25,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -62,11 +66,13 @@ fun DecomposeScreen(state: AppState, onBack: () -> Unit) {
     // Upper-triad inversion for the auditioned voicing (0 = root position; the
     // pitch-class set — and thus the fretboard — is unchanged by inversion).
     var upperInv by remember { mutableStateOf(0) }
+    var toneSheetOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val dec = ChordDecompositions.forQuality(quality) ?: ChordDecompositions.ALL.first()
 
     if (showGuide) DecomposeGuideDialog(onDismiss = { showGuide = false })
+    if (toneSheetOpen) ToneSheet(state, onDismiss = { toneSheetOpen = false })
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
@@ -77,8 +83,10 @@ fun DecomposeScreen(state: AppState, onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
             OutlinedButton(onClick = { showGuide = true }) { Text("Guide") }
             Spacer(Modifier.width(8.dp))
-            AudioQuickButton(state, compact = true)
-            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = { toneSheetOpen = true }) {
+                Icon(Icons.Outlined.Tune, contentDescription = "Tone")
+            }
+            Spacer(Modifier.width(4.dp))
             OutlinedButton(onClick = onBack) { Text("Back") }
         }
         Spacer(Modifier.height(6.dp))

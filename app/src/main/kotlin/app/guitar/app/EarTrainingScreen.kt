@@ -97,8 +97,6 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
             OutlinedButton(onClick = { statsOpen = true }) { Text("Stats") }
             if (statsOpen) EarStatsDialog(state, onDismiss = { statsOpen = false })
             Spacer(Modifier.width(4.dp))
-            AudioQuickButton(state, compact = true)
-            Spacer(Modifier.width(4.dp))
             OutlinedButton(onClick = { ear.release(); onBack() }) { Text("Back") }
         }
 
@@ -128,7 +126,6 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 GeneratorDropdown(ear, modifier = Modifier.weight(1f))
-                PlaybackControlsDropdown(state, ear)
                 OutlinedButton(onClick = { libOpen = true }) { Text("Library") }
             }
             Text(generatorCaption(ear), style = MaterialTheme.typography.labelSmall,
@@ -137,29 +134,52 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
             if (libOpen) ProgressionLibraryDialog(state, onDismiss = { libOpen = false })
         }
 
-        when (ear.progSubMode) {
-            EarSubMode.Progression ->
-                if (ear.specialProgMode) {
-                    if (ear.earMode == EarMode.Challenge) AdvancedChallengeView(ear)
-                    else AdvancedProgressionView(ear)
-                } else {
-                    if (ear.earMode == EarMode.Challenge) ProgressionChallengeView(state, ear)
-                    else ProgressionView(state, ear)
-                }
-            EarSubMode.Note2Chord ->
-                if (ear.earMode == EarMode.Challenge) Note2ChordChallengeView(ear)
-                else Note2ChordView(state, ear)
-            EarSubMode.Flavor ->
-                if (ear.earMode == EarMode.Challenge) FlavorChallengeView(ear)
-                else FlavorView(state, ear)
-            EarSubMode.Inversions ->
-                if (ear.earMode == EarMode.Challenge) InversionsChallengeView(state, ear)
-                else InversionsView(state, ear)
-            EarSubMode.AugDim ->
-                if (ear.earMode == EarMode.Challenge) AugDimChallengeView(state, ear)
-                else AugDimView(state, ear)
-            // Intervals is challenge-only (#6) — same view in either mode.
-            EarSubMode.Intervals -> IntervalsView(ear)
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            when (ear.progSubMode) {
+                EarSubMode.Progression ->
+                    if (ear.specialProgMode) {
+                        if (ear.earMode == EarMode.Challenge) AdvancedChallengeView(ear)
+                        else AdvancedProgressionView(ear)
+                    } else {
+                        if (ear.earMode == EarMode.Challenge) ProgressionChallengeView(state, ear)
+                        else ProgressionView(state, ear)
+                    }
+                EarSubMode.Note2Chord ->
+                    if (ear.earMode == EarMode.Challenge) Note2ChordChallengeView(ear)
+                    else Note2ChordView(state, ear)
+                EarSubMode.Flavor ->
+                    if (ear.earMode == EarMode.Challenge) FlavorChallengeView(ear)
+                    else FlavorView(state, ear)
+                EarSubMode.Inversions ->
+                    if (ear.earMode == EarMode.Challenge) InversionsChallengeView(state, ear)
+                    else InversionsView(state, ear)
+                EarSubMode.AugDim ->
+                    if (ear.earMode == EarMode.Challenge) AugDimChallengeView(state, ear)
+                    else AugDimView(state, ear)
+                // Intervals is challenge-only (#6) — same view in either mode.
+                EarSubMode.Intervals -> IntervalsView(ear)
+            }
+        }
+
+        // Transport dock (Signal move #2): replaces the per-view Play ▶/Stop ⏹
+        // buttons for every Progression generator (diatonic/advanced/circle/iii-focus)
+        // in both Practice and Challenge. progBpm is captured once when startLoop()
+        // launches its coroutine, so a live BPM edit restarts the loop to take effect.
+        if (ear.progSubMode == EarSubMode.Progression) {
+            Spacer(Modifier.height(8.dp))
+            var toneSheetOpen by remember { mutableStateOf(false) }
+            TransportDock(
+                playing = ear.isLooping,
+                onPlayStop = { if (ear.isLooping) ear.stopLoop() else ear.startLoop() },
+                bpm = ear.progBpm,
+                onBpm = { newBpm ->
+                    ear.progBpm = newBpm
+                    if (ear.isLooping) { ear.stopLoop(); ear.startLoop() }
+                },
+                toneLabel = state.sound.name,
+                onTone = { toneSheetOpen = true },
+            )
+            if (toneSheetOpen) ToneSheet(state, onDismiss = { toneSheetOpen = false })
         }
     }
 }
@@ -275,17 +295,13 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
             return@Column
         }
 
-        // Transport + actions — wrap so nothing gets clipped in a narrow column.
+        // Actions — wrap so nothing gets clipped in a narrow column. Play/Stop now
+        // lives in the TransportDock (Signal move #2), pinned below all four views.
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (ear.isLooping) {
-                Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
-            } else {
-                Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
-            }
             // #7: ← Prev restores the previously generated progression (reveals reset).
             OutlinedButton(
                 onClick = { ear.previousProgression() },
@@ -483,57 +499,6 @@ private fun transposeLabel(n: Int): String {
         else -> "0"
     }
     return "$num $unit"
-}
-
-/** Full-width BPM + strum sliders, shared by the progression trainer & challenge. */
-@Composable
-private fun TempoStrumSliders(state: AppState, ear: EarTrainingState) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text("Tempo: ${ear.progBpm} BPM", style = MaterialTheme.typography.bodyMedium)
-        androidx.compose.material3.Slider(
-            value = ear.progBpm.toFloat(),
-            onValueChange = { ear.progBpm = it.toInt() },
-            valueRange = 10f..300f,
-        )
-        Text(
-            if (state.strumMs == 0) "Strum: struck at once" else "Strum: ${state.strumMs} ms",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        androidx.compose.material3.Slider(
-            value = state.strumMs.toFloat(),
-            onValueChange = { state.setStrumMs(it.toInt()) },
-            valueRange = 0f..150f,
-        )
-        // #5: make the chord's root stand out of the strum — it plays separately
-        // and louder than the other voices.
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Boost root note", style = MaterialTheme.typography.bodyMedium)
-                Text("Play each chord's root louder so it cuts through",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Switch(checked = ear.earBoostTonic, onCheckedChange = { ear.earBoostTonic = it })
-        }
-    }
-}
-
-/** Top-of-section "Playback ▾" dropdown holding the Tempo + Strum sliders (task #10).
- *  Rendered once in the progression header so every generator (diatonic / advanced /
- *  circle) and both modes (practice / challenge) share the same BPM + strum controls
- *  (task #4 — advanced & circle previously had no tempo control). */
-@Composable
-private fun PlaybackControlsDropdown(state: AppState, ear: EarTrainingState, modifier: Modifier = Modifier) {
-    var open by remember { mutableStateOf(false) }
-    Box(modifier) {
-        OutlinedButton(onClick = { open = true }) { Text("Playback ▾", maxLines = 1) }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            Column(modifier = Modifier.width(280.dp).padding(horizontal = 14.dp, vertical = 6.dp)) {
-                TempoStrumSliders(state, ear)
-            }
-        }
-    }
 }
 
 /**
@@ -1242,11 +1207,6 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (ear.isLooping) {
-                Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
-            } else {
-                Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
-            }
             OutlinedButton(onClick = { ear.playProgKeyCadence() }) { Text("Hear ${ear.progCadenceLabel()}") }
             OutlinedButton(onClick = { ear.rerollChallengeQuestion() }) { Text("Re-roll") }
         }
@@ -1768,8 +1728,6 @@ private fun AdvancedProgressionView(ear: EarTrainingState) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (ear.isLooping) Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
-            else Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
             // #7: ← Prev restores the previously generated progression (reveal reset).
             OutlinedButton(
                 onClick = { ear.previousAdvancedProgression() },
@@ -1817,11 +1775,6 @@ private fun AdvancedChallengeView(ear: EarTrainingState) {
             Spacer(Modifier.width(4.dp))
             TextButton(onClick = { ear.startAdvChallenge() }) { Text("Restart") }
             TextButton(onClick = { ear.exitAdvChallenge() }) { Text("Quit") }
-        }
-        Spacer(Modifier.height(8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (ear.isLooping) Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
-            else Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
         }
         Spacer(Modifier.height(12.dp))
         AdvancedProgressionBody(ear)

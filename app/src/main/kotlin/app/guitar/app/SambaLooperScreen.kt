@@ -24,11 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -89,11 +85,12 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
 
+    var toneSheetOpen by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
             .padding(12.dp),
     ) {
         // ----- Header -----
@@ -105,38 +102,15 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 maxLines = 1,
                 modifier = Modifier.weight(1f),
             )
-            if (samba.isPlaying) {
-                Button(onClick = { samba.stop() }) {
-                    Icon(Icons.Outlined.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp)); Text("Stop")
-                }
-            } else {
-                Button(onClick = { samba.start() }) {
-                    Icon(Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp)); Text("Play")
-                }
-            }
-            Spacer(Modifier.width(8.dp))
-            AudioQuickButton(state, compact = true)
-            Spacer(Modifier.width(8.dp))
             OutlinedButton(onClick = { samba.stop(); onBack() }) { Text("Back") }
         }
 
         Spacer(Modifier.height(8.dp))
 
-        // ----- BPM -----
+        // ----- Tap tempo + metronome (BPM itself now lives in the TransportDock) -----
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("BPM: ${samba.bpm}", style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.width(96.dp))
-            Slider(
-                value = samba.bpm.toFloat(),
-                onValueChange = { samba.bpm = it.toInt() },
-                valueRange = 10f..300f,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(8.dp))
             // Tap-tempo: tap along; BPM follows the average tap interval.
-            OutlinedButton(onClick = { samba.tapTempo() }) { Text("Tap") }
+            OutlinedButton(onClick = { samba.tapTempo() }) { Text("Tap tempo") }
             Spacer(Modifier.width(6.dp))
             // Metronome click on each beat (accented downbeats).
             FilterChip(
@@ -146,6 +120,15 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             )
         }
 
+        // ----- Scrollable body: swing, loop setup, grid, footer actions -----
+        // Wrapped so the TransportDock below stays pinned and visible instead of
+        // scrolling away with the (potentially long) instrument grid + footer.
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+        ) {
         // ----- Swing (Brazilian 16th-note swing; 0 = straight) -----
         // Only meaningful on a 1/16 grid (a quarter-note beat split into four 16ths):
         // it holds the 1st & 3rd 16ths in place, delays the 2nd, and pulls the 4th
@@ -380,6 +363,20 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 dismissButton = { TextButton(onClick = { saveDialog = false }) { Text("Cancel") } },
             )
         }
+        } // end scrollable body
+
+        Spacer(Modifier.height(8.dp))
+        TransportDock(
+            playing = samba.isPlaying,
+            onPlayStop = { if (samba.isPlaying) samba.stop() else samba.start() },
+            bpm = samba.bpm,
+            // samba's playback loop re-reads `bpm` live every slot (see
+            // SambaLooperState.start()), so no restart is needed here.
+            onBpm = { samba.bpm = it },
+            toneLabel = state.sound.name,
+            onTone = { toneSheetOpen = true },
+        )
+        if (toneSheetOpen) ToneSheet(state, onDismiss = { toneSheetOpen = false })
     }
 }
 

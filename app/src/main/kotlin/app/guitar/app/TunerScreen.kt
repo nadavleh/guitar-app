@@ -16,8 +16,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -74,6 +78,7 @@ fun TunerScreen(state: AppState, onBack: () -> Unit) {
         tuner.start()
     }
     DisposableEffect(Unit) { onDispose { tuner.stop() } }
+    var toneSheetOpen by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -91,10 +96,13 @@ fun TunerScreen(state: AppState, onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(8.dp))
-            AudioQuickButton(state, compact = true)
-            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = { toneSheetOpen = true }) {
+                Icon(Icons.Outlined.Tune, contentDescription = "Tone")
+            }
+            Spacer(Modifier.width(4.dp))
             OutlinedButton(onClick = onBack) { Text("Back") }
         }
+        if (toneSheetOpen) ToneSheet(state, onDismiss = { toneSheetOpen = false })
 
         Spacer(Modifier.height(8.dp))
         // -------- Change tuning on the fly (no need to open Options) --------

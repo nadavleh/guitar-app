@@ -23,11 +23,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -428,10 +432,13 @@ private fun StatusBar(state: AppState) {
             }
             Spacer(Modifier.width(2.dp))
         }
-        // App-wide quick audio controls (strum spread + ring sustain). All tool
-        // navigation now lives in the always-visible left rail, so the old
-        // Ear / Tuner / Menu buttons here were redundant and have been removed.
-        AudioQuickButton(state, compact = true)
+        // Sound/EQ/reverb settings, reachable everywhere — opens the shared
+        // ToneSheet (replaces the old audio-quick dropdown button).
+        var toneSheetOpen by remember { mutableStateOf(false) }
+        IconButton(onClick = { toneSheetOpen = true }) {
+            Icon(Icons.Outlined.Tune, contentDescription = "Tone")
+        }
+        if (toneSheetOpen) ToneSheet(state, onDismiss = { toneSheetOpen = false })
     }
 }
 
