@@ -79,8 +79,10 @@ export class App {
   private tuner: TunerState | null = null;
   private tunerDialCanvas: HTMLCanvasElement | null = null;
   private tunerNoteEl: HTMLElement | null = null;
+  private tunerHzEl: HTMLElement | null = null;
   private tunerCentsEl: HTMLElement | null = null;
   private tunerHintEl: HTMLElement | null = null;
+  private tunerRefBtns: HTMLButtonElement[] = [];
 
   private toneSheetOpen = false;
 
@@ -822,9 +824,11 @@ export class App {
     const dialCanvas = el("canvas", { class: "tuner-dial" });
     this.tunerDialCanvas = dialCanvas;
     const noteEl = el("div", { class: "tuner-note" }, ["—"]);
+    const hzEl = el("div", { class: "tuner-hz" }, [""]);
     const centsEl = el("div", { class: "tuner-cents" }, [""]);
     const hintEl = el("div", { class: "tuner-hint" }, [""]);
     this.tunerNoteEl = noteEl;
+    this.tunerHzEl = hzEl;
     this.tunerCentsEl = centsEl;
     this.tunerHintEl = hintEl;
     noteEl.addEventListener("click", () => {
@@ -833,19 +837,28 @@ export class App {
         this.tuner.lockTo(this.tuner.midi, s.ringSustainMs);
       }
     });
-    const readout = el("div", { class: "tuner-readout" }, [noteEl, centsEl, hintEl]);
+    const readout = el("div", { class: "tuner-readout" }, [noteEl, hzEl, centsEl, hintEl]);
     dialWrap.appendChild(dialCanvas);
     dialWrap.appendChild(readout);
     screen.appendChild(dialWrap);
 
-    // reference row
+    // reference row — the string nearest the currently detected pitch (by
+    // pitch class first, tie-broken by absolute MIDI distance) is act-bordered,
+    // purely a display computation over the existing tuner reading (mirrors
+    // Android TunerScreen's `nearestIdx`; adds no new state). Buttons are kept
+    // in `tunerRefBtns` so `redrawTuner()` can update the highlight live —
+    // `renderTuner()` itself only reruns on a full app rerender, same reason
+    // note/cents/hint are mutated directly rather than rebuilt every frame.
+    const strings = s.liveTuning.openStrings;
     const refRow = el("div", { class: "tuner-ref-row" }, [el("span", { style: `font-size:11px;color:${Colors.textSecondary}` }, ["Reference"])]);
-    s.liveTuning.openStrings.forEach((n, i) => {
+    this.tunerRefBtns = [];
+    strings.forEach((n, i) => {
       const b = el("button", { class: "btn ref-btn" }, [
         el("span", { class: "s" }, [`S${stringCount(s.liveTuning) - i}`]),
         el("span", {}, [`${spellPc(midiPitchClass(n.midi))}${midiOctave(n.midi)}`]),
       ]);
       b.addEventListener("click", () => { s.playReferencePitch(n.midi); this.tuner?.lockTo(n.midi, s.ringSustainMs); });
+      this.tunerRefBtns.push(b);
       refRow.appendChild(b);
     });
     screen.appendChild(refRow);
@@ -864,7 +877,10 @@ export class App {
     const canvas = this.tunerDialCanvas;
     if (!canvas || !this.tuner) return;
     if (!this.tuner.capturing) {
-      if (this.tunerNoteEl) this.tunerNoteEl.textContent = "🎤";
+      // No emoji glyphs anywhere (Signal spec) — a Mic icon replaces the old
+      // "🎤" text in the big note slot; A4/mic capture logic is untouched.
+      if (this.tunerNoteEl) { this.tunerNoteEl.innerHTML = ""; this.tunerNoteEl.appendChild(icon("mic", 40)); }
+      if (this.tunerHzEl) this.tunerHzEl.textContent = "";
       if (this.tunerCentsEl) this.tunerCentsEl.textContent = "Allow microphone access to tune";
       if (this.tunerHintEl) this.tunerHintEl.textContent = "";
     }
@@ -879,7 +895,9 @@ export class App {
 
     const cents = this.tuner.cents;
     const midi = this.tuner.midi;
-    const inTune = cents !== null && Math.abs(cents) <= 10;
+    // Signal spec: the needle/note turn FEEDBACK (teal) once within ±5 cents
+    // (was ±10) — a display-threshold change only, not detector logic.
+    const inTune = cents !== null && Math.abs(cents) <= 5;
     drawTunerDial(ctx, w, h, cents, inTune);
 
     if (this.tunerNoteEl && this.tuner.capturing) {
@@ -895,6 +913,9 @@ export class App {
         this.tunerNoteEl.style.color = Colors.textPrimary;
       }
     }
+    if (this.tunerHzEl && this.tuner.capturing) {
+      this.tunerHzEl.textContent = this.tuner.freqHz != null ? `${this.tuner.freqHz.toFixed(1)} Hz` : "";
+    }
     if (this.tunerCentsEl && this.tuner.capturing) {
       this.tunerCentsEl.textContent = cents !== null ? `${cents >= 0 ? "+" : ""}${cents.toFixed(0)} ¢` : "";
       this.tunerCentsEl.style.color = inTune ? Colors.tuned : Colors.textSecondary;
@@ -902,6 +923,18 @@ export class App {
     if (this.tunerHintEl && this.tuner.capturing) {
       this.tunerHintEl.textContent = inTune ? "IN TUNE" : midi !== null ? "tap note to hear reference" : "";
       this.tunerHintEl.style.color = inTune ? Colors.tuned : Colors.textSecondary;
+    }
+    if (this.tunerRefBtns.length) {
+      const strings = this.state.liveTuning.openStrings;
+      let nearestIdx: number | null = null;
+      if (midi != null && strings.length) {
+        const pc = ((midi % 12) + 12) % 12;
+        const samePc = strings.map((_, i) => i).filter((i) => ((strings[i].midi % 12) + 12) % 12 === pc);
+        const candidates = samePc.length ? samePc : strings.map((_, i) => i);
+        nearestIdx = candidates.reduce((best, i) =>
+          Math.abs(strings[i].midi - midi) < Math.abs(strings[best].midi - midi) ? i : best);
+      }
+      this.tunerRefBtns.forEach((b, i) => { b.className = i === nearestIdx ? "btn ref-btn selected" : "btn ref-btn"; });
     }
   }
 

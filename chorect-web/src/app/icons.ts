@@ -29,7 +29,9 @@ export type IconName =
   | "note"
   | "flask"
   | "restart"
-  | "close";
+  | "close"
+  | "add"
+  | "mic";
 
 const PATH: Record<IconName, string> = {
   // Fretboard grid (was NAV_ICONS.fretboard).
@@ -68,6 +70,11 @@ const PATH: Record<IconName, string> = {
   // "Quit" text buttons — mirrors Android's Icons.Rounded.RestartAlt/Close).
   restart: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
   close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  // Loop screen's dashed "+" add-bar tile (Signal T10 web mirror of Android's
+  // AddBarTile, Icons.Rounded.Add).
+  add: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  // Tuner mic-permission panel (Signal T10): replaces the "🎤" emoji glyph.
+  mic: '<path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M6 11a6 6 0 0 0 12 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/>',
 };
 
 /**

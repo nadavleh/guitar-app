@@ -6,6 +6,7 @@ import { AppState } from "./appState";
 import { EarTrainingState } from "./earTrainingState";
 import { Colors } from "./theme";
 import { el, btn, segmented, labelSm } from "./dom";
+import { icon } from "./icons";
 import { transportDock, toneSheet } from "./transport";
 import {
   spellPc, TrainingMode, ChordTypeLevel, ChordTypeLevelName,
@@ -32,7 +33,7 @@ export class LoopUI {
     // header — Play/Stop and tempo now live in the transport dock below.
     screen.appendChild(el("div", { class: "tool-topbar" }, [
       el("div", { class: "tool-title" }, ["LOOP"]),
-      btn(L.isLooping || L.hasAnyChord() ? "Watch on neck ▶" : "Back", () => {
+      btn(L.isLooping || L.hasAnyChord() ? "Watch on neck" : "Back", () => {
         if (!L.isLooping && L.hasAnyChord()) L.startLoop();
         this.onBack();
       }),
@@ -40,6 +41,11 @@ export class LoopUI {
 
     const body = el("div", { class: "et-scroll" });
     screen.appendChild(body);
+
+    // "Now playing / next" banner (purely derived from existing loop state —
+    // no new fields), shown only while the loop is actually running.
+    const banner = this.nowNextBanner();
+    if (banner) body.appendChild(banner);
 
     // slots/bar + bars
     body.appendChild(el("div", { class: "et-row-gap", style: "margin-top:6px" }, [
@@ -90,12 +96,29 @@ export class LoopUI {
     if (this.toneSheetOpen) container.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.rerender(); }));
   }
 
+  /** "Now playing / next" banner: current chord bold/act-colored, "next: X"
+   *  muted — derived purely from `currentAndNextLoopChord`, no new state. */
+  private nowNextBanner(): HTMLElement | null {
+    const L = this.loop;
+    if (!L.isLooping) return null;
+    const [current, next] = currentAndNextLoopChord(L);
+    const children: HTMLElement[] = [
+      el("span", { style: `font-weight:700;font-size:16px;color:${Colors.primary}` }, [current ?? "·"]),
+    ];
+    if (next) children.push(el("span", { class: "et-muted", style: "margin-left:10px" }, [`next: ${next}`]));
+    return el("div", { class: "row", style: "margin:2px 0 8px" }, children);
+  }
+
+  /** Bars render as a horizontally-scrolling lane of fixed-width tiles (rather
+   *  than a wrapped grid), with a dashed "+" tile at the end that adds a bar
+   *  via the exact same `setBarCount` call the old "+" stepper used. */
   private barsGrid(): HTMLElement {
     const L = this.loop;
-    const grid = el("div", { class: "loop-bars" });
+    const barWidth = `${Math.max(L.slotsPerBar, 1) * 46 + 20}px`;
+    const lane = el("div", { class: "loop-bars" });
     L.progression.forEach((bar, barIdx) => {
       const isCurrent = L.isLooping && L.currentBar === barIdx;
-      const card = el("div", { class: isCurrent ? "bar-card current" : "bar-card" }, [
+      const card = el("div", { class: isCurrent ? "bar-card current" : "bar-card", style: `width:${barWidth}` }, [
         el("div", { class: "bar-num" }, [`Bar ${barIdx + 1}`]),
       ]);
       const slots = el("div", { class: "bar-slots" });
@@ -111,9 +134,14 @@ export class LoopUI {
         slots.appendChild(box);
       });
       card.appendChild(slots);
-      grid.appendChild(card);
+      lane.appendChild(card);
     });
-    return grid;
+    const canAdd = L.progression.length < 16;
+    const addTile = el("div", { class: canAdd ? "add-bar-tile" : "add-bar-tile disabled", style: `width:${barWidth}` }, [icon("add", 22)]);
+    addTile.setAttribute("aria-label", "Add bar");
+    if (canAdd) addTile.addEventListener("click", () => L.setBarCount(L.progression.length + 1));
+    lane.appendChild(addTile);
+    return lane;
   }
 
   private slotEditor(barIdx: number, slotIdx: number): HTMLElement {
@@ -241,4 +269,19 @@ export class LoopUI {
   }
 
   private rerender(): void { (this.loop as unknown as { deps: { onChange: () => void } }).deps.onChange(); }
+}
+
+/** Current + next chord symbol for the "now playing" banner — a pure read of
+ *  `LoopState.progression`/`currentBar`/`currentSlot`; adds no new state
+ *  (mirrors Android's `currentAndNextLoopChord` in Screens.kt). */
+function currentAndNextLoopChord(L: LoopState): [string | null, string | null] {
+  const bars = L.progression;
+  if (bars.length === 0) return [null, null];
+  const barIdx = Math.min(Math.max(L.currentBar, 0), bars.length - 1);
+  const bar = bars[barIdx];
+  if (bar.length === 0) return [null, null];
+  const slotIdx = Math.min(Math.max(L.currentSlot, 0), bar.length - 1);
+  const current = bar[slotIdx].chordSymbol;
+  const next = bar[slotIdx + 1]?.chordSymbol ?? bars[(barIdx + 1) % bars.length]?.[0]?.chordSymbol ?? null;
+  return [current, next];
 }

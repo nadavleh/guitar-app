@@ -132,7 +132,7 @@ export class DecomposeUI {
     body.appendChild(card);
 
     body.appendChild(el("div", { class: "et-row-gap", style: "margin-top:10px;flex-wrap:wrap" }, [
-      btn("Shell → triad ▶", () => this.play(dec), "btn primary"),
+      btn("Shell → triad", () => this.play(dec), "btn primary"),
       btn("Shell", () => this.playGroup(dec, "shell")),
       btn("Triad", () => this.playGroup(dec, "upper")),
       btn("Full chord", () => this.playGroup(dec, "full")),

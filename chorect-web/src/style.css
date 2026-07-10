@@ -580,6 +580,8 @@ canvas.tuner-dial { position: absolute; inset: 0; width: 100%; height: 100%; }
   cursor: pointer;
 }
 .tuner-note .oct { font-size: 28px; opacity: 0.7; }
+.tuner-note .glyph { display: flex; }
+.tuner-hz { font-size: 13px; color: var(--text-secondary); margin-top: 2px; font-variant-numeric: tabular-nums; }
 .tuner-cents { font-size: 16px; font-weight: 600; margin-top: 4px; }
 .tuner-hint { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
 
@@ -599,6 +601,9 @@ canvas.tuner-dial { position: absolute; inset: 0; width: 100%; height: 100%; }
   gap: 2px;
   padding: 8px 4px;
 }
+/* Nearest string to the currently detected pitch (Signal T10, mirrors
+   Android TunerScreen's act-bordered nearest-string highlight). */
+.tuner-ref-row .ref-btn.selected { border: 2px solid var(--act); color: var(--act); }
 .tuner-ref-row .ref-btn .s { font-size: 10px; color: var(--text-secondary); }
 
 .placeholder {
@@ -735,10 +740,7 @@ select.et-select {
 
 .drum-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
 .drum-label { width: 132px; flex: 0 0 132px; }
-.drum-label .name {
-  font-weight: 600; cursor: pointer; display: inline-block; padding: 2px 4px; border-radius: 6px;
-}
-.drum-label .name:hover { background: rgba(255,255,255,0.05); }
+.drum-label .name { font-weight: 600; display: inline-block; padding: 2px 4px; }
 .drum-label.dim .name { color: var(--text-secondary); }
 .drum-ms { display: flex; gap: 6px; margin-top: 4px; }
 .ms-tag {
@@ -755,16 +757,9 @@ select.et-select {
   border: 2px solid transparent;
 }
 .drum-cell.playhead { border-color: var(--text-primary); }
-.drum-cell.accent { border-color: rgba(255, 255, 255, 0.85); font-weight: 700; font-size: 18px; }
+.drum-cell.accent { border-color: var(--feedback); font-weight: 700; font-size: 18px; }
 .btn .btn-ico svg, .btn-ico svg { width: 15px; height: 15px; vertical-align: -2px; margin-right: 5px; }
 .drum-cells.dim { opacity: 0.4; }
-.drum-voice-pop {
-  position: absolute; z-index: 30; margin-top: 4px; width: 240px;
-  background: var(--surface); border: 1px solid var(--divider); border-radius: 12px;
-  padding: 10px 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
-}
-.drum-voice-pop .vrow { padding: 6px 4px; cursor: pointer; border-radius: 6px; }
-.drum-voice-pop .vrow:hover { background: rgba(255,255,255,0.05); }
 .drum-caption { font-size: 11px; color: var(--text-secondary); margin: 4px 0 0 138px; }
 .drum-setup-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 8px 0; }
 .drum-setup-item { display: flex; align-items: center; gap: 6px; }
@@ -789,13 +784,25 @@ select.et-select {
 
 /* ---------- Progression looper ---------- */
 
-.loop-bars { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Bar lane: a horizontally-scrolling row of fixed-width tiles (Signal T10 —
+   mirrors Android's LoopScreen `Row` + `horizontalScroll`), rather than a
+   wrapped grid, plus a dashed "+" tile at the end. */
+.loop-bars { display: flex; align-items: stretch; gap: 6px; overflow-x: auto; }
 .bar-card {
-  background: var(--surface-elev); border-radius: 10px; padding: 6px; flex: 1 1 120px; min-width: 120px;
+  background: var(--surface-elev); border-radius: 10px; padding: 6px; flex: 0 0 auto;
+  border: 2px solid transparent;
 }
-.bar-card.current { background: var(--primary-container); }
+.bar-card.current { background: var(--primary-container); border-color: var(--act); }
 .bar-card .bar-num { font-size: 11px; color: var(--text-secondary); }
 .bar-slots { display: flex; gap: 3px; margin-top: 4px; }
+.add-bar-tile {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px dashed var(--line); border-radius: 8px;
+  color: var(--muted); cursor: pointer;
+}
+.add-bar-tile:hover { border-color: var(--muted); }
+.add-bar-tile.disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 .slot-box {
   flex: 1 1 0; min-height: 50px; border-radius: 4px; background: rgba(120,128,144,0.25);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
