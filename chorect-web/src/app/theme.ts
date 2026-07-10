@@ -1,23 +1,26 @@
-// Brand palette — ported verbatim from app/.../Theme.kt (GuitarColors).
-// The Kotlin app is always dark; we keep that here.
+// Brand palette — ported verbatim from app/.../Theme.kt (SignalColors /
+// GuitarColors, DEFAULT combination: dark theme, Coral accent). This feeds
+// canvases (fretboard marks etc.), which stay fixed-dark and non-accent-
+// reactive for now, same as before ("the Kotlin app is always dark" — now:
+// the Signal dark tokens at their default coral/teal/blue combo).
 
 export const Colors = {
-  background: "#0E1014",
-  surface: "#181B22",
-  surfaceElev: "#20242E",
-  divider: "#262A33",
+  background: "#10141E",
+  surface: "#191F2E",
+  surfaceElev: "#20283C",
+  divider: "#273049",
 
-  textPrimary: "#F5F0E6",
-  textSecondary: "#9098A6",
-  textDisabled: "#4A5060",
+  textPrimary: "#EAEEF7",
+  textSecondary: "#7C86A2",
+  textDisabled: "#454E64",
 
-  primary: "#F2A93B", // amber
-  onPrimary: "#1A1206",
+  primary: "#FF5C57", // coral (act, default accent)
+  onPrimary: "#2A0A09",
 
-  rootTone: "#D34D52", // crimson
-  chordTone: "#3FB8AF", // teal
-  scaleTone: "#9B7BF7", // lavender
-  pickSelect: "#F2A93B", // amber
+  rootTone: "#FF5C57", // root marks: act (coral)
+  chordTone: "#3DDCC8", // chord-tone marks: feedback (teal)
+  scaleTone: "#8AA3FF", // scale-tone marks: blue
+  pickSelect: "#FF5C57", // coral (act, default accent)
 
   wood: "#3D2817",
   woodGrain: "#2C1C10",
@@ -27,7 +30,7 @@ export const Colors = {
   stringWound: "#C9A876", // bronze base for low strings
   stringPlain: "#DCC698", // bright steel for high strings
 
-  tuned: "#66BB6A", // tuner "in tune" green
+  tuned: "#3DDCC8", // tuner "in tune": feedback (teal)
 } as const;
 
 /** Hex color with an alpha applied, returned as rgba(). */

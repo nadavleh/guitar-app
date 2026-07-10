@@ -215,6 +215,9 @@ export class App {
     this.rendering = true;
     // Theme: the light palette is a :root.light override of the CSS variables.
     document.documentElement.classList.toggle("light", !this.state.darkTheme);
+    // ACT accent: style.css `[data-accent="..."]` overrides; coral (default) has none.
+    if (this.state.accent === "coral") delete document.documentElement.dataset.accent;
+    else document.documentElement.dataset.accent = this.state.accent;
     try {
       this.renderInner();
     } finally {

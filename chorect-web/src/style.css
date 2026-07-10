@@ -1,43 +1,93 @@
-:root {
-  --bg: #0E1014;
-  --surface: #181B22;
-  --surface-elev: #20242E;
-  --divider: #262A33;
-  --text-primary: #F5F0E6;
-  --text-secondary: #9098A6;
-  --text-disabled: #4A5060;
-  --primary: #F2A93B;
-  --on-primary: #1A1206;
-  --root-tone: #D34D52;
-  --chord-tone: #3FB8AF;
-  --scale-tone: #9B7BF7;
-  --tuned: #66BB6A;
+/* "Signal" design tokens — see docs/superpowers/specs/2026-07-10-signal-gui-redesign-design.md
+   §Design tokens. Mirrors app/.../Theme.kt (SignalColors + Accent) exactly.
+   Indigo ground; ACT (coral by default, user-swappable — see the
+   [data-accent] overrides below) drives primary actions/selection; FEEDBACK
+   (teal) is correct/in-tune/accents/tone-chip, and falls back to blue only
+   when the chosen ACT accent IS teal (avoids the two roles colliding).
 
-  --primary-container: rgba(242, 169, 59, 0.20);
+   Every var name that existed before this task is kept and re-pointed to the
+   new Signal values so untouched components keep inheriting correctly. New
+   semantic names (--act, --on-act, --feedback, --surface2, --line, --muted)
+   are added as aliases of the same values for restyled components to prefer
+   going forward. The legacy tone names (--root-tone/--chord-tone/--scale-tone/
+   --tuned) are fixed compat aliases at their DEFAULT (coral/teal/blue) value —
+   mirroring Android's static `GuitarColors` object — and are deliberately NOT
+   re-pointed inside the accent overrides; only --act/--primary (+ container)
+   and, for teal, --feedback react live to the accent picker. */
+:root {
+  --bg: #10141E;
+  --surface: #191F2E;
+  --surface-elev: #20283C;
+  --divider: #273049;
+  --text-primary: #EAEEF7;
+  --text-secondary: #7C86A2;
+  --text-disabled: #454E64;
+
+  --surface2: var(--surface-elev);
+  --line: var(--divider);
+  --muted: var(--text-secondary);
+
+  --act: #FF5C57;
+  --on-act: #2A0A09;
+  --primary: var(--act);
+  --on-primary: var(--on-act);
+  --primary-container: rgba(255, 92, 87, 0.20);
+
+  --feedback: #3DDCC8;
+
+  --root-tone: #FF5C57;
+  --chord-tone: #3DDCC8;
+  --scale-tone: #8AA3FF;
+  --tuned: #3DDCC8;
 
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--text-primary);
   background: var(--bg);
 }
 
-/* Light theme: warm paper background, deeper brand accents for contrast.
+/* Light theme: Signal light tokens (act/feedback darkened for contrast).
    (The wooden fretboard canvas keeps its own palette either way.) */
 :root.light {
-  --bg: #F6F3EC;
-  --surface: #FFFDF7;
-  --surface-elev: #ECE7DB;
-  --divider: #CFC9BB;
-  --text-primary: #1E222A;
-  --text-secondary: #5A6070;
-  --text-disabled: #A8ADB8;
-  --primary: #B57612;
-  --on-primary: #FFFFFF;
-  --root-tone: #B3282E;
-  --chord-tone: #16766F;
-  --scale-tone: #6B47C9;
-  --tuned: #2E7D32;
-  --primary-container: rgba(181, 118, 18, 0.18);
+  --bg: #F4F6FB;
+  --surface: #FFFFFF;
+  --surface-elev: #E9EDF6;
+  --divider: #D8DEED;
+  --text-primary: #1C2233;
+  --text-secondary: #5D6782;
+  --text-disabled: #A9AFC7;
+
+  --act: #E03E39;
+  --on-act: #FFFFFF;
+  --primary-container: rgba(224, 62, 57, 0.18);
+
+  --feedback: #159C8B;
+
+  --root-tone: #E03E39;
+  --chord-tone: #159C8B;
+  --scale-tone: #3D5CC7;
+  --tuned: #159C8B;
 }
+
+/* ---------- Accent picker overrides ----------
+   Coral is the default ACT accent, so it needs no [data-accent] attribute.
+   Each other swatch re-points --act (and --primary via var() chaining) +
+   --primary-container to its accent value; teal additionally redirects
+   --feedback to blue so FEEDBACK never collides with a teal ACT. --on-act/
+   --on-primary are NOT overridden here — like Android's `onAct`, they're
+   fixed per theme (dark/light), not per accent. Dark values below; light
+   pairs (darkened for contrast) are the :root.light[data-accent] blocks,
+   which need the extra ".light" for specificity to win over both the plain
+   ":root.light" and plain ":root[data-accent]" rules (equal specificity
+   would otherwise fall to source order). */
+:root[data-accent="amber"]  { --act: #FFB454; --primary-container: rgba(255, 180, 84, 0.20); }
+:root[data-accent="teal"]   { --act: #3DDCC8; --primary-container: rgba(61, 220, 200, 0.20); --feedback: #8AA3FF; }
+:root[data-accent="blue"]   { --act: #8AA3FF; --primary-container: rgba(138, 163, 255, 0.20); }
+:root[data-accent="purple"] { --act: #C98ADF; --primary-container: rgba(201, 138, 223, 0.20); }
+
+:root.light[data-accent="amber"]  { --act: #B8720E; --primary-container: rgba(184, 114, 14, 0.18); }
+:root.light[data-accent="teal"]   { --act: #159C8B; --primary-container: rgba(21, 156, 139, 0.18); --feedback: #3D5CC7; }
+:root.light[data-accent="blue"]   { --act: #3D5CC7; --primary-container: rgba(61, 92, 199, 0.18); }
+:root.light[data-accent="purple"] { --act: #9C4FBD; --primary-container: rgba(156, 79, 189, 0.18); }
 
 * {
   box-sizing: border-box;

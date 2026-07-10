@@ -72,12 +72,19 @@ function defaultReverb(): Record<SoundName, number> {
 
 const LS_KEY = "chorect-web.v1";
 
+/** The 5 user-swappable ACT accents (see style.css `[data-accent]` overrides
+ *  and app/.../Theme.kt `Accent`). "coral" is the default and maps to no
+ *  `data-accent` attribute at all. */
+export type AccentName = "coral" | "amber" | "teal" | "blue" | "purple";
+const ACCENT_NAMES: readonly AccentName[] = ["coral", "amber", "teal", "blue", "purple"];
+
 interface Persisted {
   instrument: string;
   tuningName: string;
   labelMode: string;
   leftHanded: boolean;
   darkTheme: boolean;
+  accent: string;
   voicingShell: boolean;
   a4Hz: number;
   ringSustainMs: number;
@@ -107,6 +114,8 @@ export class AppState {
   leftHanded = false;
   /** UI theme; dark is the original look. */
   darkTheme = true;
+  /** ACT accent (Personalize / Settings). "coral" is the default. */
+  accent: AccentName = "coral";
 
   displayMode = DisplayMode.None;
   currentSheet: Sheet | null = null;
@@ -181,6 +190,9 @@ export class AppState {
       if (p.labelMode && p.labelMode in LabelMode) this.labelMode = p.labelMode as LabelMode;
       if (typeof p.leftHanded === "boolean") this.leftHanded = p.leftHanded;
       if (typeof p.darkTheme === "boolean") this.darkTheme = p.darkTheme;
+      if (typeof p.accent === "string" && (ACCENT_NAMES as readonly string[]).includes(p.accent)) {
+        this.accent = p.accent as AccentName;
+      }
       if (typeof p.voicingShell === "boolean") this.voicingStyle = p.voicingShell ? VoicingStyle.Shell : VoicingStyle.Standard;
       if (typeof p.a4Hz === "number") this.a4Hz = p.a4Hz;
       if (typeof p.ringSustainMs === "number") this.ringSustainMs = p.ringSustainMs;
@@ -230,6 +242,7 @@ export class AppState {
       labelMode: this.labelMode,
       leftHanded: this.leftHanded,
       darkTheme: this.darkTheme,
+      accent: this.accent,
       voicingShell: this.voicingStyle === VoicingStyle.Shell,
       a4Hz: this.a4Hz,
       ringSustainMs: this.ringSustainMs,
@@ -359,6 +372,15 @@ export class AppState {
   setLabelMode(m: LabelMode): void { this.commit(() => { this.labelMode = m; }); }
   toggleLeftHanded(v: boolean): void { this.commit(() => { this.leftHanded = v; }); }
   toggleDarkTheme(v: boolean): void { this.commit(() => { this.darkTheme = v; }); }
+  /** Persist the chosen ACT accent and apply it immediately: coral (the
+   *  default) clears `[data-accent]` entirely (style.css's un-attributed
+   *  `:root` rules already are coral); any other accent sets the attribute so
+   *  the matching style.css `[data-accent="..."]` override takes effect. */
+  setAccent(a: AccentName): void {
+    this.commit(() => { this.accent = a; });
+    if (a === "coral") delete document.documentElement.dataset.accent;
+    else document.documentElement.dataset.accent = a;
+  }
   setTapOnTouchDown(v: boolean): void { this.commit(() => { this.tapOnTouchDown = v; }); }
   setA4Hz(v: number): void { this.commit(() => { this.a4Hz = Math.min(Math.max(Math.round(v), 435), 445); }); }
   setRingSustainMs(v: number): void { this.commit(() => { this.ringSustainMs = Math.min(Math.max(Math.round(v), 300), 4000); }); }
