@@ -17,8 +17,8 @@ android {
         // releases are kept in /releases — never delete them. versionCode is a
         // monotonically increasing integer: major*10000 + minor*100 + patch
         // (e.g. 1.2.0 = 10200, 1.2.1 = 10201, 2.0.0 = 20000).
-        versionCode = 12900
-        versionName = "1.29.0"
+        versionCode = 20000
+        versionName = "2.0.0"
     }
 
     buildTypes {
