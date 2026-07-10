@@ -475,7 +475,7 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
         Spacer(Modifier.height(8.dp))
 
         // ----- Tuner / audio configuration -----
-        Text("Tuner & audio", style = MaterialTheme.typography.titleSmall)
+        Text("Tuner", style = MaterialTheme.typography.titleSmall)
         Spacer(Modifier.height(6.dp))
         Text("A4 reference: ${state.a4Hz.toInt()} Hz",
             style = MaterialTheme.typography.bodyMedium)
@@ -484,25 +484,6 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
             onValueChange = { state.setA4Hz(it) },
             valueRange = 435f..445f,
             steps = 9,  // 1 Hz increments
-        )
-        Spacer(Modifier.height(8.dp))
-        Text("Ring sustain: ${"%.1f".format(state.ringSustainMs / 1000f)} s",
-            style = MaterialTheme.typography.bodyMedium)
-        androidx.compose.material3.Slider(
-            value = state.ringSustainMs.toFloat(),
-            onValueChange = { state.setRingSustainMs(it.toInt()) },
-            valueRange = 300f..4000f,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            if (state.strumMs == 0) "Strum spread: struck at once"
-            else "Strum spread: ${state.strumMs} ms",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        androidx.compose.material3.Slider(
-            value = state.strumMs.toFloat(),
-            onValueChange = { state.setStrumMs(it.toInt()) },
-            valueRange = 0f..150f,
         )
 
         Spacer(Modifier.height(12.dp))
