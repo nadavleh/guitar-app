@@ -335,7 +335,7 @@ export class App {
   private isTabSelected(dest: TabDestName): boolean {
     const sheet = this.state.currentSheet;
     if (sheet !== null) return sheet === TAB_SHEET[dest];
-    return dest === "Neck" && this.state.displayMode !== DisplayMode.None;
+    return dest === "Neck";
   }
 
   /** "More" is selected whenever the open sheet isn't one of the current 4
@@ -394,7 +394,7 @@ export class App {
         icon("stop", 16), el("span", {}, [" Stop"]),
       ]);
       stop.addEventListener("click", () => this.loop.stopLoop());
-      stop.style.color = Colors.rootTone;
+      stop.style.color = "var(--root-tone)";
       statusRight.appendChild(stop);
     }
     statusRight.appendChild(this.tuneButton());
@@ -668,7 +668,7 @@ export class App {
       const notes = notesFrom(q, root).map((pc) => spellPc(pc)).join(" ");
       const intervals = q.intervals.map((iv) => intervalName(iv)).join(" ");
       sheet.appendChild(el("div", {}, [`${spellPc(root)}${q.symbol}:  ${notes}`]));
-      sheet.appendChild(el("div", { class: "mono", style: `color:${Colors.textSecondary}` }, [`intervals:  ${intervals}`]));
+      sheet.appendChild(el("div", { class: "mono", style: `color:var(--muted)` }, [`intervals:  ${intervals}`]));
       // selected position's voicing card
       if (this.state.chordView === ChordScaleView.Positions) {
         const shapes = this.chordShapes();
@@ -676,7 +676,7 @@ export class App {
         if (sh) sheet.appendChild(this.shapeCard(sh));
       }
     } else {
-      sheet.appendChild(el("div", { style: `color:${Colors.rootTone}` }, ["(chord not recognized)"]));
+      sheet.appendChild(el("div", { style: `color:var(--root-tone)` }, ["(chord not recognized)"]));
     }
   }
 
@@ -713,12 +713,12 @@ export class App {
       sheet.appendChild(el("div", { class: "mono" }, [`notes    ${notes}`]));
       sheet.appendChild(el("div", { class: "mono" }, [`formula  ${formula}`]));
     } else {
-      sheet.appendChild(el("div", { style: `color:${Colors.rootTone}` }, ["(invalid root or scale)"]));
+      sheet.appendChild(el("div", { style: `color:var(--root-tone)` }, ["(invalid root or scale)"]));
     }
   }
 
   private fillPickControls(sheet: HTMLElement): void {
-    sheet.appendChild(el("div", { style: `color:${Colors.textSecondary}` }, [
+    sheet.appendChild(el("div", { style: `color:var(--muted)` }, [
       "Tap any fret on the neck to add or remove it from your selection, mute whole strings below, then strum or arpeggiate the set.",
     ]));
     sheet.appendChild(el("div", { class: "v-gap-8" }));
@@ -751,7 +751,7 @@ export class App {
     const fingersLine = rev(suggestFingering(shape)).map((f) => (f === null ? " ·" : pad(String(f)))).join(" ");
     const positionLabel = shape.position === 0 ? "open position" : `position ${shape.position}`;
     const rootTag = shape.hasRootInBass ? " · root in bass" : "";
-    return el("div", { style: `margin-top:10px;background:${Colors.surfaceElev};border-radius:10px;padding:12px` }, [
+    return el("div", { style: `margin-top:10px;background:var(--surface2);border-radius:10px;padding:12px` }, [
       el("div", {}, [`${shape.chordName}  ·  ${positionLabel}  ·  span ${shape.fretSpan}${rootTag}`]),
       el("div", { class: "mono" }, [`frets     ${fretsLine}`]),
       el("div", { class: "mono" }, [`notes     ${notesLine}`]),
@@ -810,7 +810,7 @@ export class App {
         const selected = name === s.tuningName && !s.isEditedTuning;
         const chip = el("button", { class: selected ? "chip selected" : "chip" }, [name + "  "]);
         chip.addEventListener("click", () => s.selectTuning(name, t));
-        const x = el("span", { style: `margin-left:6px;color:${Colors.rootTone}` }, ["✕"]);
+        const x = el("span", { style: `margin-left:6px;color:var(--root-tone)` }, ["✕"]);
         x.addEventListener("click", (e) => { e.stopPropagation(); s.deleteCustomTuning(name); });
         chip.appendChild(x);
         myRow.appendChild(chip);
@@ -820,7 +820,7 @@ export class App {
     sheet.appendChild(el("div", { class: "mono", style: "margin-top:6px" }, [
       "Open strings (low → high):  " + s.liveTuning.openStrings.map((n) => spellNote(n)).join(" "),
     ]));
-    if (s.isEditedTuning) sheet.appendChild(el("div", { style: `color:${Colors.rootTone};font-size:12px` }, ["(unsaved edits)"]));
+    if (s.isEditedTuning) sheet.appendChild(el("div", { style: `color:var(--root-tone);font-size:12px` }, ["(unsaved edits)"]));
     sheet.appendChild(this.tuningEditor());
 
     sheet.appendChild(el("div", { class: "divider-line" }));
@@ -929,7 +929,7 @@ export class App {
 
   private tuningEditor(): HTMLElement {
     const s = this.state;
-    const card = el("div", { style: `margin-top:8px;background:${Colors.surfaceElev};border-radius:10px;padding:10px` });
+    const card = el("div", { style: `margin-top:8px;background:var(--surface2);border-radius:10px;padding:10px` });
     for (let str = stringCount(s.liveTuning) - 1; str >= 0; str--) {
       const n = stringCount(s.liveTuning) - str;
       const note0 = s.liveTuning.openStrings[str];
@@ -958,7 +958,7 @@ export class App {
     // top bar
     screen.appendChild(el("div", { class: "tool-topbar" }, [
       el("div", { class: "tool-title" }, ["TUNER"]),
-      el("div", { style: `font-size:12px;color:${Colors.textSecondary}` }, [`A4 = ${s.a4Hz} Hz`]),
+      el("div", { style: `font-size:12px;color:var(--muted)` }, [`A4 = ${s.a4Hz} Hz`]),
       this.tuneButton(),
       btn("Back", () => s.closeSheet()),
     ]));
@@ -1002,7 +1002,7 @@ export class App {
     // `renderTuner()` itself only reruns on a full app rerender, same reason
     // note/cents/hint are mutated directly rather than rebuilt every frame.
     const strings = s.liveTuning.openStrings;
-    const refRow = el("div", { class: "tuner-ref-row" }, [el("span", { style: `font-size:11px;color:${Colors.textSecondary}` }, ["Reference"])]);
+    const refRow = el("div", { class: "tuner-ref-row" }, [el("span", { style: `font-size:11px;color:var(--muted)` }, ["Reference"])]);
     this.tunerRefBtns = [];
     strings.forEach((n, i) => {
       const b = el("button", { class: "btn ref-btn" }, [
@@ -1059,10 +1059,10 @@ export class App {
         this.tunerNoteEl.innerHTML = "";
         this.tunerNoteEl.appendChild(document.createTextNode(name));
         this.tunerNoteEl.appendChild(el("span", { class: "oct" }, [String(oct)]));
-        this.tunerNoteEl.style.color = inTune ? Colors.tuned : Colors.textPrimary;
+        this.tunerNoteEl.style.color = inTune ? "var(--tuned)" : "var(--text-primary)";
       } else {
         this.tunerNoteEl.textContent = "—";
-        this.tunerNoteEl.style.color = Colors.textPrimary;
+        this.tunerNoteEl.style.color = "var(--text-primary)";
       }
     }
     if (this.tunerHzEl && this.tuner.capturing) {
@@ -1070,11 +1070,11 @@ export class App {
     }
     if (this.tunerCentsEl && this.tuner.capturing) {
       this.tunerCentsEl.textContent = cents !== null ? `${cents >= 0 ? "+" : ""}${cents.toFixed(0)} ¢` : "";
-      this.tunerCentsEl.style.color = inTune ? Colors.tuned : Colors.textSecondary;
+      this.tunerCentsEl.style.color = inTune ? "var(--tuned)" : "var(--muted)";
     }
     if (this.tunerHintEl && this.tuner.capturing) {
       this.tunerHintEl.textContent = inTune ? "IN TUNE" : midi !== null ? "tap note to hear reference" : "";
-      this.tunerHintEl.style.color = inTune ? Colors.tuned : Colors.textSecondary;
+      this.tunerHintEl.style.color = inTune ? "var(--tuned)" : "var(--muted)";
     }
     if (this.tunerRefBtns.length) {
       const strings = this.state.liveTuning.openStrings;

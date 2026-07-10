@@ -171,7 +171,7 @@ export class SambaLooperUI {
     if (!legendDismissed) {
       const closeBtn = el("button", { class: "tune-btn", "aria-label": "Dismiss" }, [icon("close", 16)]);
       closeBtn.addEventListener("click", () => { legendDismissed = true; this.rerender(); });
-      wrap.appendChild(el("div", { class: "et-card drum-legend", style: `background:${Colors.surfaceElev}` }, [
+      wrap.appendChild(el("div", { class: "et-card drum-legend", style: `background:var(--surface2)` }, [
         el("div", { class: "row" }, [
           el("div", { class: "et-muted", style: "flex:1" }, ["Tap = toggle · hold = accent · long-press = erase"]),
           closeBtn,
@@ -192,7 +192,7 @@ export class SambaLooperUI {
     const swingActive = s.meter.beatUnit === 4 && s.meter.division === 16;
     const swingSlider = slider(0, 100, s.swing, (v) => s.setSwing(v));
     swingSlider.disabled = !swingActive;
-    wrap.appendChild(el("div", { class: "et-card", style: `background:${Colors.surfaceElev};margin-top:8px` }, [
+    wrap.appendChild(el("div", { class: "et-card", style: `background:var(--surface2);margin-top:8px` }, [
       el("div", { class: "row" }, [
         btn("Tap tempo", () => s.tapTempo()),
         btn(s.metronome ? "Metro ✓" : "Metro", () => s.toggleMetronome(), s.metronome ? "btn primary" : "btn"),
@@ -402,7 +402,7 @@ export class SambaLooperUI {
   private mixerCard(inst: PercussionInstrument): HTMLElement {
     const s = this.samba;
     const vol = s.volumeOf(inst);
-    const card = el("div", { class: "et-card", style: `background:${Colors.surfaceElev}` }, [
+    const card = el("div", { class: "et-card", style: `background:var(--surface2)` }, [
       el("div", { style: "font-weight:600" }, [inst.displayName]),
       el("div", { class: "label-sm" }, [`Overall volume: ${Math.round(vol * 100)}%`]),
       slider(0, 1, vol, (v) => s.setVolume(inst, v), 0.01),
@@ -416,7 +416,7 @@ export class SambaLooperUI {
       label.addEventListener("click", () => s.preview(inst, idx));
       const row = el("div", { class: "row", style: "margin-top:6px" }, [
         label,
-        el("span", { style: `font-size:10px;color:${s.usesSample(inst, idx) ? Colors.primary : Colors.textSecondary}` }, [src]),
+        el("span", { style: `font-size:10px;color:${s.usesSample(inst, idx) ? "var(--act)" : "var(--muted)"}` }, [src]),
       ]);
       card.appendChild(row);
       card.appendChild(slider(0, 1, vvol, (val) => s.setVoiceVolume(inst, idx, val), 0.01));

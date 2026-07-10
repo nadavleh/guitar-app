@@ -6,7 +6,6 @@ import { AppState, ChallengeScore, CHALLENGE_SCORE_ORDER } from "./appState";
 import { EarTrainingState, EarSubMode, EarMode } from "./earTrainingState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { shapeMarks } from "./marks";
-import { Colors, withAlpha } from "./theme";
 import { el, btn, segmented, switchRow, labelSm } from "./dom";
 import { transportDock, toneSheet } from "./transport";
 import { icon } from "./icons";
@@ -23,11 +22,12 @@ import {
 
 const DISPLAY_FRETS = 14;
 
-// card backgrounds (Compose container colors → tints of our palette)
-const BG_HIDDEN = Colors.surfaceElev;
-const BG_REVEAL = withAlpha(Colors.scaleTone, 0.20);
-const BG_PRIMARY = withAlpha(Colors.primary, 0.20);
-const BG_TEACH = withAlpha(Colors.chordTone, 0.15);
+// card backgrounds (Compose container colors → tints of our palette). CSS
+// custom properties, not static hexes, so these stay readable in light theme.
+const BG_HIDDEN = "var(--surface2)";
+const BG_REVEAL = "color-mix(in srgb, var(--scale-tone) 20%, transparent)";
+const BG_PRIMARY = "color-mix(in srgb, var(--act) 20%, transparent)";
+const BG_TEACH = "color-mix(in srgb, var(--chord-tone) 15%, transparent)";
 
 function select(options: { value: string; label: string }[], value: string, onChange: (v: string) => void): HTMLSelectElement {
   const s = el("select", { class: "et-select" }) as HTMLSelectElement;
@@ -219,7 +219,7 @@ export class EarTrainingUI {
     const ear = this.ear;
     const keyLabel = ear.fixedKey == null ? "Random key" : spellPc(ear.fixedKey);
     const summary = this.generatorLabel() + "  ·  " + keyLabel + (!ear.specialProgMode ? "  ·  " + this.levelLabel() : "");
-    const card = el("div", { class: "et-card et-summary-card", style: `background:${Colors.surfaceElev}` }, [
+    const card = el("div", { class: "et-card et-summary-card", style: `background:var(--surface2)` }, [
       el("div", { style: "flex:1;min-width:0" }, [
         el("div", { style: "font-weight:600" }, [summary]),
         el("div", { class: "ans-label" }, ["tap to configure"]),
@@ -265,7 +265,7 @@ export class EarTrainingUI {
   private challengeScoreRow(label: string, score: string): HTMLElement {
     return el("div", { class: "row" }, [
       el("div", { style: "flex:1;font-weight:600" }, [label]),
-      el("div", { style: `color:${Colors.primary};font-weight:600` }, [score]),
+      el("div", { style: `color:var(--act);font-weight:600` }, [score]),
     ]);
   }
 
@@ -394,7 +394,7 @@ export class EarTrainingUI {
       btn(`Clear bar ${bar + 1}`, () => { ear.clearChallengeBar(bar); this.resetPad(); this.rerender(); }, "btn text"),
     ]));
 
-    return el("div", { class: "et-card", style: `background:${withAlpha(Colors.surfaceElev, 0.7)}` }, children);
+    return el("div", { class: "et-card", style: `background:color-mix(in srgb, var(--surface2) 70%, transparent)` }, children);
   }
 
   render(container: HTMLElement): void {
@@ -557,7 +557,7 @@ export class EarTrainingUI {
         style: `font-size:13px;display:flex;gap:8px;align-items:baseline;cursor:pointer`,
       }, [
         el("span", { style: "flex:1" }, [label]),
-        el("span", { style: `color:${Colors.primary}` }, [open ? "▾" : "▸"]),
+        el("span", { style: `color:var(--act)` }, [open ? "▾" : "▸"]),
       ]);
       head.addEventListener("click", () => {
         saveScroll();
@@ -572,7 +572,7 @@ export class EarTrainingUI {
 
     const section = (title: string, caption: string | null, rows: HTMLElement[]): HTMLElement =>
       el("div", { style: "margin-bottom:10px" }, [
-        el("div", { style: `font-weight:700;color:${Colors.primary}` }, [title]),
+        el("div", { style: `font-weight:700;color:var(--act)` }, [title]),
         ...(caption ? [el("div", { class: "et-muted", style: "font-size:12px;font-style:italic" }, [caption])] : []),
         ...rows,
       ]);
@@ -744,7 +744,7 @@ export class EarTrainingUI {
   private challengeHeader(parent: HTMLElement, label: string, score: string, onRestart: () => void, onQuit: () => void): void {
     parent.appendChild(el("div", { class: "row" }, [
       el("div", { style: "flex:1;font-weight:600" }, [label]),
-      el("div", { style: `color:${Colors.primary};font-weight:600` }, [score]),
+      el("div", { style: `color:var(--act);font-weight:600` }, [score]),
       btn("Restart", onRestart, "btn text"),
       btn("Quit", onQuit, "btn text"),
     ]));
@@ -865,7 +865,7 @@ export class EarTrainingUI {
     parent.appendChild(el("div", { class: "row", style: "align-items:center;gap:14px" }, [
       this.challengeProgressRing(ear.challengeIndex, ear.challengeTotal),
       el("div", { style: "flex:1;min-width:0" }, [
-        el("div", { style: `font-weight:600;color:${Colors.primary}` }, [`Score: ${ear.challengeBarScore()} / ${ear.challengeBarTotal()} bars`]),
+        el("div", { style: `font-weight:600;color:var(--act)` }, [`Score: ${ear.challengeBarScore()} / ${ear.challengeBarTotal()} bars`]),
         el("div", { class: "v-gap-8" }),
         this.challengeDotStrip(),
       ]),
@@ -922,10 +922,10 @@ export class EarTrainingUI {
     const verdict = ear.challengeBarCorrect(i);
     const selected = selectedBar === i;
     const label = ear.challengeGuessLabel[i];
-    const border = verdict === true ? Colors.primary : verdict === false ? Colors.rootTone : selected ? Colors.primary : Colors.divider;
+    const border = verdict === true ? "var(--act)" : verdict === false ? "var(--root-tone)" : selected ? "var(--act)" : "var(--line)";
     const box = el("div", {
       class: "et-barsq",
-      style: `border-color:${border};border-width:${selected && verdict === null ? "3px" : "2px"};background:${label == null ? BG_HIDDEN : Colors.surfaceElev}`,
+      style: `border-color:${border};border-width:${selected && verdict === null ? "3px" : "2px"};background:${label == null ? BG_HIDDEN : "var(--surface2)"}`,
     }, [label ?? "?"]);
     box.addEventListener("click", onSelect);
     const col = el("div", { class: "et-slot" }, [
@@ -936,7 +936,7 @@ export class EarTrainingUI {
     if (verdict !== null) {
       const answer = ear.progResolved[i]?.romanLabel ?? "";
       col.appendChild(el("div", {
-        style: `font-size:11px;font-weight:600;margin-top:2px;color:${verdict ? Colors.primary : Colors.rootTone}`,
+        style: `font-size:11px;font-weight:600;margin-top:2px;color:${verdict ? "var(--act)" : "var(--root-tone)"}`,
       }, [verdict ? "✔" : `✘ ${answer}`]));
     }
     return col;
@@ -952,7 +952,7 @@ export class EarTrainingUI {
     // per-question dots
     const dots = el("div", { class: "chip-row", style: "justify-content:center;margin:12px 0" });
     ear.challengeAnswers.forEach((a, i) => {
-      const color = a === true ? Colors.primary : a === false ? Colors.rootTone : Colors.divider;
+      const color = a === true ? "var(--act)" : a === false ? "var(--root-tone)" : "var(--line)";
       dots.appendChild(el("div", { class: "et-dot", style: `background:${color}` }, [String(i + 1)]));
     });
     card.appendChild(dots);
@@ -1219,7 +1219,7 @@ export class EarTrainingUI {
     } else {
       const degOk = ear.flavorGuessDegree === ear.flavorDegree;
       const qualOk = ear.flavorGuessQuality === ear.flavorQuality;
-      parent.appendChild(el("div", { style: `font-weight:700;color:${Colors.primary}` }, [`Answer: degree ${ear.flavorDegree} (${ear.flavorDegreeRoman()}) · ${ear.flavorQuality === "" ? "maj" : ear.flavorQuality}  [${ear.flavorChordSymbol()}, ${ear.flavorMode === TrainingMode.Major ? "major" : "minor"}]`]));
+      parent.appendChild(el("div", { style: `font-weight:700;color:var(--act)` }, [`Answer: degree ${ear.flavorDegree} (${ear.flavorDegreeRoman()}) · ${ear.flavorQuality === "" ? "maj" : ear.flavorQuality}  [${ear.flavorChordSymbol()}, ${ear.flavorMode === TrainingMode.Major ? "major" : "minor"}]`]));
       parent.appendChild(el("div", { style: "font-weight:600" }, [`you: degree ${degOk ? "✔" : "✘"} · flavor ${qualOk ? "✔" : "✘"}`]));
       parent.appendChild(btn(ear.flavorChIndex === ear.flavorChallengeTotal - 1 ? "See score →" : "Next →", () => ear.advanceFlavorChallenge(), "btn primary"));
     }
@@ -1290,7 +1290,7 @@ export class EarTrainingUI {
       parent.appendChild(b);
     } else {
       const ok = ear.invGuess === ear.invInversion;
-      parent.appendChild(el("div", { style: `font-weight:700;color:${Colors.primary}` }, [`${ok ? "✔ correct" : `✘ answer: ${inversionName(ear.invInversion)}`}   (${spellPc(ear.invRoot)}${ear.invQuality})`]));
+      parent.appendChild(el("div", { style: `font-weight:700;color:var(--act)` }, [`${ok ? "✔ correct" : `✘ answer: ${inversionName(ear.invInversion)}`}   (${spellPc(ear.invRoot)}${ear.invQuality})`]));
       parent.appendChild(btn(ear.invChIndex === ear.invChallengeTotal - 1 ? "See score →" : "Next →", () => ear.advanceInvChallenge(), "btn primary"));
       // Post-answer only: showing the chord earlier would leak the answer.
       parent.appendChild(el("div", { class: "v-gap-8" }));
@@ -1378,7 +1378,7 @@ export class EarTrainingUI {
       parent.appendChild(b);
     } else {
       const ok = ear.adGuess === ear.adQuality;
-      parent.appendChild(el("div", { style: `font-weight:700;color:${Colors.primary}` }, [`${ok ? "✔ correct" : `✘ answer: ${this.augDimLabel(ear.adQuality)}`}   (${spellPc(ear.adRoot)}${ear.adQuality})`]));
+      parent.appendChild(el("div", { style: `font-weight:700;color:var(--act)` }, [`${ok ? "✔ correct" : `✘ answer: ${this.augDimLabel(ear.adQuality)}`}   (${spellPc(ear.adRoot)}${ear.adQuality})`]));
       parent.appendChild(btn(ear.adChIndex === ear.augDimChallengeTotal - 1 ? "See score →" : "Next →", () => ear.advanceAugDimChallenge(), "btn primary"));
       // Post-answer only: showing the chord earlier would leak the answer.
       parent.appendChild(el("div", { class: "v-gap-8" }));
@@ -1442,7 +1442,7 @@ export class EarTrainingUI {
     } else {
       const ok = ear.intervalGuess === ear.intervalSemitones;
       const dir = ear.intervalAscending ? "ascending" : "descending";
-      parent.appendChild(el("div", { style: `font-weight:700;color:${Colors.primary}` }, [
+      parent.appendChild(el("div", { style: `font-weight:700;color:var(--act)` }, [
         `${ok ? "✔ correct" : `✘ answer: ${intervalChoiceFor(ear.intervalSemitones).longName}`}  (${dir})`,
       ]));
       parent.appendChild(btn(ear.intervalChIndex === ear.intervalChallengeTotal - 1 ? "See score →" : "Next →",

@@ -7,7 +7,6 @@
 // AppState — no dependency on the Ear Training screen's own runtime state.
 
 import { AppState } from "./appState";
-import { Colors } from "./theme";
 import { el, btn } from "./dom";
 
 const KIND_LABEL: Record<string, string> = {
@@ -38,7 +37,7 @@ export function renderChallengeStatsOverlay(state: AppState, onClose: () => void
       const best = rows[0]; // stored best-first per kind
       const avg = Math.round(rows.reduce((a, r) => a + (r.score * 100) / r.total, 0) / rows.length);
       const last = rows.reduce((a, r) => Math.max(a, r.dateMillis), 0);
-      body.appendChild(el("div", { style: `font-weight:700;color:${Colors.primary};margin-top:6px` }, [KIND_LABEL[kind] ?? kind]));
+      body.appendChild(el("div", { style: `font-weight:700;color:var(--act);margin-top:6px` }, [KIND_LABEL[kind] ?? kind]));
       body.appendChild(el("div", { class: "et-muted" }, [
         `best ${best.score}/${best.total}  ·  avg ${avg}%  ·  ${rows.length} run${rows.length === 1 ? "" : "s"}  ·  last ${new Date(last).toLocaleDateString()}`,
       ]));

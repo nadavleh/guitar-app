@@ -6,7 +6,6 @@ import { AppState } from "./appState";
 import { EarTrainingState } from "./earTrainingState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { FretMark, MarkKind } from "./marks";
-import { Colors } from "./theme";
 import { el, btn, clear } from "./dom";
 import { icon } from "./icons";
 import { toneSheet } from "./transport";
@@ -126,8 +125,8 @@ export class DecomposeUI {
     const upperPc = ((this.root + upperRootInterval(dec)) % 12 + 12) % 12;
     const card = el("div", { class: "et-card", style: "margin-top:10px" }, [
       el("div", { style: "font-weight:700;font-size:16px" }, [`${spellPc(this.root)}${dec.displayName}  ≈  shell + triad`]),
-      el("div", { style: `color:${Colors.primary}` }, [`Shell (bass): ${shellNotes.join(" · ")}`]),
-      el("div", { style: `color:${Colors.scaleTone}` }, [`Upper triad: ${spellPc(upperPc)} ${dec.upperTriad}   (${dec.upperDegrees})`]),
+      el("div", { style: `color:var(--act)` }, [`Shell (bass): ${shellNotes.join(" · ")}`]),
+      el("div", { style: `color:var(--scale-tone)` }, [`Upper triad: ${spellPc(upperPc)} ${dec.upperTriad}   (${dec.upperDegrees})`]),
     ]);
     body.appendChild(card);
 
@@ -151,9 +150,9 @@ export class DecomposeUI {
     ]));
     // Legend: circle colours + that the numbers are interval degrees.
     body.appendChild(el("div", { class: "et-row-gap", style: "margin-top:4px;font-size:12px;flex-wrap:wrap;gap:12px" }, [
-      el("span", {}, [el("span", { style: `color:${Colors.rootTone}` }, ["●"]), " root (1)"]),
-      el("span", {}, [el("span", { style: `color:${Colors.chordTone}` }, ["●"]), " shell"]),
-      el("span", {}, [el("span", { style: `color:${Colors.scaleTone}` }, ["●"]), " upper triad"]),
+      el("span", {}, [el("span", { style: `color:var(--root-tone)` }, ["●"]), " root (1)"]),
+      el("span", {}, [el("span", { style: `color:var(--chord-tone)` }, ["●"]), " shell"]),
+      el("span", {}, [el("span", { style: `color:var(--scale-tone)` }, ["●"]), " upper triad"]),
       el("span", { class: "et-muted" }, ["numbers = interval degree"]),
     ]));
 

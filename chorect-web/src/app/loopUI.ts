@@ -4,7 +4,6 @@
 import { LoopState, StrumPattern, StrumGlyph, StrumName } from "./loopState";
 import { AppState } from "./appState";
 import { EarTrainingState } from "./earTrainingState";
-import { Colors } from "./theme";
 import { el, btn, segmented, labelSm } from "./dom";
 import { icon } from "./icons";
 import { transportDock, toneSheet } from "./transport";
@@ -103,7 +102,7 @@ export class LoopUI {
     if (!L.isLooping) return null;
     const [current, next] = currentAndNextLoopChord(L);
     const children: HTMLElement[] = [
-      el("span", { style: `font-weight:700;font-size:16px;color:${Colors.primary}` }, [current ?? "·"]),
+      el("span", { style: `font-weight:700;font-size:16px;color:var(--act)` }, [current ?? "·"]),
     ];
     if (next) children.push(el("span", { class: "et-muted", style: "margin-left:10px" }, [`next: ${next}`]));
     return el("div", { class: "row", style: "margin:2px 0 8px" }, children);
@@ -127,7 +126,7 @@ export class LoopUI {
         const isPlaying = L.isLooping && isCurrent && L.currentSlot === slotIdx;
         const cls = isEditing ? "slot-box editing" : isPlaying ? "slot-box playing" : "slot-box";
         const box = el("div", { class: cls }, [
-          el("div", { class: "sym", style: s.chordSymbol ? "" : `color:${Colors.textSecondary}` }, [s.chordSymbol ?? "·"]),
+          el("div", { class: "sym", style: s.chordSymbol ? "" : `color:var(--muted)` }, [s.chordSymbol ?? "·"]),
           el("div", { class: "strum" }, [StrumGlyph[s.strum]]),
         ]);
         box.addEventListener("click", () => L.setEditingSlot([barIdx, slotIdx]));
@@ -148,7 +147,7 @@ export class LoopUI {
     const L = this.loop;
     const s = L.progression[barIdx]?.[slotIdx];
     if (!s) return el("div", {});
-    const card = el("div", { class: "et-card", style: `background:${Colors.surfaceElev}` });
+    const card = el("div", { class: "et-card", style: `background:var(--surface2)` });
     card.appendChild(el("div", { class: "row" }, [
       el("div", { style: "flex:1;font-weight:600" }, [`Edit · Bar ${barIdx + 1} / slot ${slotIdx + 1}`]),
       btn("Close", () => L.setEditingSlot(null), "btn text"),
@@ -169,7 +168,7 @@ export class LoopUI {
       card.appendChild(labelSm("Voicing"));
       const shapes = L.shapesForSlot(barIdx, slotIdx);
       if (shapes.length === 0) {
-        card.appendChild(el("div", { style: `color:${Colors.rootTone};font-size:13px` }, ["(chord not recognized)"]));
+        card.appendChild(el("div", { style: `color:var(--root-tone);font-size:13px` }, ["(chord not recognized)"]));
       } else {
         const row = el("div", { class: "chip-row" });
         shapes.forEach((sh, i) => {
