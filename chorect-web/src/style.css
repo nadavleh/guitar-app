@@ -408,6 +408,73 @@ button:disabled:active { filter: none; }
   display: block;
 }
 
+/* ---------- Settings → Personalize (Signal T12: theme/accent/tabs & order) ---------- */
+
+.section-label {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.settings-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: -2px 0 6px;
+}
+
+/* Accent picker: 5 circular swatches, each given its accent's hex as an
+   inline background-color (ui.ts's accentRow/ACCENT_SWATCH_HEX) clipped to
+   the content box so the border only shows as a ring on the selected swatch.
+   44px hit target throughout. */
+.accent-row {
+  display: flex;
+  gap: 14px;
+  margin: 2px 0;
+}
+.accent-swatch {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  padding: 3px;
+  background-clip: content-box;
+  cursor: pointer;
+}
+.accent-swatch.selected { border-color: var(--text-primary); }
+
+/* Tabs & order editor: pick-exactly-4 checkbox rows + up/down reorder, 44px+
+   targets throughout (checkbox, reorder buttons). */
+.tab-order-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 10px;
+}
+.tab-order-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+.tab-order-row .glyph { color: var(--text-secondary); flex: 0 0 auto; }
+.tab-order-label { flex: 1 1 auto; font-size: 14px; }
+.tab-order-row.disabled .tab-order-label,
+.tab-order-row.disabled .glyph { color: var(--text-disabled); }
+.tab-order-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+  flex: 0 0 auto;
+}
+.tab-order-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
 .mono {
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
   font-size: 12px;

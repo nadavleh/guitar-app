@@ -2,7 +2,10 @@
 // AudioQuick}.kt. Vanilla DOM, re-rendered on each state change. The fretboard
 // <canvas> element is persistent across renders so its zoom/pan survives.
 
-import { AppState, DisplayMode, LabelMode, Sheet, ChordScaleView, DISPLAY_FRETS, TabDestName, ALL_TAB_DESTS } from "./appState";
+import {
+  AppState, DisplayMode, LabelMode, Sheet, ChordScaleView, DISPLAY_FRETS, TabDestName, ALL_TAB_DESTS,
+  ThemeMode, ALL_THEME_MODES, AccentName, ALL_ACCENTS,
+} from "./appState";
 import { icon, IconName } from "./icons";
 import { renderChallengeStatsOverlay } from "./statsOverlay";
 import { FretboardCanvas, FretboardData } from "./fretboardCanvas";
@@ -60,6 +63,34 @@ const TAB_SUBTITLE: Record<TabDestName, string> = {
   Decompose: "Chord-tone breakdown reference",
 };
 
+// Settings → Personalize (Signal T12): Theme Auto resolution + accent swatches.
+
+/** Live OS/browser theme-preference query, polled once via `.matches` and
+ *  subscribed to below (App constructor) so an "Auto" theme mode re-renders
+ *  immediately when the system flips light/dark — no reload needed. */
+const prefersDarkMQL = window.matchMedia("(prefers-color-scheme: dark)");
+
+/** Resolve a persisted Theme mode to the boolean `render()` needs for its
+ *  `.light` class toggle: Light is always light, Dark is always dark, Auto
+ *  follows `prefersDarkMQL` live (mirrors Android's MainActivity theme
+ *  resolution: auto → system, light → false, dark → true). */
+function isLightFor(mode: ThemeMode): boolean {
+  if (mode === "Light") return true;
+  if (mode === "Dark") return false;
+  return !prefersDarkMQL.matches;
+}
+
+/** Settings → Personalize's 5 accent swatches: each [AccentName]'s dark-theme
+ *  hex (style.css `[data-accent]` overrides' `--act` values) — the palette
+ *  always shows dark swatches, paint-chip style, even in light theme. */
+const ACCENT_SWATCH_HEX: Record<AccentName, string> = {
+  coral: "#FF5C57",
+  amber: "#FFB454",
+  teal: "#3DDCC8",
+  blue: "#8AA3FF",
+  purple: "#C98ADF",
+};
+
 export class App {
   private railEl = el("div", { class: "nav-rail" });
   private tabbarEl = el("div", { class: "tabbar" });
@@ -85,6 +116,15 @@ export class App {
   private tunerRefBtns: HTMLButtonElement[] = [];
 
   private toneSheetOpen = false;
+
+  /** Settings → Personalize's Tabs & order editor: the local pending pick,
+   *  distinct from the committed `state.tabOrder` so unchecking one of the 4
+   *  can "free a slot" (3 items) without ever pushing an invalid <4 set to the
+   *  live tab bar — mirrors Android's TabOrderEditor `remember(state.tabOrder)`
+   *  local state. `null` means "mirror state.tabOrder directly" (no pending
+   *  edit); reset to `null` whenever the Settings sheet isn't showing, so a
+   *  transient 3-item edit is dropped on dismiss, same as Android. */
+  private tabOrderPending: TabDestName[] | null = null;
 
   private ear: EarTrainingState;
   private earUI: EarTrainingUI;
@@ -155,6 +195,10 @@ export class App {
     this.setupPressGuard();
     this.setupSpacebarShortcut();
     state.subscribe(() => this.scheduleRender());
+    // Theme mode "Auto" tracks the system live (see isLightFor/render()).
+    prefersDarkMQL.addEventListener("change", () => {
+      if (this.state.themeMode === "Auto") this.scheduleRender();
+    });
     this.render();
     // Deep link: #EarTraining / #Tuner / #Options / … opens that tool on load.
     const hash = location.hash.replace("#", "");
@@ -241,7 +285,9 @@ export class App {
     if (this.rendering) return;
     this.rendering = true;
     // Theme: the light palette is a :root.light override of the CSS variables.
-    document.documentElement.classList.toggle("light", !this.state.darkTheme);
+    // themeMode Dark/Light is static; Auto resolves against the live system
+    // preference (isLightFor / prefersDarkMQL, listened for above).
+    document.documentElement.classList.toggle("light", isLightFor(this.state.themeMode));
     // ACT accent: style.css `[data-accent="..."]` overrides; coral (default) has none.
     if (this.state.accent === "coral") delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = this.state.accent;
@@ -540,6 +586,11 @@ export class App {
    *  currentSheet at all. */
   private renderOverlays(route: Sheet | null): void {
     clear(this.sheetLayer);
+    // The Tabs & order editor's pending pick is local UI state, not part of
+    // AppState — drop any in-flight (<4) edit once the Settings sheet isn't
+    // showing, same as Android's remember-scoped TabOrderEditor being
+    // disposed on dismiss.
+    if (route !== Sheet.Options) this.tabOrderPending = null;
     if (this.moreOpen) {
       this.sheetLayer.appendChild(this.moreSheet());
       if (this.moreStatsOpen) {
@@ -551,7 +602,7 @@ export class App {
       const sheet = el("div", { class: "sheet" });
       sheet.appendChild(el("div", { class: "sheet-grabber" }));
       const header = el("div", { class: "sheet-header" }, [
-        el("h2", {}, [route === Sheet.Fretboard ? "Fretboard" : "Options"]),
+        el("h2", {}, [route === Sheet.Fretboard ? "Fretboard" : "Settings"]),
         btn("✕", () => this.state.closeSheet(), "btn text"),
       ]);
       sheet.appendChild(header);
@@ -706,17 +757,42 @@ export class App {
     ]);
   }
 
+  /** Settings sheet content (Signal T12, mirrors Android's Screens.kt
+   *  OptionsSheet grouping exactly): Personalize (theme/accent/tabs & order/
+   *  left-handed) → Instrument (tuning, unchanged) → Behavior (labels/touch/
+   *  voicing, unchanged) → Tuner (A4 only — ring sustain/strum spread live in
+   *  the Tone sheet, see transport.ts, so aren't duplicated here). */
   private fillOptionsSheet(sheet: HTMLElement): void {
     const s = this.state;
-    // Instrument
-    sheet.appendChild(el("div", { style: "font-weight:600" }, ["Instrument"]));
+
+    // ----- Personalize -----
+    sheet.appendChild(this.sectionLabel("Personalize"));
+
+    sheet.appendChild(labelSm("Theme"));
+    sheet.appendChild(segmented<ThemeMode>(
+      ALL_THEME_MODES.map((m) => ({ value: m, label: m })),
+      s.themeMode, (v) => s.setThemeMode(v),
+    ));
+
+    sheet.appendChild(labelSm("Accent"));
+    sheet.appendChild(this.accentRow());
+
+    sheet.appendChild(labelSm("Tabs & order"));
+    sheet.appendChild(el("div", { class: "settings-hint" }, ["Pick 4 tabs; everything else lives in More"]));
+    sheet.appendChild(this.tabOrderEditor());
+
+    sheet.appendChild(switchRow("Left-handed", null, s.leftHanded, (v) => s.toggleLeftHanded(v)));
+
+    sheet.appendChild(el("div", { class: "divider-line" }));
+
+    // ----- Instrument (unchanged) -----
+    sheet.appendChild(this.sectionLabel("Instrument"));
     sheet.appendChild(el("div", { class: "v-gap-8" }));
     sheet.appendChild(segmented<Instrument>(
       [Instrument.Guitar, Instrument.Cavaquinho].map((i) => ({ value: i, label: InstrumentInfo[i].displayName })),
       s.instrument, (v) => s.setInstrument(v),
     ));
 
-    // Tuning
     sheet.appendChild(labelSm("Tuning"));
     const presets = [...Tunings.presetsFor(s.instrument).entries()];
     sheet.appendChild(chipRow(
@@ -746,12 +822,10 @@ export class App {
 
     sheet.appendChild(el("div", { class: "divider-line" }));
 
-    // Display
-    sheet.appendChild(el("div", { style: "font-weight:600" }, ["Display"]));
+    // ----- Behavior (unchanged, minus the dark-theme switch — moved to Personalize) -----
+    sheet.appendChild(this.sectionLabel("Behavior"));
     sheet.appendChild(labelSm("Labels on dots"));
     sheet.appendChild(this.labelModeSeg());
-    sheet.appendChild(switchRow("Left-handed", null, s.leftHanded, (v) => s.toggleLeftHanded(v)));
-    sheet.appendChild(switchRow("Dark theme", null, s.darkTheme, (v) => s.toggleDarkTheme(v)));
     sheet.appendChild(switchRow(
       "Play note on touch-down",
       "Off (default): notes play on tap-release, so swiping the neck won't sound a note. On: notes fire the instant you touch.",
@@ -765,14 +839,89 @@ export class App {
 
     sheet.appendChild(el("div", { class: "divider-line" }));
 
-    // Tuner & audio
-    sheet.appendChild(el("div", { style: "font-weight:600" }, ["Tuner & audio"]));
+    // ----- Tuner (A4 reference only; ring sustain/strum spread moved to Tone sheet in T6) -----
+    sheet.appendChild(this.sectionLabel("Tuner"));
     sheet.appendChild(el("div", { style: "margin-top:6px" }, [`A4 reference: ${s.a4Hz} Hz`]));
     sheet.appendChild(slider(435, 445, s.a4Hz, (v) => s.setA4Hz(v)));
-    sheet.appendChild(el("div", {}, [`Ring sustain: ${(s.ringSustainMs / 1000).toFixed(1)} s`]));
-    sheet.appendChild(slider(300, 4000, s.ringSustainMs, (v) => s.setRingSustainMs(v)));
-    sheet.appendChild(el("div", {}, [s.strumMs === 0 ? "Strum spread: struck at once" : `Strum spread: ${s.strumMs} ms`]));
-    sheet.appendChild(slider(0, 150, s.strumMs, (v) => s.setStrumMs(v)));
+  }
+
+  private sectionLabel(text: string): HTMLElement {
+    return el("div", { class: "section-label" }, [text]);
+  }
+
+  /** Settings → Personalize's 5 ACT-accent swatches: each circle is
+   *  [ACCENT_SWATCH_HEX]'s dark color; the selected swatch gets a ring.
+   *  Applies immediately via `AppState.setAccent` (no "Done" step) — mirrors
+   *  Android's AccentRow exactly. */
+  private accentRow(): HTMLElement {
+    const s = this.state;
+    const row = el("div", { class: "accent-row" });
+    for (const a of ALL_ACCENTS) {
+      const swatch = el("button", {
+        class: a === s.accent ? "accent-swatch selected" : "accent-swatch",
+        style: `background-color:${ACCENT_SWATCH_HEX[a]}`,
+        "aria-label": `${a} accent`,
+        "aria-pressed": a === s.accent ? "true" : "false",
+      });
+      swatch.addEventListener("click", () => s.setAccent(a));
+      row.appendChild(swatch);
+    }
+    return row;
+  }
+
+  /** Settings → Personalize's Tabs & order editor: pick exactly 4 of the 6
+   *  [ALL_TAB_DESTS] candidates for the bottom tab bar/rail, reorder the
+   *  picked ones with up/down buttons. See `tabOrderPending`'s doc comment
+   *  for the local-pending-list rationale; mirrors Android's TabOrderEditor. */
+  private tabOrderEditor(): HTMLElement {
+    const s = this.state;
+    const pending = this.tabOrderPending ?? s.tabOrder;
+    const commit = (next: TabDestName[]): void => {
+      if (next.length === 4) {
+        this.tabOrderPending = null;
+        s.setTabOrder(next); // persists + notifies (schedules its own render)
+      } else {
+        this.tabOrderPending = next;
+        this.scheduleRender();
+      }
+    };
+    const swapped = (i: number, j: number): TabDestName[] => {
+      const next = pending.slice();
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    };
+
+    const wrap = el("div", { class: "tab-order-editor" });
+    pending.forEach((dest, idx) => {
+      const cb = el("input", { type: "checkbox" });
+      cb.checked = true;
+      cb.addEventListener("change", () => commit(pending.filter((d) => d !== dest)));
+
+      const up = el("button", { class: "btn tab-order-btn", "aria-label": `Move ${TAB_LABEL[dest]} up` }, [icon("chevronUp", 18)]);
+      up.disabled = idx === 0;
+      up.addEventListener("click", () => commit(swapped(idx, idx - 1)));
+
+      const down = el("button", { class: "btn tab-order-btn", "aria-label": `Move ${TAB_LABEL[dest]} down` }, [icon("chevronDown", 18)]);
+      down.disabled = idx === pending.length - 1;
+      down.addEventListener("click", () => commit(swapped(idx, idx + 1)));
+
+      wrap.appendChild(el("div", { class: "tab-order-row" }, [
+        cb, icon(TAB_ICON[dest], 18), el("span", { class: "tab-order-label" }, [TAB_LABEL[dest]]), up, down,
+      ]));
+    });
+
+    const unpicked = ALL_TAB_DESTS.filter((d) => !pending.includes(d));
+    for (const dest of unpicked) {
+      const canAdd = pending.length < 4;
+      const cb = el("input", { type: "checkbox" });
+      cb.checked = false;
+      cb.disabled = !canAdd;
+      cb.addEventListener("change", () => { if (canAdd) commit([...pending, dest]); });
+      wrap.appendChild(el("div", { class: canAdd ? "tab-order-row" : "tab-order-row disabled" }, [
+        cb, icon(TAB_ICON[dest], 18), el("span", { class: "tab-order-label" }, [TAB_LABEL[dest]]),
+      ]));
+    }
+    return wrap;
   }
 
   private tuningEditor(): HTMLElement {
@@ -942,7 +1091,7 @@ export class App {
     switch (s) {
       case Sheet.Fretboard: return "Fretboard";
       case Sheet.Loop: return "Loop";
-      case Sheet.Options: return "Options";
+      case Sheet.Options: return "Settings";
       case Sheet.Tuner: return "Tuner";
       case Sheet.EarTraining: return "Ear";
       case Sheet.SambaLooper: return "Drums";

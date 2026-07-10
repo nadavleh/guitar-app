@@ -23,6 +23,7 @@ export type IconName =
   | "tune"
   | "eq"
   | "chevronDown"
+  | "chevronUp"
   | "waves"
   | "spread"
   | "timer"
@@ -60,6 +61,8 @@ const PATH: Record<IconName, string> = {
   // Tone sheet row icons.
   eq: '<line x1="5" y1="21" x2="5" y2="10"/><line x1="12" y1="21" x2="12" y2="4"/><line x1="19" y1="21" x2="19" y2="14"/><circle cx="5" cy="7" r="1.6"/><circle cx="12" cy="14" r="1.6"/><circle cx="19" cy="10" r="1.6"/>',
   chevronDown: '<polyline points="6 9 12 15 18 9"/>',
+  // Tabs & order editor's reorder buttons (Signal T12): pairs with chevronDown.
+  chevronUp: '<polyline points="6 15 12 9 18 15"/>',
   waves: '<path d="M2 13c2.2-4 4.4-4 6.6 0s4.4 4 6.6 0 4.4-4 6.6 0"/><path d="M2 18c2.2-4 4.4-4 6.6 0s4.4 4 6.6 0 4.4-4 6.6 0"/>',
   spread: '<line x1="4" y1="12" x2="20" y2="12"/><polyline points="8 6 4 12 8 18"/><polyline points="16 6 20 12 16 18"/>',
   timer: '<circle cx="12" cy="13" r="8"/><line x1="12" y1="13" x2="12" y2="9"/><line x1="12" y1="13" x2="15" y2="15"/><line x1="9" y1="3" x2="15" y2="3"/><line x1="12" y1="3" x2="12" y2="5"/>',

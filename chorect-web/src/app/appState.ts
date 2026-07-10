@@ -76,7 +76,17 @@ const LS_KEY = "chorect-web.v1";
  *  and app/.../Theme.kt `Accent`). "coral" is the default and maps to no
  *  `data-accent` attribute at all. */
 export type AccentName = "coral" | "amber" | "teal" | "blue" | "purple";
-const ACCENT_NAMES: readonly AccentName[] = ["coral", "amber", "teal", "blue", "purple"];
+export const ALL_ACCENTS: readonly AccentName[] = ["coral", "amber", "teal", "blue", "purple"];
+
+/** UI theme mode (Settings' Personalize section). "Auto" follows the OS/browser
+ *  `prefers-color-scheme` live (see ui.ts's `matchMedia` listener); mirrors
+ *  Android's `ThemeMode` enum + `theme_mode` pref exactly, so the persisted
+ *  string round-trips identically on both platforms. */
+export type ThemeMode = "Dark" | "Light" | "Auto";
+export const ALL_THEME_MODES: readonly ThemeMode[] = ["Dark", "Light", "Auto"];
+function isThemeMode(v: unknown): v is ThemeMode {
+  return typeof v === "string" && (ALL_THEME_MODES as readonly string[]).includes(v);
+}
 
 /** One user-configurable tab destination — names mirror Android's `TabDest`
  *  enum (Shell.kt) EXACTLY, so a tab-order value round-trips identically on
@@ -95,6 +105,7 @@ interface Persisted {
   labelMode: string;
   leftHanded: boolean;
   darkTheme: boolean;
+  themeMode: string;
   accent: string;
   tabOrder: string[];
   voicingShell: boolean;
@@ -124,8 +135,13 @@ export class AppState {
   labelMode = LabelMode.Intervals;
   selectedPosition: FretPosition | null = null;
   leftHanded = false;
-  /** UI theme; dark is the original look. */
+  /** UI theme; dark is the original look. Dead now that `themeMode` drives the
+   *  UI (Settings' Theme segmented) — kept only as the migration fallback's
+   *  source (see `load()`), mirroring Android's AppState.darkTheme. */
   darkTheme = true;
+  /** UI theme mode (Settings' Personalize section): Dark/Light/Auto. "Auto"
+   *  resolves against `prefers-color-scheme` in ui.ts's render(). */
+  themeMode: ThemeMode = "Dark";
   /** ACT accent (Personalize / Settings). "coral" is the default. */
   accent: AccentName = "coral";
   /** User-configurable tab set + order (Settings' "Tabs & order" editor); the
@@ -205,7 +221,15 @@ export class AppState {
       if (p.labelMode && p.labelMode in LabelMode) this.labelMode = p.labelMode as LabelMode;
       if (typeof p.leftHanded === "boolean") this.leftHanded = p.leftHanded;
       if (typeof p.darkTheme === "boolean") this.darkTheme = p.darkTheme;
-      if (typeof p.accent === "string" && (ACCENT_NAMES as readonly string[]).includes(p.accent)) {
+      // themeMode migration: prefer the new field; if this profile predates it,
+      // fall back to the old boolean flag (mirrors Android's TuningRepository
+      // theme_mode/dark_theme fallback).
+      if (typeof p.themeMode === "string" && isThemeMode(p.themeMode)) {
+        this.themeMode = p.themeMode;
+      } else if (typeof p.darkTheme === "boolean") {
+        this.themeMode = p.darkTheme ? "Dark" : "Light";
+      }
+      if (typeof p.accent === "string" && (ALL_ACCENTS as readonly string[]).includes(p.accent)) {
         this.accent = p.accent as AccentName;
       }
       if (Array.isArray(p.tabOrder)) {
@@ -261,6 +285,7 @@ export class AppState {
       labelMode: this.labelMode,
       leftHanded: this.leftHanded,
       darkTheme: this.darkTheme,
+      themeMode: this.themeMode,
       accent: this.accent,
       tabOrder: this.tabOrder,
       voicingShell: this.voicingStyle === VoicingStyle.Shell,
@@ -392,6 +417,10 @@ export class AppState {
   setLabelMode(m: LabelMode): void { this.commit(() => { this.labelMode = m; }); }
   toggleLeftHanded(v: boolean): void { this.commit(() => { this.leftHanded = v; }); }
   toggleDarkTheme(v: boolean): void { this.commit(() => { this.darkTheme = v; }); }
+  /** Persist the chosen Theme mode (Personalize's segmented Dark/Light/Auto).
+   *  Resolving "Auto" against the live system preference happens in ui.ts's
+   *  render() (a DOM/`matchMedia` concern, not state). */
+  setThemeMode(m: ThemeMode): void { this.commit(() => { this.themeMode = m; }); }
   /** Persist the chosen ACT accent and apply it immediately: coral (the
    *  default) clears `[data-accent]` entirely (style.css's un-attributed
    *  `:root` rules already are coral); any other accent sets the attribute so
