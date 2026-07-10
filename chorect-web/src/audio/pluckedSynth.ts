@@ -100,11 +100,13 @@ export class PluckedSynth {
       output[i] = amplitude * mix;
     }
 
-    // 50ms linear fade-out so the last sample ends at 0 (no click).
-    const fadeSamples = Math.min(Math.floor(this.sampleRate * 0.05), numSamples);
+    // Release fade-out so the note ends silently. A long (up to 350 ms, or 30% of the
+    // note if shorter) SMOOTHSTEP ramp — the old 50 ms linear fade cut the still-ringing
+    // string audibly short; this tapers it like a natural decay. (Mirrors PluckedSynth.kt.)
+    const fadeSamples = Math.max(1, Math.min(Math.floor(this.sampleRate * 0.35), Math.floor(numSamples * 0.3)));
     for (let i = 0; i < fadeSamples; i++) {
-      const mult = i / fadeSamples;
-      output[numSamples - 1 - i] *= mult;
+      const t = i / fadeSamples;
+      output[numSamples - 1 - i] *= t * t * (3 - 2 * t); // smoothstep: no corner at either end
     }
     return output;
   }

@@ -109,13 +109,15 @@ class PluckedSynth(val sampleRate: Int = 48000) {
             output[i] = (amplitude * mix).toFloat()
         }
 
-        // 50ms linear fade-out so the very last sample ends at 0 (no click).
-        // For loop index i: 0 maps to the very last sample (mult = 0), fadeSamples-1 maps
-        // to the first sample of the fade region (mult ≈ 1).
-        val fadeSamples = (sampleRate * 0.05).toInt().coerceAtMost(numSamples)
+        // Release fade-out so the note ends silently. A long (up to 350 ms, or 30% of
+        // the note if shorter) SMOOTHSTEP ramp — the old 50 ms linear fade cut the
+        // still-ringing string audibly short; this tapers it like a natural decay.
+        // For loop index i: 0 maps to the very last sample (mult = 0), fadeSamples-1
+        // maps to the first sample of the fade region (mult ≈ 1).
+        val fadeSamples = minOf((sampleRate * 0.35).toInt(), (numSamples * 3) / 10).coerceAtLeast(1)
         for (i in 0 until fadeSamples) {
-            val mult = i.toFloat() / fadeSamples
-            output[numSamples - 1 - i] *= mult
+            val t = i.toFloat() / fadeSamples
+            output[numSamples - 1 - i] *= t * t * (3f - 2f * t)   // smoothstep: no corner at either end
         }
         return output
     }

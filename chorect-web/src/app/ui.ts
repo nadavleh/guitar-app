@@ -6,7 +6,7 @@ import { AppState, DisplayMode, LabelMode, Sheet, ChordScaleView, DISPLAY_FRETS 
 import { FretboardCanvas, FretboardData } from "./fretboardCanvas";
 import { computeMarks, scaleInfo, intervalName, shapeMarks } from "./marks";
 import { TunerState } from "./tunerState";
-import { EarTrainingState } from "./earTrainingState";
+import { EarTrainingState, EarSubMode } from "./earTrainingState";
 import { EarTrainingUI } from "./earTrainingUI";
 import { SambaLooperState } from "./sambaLooperState";
 import { SambaLooperUI } from "./sambaLooperUI";
@@ -126,6 +126,7 @@ export class App {
     root.appendChild(shell);
     root.appendChild(this.sheetLayer);
     this.setupPressGuard();
+    this.setupSpacebarShortcut();
     state.subscribe(() => this.scheduleRender());
     this.render();
     // Deep link: #EarTraining / #Tuner / #Options / … opens that tool on load.
@@ -171,6 +172,29 @@ export class App {
     };
     window.addEventListener("pointerup", release, true);
     window.addEventListener("pointercancel", release, true);
+  }
+
+  /** #8: spacebar toggles play/stop of the active screen's loop — the drum looper,
+   *  the chord Loop, and the ear-training progression loop. Ignored while typing in
+   *  an input. preventDefault also stops the page scrolling and stops a still-focused
+   *  Play button from re-activating (which would double-toggle). */
+  private setupSpacebarShortcut(): void {
+    document.addEventListener("keydown", (e) => {
+      if (e.code !== "Space" || e.repeat) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      const sheet = this.state.currentSheet;
+      if (sheet === Sheet.SambaLooper) {
+        e.preventDefault();
+        if (this.samba.isPlaying) this.samba.stop(); else this.samba.start();
+      } else if (sheet === Sheet.Loop) {
+        e.preventDefault();
+        if (this.loop.isLooping) this.loop.stopLoop(); else this.loop.startLoop();
+      } else if (sheet === Sheet.EarTraining && this.ear.progSubMode === EarSubMode.Progression) {
+        e.preventDefault();
+        if (this.ear.isLooping) this.ear.stopLoop(); else this.ear.startLoop();
+      }
+    });
   }
 
   /** Coalesced, press-aware render request. Prefer this over render() for state changes. */

@@ -425,6 +425,9 @@ export class EarTrainingUI {
     parent.appendChild(slider(10, 300, ear.progBpm, (v) => { ear.progBpm = Math.round(v); this.rerender(); }));
     parent.appendChild(el("div", { class: "et-muted" }, [s.strumMs === 0 ? "Strum: struck at once" : `Strum: ${s.strumMs} ms`]));
     parent.appendChild(slider(0, 150, s.strumMs, (v) => s.setStrumMs(v)));
+    // #5: make the chord's root stand out of the strum — it plays separately and louder.
+    parent.appendChild(switchRow("Boost root note", "Play each chord's root louder so it cuts through",
+      ear.earBoostTonic, (v) => { ear.earBoostTonic = v; this.rerender(); }));
   }
 
   private fretboardPanel(parent: HTMLElement): void {
@@ -529,8 +532,12 @@ export class EarTrainingUI {
       return;
     }
 
+    // #7: ← Prev (left of Next) restores the previously generated progression.
+    const prevBtn = btn("← Prev", () => ear.previousProgression());
+    prevBtn.disabled = !ear.canGoPrevProgression;
     parent.appendChild(el("div", { class: "et-row-gap" }, [
       ear.isLooping ? btn("Stop ⏹", () => ear.stopLoop(), "btn primary") : btn("Play ▶", () => ear.startLoop(), "btn primary"),
+      prevBtn,
       btn("Next →", () => ear.nextProgression()),
       btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
       btn("→ Looper", () => this.onToLooper(ear.progResolved.map((rc) => rc.symbol))),
@@ -575,7 +582,7 @@ export class EarTrainingUI {
   private progressionChallenge(parent: HTMLElement): void {
     const ear = this.ear, s = this.state;
     if (!ear.challengeActive) {
-      parent.appendChild(el("div", { class: "et-muted" }, ["A challenge is 15 progressions in a row. Listen, then tap the correct Roman numeral for each bar (and its extension when shown). Each question auto-scores; your total appears at the end."]));
+      parent.appendChild(el("div", { class: "et-muted" }, [`A challenge is ${ear.challengeTotal} progressions in a row. Listen, then tap the correct Roman numeral for each bar (and its extension when shown). Each question auto-scores; your total appears at the end.`]));
       parent.appendChild(el("div", { class: "v-gap-12" }));
       this.progressionSettings(parent);
       parent.appendChild(el("div", { class: "v-gap-12" }));
@@ -849,8 +856,12 @@ export class EarTrainingUI {
       parent.appendChild(btn("Generate progression ▶", () => ear.nextAdvancedProgression(), "btn primary"));
       return;
     }
+    // #7: ← Prev (left of Next) restores the previously generated progression.
+    const advPrevBtn = btn("← Prev", () => ear.previousAdvancedProgression());
+    advPrevBtn.disabled = !ear.canGoPrevAdvanced;
     parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:8px" }, [
       ear.isLooping ? btn("Stop ⏹", () => ear.stopLoop(), "btn primary") : btn("Play ▶", () => ear.startLoop(), "btn primary"),
+      advPrevBtn,
       btn("Next →", () => ear.nextAdvancedProgression()),
     ]));
     parent.appendChild(this.transposeRow());

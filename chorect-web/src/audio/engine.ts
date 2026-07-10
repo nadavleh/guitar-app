@@ -312,7 +312,10 @@ export class WebAudioEngine {
           pitchRate(midiNote, root),
           panForMidi(midiNote),
           this.voiceReverbSend,
-          1.0,
+          // Samples ignore the synth's amplitude param, so map it to voice level
+          // (0.6 = the Timbre default = unity) — keeps per-timbre level differences
+          // (e.g. the ear-training root boost) audible on samples.
+          timbre.amplitude / 0.6,
           timbre.releaseMs,
         );
         return;
@@ -337,7 +340,7 @@ export class WebAudioEngine {
           pitchRate(midiNote, root),
           0,
           this.voiceReverbSend,
-          1.0,
+          timbre.amplitude / 0.6, // amplitude → level (0.6 = unity); see playNote
           timbre.releaseMs,
         );
         return;
@@ -370,7 +373,7 @@ export class WebAudioEngine {
             pitchRate(midi, root),
             panForMidi(midi),
             this.voiceReverbSend,
-            level,
+            level * (timbre.amplitude / 0.6), // amplitude → level (0.6 = unity); see playNote
             timbre.releaseMs,
             startAt,
           );

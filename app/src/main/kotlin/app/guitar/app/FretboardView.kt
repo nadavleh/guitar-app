@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -84,6 +85,21 @@ private const val FRET_NUMBER_DP = 18   // extra height below for fret-number ro
  * still uses the Canvas's un-transformed coordinate space — Compose maps pointer
  * coordinates back through the layer for us, and [pixelToPosition] is unchanged.
  */
+/**
+ * Hoistable zoom/pan state for [FretboardView]. Hold one per logical fretboard (e.g.
+ * in a screen-level state object) and pass it in, so hiding/showing the view — which
+ * removes it from composition — no longer resets the user's zoom. [initializedFor]
+ * records the orientation the camera was last framed for; the view re-frames it when
+ * the orientation changes (replacing the old `remember(portrait)` reset).
+ */
+@Stable
+class FretboardCamera {
+    var initializedFor: Boolean? = null
+    var scale by mutableFloatStateOf(1f)
+    var offsetX by mutableFloatStateOf(0f)
+    var offsetY by mutableFloatStateOf(0f)
+}
+
 @Composable
 fun FretboardView(
     tuning: Tuning,
@@ -100,6 +116,10 @@ fun FretboardView(
     /** String indices (0 = lowest pitch) marked as muted (X). Drawn as a red ✕ at
      *  the nut, like a chord diagram, and excluded from any strum. */
     mutedStrings: Set<Int> = emptySet(),
+    /** Optional hoisted zoom/pan state. Pass a caller-owned [FretboardCamera] to keep
+     *  the zoom across this view leaving composition (e.g. a show/hide toggle); when
+     *  null the camera lives (and dies) with the composable, as before. */
+    camera: FretboardCamera? = null,
 ) {
     val measurer = rememberTextMeasurer()
 
@@ -153,12 +173,16 @@ fun FretboardView(
         val portrait = boxHpx > boxWpx
         val initialScale = if (portrait) minOf(maxScale, 2.2f) else 1f
 
-        // Zoom/pan state, keyed on `portrait` so a rotation re-frames sensibly.
-        var scale by remember(portrait) { mutableFloatStateOf(initialScale) }
-        var offsetX by remember(portrait) {
-            mutableFloatStateOf(if (portrait) canvasWpx * (initialScale - 1f) / 2f else 0f)
+        // Zoom/pan state — hoistable via [camera] so callers can keep it across
+        // hide/show. Re-framed when the orientation flips (or on first use), which
+        // replaces the old `remember(portrait)` keying.
+        val cam = camera ?: remember { FretboardCamera() }
+        if (cam.initializedFor != portrait) {
+            cam.scale = initialScale
+            cam.offsetX = if (portrait) canvasWpx * (initialScale - 1f) / 2f else 0f
+            cam.offsetY = 0f
+            cam.initializedFor = portrait
         }
-        var offsetY by remember(portrait) { mutableFloatStateOf(0f) }
 
         // Pinch/drag over the WHOLE allotted area — including the empty letterbox
         // margins above/below the short neck — so the user need not pinch precisely
@@ -168,15 +192,15 @@ fun FretboardView(
         // pixel translations line up even though the gesture sees the larger box.
         val zoomModifier = Modifier.pointerInput(minScale, maxScale, canvasWpx, canvasHpx) {
             detectTransformGestures { centroid, pan, zoom, _ ->
-                val oldScale = scale
+                val oldScale = cam.scale
                 val newScale = (oldScale * zoom).coerceIn(minScale, maxScale)
                 val cx = size.width / 2f
                 val cy = size.height / 2f
-                scale = newScale
+                cam.scale = newScale
                 val maxX = max(0f, canvasWpx * (newScale - 1f) / 2f)
                 val maxY = max(0f, canvasHpx * (newScale - 1f) / 2f)
-                offsetX = (offsetX + pan.x + (centroid.x - cx) * (oldScale - newScale)).coerceIn(-maxX, maxX)
-                offsetY = (offsetY + pan.y + (centroid.y - cy) * (oldScale - newScale)).coerceIn(-maxY, maxY)
+                cam.offsetX = (cam.offsetX + pan.x + (centroid.x - cx) * (oldScale - newScale)).coerceIn(-maxX, maxX)
+                cam.offsetY = (cam.offsetY + pan.y + (centroid.y - cy) * (oldScale - newScale)).coerceIn(-maxY, maxY)
             }
         }
 
@@ -188,10 +212,10 @@ fun FretboardView(
             modifier = Modifier
                 .aspectRatio(neckAspect)
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    translationX = offsetX
-                    translationY = offsetY
+                    scaleX = cam.scale
+                    scaleY = cam.scale
+                    translationX = cam.offsetX
+                    translationY = cam.offsetY
                 }
                 .then(tapModifier)
         ) {

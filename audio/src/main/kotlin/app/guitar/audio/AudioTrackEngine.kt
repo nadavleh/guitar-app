@@ -127,6 +127,10 @@ class AudioTrackEngine(
             if (inst != null) {
                 addVoiceSource(
                     SampleSource(inst, midiNote),
+                    // Samples ignore the synth's amplitude param, so map it to voice
+                    // gain (0.6 = the Timbre default = unity) — keeps per-timbre level
+                    // differences (e.g. the ear-training root boost) audible on samples.
+                    gain = (timbre.amplitude / 0.6).toFloat(),
                     pan = Panner.forMidi(midiNote),
                     reverbSend = voiceReverbSend,
                     releaseMs = timbre.releaseMs,
@@ -169,7 +173,8 @@ class AudioTrackEngine(
             val inst = voiceInstrument
             if (inst != null) {
                 val midi = Math.round(69 + 12 * (Math.log(freqHz.toDouble() / 440.0) / Math.log(2.0))).toInt().coerceIn(0, 127)
-                addVoiceSource(SampleSource(inst, midi), reverbSend = voiceReverbSend, releaseMs = timbre.releaseMs)
+                addVoiceSource(SampleSource(inst, midi), gain = (timbre.amplitude / 0.6).toFloat(),
+                    reverbSend = voiceReverbSend, releaseMs = timbre.releaseMs)
                 return@execute
             }
             val samples = synth.synthesizeFrequency(
@@ -192,6 +197,9 @@ class AudioTrackEngine(
         val gain = (1.0 / kotlin.math.sqrt(notes.size.toDouble())).toFloat()
         synthesizer.execute {
             val inst = voiceInstrument
+            // Samples ignore the synth's amplitude param, so fold it into the voice
+            // gain (0.6 = the Timbre default = unity); synth buffers already bake it in.
+            val voiceGain = if (inst != null) (gain * timbre.amplitude / 0.6).toFloat() else gain
             notes.forEachIndexed { i, midi ->
                 val source: VoiceSource = if (inst != null) SampleSource(inst, midi)
                     else BufferSource(synth.synthesize(
@@ -202,7 +210,7 @@ class AudioTrackEngine(
                 mixer.addAndCap(
                     MixVoice(
                         source,
-                        gain,
+                        voiceGain,
                         strumFrames * i,
                         AmpEnvelope(sampleRate, 3.0, timbre.releaseMs.toDouble()),
                         reverbSend = voiceReverbSend,

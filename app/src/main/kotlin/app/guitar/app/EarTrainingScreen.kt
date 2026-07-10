@@ -286,6 +286,11 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
             } else {
                 Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
             }
+            // #7: ← Prev restores the previously generated progression (reveals reset).
+            OutlinedButton(
+                onClick = { ear.previousProgression() },
+                enabled = ear.canGoPrevProgression,
+            ) { Text("← Prev") }
             OutlinedButton(onClick = { ear.nextProgression() }) { Text("Next →") }
             // #1: hear the tonic — plays I-V-I (or i-V-i) in the current key.
             OutlinedButton(onClick = { ear.playProgKeyCadence() }) { Text("Hear ${ear.progCadenceLabel()}") }
@@ -363,6 +368,8 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
                     },
                     numFrets = DISPLAY_FRETS,
                     leftHanded = state.leftHanded,
+                    // Hoisted camera: keeps the zoom when the panel is toggled off/on.
+                    camera = ear.progFretboardCamera,
                 )
             }
         }
@@ -498,6 +505,17 @@ private fun TempoStrumSliders(state: AppState, ear: EarTrainingState) {
             onValueChange = { state.setStrumMs(it.toInt()) },
             valueRange = 0f..150f,
         )
+        // #5: make the chord's root stand out of the strum — it plays separately
+        // and louder than the other voices.
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Boost root note", style = MaterialTheme.typography.bodyMedium)
+                Text("Play each chord's root louder so it cuts through",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = ear.earBoostTonic, onCheckedChange = { ear.earBoostTonic = it })
+        }
     }
 }
 
@@ -1116,12 +1134,12 @@ private fun SimpleDoneCard(score: Int, total: Int, onRestart: () -> Unit, onExit
 // -------- Progression Challenge view --------
 
 /**
- * Auto-scored 15-question quiz. Each question is a fresh random progression
- * generated under the same settings as the Progressions sub-mode (Major/Minor
- * include flags + Triads / 7ths / Extended). For each bar the user taps the
- * correct Roman numeral (and extension, when the level has one); the question
- * scores a point only if all four bars are right. After 15 questions a final
- * score screen is shown with a Restart button.
+ * Auto-scored quiz of [EarTrainingState.challengeTotal] questions. Each question is a
+ * fresh random progression generated under the same settings as the Progressions
+ * sub-mode (Major/Minor include flags + Triads / 7ths / Extended). For each bar the
+ * user taps the correct Roman numeral (and extension, when the level has one); the
+ * question scores a point only if all four bars are right. After the last question a
+ * final score screen is shown with a Restart button.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -1134,7 +1152,7 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         if (!ear.challengeActive) {
             // ---- title / config screen ----
             Text(
-                "A challenge is 15 progressions in a row. Listen, then tap the correct " +
+                "A challenge is ${ear.challengeTotal} progressions in a row. Listen, then tap the correct " +
                     "Roman numeral for each bar (and its extension when shown). Each " +
                     "question auto-scores; your total appears at the end.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -1174,18 +1192,24 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         }
 
         // ---- in-flight question screen ----
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        // #1: a FlowRow, not a Row — on narrow phones the old single-line row pushed
+        // the Restart/Quit buttons off-screen; now they wrap to a second line instead.
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
             Text(
                 "Question ${ear.challengeIndex + 1} / ${ear.challengeTotal}",
                 style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.align(Alignment.CenterVertically),
             )
             Text(
                 "Score: ${ear.challengeBarScore} bars",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.align(Alignment.CenterVertically),
             )
-            Spacer(Modifier.width(4.dp))
             TextButton(onClick = { ear.startChallenge() }) { Text("Restart") }
             TextButton(onClick = { ear.exitChallenge() }) { Text("Quit") }
         }
@@ -1347,6 +1371,8 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                     },
                     numFrets = DISPLAY_FRETS,
                     leftHanded = state.leftHanded,
+                    // Hoisted camera: keeps the zoom when the panel is toggled off/on.
+                    camera = ear.progFretboardCamera,
                 )
             }
         }
@@ -1550,7 +1576,7 @@ private fun ChallengeDoneCard(
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Spacer(Modifier.height(12.dp))
-            // Per-question dot strip (wraps so all 15 fit on a narrow screen)
+            // Per-question dot strip (wraps so all the questions fit on a narrow screen)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -1744,6 +1770,11 @@ private fun AdvancedProgressionView(ear: EarTrainingState) {
         ) {
             if (ear.isLooping) Button(onClick = { ear.stopLoop() }) { Text("Stop ⏹") }
             else Button(onClick = { ear.startLoop() }) { Text("Play ▶") }
+            // #7: ← Prev restores the previously generated progression (reveal reset).
+            OutlinedButton(
+                onClick = { ear.previousAdvancedProgression() },
+                enabled = ear.canGoPrevAdvanced,
+            ) { Text("← Prev") }
             OutlinedButton(onClick = { ear.nextAdvancedProgression() }) { Text("Next →") }
         }
         Spacer(Modifier.height(10.dp))

@@ -78,6 +78,10 @@ export class EarTrainingState {
   hasGenerated = false;
 
   showFretboard = false;
+
+  /** Boost the ROOT of each ear-training chord: it is played separately and louder
+   *  than the other voices, so the bass note stands out of the strum. */
+  earBoostTonic = false;
   currentPlayingShape: ChordShape | null = null;
   lastShownShape: ChordShape | null = null;
 
@@ -121,7 +125,38 @@ export class EarTrainingState {
 
   // ---------- Progression trainer ----------
 
+  // ← Previous history (practice only): each "Next" pushes the outgoing progression
+  // so ← Prev can bring it back (reveals reset — it returns as a fresh quiz).
+  // Challenge questions are NOT recorded (the challenge has its own per-question Prev).
+  private diatonicHistory: { prog: Progression; key: PitchClass; mode: TrainingMode; resolved: ResolvedChord[] }[] = [];
+  get canGoPrevProgression(): boolean { return this.diatonicHistory.length > 0; }
+
+  /** Restore the previously generated diatonic practice progression. */
+  previousProgression() {
+    const snap = this.diatonicHistory.pop();
+    if (!snap) return;
+    this.progKey = snap.key;
+    this.progMode = snap.mode;
+    this.progProgression = snap.prog;
+    this.progResolved = snap.resolved;
+    this.progTranspose = 0;
+    this.progBarRevealed = new Set();
+    this.keyRevealed = false;
+    this.modeRevealed = false;
+    this.currentBar = 0;
+    this.prevPlayedShape = null;
+    if (this.isLooping) { this.stopLoop(); this.startLoop(); }
+    this.notify();
+  }
+
   nextProgression() {
+    // Record the outgoing progression for ← Prev (practice only; cap the stack).
+    if (this.earMode === EarMode.Practice && this.progProgression) {
+      this.diatonicHistory.push({
+        prog: this.progProgression, key: this.progKey, mode: this.progMode, resolved: this.progResolved,
+      });
+      while (this.diatonicHistory.length > 20) this.diatonicHistory.shift();
+    }
     const candidates: TrainingMode[] = [];
     if (this.includeMajor) candidates.push(TrainingMode.Major);
     if (this.includeMinor) candidates.push(TrainingMode.Minor);
@@ -194,9 +229,8 @@ export class EarTrainingState {
     this.prevPlayedShape = shape;
     this.lastShownShape = shape;
     this.currentBar = idx;
-    const midis = shape.notes.filter((n) => n !== null).map((n) => n!.midi);
-    if (midis.length === 0) return;
-    this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), Timbres.Clarity);
+    // Deduped voicing (never a full barre) + optional root boost.
+    this.playEarChord(this.earMidis(shape), root, this.deps.sustainProvider());
     this.notify();
   }
 
@@ -256,6 +290,39 @@ export class EarTrainingState {
     this.notify();
   }
 
+  /** Thin a guitar voicing for EAR TRAINING playback: keep only the LOWEST occurrence
+   *  of each pitch class, so a 6-string barre grip collapses to its 3–4 distinct chord
+   *  tones instead of sounding all doubled strings at once (a cacophony by ear).
+   *  (Mirrors EarTrainingState.earMidis on Android.) */
+  private earMidis(shape: ChordShape): number[] {
+    const midis = shape.notes.filter((n) => n !== null).map((n) => n!.midi).sort((a, b) => a - b);
+    const seen = new Set<number>();
+    return midis.filter((m) => {
+      const pc = ((m % 12) + 12) % 12;
+      if (seen.has(pc)) return false;
+      seen.add(pc);
+      return true;
+    });
+  }
+
+  /** Sound midis as an ear-training chord. When earBoostTonic is on, the lowest note
+   *  matching rootPc plays separately and louder (and is left out of the strummed
+   *  chord) so the root is clearly audible above the other strings. */
+  private playEarChord(midis: number[], rootPc: number, sustainMs: number) {
+    if (midis.length === 0) return;
+    if (this.earBoostTonic) {
+      const tonics = midis.filter((m) => ((m % 12) + 12) % 12 === rootPc);
+      if (tonics.length > 0) {
+        const tonic = Math.min(...tonics);
+        this.deps.audio.playNote(tonic, sustainMs, { ...Timbres.Clarity, amplitude: 0.95 });
+        const rest = midis.filter((m) => m !== tonic);
+        if (rest.length > 0) this.deps.audio.playChord(rest, this.deps.strumProvider(), sustainMs, Timbres.Clarity);
+        return;
+      }
+    }
+    this.deps.audio.playChord(midis, this.deps.strumProvider(), sustainMs, Timbres.Clarity);
+  }
+
   private playChordOnce(symbol: string, barMs: number) {
     const parsed = parseChord(symbol);
     if (!parsed) return;
@@ -267,7 +334,7 @@ export class EarTrainingState {
       this.currentPlayingShape = null;
       const rootMidi = 52 + root;
       const midis = q.intervals.map((iv) => rootMidi + iv);
-      this.deps.audio.playChord(midis, this.deps.strumProvider(), sustain, Timbres.Clarity);
+      this.playEarChord(midis, root, sustain);
       return;
     }
     const shape = this.prevPlayedShape == null
@@ -276,9 +343,8 @@ export class EarTrainingState {
     this.prevPlayedShape = shape;
     this.currentPlayingShape = shape;
     this.lastShownShape = shape;
-    const midis = shape.notes.filter((n) => n !== null).map((n) => n!.midi);
-    if (midis.length === 0) return;
-    this.deps.audio.playChord(midis, this.deps.strumProvider(), sustain, Timbres.Clarity);
+    // Deduped voicing (never a full barre) + optional root boost.
+    this.playEarChord(this.earMidis(shape), root, sustain);
   }
 
   playProgChordDirect(idx: number) {
@@ -358,7 +424,7 @@ export class EarTrainingState {
       this.libShape = null;
       const rootMidi = 52 + root;
       const midis = q.intervals.map((iv) => rootMidi + iv);
-      this.deps.audio.playChord(midis, this.deps.strumProvider(), sustain, Timbres.Clarity);
+      this.playEarChord(midis, root, sustain);
       return;
     }
     const shape = this.libPrevShape == null
@@ -366,9 +432,8 @@ export class EarTrainingState {
       : shapes[pickMinMovement(this.libPrevShape, shapes)];
     this.libPrevShape = shape;
     this.libShape = shape;
-    const midis = shape.notes.filter((n) => n !== null).map((n) => n!.midi);
-    if (midis.length === 0) return;
-    this.deps.audio.playChord(midis, this.deps.strumProvider(), sustain, Timbres.Clarity);
+    // Deduped voicing (never a full barre) + optional root boost.
+    this.playEarChord(this.earMidis(shape), root, sustain);
   }
 
   // ---------- Note2Chord ----------
@@ -960,7 +1025,32 @@ export class EarTrainingState {
   setCircleMode(v: boolean) { this.circleMode = v; if (v) { this.advancedMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
   setIiiFocusMode(v: boolean) { this.iiiFocusMode = v; if (v) { this.advancedMode = false; this.circleMode = false; } this.stopLoop(); this.notify(); }
 
+  // ← Previous history for the advanced/circle practice view (mirrors the diatonic one).
+  private advHistory: { np: NamedProgression; key: PitchClass; resolved: ResolvedChord[] }[] = [];
+  get canGoPrevAdvanced(): boolean { return this.advHistory.length > 0; }
+
+  /** Restore the previously generated advanced/circle practice progression. */
+  previousAdvancedProgression() {
+    const snap = this.advHistory.pop();
+    if (!snap) return;
+    this.advProg = snap.np;
+    this.progKey = snap.key;
+    this.progMode = snap.np.tonicMode;
+    this.progProgression = null;
+    this.progResolved = snap.resolved;
+    this.progTranspose = 0;
+    this.advRevealed = false;
+    this.prevPlayedShape = null;
+    if (this.isLooping) { this.stopLoop(); this.startLoop(); }
+    this.notify();
+  }
+
   nextAdvancedProgression() {
+    // Record the outgoing progression for ← Prev (practice only; cap the stack).
+    if (this.earMode === EarMode.Practice && this.advProg) {
+      this.advHistory.push({ np: this.advProg, key: this.progKey, resolved: this.progResolved });
+      while (this.advHistory.length > 20) this.advHistory.shift();
+    }
     const np = this.circleMode ? randomCircleOfFifths(this.rng) : randomAdvanced(this.rng);
     const key = this.fixedKey ?? this.rng.int(12);
     this.advProg = np;
