@@ -1060,8 +1060,12 @@ private fun Note2ChordChallengeView(ear: EarTrainingState) {
             Text("Score: ${ear.n2cChScore}", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(4.dp))
-            TextButton(onClick = { ear.startN2cChallenge() }) { Text("Restart") }
-            TextButton(onClick = { ear.exitN2cChallenge() }) { Text("Quit") }
+            IconButton(onClick = { ear.startN2cChallenge() }) {
+                Icon(Icons.Rounded.RestartAlt, contentDescription = "Restart challenge")
+            }
+            IconButton(onClick = { ear.exitN2cChallenge() }) {
+                Icon(Icons.Rounded.Close, contentDescription = "Quit challenge")
+            }
         }
         Spacer(Modifier.height(8.dp))
         FlowRow(
@@ -1145,8 +1149,12 @@ private fun FlavorChallengeView(ear: EarTrainingState) {
             Text("Score: ${ear.flavorChScore}", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(4.dp))
-            TextButton(onClick = { ear.startFlavorChallenge() }) { Text("Restart") }
-            TextButton(onClick = { ear.exitFlavorChallenge() }) { Text("Quit") }
+            IconButton(onClick = { ear.startFlavorChallenge() }) {
+                Icon(Icons.Rounded.RestartAlt, contentDescription = "Restart challenge")
+            }
+            IconButton(onClick = { ear.exitFlavorChallenge() }) {
+                Icon(Icons.Rounded.Close, contentDescription = "Quit challenge")
+            }
         }
         Spacer(Modifier.height(8.dp))
         FlowRow(
@@ -2090,8 +2098,12 @@ private fun InversionsChallengeView(state: AppState, ear: EarTrainingState) {
             Text("Score: ${ear.invChScore}", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(4.dp))
-            TextButton(onClick = { ear.startInvChallenge() }) { Text("Restart") }
-            TextButton(onClick = { ear.exitInvChallenge() }) { Text("Quit") }
+            IconButton(onClick = { ear.startInvChallenge() }) {
+                Icon(Icons.Rounded.RestartAlt, contentDescription = "Restart challenge")
+            }
+            IconButton(onClick = { ear.exitInvChallenge() }) {
+                Icon(Icons.Rounded.Close, contentDescription = "Quit challenge")
+            }
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = { ear.playInversion() }) { Text("Replay ▶") }
@@ -2236,8 +2248,12 @@ private fun AugDimChallengeView(state: AppState, ear: EarTrainingState) {
             Text("Score: ${ear.adChScore}", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(4.dp))
-            TextButton(onClick = { ear.startAugDimChallenge() }) { Text("Restart") }
-            TextButton(onClick = { ear.exitAugDimChallenge() }) { Text("Quit") }
+            IconButton(onClick = { ear.startAugDimChallenge() }) {
+                Icon(Icons.Rounded.RestartAlt, contentDescription = "Restart challenge")
+            }
+            IconButton(onClick = { ear.exitAugDimChallenge() }) {
+                Icon(Icons.Rounded.Close, contentDescription = "Quit challenge")
+            }
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = { ear.playAugDim() }) { Text("Replay ▶") }
@@ -2344,8 +2360,12 @@ private fun IntervalsView(ear: EarTrainingState) {
             Text("Score: ${ear.intervalChScore}", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(4.dp))
-            TextButton(onClick = { ear.startIntervalChallenge() }) { Text("Restart") }
-            TextButton(onClick = { ear.exitIntervalChallenge() }) { Text("Quit") }
+            IconButton(onClick = { ear.startIntervalChallenge() }) {
+                Icon(Icons.Rounded.RestartAlt, contentDescription = "Restart challenge")
+            }
+            IconButton(onClick = { ear.exitIntervalChallenge() }) {
+                Icon(Icons.Rounded.Close, contentDescription = "Quit challenge")
+            }
         }
         Spacer(Modifier.height(8.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

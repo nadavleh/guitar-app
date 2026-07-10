@@ -35,7 +35,7 @@ root.innerHTML = `
       <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
         <button id="play" class="btn primary">Play ▶</button>
         <button id="playAll" class="btn">Play whole</button>
-        <button id="stop" class="btn">Stop ⏹</button>
+        <button id="stop" class="btn">Stop ■</button>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input id="loop" type="checkbox" /> loop</label>
         <span style="flex:1"></span>
         <button id="nudgeS" class="btn">◂ start</button>

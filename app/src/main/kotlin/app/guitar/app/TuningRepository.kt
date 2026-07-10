@@ -86,15 +86,10 @@ class TuningRepository(private val context: Context) {
         }
     }
 
+    /** Legacy pre-Signal boolean theme pref — no longer read/written directly
+     *  (superseded by [keyThemeMode]); kept only as [themeMode]'s migration
+     *  fallback for installs from before that pref existed. */
     private val keyDarkTheme = booleanPreferencesKey("dark_theme")
-
-    /** UI theme; defaults to dark (the original look). */
-    val darkTheme: Flow<Boolean> =
-        context.tuningDataStore.data.map { prefs -> prefs[keyDarkTheme] ?: true }
-
-    suspend fun setDarkTheme(value: Boolean) {
-        context.tuningDataStore.edit { prefs -> prefs[keyDarkTheme] = value }
-    }
 
     private val keyThemeMode = stringPreferencesKey("theme_mode")
 

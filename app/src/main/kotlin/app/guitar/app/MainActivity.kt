@@ -23,8 +23,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -163,8 +165,6 @@ fun App(audio: AudioEngine) {
         }
     }
     LaunchedEffect(persistedLeftHanded) { state.leftHanded = persistedLeftHanded }
-    val persistedDarkTheme by repo.darkTheme.collectAsState(initial = true)
-    LaunchedEffect(persistedDarkTheme) { state.darkTheme = persistedDarkTheme }
     LaunchedEffect(persistedVoicingShell) {
         state.voicingStyle =
             if (persistedVoicingShell) app.guitar.theory.VoicingStyle.Shell
@@ -462,7 +462,14 @@ private fun StatusBar(state: AppState) {
                 onClick = { state.stopLoop() },
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
             ) {
-                Text("⏹ Stop", color = MaterialTheme.colorScheme.error,
+                Icon(
+                    Icons.Outlined.Stop,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("Stop", color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.titleSmall)
             }
             Spacer(Modifier.width(2.dp))

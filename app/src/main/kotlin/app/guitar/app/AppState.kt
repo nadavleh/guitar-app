@@ -244,9 +244,9 @@ class AppState(
     }
 
     /** Signal ACT accent (persisted). MainActivity reads the repo flow directly too
-     *  (like [darkTheme]) so the outer [GuitarTheme] wrap has it before this
-     *  AppState even exists; this mirror keeps a future Settings accent-picker in
-     *  sync with the same value. */
+     *  (theme mode/accent must be resolved before the outer [GuitarTheme] wrap,
+     *  which exists before this AppState does); this mirror keeps a future
+     *  Settings accent-picker in sync with the same value. */
     var accent by mutableStateOf(Accent.Coral)
         private set
 
@@ -342,9 +342,6 @@ class AppState(
     var labelMode by mutableStateOf(LabelMode.Intervals)
     var selectedPosition by mutableStateOf<FretPosition?>(null)
     var leftHanded by mutableStateOf(false)
-    /** UI theme (persisted). MainActivity reads the repo flow directly to wrap the
-     *  whole app; this mirror keeps the Options switch in sync. */
-    var darkTheme by mutableStateOf(true)
 
     // v1 GUI state.
     // Start with NOTHING lit on the neck (task #5): the user wants a clean
@@ -656,11 +653,6 @@ class AppState(
     fun toggleLeftHanded(value: Boolean) {
         leftHanded = value
         scope.launch { repo.setLeftHanded(value) }
-    }
-
-    fun toggleDarkTheme(value: Boolean) {
-        darkTheme = value
-        scope.launch { repo.setDarkTheme(value) }
     }
 
     // ---------- Sheet / display-mode interactions ----------

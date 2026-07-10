@@ -70,12 +70,13 @@ enum class TabDest(val sheet: Sheet, val label: String, val icon: ImageVector) {
 val DEFAULT_TAB_ORDER: List<TabDest> = listOf(TabDest.Neck, TabDest.Ear, TabDest.Rhythm, TabDest.Loop)
 
 /** One tab is "selected" when it's the open sheet; the bare Fretboard screen
- *  (currentSheet == null but the neck is lit) counts as the Neck tab being
- *  selected, mirroring the milestone-1 NavRail's behavior. */
+ *  (currentSheet == null) counts as the Neck tab being selected — whether an
+ *  overlay (chord/scale/strum) is lit on the neck or not, since Neck is the
+ *  app's implicit home screen (fresh launch included). */
 private fun isTabSelected(state: AppState, dest: TabDest): Boolean {
     val sheet = state.currentSheet
     return if (sheet != null) sheet == dest.sheet
-    else dest.sheet == Sheet.Fretboard && state.displayMode != DisplayMode.None
+    else dest.sheet == Sheet.Fretboard
 }
 
 /** "More" is selected whenever the open sheet isn't one of the current 4 tabs

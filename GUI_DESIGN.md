@@ -159,26 +159,21 @@ This matches a standard light gauge (.010-.046) acoustic/electric set. We don't 
 - Tap a fret cell → that position is **selected & sounded** (and inspected in the info line below the neck) in Chord/Scale modes.
 - In **Strum (Pick)** mode, tap → toggles that position's inclusion in the strum set.
 
-### 3.2 `NavRail` — persistent left navigation (`AppShell.kt`)
+### 3.2 4+More tab shell (`Shell.kt`) — superseded the NavRail
 
-```
-┌────┐
-│ 🎸 │  Fretboard   ← Chord / Scale / Strum sheet over the neck
-│ ⟲ │  Loop        ← full-screen route
-│ 👂 │  Ear         ← full-screen route
-│ 🥁 │  Drums       ← full-screen route
-│ 🎛 │  Tuner       ← full-screen route
-│ ⚙ │  Options     ← bottom sheet
-└────┘
-```
-
-A slim **58 dp** column down the left edge, **always visible in both portrait and landscape**, separated from the content by a 1-dp divider. Each item is a glyph + 9-sp single-line label in a 50-dp rounded button.
-
-- **Active item**: amber glyph/label on an amber-tinted (`primaryContainer`) pill. The Fretboard item reads as active whenever a chord/scale/strum overlay is showing on the bare neck; otherwise the active item is whatever sheet/route is open.
-- Tapping an item calls `openSheet(...)`. **Fretboard** and **Options** open as draggable bottom sheets over the neck; **Loop / Ear / Drums / Tuner** take over the content area to the right of the rail as full-screen routes (each with its own Back button).
-- The rail itself scrolls vertically if the device is too short to fit all six items.
-
-There is **no bottom mode bar and no top tab/drawer** — the rail is the only chrome.
+> **Update (Signal v2.0.0)**: the left `NavRail` described in earlier revisions of this
+> section was replaced by a **4+More tab shell** (`Shell.kt`: `TabDest` enum + `SignalTabBar`
+> / `SignalTabRail`, Material icons — no emoji). Portrait gets a bottom `SignalTabBar`;
+> landscape gets a compact `SignalTabRail` on the left; both share one `TabBarItem`
+> composable so they can't drift. Exactly **4 user-chosen tabs** (from `AppState.tabOrder`,
+> default Neck/Ear/Rhythm/Loop, reorderable in Settings → Personalize) plus a fixed
+> **More** slot for everything else (Tuner, Decompose, Challenge Stats, Settings). Neck
+> (the bare fretboard) is the implicit home screen and reads as selected whenever no
+> sheet is open, matching the rail's old "Fretboard active when nothing else is" rule.
+> `Tuner` and `Decompose` are no longer always-tabbed — they live in **More** unless
+> the user puts them in their 4. Treat `Shell.kt` as the source of truth for current
+> navigation; the design spec is
+> `docs/superpowers/specs/2026-07-10-signal-gui-redesign-design.md`.
 
 ### 3.3 `StatusBar` + `ContextBar` — around the neck
 

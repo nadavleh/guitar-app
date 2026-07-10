@@ -390,7 +390,10 @@ export class App {
     }
     // While the loop plays, surface a Stop here (the loop keeps running across screens).
     if (this.loop.isLooping) {
-      const stop = btn("⏹ Stop", () => this.loop.stopLoop(), "btn text");
+      const stop = el("button", { class: "btn text" }, [
+        icon("stop", 16), el("span", {}, [" Stop"]),
+      ]);
+      stop.addEventListener("click", () => this.loop.stopLoop());
       stop.style.color = Colors.rootTone;
       statusRight.appendChild(stop);
     }
