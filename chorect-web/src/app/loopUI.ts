@@ -2,8 +2,11 @@
 // BuildByDegreePanel section of app/.../Screens.kt.
 
 import { LoopState, StrumPattern, StrumGlyph, StrumName } from "./loopState";
+import { AppState } from "./appState";
+import { EarTrainingState } from "./earTrainingState";
 import { Colors } from "./theme";
-import { el, btn, slider, segmented, labelSm } from "./dom";
+import { el, btn, segmented, labelSm } from "./dom";
+import { transportDock, toneSheet } from "./transport";
 import {
   spellPc, TrainingMode, ChordTypeLevel, ChordTypeLevelName,
   degreeRoot, degreesMapFor, CagedShapeInfo,
@@ -12,18 +15,23 @@ import {
 const OVERRIDE_QUALITIES = ["", "m", "aug", "7", "maj7", "m7", "m7b5", "dim7", "6", "m6", "9", "13", "sus4", "add9"];
 
 export class LoopUI {
-  constructor(private loop: LoopState, private onBack: () => void) {}
+  private toneSheetOpen = false;
+
+  constructor(
+    private loop: LoopState,
+    private state: AppState,
+    private ear: EarTrainingState,
+    private onBack: () => void,
+  ) {}
 
   render(container: HTMLElement): void {
     const L = this.loop;
     L.ensureNormalized();
     const screen = el("div", { class: "tool-screen" });
 
-    // header
+    // header — Play/Stop and tempo now live in the transport dock below.
     screen.appendChild(el("div", { class: "tool-topbar" }, [
       el("div", { class: "tool-title" }, ["LOOP"]),
-      L.isLooping ? btn("Stop ⏹", () => L.stopLoop(), "btn primary")
-        : (() => { const b = btn("Play ▶", () => L.startLoop(), "btn primary"); if (!L.hasAnyChord()) b.disabled = true; return b; })(),
       btn(L.isLooping || L.hasAnyChord() ? "Watch on neck ▶" : "Back", () => {
         if (!L.isLooping && L.hasAnyChord()) L.startLoop();
         this.onBack();
@@ -32,10 +40,6 @@ export class LoopUI {
 
     const body = el("div", { class: "et-scroll" });
     screen.appendChild(body);
-
-    // tempo
-    body.appendChild(el("div", {}, [`Tempo: ${L.bpm} BPM`]));
-    body.appendChild(slider(10, 300, L.bpm, (v) => L.setBpm(v)));
 
     // slots/bar + bars
     body.appendChild(el("div", { class: "et-row-gap", style: "margin-top:6px" }, [
@@ -68,7 +72,22 @@ export class LoopUI {
       body.appendChild(this.slotEditor(L.editingSlot[0], L.editingSlot[1]));
     }
 
+    // Transport dock (Signal move #2): L.bpm is re-read live every bar (see
+    // LoopState.playBar()), so no restart is needed when it changes.
+    screen.appendChild(transportDock({
+      playing: L.isLooping,
+      onPlayStop: () => {
+        if (L.isLooping) L.stopLoop();
+        else if (L.hasAnyChord()) L.startLoop();  // preserve the old Play button's guard
+      },
+      bpm: L.bpm,
+      onBpm: (v) => L.setBpm(v),
+      toneLabel: this.state.sound,
+      onTone: () => { this.toneSheetOpen = true; this.rerender(); },
+    }));
+
     container.appendChild(screen);
+    if (this.toneSheetOpen) container.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.rerender(); }));
   }
 
   private barsGrid(): HTMLElement {

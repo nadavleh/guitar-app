@@ -19,7 +19,7 @@ import { loadDrumSample } from "./drumSamples";
 import { Timbres } from "../audio";
 import { Colors, withAlpha } from "./theme";
 import { el, clear, btn, segmented, chipRow, slider, switchRow, labelSm } from "./dom";
-import { audioControlButton } from "./audioControl";
+import { toneSheet } from "./transport";
 import {
   PC, Instrument, InstrumentInfo, ChordShape, ScalePosition, VoicingStyle,
   spellPc, spellNote, midiPitchClass, midiOctave, noteAt, stringCount, suggestFingering,
@@ -82,7 +82,7 @@ export class App {
   private tunerCentsEl: HTMLElement | null = null;
   private tunerHintEl: HTMLElement | null = null;
 
-  private audioPopupOpen = false;
+  private toneSheetOpen = false;
 
   private ear: EarTrainingState;
   private earUI: EarTrainingUI;
@@ -113,7 +113,7 @@ export class App {
       timbreProvider: () => (state.instrument === Instrument.Cavaquinho ? Timbres.Cavaquinho : Timbres.Guitar),
       onChange: () => this.scheduleRender(),
     });
-    this.loopUI = new LoopUI(this.loop, () => state.closeSheet());
+    this.loopUI = new LoopUI(this.loop, state, this.ear, () => state.closeSheet());
     this.earUI = new EarTrainingUI(this.ear, state, () => state.closeSheet(), (symbols) => {
       this.loop.loadProgressionIntoLoop(symbols);
       state.openSheet(Sheet.Loop);
@@ -128,8 +128,8 @@ export class App {
       getVolumes: () => state.drumVolumes,
       saveVolume: (key, value) => state.setDrumVolume(key, value),
     });
-    this.sambaUI = new SambaLooperUI(this.samba, () => state.closeSheet());
-    this.decomposeUI = new DecomposeUI(state, () => state.closeSheet(), (symbols) => {
+    this.sambaUI = new SambaLooperUI(this.samba, state, this.ear, () => state.closeSheet());
+    this.decomposeUI = new DecomposeUI(state, this.ear, () => state.closeSheet(), (symbols) => {
       this.loop.loadProgressionIntoLoop(symbols);
       state.openSheet(Sheet.Loop);
     });
@@ -338,7 +338,7 @@ export class App {
       stop.style.color = Colors.rootTone;
       statusRight.appendChild(stop);
     }
-    statusRight.appendChild(this.audioQuickButton());
+    statusRight.appendChild(this.tuneButton());
     const statusBar = el("div", { class: "status-bar" }, [
       wordmark,
       el("div", { class: "status-summary" }, [summary]),
@@ -465,15 +465,16 @@ export class App {
     return row;
   }
 
-  // ---------- audio quick popup ----------
+  // ---------- Tone sheet access ----------
 
-  private audioQuickButton(): HTMLElement {
-    return audioControlButton(
-      this.state,
-      this.audioPopupOpen,
-      () => { this.audioPopupOpen = !this.audioPopupOpen; this.render(); },
-      () => this.render(),
-    );
+  /** Small tune-icon button — the Fretboard/Options status bar and the Tuner
+   *  topbar's way into the shared Tone sheet (Signal move #3). Ear/Rhythm/Loop
+   *  reach it through their transport dock's tone chip instead. */
+  private tuneButton(): HTMLElement {
+    const b = el("button", { class: "tune-btn" }, [icon("tune", 18)]);
+    b.setAttribute("aria-label", "Tone");
+    b.addEventListener("click", () => { this.toneSheetOpen = true; this.render(); });
+    return b;
   }
 
   // ---------- More sheet ----------
@@ -536,21 +537,28 @@ export class App {
       }
       return;
     }
-    if (route !== Sheet.Fretboard && route !== Sheet.Options) return;
-    const sheet = el("div", { class: "sheet" });
-    sheet.appendChild(el("div", { class: "sheet-grabber" }));
-    const header = el("div", { class: "sheet-header" }, [
-      el("h2", {}, [route === Sheet.Fretboard ? "Fretboard" : "Options"]),
-      btn("✕", () => this.state.closeSheet(), "btn text"),
-    ]);
-    sheet.appendChild(header);
-    if (route === Sheet.Fretboard) this.fillFretboardSheet(sheet);
-    else this.fillOptionsSheet(sheet);
-    sheet.appendChild(el("div", { class: "row end" }, [btn("Done", () => this.state.closeSheet(), "btn text")]));
+    if (route === Sheet.Fretboard || route === Sheet.Options) {
+      const sheet = el("div", { class: "sheet" });
+      sheet.appendChild(el("div", { class: "sheet-grabber" }));
+      const header = el("div", { class: "sheet-header" }, [
+        el("h2", {}, [route === Sheet.Fretboard ? "Fretboard" : "Options"]),
+        btn("✕", () => this.state.closeSheet(), "btn text"),
+      ]);
+      sheet.appendChild(header);
+      if (route === Sheet.Fretboard) this.fillFretboardSheet(sheet);
+      else this.fillOptionsSheet(sheet);
+      sheet.appendChild(el("div", { class: "row end" }, [btn("Done", () => this.state.closeSheet(), "btn text")]));
 
-    const scrim = el("div", { class: "sheet-scrim" }, [sheet]);
-    scrim.addEventListener("click", (e) => { if (e.target === scrim) this.state.closeSheet(); });
-    this.sheetLayer.appendChild(scrim);
+      const scrim = el("div", { class: "sheet-scrim" }, [sheet]);
+      scrim.addEventListener("click", (e) => { if (e.target === scrim) this.state.closeSheet(); });
+      this.sheetLayer.appendChild(scrim);
+    }
+    // Tone sheet (Signal move #3): stacked on top of whatever else is showing —
+    // reachable from the Fretboard/Options status bar and the Tuner topbar's
+    // tune button (Ear/Rhythm/Loop reach it through their own transport dock).
+    if (this.toneSheetOpen) {
+      this.sheetLayer.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.render(); }));
+    }
   }
 
   private fillFretboardSheet(sheet: HTMLElement): void {
@@ -789,7 +797,7 @@ export class App {
     screen.appendChild(el("div", { class: "tool-topbar" }, [
       el("div", { class: "tool-title" }, ["TUNER"]),
       el("div", { style: `font-size:12px;color:${Colors.textSecondary}` }, [`A4 = ${s.a4Hz} Hz`]),
-      this.audioQuickButton(),
+      this.tuneButton(),
       btn("Back", () => s.closeSheet()),
     ]));
 

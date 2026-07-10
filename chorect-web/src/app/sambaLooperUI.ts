@@ -4,8 +4,11 @@
 // omitted — the web grid sizes responsively to the viewport width instead.
 
 import { SambaLooperState } from "./sambaLooperState";
+import { EarTrainingState } from "./earTrainingState";
 import { Colors } from "./theme";
 import { el, btn, slider } from "./dom";
+import { transportDock, toneSheet } from "./transport";
+import { AppState } from "./appState";
 import {
   PercussionInstrument, voicesFor, voiceOf, PercussionPattern, BUILTIN_PATTERNS,
   DIVISIONS,
@@ -17,16 +20,6 @@ const TIME_SIGNATURES: [number, number][] = [
 ];
 
 const LONG_PRESS_MS = 450;
-
-// White line icons for the transport (no emoji/▶⏹ glyphs).
-const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><polygon points="7 4 20 12 7 20 7 4"/></svg>';
-const ICON_STOP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
-function iconBtn(svg: string, label: string, onClick: () => void): HTMLButtonElement {
-  const b = el("button", { class: "btn primary" }) as HTMLButtonElement;
-  b.innerHTML = `<span class="btn-ico">${svg}</span>${label}`;
-  b.addEventListener("click", onClick);
-  return b;
-}
 
 export class SambaLooperUI {
   private eraseMode = false;
@@ -40,8 +33,14 @@ export class SambaLooperUI {
   private laneScrollLeft = 0;
   /** The single active outside-tap popup closer (never stacked). */
   private outsideCloser: ((e: Event) => void) | null = null;
+  private toneSheetOpen = false;
 
-  constructor(private samba: SambaLooperState, private onBack: () => void) {}
+  constructor(
+    private samba: SambaLooperState,
+    private state: AppState,
+    private ear: EarTrainingState,
+    private onBack: () => void,
+  ) {}
 
   render(container: HTMLElement): void {
     const s = this.samba;
@@ -50,20 +49,17 @@ export class SambaLooperUI {
     // header
     screen.appendChild(el("div", { class: "tool-topbar" }, [
       el("div", { class: "tool-title" }, ["DRUMS"]),
-      s.isPlaying ? iconBtn(ICON_STOP, "Stop", () => s.stop()) : iconBtn(ICON_PLAY, "Play", () => s.start()),
       btn("Back", () => { s.stop(); this.onBack(); }),
     ]));
 
     const body = el("div", { class: "et-scroll" });
     screen.appendChild(body);
 
-    // BPM + tap tempo + metronome
+    // tap tempo + metronome (BPM itself lives in the transport dock below)
     body.appendChild(el("div", { class: "et-row-gap" }, [
-      el("span", {}, [`BPM: ${s.bpm}`]),
       btn("Tap", () => s.tapTempo()),
       btn(s.metronome ? "Metro ✓" : "Metro", () => s.toggleMetronome(), s.metronome ? "btn primary" : "btn"),
     ]));
-    body.appendChild(slider(10, 300, s.bpm, (v) => s.setBpm(v)));
     // Swing only acts on a 1/16 grid (a quarter-note split into four 16ths): it
     // holds the 1st & 3rd 16ths, delays the 2nd, and pulls the 4th early. On any
     // other division it does nothing, so the slider is disabled and says why.
@@ -102,7 +98,20 @@ export class SambaLooperUI {
       this.addInstrumentControl(),
     ]));
 
+    // Transport dock (Signal move #2): BPM lives here now — samba reads `bpm`
+    // live every slot (see SambaLooperState.start()), so no restart is needed
+    // when it changes, unlike the Ear progression loop.
+    screen.appendChild(transportDock({
+      playing: s.isPlaying,
+      onPlayStop: () => { if (s.isPlaying) s.stop(); else s.start(); },
+      bpm: s.bpm,
+      onBpm: (v) => s.setBpm(v),
+      toneLabel: this.state.sound,
+      onTone: () => { this.toneSheetOpen = true; this.rerender(); },
+    }));
+
     container.appendChild(screen);
+    if (this.toneSheetOpen) container.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.rerender(); }));
 
     // Keep all step lanes scrolled together (fixed-size cells scroll horizontally
     // so they stay a consistent size regardless of viewport width).

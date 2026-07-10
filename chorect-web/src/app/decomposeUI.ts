@@ -3,10 +3,13 @@
 // and an upper-structure triad, drawn on the fretboard in two colours.
 
 import { AppState } from "./appState";
+import { EarTrainingState } from "./earTrainingState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { FretMark, MarkKind } from "./marks";
 import { Colors } from "./theme";
 import { el, btn, clear } from "./dom";
+import { icon } from "./icons";
+import { toneSheet } from "./transport";
 
 /** Degree label for a chord-relative interval (incl. compound 9/11/13). */
 function decomposeDegree(iv: number): string {
@@ -61,12 +64,14 @@ export class DecomposeUI {
   private showGuide = false;
   /** Upper-triad inversion for the auditioned voicing (pc set unchanged). */
   private upperInv = 0;
+  private toneSheetOpen = false;
   private parent: HTMLElement | null = null;
   private fbCanvasEl: HTMLCanvasElement | null = null;
   private fb: FretboardCanvas | null = null;
 
   constructor(
     private state: AppState,
+    private ear: EarTrainingState,
     private onBack: () => void,
     private onSendToLoop: (symbols: string[]) => void,
   ) {}
@@ -80,9 +85,13 @@ export class DecomposeUI {
     const dec = decompositionFor(this.quality) ?? CHORD_DECOMPOSITIONS[0];
 
     const screen = el("div", { class: "tool-screen" });
+    const tuneBtn = el("button", { class: "tune-btn" }, [icon("tune", 18)]);
+    tuneBtn.setAttribute("aria-label", "Tone");
+    tuneBtn.addEventListener("click", () => { this.toneSheetOpen = true; this.rerender(); });
     screen.appendChild(el("div", { class: "tool-topbar" }, [
       el("div", { class: "tool-title" }, ["DECOMPOSE"]),
       btn("Guide", () => { this.showGuide = true; this.rerender(); }),
+      tuneBtn,
       btn("Back", () => this.onBack()),
     ]));
 
@@ -179,6 +188,7 @@ export class DecomposeUI {
       scrim.addEventListener("click", close);
       parent.appendChild(scrim);
     }
+    if (this.toneSheetOpen) parent.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.rerender(); }));
   }
 
   private groupMidis(dec: ChordDecomposition): { shell: number[]; upper: number[] } {

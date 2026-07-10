@@ -746,6 +746,123 @@ select.et-select {
 .slot-box.playing { background: var(--chord-tone); }
 .slot-box .sym { font-size: 14px; }
 .slot-box .strum { font-size: 11px; color: var(--text-secondary); }
+
+/* ---------- Transport dock + Tone sheet (Signal moves #2/#3) ---------- */
+
+.tone-sheet { max-width: 480px; }
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  margin: 10px 0 2px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+}
+.transport-play {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--act);
+  color: var(--on-act);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.transport-bpm-wrap { position: relative; flex: 0 0 auto; }
+.transport-bpm {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  cursor: pointer;
+  list-style: none;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+.transport-bpm::-webkit-details-marker { display: none; }
+.transport-bpm-val { font-size: 16px; font-weight: 700; }
+.transport-bpm-unit { font-size: 11px; color: var(--muted); }
+.transport-bpm-pop {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 8px;
+  z-index: 20;
+  width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+.tone-chip {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 1px solid var(--feedback);
+  color: var(--feedback);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Small tune-icon button (Fretboard/Options status bar, Tuner, Decompose). */
+.tune-btn {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tune-btn:hover { background: rgba(255, 255, 255, 0.05); }
+
+.tone-sheet-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+.tone-sheet-row .glyph { color: var(--muted); flex: 0 0 auto; }
+.tone-sheet-row .tone-row-body { flex: 1 1 auto; min-width: 0; }
+.tone-row-val { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+.tone-sound-row { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin: 4px 0; }
+.tone-sound-btn {
+  flex: 1 1 0;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+  padding: 8px 4px;
+  font-size: 13px;
+}
+.tone-sound-btn:last-child { border-right: none; }
+.tone-sound-btn.selected { background: var(--act); color: var(--on-act); font-weight: 700; }
+
+.tone-eq-wrap { display: block; }
+.tone-eq-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.tone-eq-summary::-webkit-details-marker { display: none; }
+.tone-eq-summary .glyph:first-child { color: var(--muted); flex: 0 0 auto; }
+.tone-eq-summary .tone-row-body { flex: 1 1 auto; min-width: 0; }
+.tone-eq-chevron { color: var(--muted); flex: 0 0 auto; transition: transform 0.15s; }
+.tone-eq-wrap[open] .tone-eq-chevron { transform: rotate(180deg); }
+.tone-eq-body { padding: 0 0 6px 30px; }
+
 .build-panel { background: var(--surface-elev); border-radius: 10px; padding: 10px; margin: 8px 0; }
 .degree-btn {
   background: transparent; border: 1px solid var(--divider); border-radius: 8px; color: var(--text-primary);

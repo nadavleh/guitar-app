@@ -3,7 +3,10 @@
 // rail/tab bar (ui.ts renderNav()) and the More sheet's rows. Path data is
 // ported 1:1 from the pre-M2 NAV_ICONS map that lived in ui.ts (now deleted
 // there — this module is its only home); "more" and "stats" are new, added
-// for the 4+More shell (Task 4 / M2).
+// for the 4+More shell (Task 4 / M2). "play"/"stop"/"tune"/"eq"/"chevronDown"/
+// "waves"/"spread"/"timer"/"note"/"flask" are new for the transport dock +
+// Tone sheet (Task 6 / M3, see transport.ts) — replacing the old ▶/⏹ text
+// glyphs and the per-screen 🎚 popup with SVG throughout.
 
 export type IconName =
   | "neck"
@@ -14,7 +17,17 @@ export type IconName =
   | "decompose"
   | "more"
   | "stats"
-  | "settings";
+  | "settings"
+  | "play"
+  | "stop"
+  | "tune"
+  | "eq"
+  | "chevronDown"
+  | "waves"
+  | "spread"
+  | "timer"
+  | "note"
+  | "flask";
 
 const PATH: Record<IconName, string> = {
   // Fretboard grid (was NAV_ICONS.fretboard).
@@ -35,6 +48,19 @@ const PATH: Record<IconName, string> = {
   stats: '<line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="13" width="4" height="7" rx="0.6"/><rect x="11" y="8" width="4" height="12" rx="0.6"/><rect x="17" y="4" width="4" height="16" rx="0.6"/>',
   // Sliders (was NAV_ICONS.options — Settings row in the More sheet).
   settings: '<line x1="4" y1="8" x2="20" y2="8"/><circle cx="9" cy="8" r="2.1"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="15" cy="16" r="2.1"/>',
+  // Transport dock: act-filled Play/Stop button.
+  play: '<polygon points="7 4 20 12 7 20 7 4"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
+  // Tone chip / small tune buttons (Fretboard, Tuner, Decompose, Options).
+  tune: '<line x1="6" y1="21" x2="6" y2="3"/><circle cx="6" cy="14" r="2"/><line x1="12" y1="21" x2="12" y2="3"/><circle cx="12" cy="8" r="2"/><line x1="18" y1="21" x2="18" y2="3"/><circle cx="18" cy="17" r="2"/>',
+  // Tone sheet row icons.
+  eq: '<line x1="5" y1="21" x2="5" y2="10"/><line x1="12" y1="21" x2="12" y2="4"/><line x1="19" y1="21" x2="19" y2="14"/><circle cx="5" cy="7" r="1.6"/><circle cx="12" cy="14" r="1.6"/><circle cx="19" cy="10" r="1.6"/>',
+  chevronDown: '<polyline points="6 9 12 15 18 9"/>',
+  waves: '<path d="M2 13c2.2-4 4.4-4 6.6 0s4.4 4 6.6 0 4.4-4 6.6 0"/><path d="M2 18c2.2-4 4.4-4 6.6 0s4.4 4 6.6 0 4.4-4 6.6 0"/>',
+  spread: '<line x1="4" y1="12" x2="20" y2="12"/><polyline points="8 6 4 12 8 18"/><polyline points="16 6 20 12 16 18"/>',
+  timer: '<circle cx="12" cy="13" r="8"/><line x1="12" y1="13" x2="12" y2="9"/><line x1="12" y1="13" x2="15" y2="15"/><line x1="9" y1="3" x2="15" y2="3"/><line x1="12" y1="3" x2="12" y2="5"/>',
+  note: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
+  flask: '<path d="M9 2h6"/><path d="M10 2v6.5l-6 10.5a1.5 1.5 0 0 0 1.3 2.2h13.4a1.5 1.5 0 0 0 1.3-2.2l-6-10.5V2"/><line x1="7.5" y1="15" x2="16.5" y2="15"/>',
 };
 
 /**

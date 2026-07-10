@@ -7,8 +7,8 @@ import { EarTrainingState, EarSubMode, EarMode } from "./earTrainingState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { shapeMarks } from "./marks";
 import { Colors, withAlpha } from "./theme";
-import { el, btn, slider, switchRow, labelSm } from "./dom";
-import { audioControlButton } from "./audioControl";
+import { el, btn, switchRow, labelSm } from "./dom";
+import { transportDock, toneSheet } from "./transport";
 import { renderChallengeStatsOverlay } from "./statsOverlay";
 import {
   spellPc, noteAt, TrainingMode, ChordTypeLevel, ChordTypeLevelName,
@@ -81,8 +81,7 @@ export class EarTrainingUI {
 
   private statsOpen = false;
   private libraryOpen = false;
-  private playbackOpen = false;
-  private audioPopupOpen = false;
+  private toneSheetOpen = false;
   /** Which progression-library row is expanded (single-open accordion), or null. */
   private libExpandedKey: string | null = null;
   /** Whether the expanded row's follow-along fretboard is shown. */
@@ -109,13 +108,6 @@ export class EarTrainingUI {
     // header
     screen.appendChild(el("div", { class: "tool-topbar" }, [
       el("div", { class: "tool-title" }, ["EAR TRAINING"]),
-      // Sound menu (guitar sound + tone/reverb) reachable here too, like every section.
-      audioControlButton(
-        this.state,
-        this.audioPopupOpen,
-        () => { this.audioPopupOpen = !this.audioPopupOpen; this.rerender(); },
-        () => this.rerender(),
-      ),
       btn("Stats", () => { this.statsOpen = true; this.rerender(); }),
       btn("Back", () => { ear.release(); this.onBack(); }),
     ]));
@@ -169,18 +161,11 @@ export class EarTrainingUI {
         },
       );
       const libBtn = btn("Library", () => { this.libraryOpen = true; this.rerender(); });
-      // "Playback ▾" disclosure holding Tempo + Strum — shared by every generator and
-      // both modes (tasks #4/#10). A native <details> keeps its open state across
-      // rerenders via this.playbackOpen so dragging a slider doesn't collapse it.
-      const playback = el("details", { class: "et-playback" }, [
-        el("summary", {}, ["Playback ▾"]),
-      ]) as HTMLDetailsElement;
-      playback.open = this.playbackOpen;
-      playback.addEventListener("toggle", () => { this.playbackOpen = playback.open; });
-      this.tempoStrumSliders(playback);
+      // Tempo + Strum + Boost-root now live in the transport dock / Tone sheet
+      // (Signal moves #2/#3), pinned below the body — see the dock appended at
+      // the end of render().
       screen.appendChild(el("div", { style: "display:flex;gap:8px;align-items:center;margin:4px 0" }, [
         el("div", { style: "flex:1" }, [genSelect]),
-        playback,
         libBtn,
       ]));
       screen.appendChild(el("div", { class: "et-muted", style: "font-size:12px;font-style:italic;margin-bottom:6px" }, [genCaption]));
@@ -211,9 +196,30 @@ export class EarTrainingUI {
         break;
     }
 
+    // Transport dock (Signal move #2): replaces the per-view Play ▶/Stop ⏹
+    // buttons for every Progression generator (diatonic/advanced/circle/iii-focus)
+    // in both Practice and Challenge. progBpm is read once when startLoop()
+    // launches its loop, so a live BPM edit restarts it to take effect (mirrors
+    // Android's TransportDock wiring in EarTrainingScreen.kt).
+    if (ear.progSubMode === EarSubMode.Progression) {
+      screen.appendChild(transportDock({
+        playing: ear.isLooping,
+        onPlayStop: () => { if (ear.isLooping) ear.stopLoop(); else ear.startLoop(); },
+        bpm: ear.progBpm,
+        onBpm: (v) => {
+          ear.progBpm = Math.round(v);
+          if (ear.isLooping) { ear.stopLoop(); ear.startLoop(); }
+          this.rerender();
+        },
+        toneLabel: this.state.sound,
+        onTone: () => { this.toneSheetOpen = true; this.rerender(); },
+      }));
+    }
+
     container.appendChild(screen);
     if (this.statsOpen) container.appendChild(this.statsOverlay());
     if (this.libraryOpen) container.appendChild(this.libraryOverlay());
+    if (this.toneSheetOpen) container.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.rerender(); }));
   }
 
   /** Progression-library popup: the pools the trainer draws from. Every row is clickable
@@ -389,17 +395,6 @@ export class EarTrainingUI {
     return wrap;
   }
 
-  private tempoStrumSliders(parent: HTMLElement): void {
-    const ear = this.ear, s = this.state;
-    parent.appendChild(el("div", { style: "margin-top:8px" }, [`Tempo: ${ear.progBpm} BPM`]));
-    parent.appendChild(slider(10, 300, ear.progBpm, (v) => { ear.progBpm = Math.round(v); this.rerender(); }));
-    parent.appendChild(el("div", { class: "et-muted" }, [s.strumMs === 0 ? "Strum: struck at once" : `Strum: ${s.strumMs} ms`]));
-    parent.appendChild(slider(0, 150, s.strumMs, (v) => s.setStrumMs(v)));
-    // #5: make the chord's root stand out of the strum — it plays separately and louder.
-    parent.appendChild(switchRow("Boost root note", "Play each chord's root louder so it cuts through",
-      ear.earBoostTonic, (v) => { ear.earBoostTonic = v; this.rerender(); }));
-  }
-
   private fretboardPanel(parent: HTMLElement): void {
     const ear = this.ear, s = this.state;
     parent.appendChild(switchRow("Show chord on fretboard", null, ear.showFretboard, (v) => { ear.showFretboard = v; this.rerender(); }));
@@ -506,7 +501,6 @@ export class EarTrainingUI {
     const prevBtn = btn("← Prev", () => ear.previousProgression());
     prevBtn.disabled = !ear.canGoPrevProgression;
     parent.appendChild(el("div", { class: "et-row-gap" }, [
-      ear.isLooping ? btn("Stop ⏹", () => ear.stopLoop(), "btn primary") : btn("Play ▶", () => ear.startLoop(), "btn primary"),
       prevBtn,
       btn("Next →", () => ear.nextProgression()),
       btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
@@ -576,7 +570,6 @@ export class EarTrainingUI {
     parent.appendChild(el("div", { class: "row", style: "gap:8px" }, [prevBtn, nextTopBtn]));
 
     parent.appendChild(el("div", { class: "et-row-gap" }, [
-      ear.isLooping ? btn("Stop ⏹", () => ear.stopLoop(), "btn primary") : btn("Play ▶", () => ear.startLoop(), "btn primary"),
       btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
       btn("Re-roll", () => ear.rerollChallengeQuestion()),
     ]));
@@ -830,7 +823,6 @@ export class EarTrainingUI {
     const advPrevBtn = btn("← Prev", () => ear.previousAdvancedProgression());
     advPrevBtn.disabled = !ear.canGoPrevAdvanced;
     parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:8px" }, [
-      ear.isLooping ? btn("Stop ⏹", () => ear.stopLoop(), "btn primary") : btn("Play ▶", () => ear.startLoop(), "btn primary"),
       advPrevBtn,
       btn("Next →", () => ear.nextAdvancedProgression()),
     ]));
@@ -854,9 +846,6 @@ export class EarTrainingUI {
     }
     this.challengeHeader(parent, `Progression ${ear.advChIndex + 1} / ${ear.advChallengeTotal}`, `Score: ${ear.advChScore}`,
       () => ear.startAdvChallenge(), () => ear.exitAdvChallenge());
-    parent.appendChild(el("div", { class: "et-row-gap" }, [
-      ear.isLooping ? btn("Stop ⏹", () => ear.stopLoop(), "btn primary") : btn("Play ▶", () => ear.startLoop(), "btn primary"),
-    ]));
     parent.appendChild(el("div", { class: "v-gap-8" }));
     this.advancedBody(parent);
     parent.appendChild(el("div", { class: "v-gap-8" }));
