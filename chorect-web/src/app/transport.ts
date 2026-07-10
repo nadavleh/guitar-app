@@ -50,7 +50,10 @@ export function transportDock(opts: TransportDockOpts): HTMLElement {
       el("div", { class: "label-sm", style: "margin-top:0" }, [`Tempo: ${bpm} BPM`]),
       slider(10, 300, bpm, (v) => onBpm(Math.round(v))),
     ]);
-    children.push(el("details", { class: "transport-bpm-wrap" }, [summary, pop]));
+    const details = el("details", { class: "transport-bpm-wrap" }, [summary, pop]);
+    details.open = bpmExpanded;
+    details.addEventListener("toggle", () => { bpmExpanded = details.open; });
+    children.push(details);
   }
 
   children.push(el("div", { class: "spacer" }));
@@ -65,6 +68,12 @@ export function transportDock(opts: TransportDockOpts): HTMLElement {
 // ---------- Tone sheet ----------
 
 const SOUND_OPTIONS: SoundName[] = ["Synth", "Acoustic", "Nylon", "Electric"];
+
+/** Whether the Transport BPM popover is expanded. Module-level (not a class
+ *  field) because only one dock is ever visible at a time — a single persisted
+ *  flag survives the frequent full-app rerenders that happen while playback
+ *  rebuilds the DOM. */
+let bpmExpanded = false;
 
 /** Whether the Tone sheet's EQ row is expanded. Module-level (not a class
  *  field) because only one Tone sheet is ever open at a time across every
