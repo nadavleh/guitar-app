@@ -2252,8 +2252,10 @@ private fun statsKindLabel(kind: String): String = when (kind) {
     else -> kind
 }
 
+/** Internal (not private): reused by [MoreScreen] (Shell.kt) so "Challenge stats"
+ *  opens the exact same dialog from the More screen as it does from this header. */
 @Composable
-private fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
+internal fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
     val scores by state.challengeScores.collectAsState(initial = emptyList())
     AlertDialog(
         onDismissRequest = onDismiss,

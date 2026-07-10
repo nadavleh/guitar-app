@@ -2,6 +2,7 @@ package app.guitar.app
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -12,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -44,6 +46,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -245,61 +248,79 @@ fun App(audio: AudioEngine) {
         }
     }
 
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()   // keep content clear of status bar + nav gesture
-    ) {
-        // Concept-A persistent navigation rail (milestone 1). Always visible so
-        // the user can jump between tools without the menu.
-        NavRail(state)
-        HorizontalDivider(
-            modifier = Modifier.fillMaxHeight().width(1.dp),
-            color = MaterialTheme.colorScheme.outline,
-        )
-        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-            if (state.currentSheet == Sheet.Loop) {
-                // Loop takes over the content area — it has its own controls and Back button.
-                LoopScreen(state)
-            } else if (state.currentSheet == Sheet.Tuner) {
-                TunerScreen(state, onBack = { state.closeSheet() })
-            } else if (state.currentSheet == Sheet.EarTraining) {
-                EarTrainingScreen(state, onBack = { state.closeSheet() })
-            } else if (state.currentSheet == Sheet.SambaLooper) {
-                SambaLooperScreen(state, onBack = { state.closeSheet() })
-            } else if (state.currentSheet == Sheet.Decompose) {
-                DecomposeScreen(state, onBack = { state.closeSheet() })
-            } else {
-                StatusBar(state)
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                // Fretboard fills all remaining vertical space (landscape-locked, so this
-                // is always wider than tall — renders as a horizontal neck).
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 4.dp)
-                ) {
-                    FretboardView(
-                        tuning = state.liveTuning,
-                        marks = marks,
-                        selectedPosition = state.selectedPosition,
-                        onTap = { pos ->
-                            if (state.displayMode == DisplayMode.Pick) state.togglePick(pos)
-                            else state.tapPosition(pos)
-                        },
-                        numFrets = DISPLAY_FRETS,
-                        leftHanded = state.leftHanded,
-                        playOnTouchDown = state.tapOnTouchDown,
-                        mutedStrings = if (state.displayMode == DisplayMode.Pick) state.mutedStrings else emptySet(),
-                    )
-                }
-                SelectedPositionInfo(state.liveTuning, state.selectedPosition, parsedChord)
-                // Tool controls live in the draggable bottom sheets (opened from the
-                // rail or the menu), so the neck keeps its full height here.
-                ContextBar(state, chordShapes, scalePositions)
+    // Content area is identical regardless of orientation — only the chrome
+    // (bottom tab bar vs. left rail) around it differs. Captured as a
+    // ColumnScope-receiver lambda so `Modifier.weight(1f)` below (on the
+    // FretboardView Box) keeps resolving against whichever Column hosts it.
+    val content: @Composable ColumnScope.() -> Unit = {
+        if (state.currentSheet == Sheet.Loop) {
+            // Loop takes over the content area — it has its own controls and Back button.
+            LoopScreen(state)
+        } else if (state.currentSheet == Sheet.Tuner) {
+            TunerScreen(state, onBack = { state.closeSheet() })
+        } else if (state.currentSheet == Sheet.EarTraining) {
+            EarTrainingScreen(state, onBack = { state.closeSheet() })
+        } else if (state.currentSheet == Sheet.SambaLooper) {
+            SambaLooperScreen(state, onBack = { state.closeSheet() })
+        } else if (state.currentSheet == Sheet.Decompose) {
+            DecomposeScreen(state, onBack = { state.closeSheet() })
+        } else {
+            StatusBar(state)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            // Fretboard fills all remaining vertical space (this screen renders as a
+            // horizontal neck in both portrait and landscape).
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 4.dp)
+            ) {
+                FretboardView(
+                    tuning = state.liveTuning,
+                    marks = marks,
+                    selectedPosition = state.selectedPosition,
+                    onTap = { pos ->
+                        if (state.displayMode == DisplayMode.Pick) state.togglePick(pos)
+                        else state.tapPosition(pos)
+                    },
+                    numFrets = DISPLAY_FRETS,
+                    leftHanded = state.leftHanded,
+                    playOnTouchDown = state.tapOnTouchDown,
+                    mutedStrings = if (state.displayMode == DisplayMode.Pick) state.mutedStrings else emptySet(),
+                )
             }
+            SelectedPositionInfo(state.liveTuning, state.selectedPosition, parsedChord)
+            // Tool controls live in the draggable bottom sheets (opened from the
+            // tab bar/rail or More), so the neck keeps its full height here.
+            ContextBar(state, chordShapes, scalePositions)
+        }
+    }
+
+    val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
+    if (isPortrait) {
+        // Signal bottom-tab shell (M3): content above, tab bar pinned to the
+        // bottom. safeDrawingPadding on this Column already keeps the bar clear
+        // of the gesture/nav-bar inset.
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .safeDrawingPadding()
+        ) {
+            Column(modifier = Modifier.weight(1f).fillMaxWidth(), content = content)
+            SignalTabBar(state)
+        }
+    } else {
+        // Landscape: same 5 items as a compact left rail (existing landscape
+        // support preserved) — content area is untouched.
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .safeDrawingPadding()
+        ) {
+            SignalTabRail(state)
+            Column(modifier = Modifier.weight(1f).fillMaxHeight(), content = content)
         }
     }
 
@@ -319,6 +340,20 @@ fun App(audio: AudioEngine) {
                 Sheet.Options   -> OptionsSheet(state, customTunings)
                 else -> {}
             }
+        }
+    }
+
+    // "More" overlay (Shell.kt): lists every destination not currently tabbed,
+    // plus Challenge Stats and Settings. Not a Sheet — AppState.moreOpen is a
+    // transient flag toggled by the tab bar/rail's fixed 5th item.
+    if (state.moreOpen) {
+        val moreSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        ModalBottomSheet(
+            onDismissRequest = { state.closeMore() },
+            sheetState = moreSheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            MoreScreen(state)
         }
     }
 }

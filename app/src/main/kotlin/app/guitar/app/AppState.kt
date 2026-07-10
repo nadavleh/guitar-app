@@ -260,6 +260,44 @@ class AppState(
         }
     }
 
+    /** Configured bottom-tab set + order (Signal M3, [TabDest] — see Shell.kt).
+     *  Default Neck/Ear/Rhythm/Loop; a later Settings milestone lets the user pick
+     *  any 4 of the six destinations and reorder them. "More" is fixed and not
+     *  part of this list. */
+    var tabOrder by mutableStateOf(DEFAULT_TAB_ORDER)
+        private set
+
+    @JvmName("applyTabOrder")
+    fun setTabOrder(order: List<TabDest>) {
+        val distinct = order.distinct()
+        val resolved = if (distinct.size >= 4) distinct.take(4) else DEFAULT_TAB_ORDER
+        tabOrder = resolved
+        scope.launch { repo.setTabOrder(resolved.joinToString(",") { it.name }) }
+    }
+
+    init {
+        // Restore the persisted tab set/order once on startup. Unrecognized names
+        // (stale pref, foreign enum entry) are dropped; fewer than 4 valid
+        // survivors falls back to the default set rather than showing a ragged bar.
+        scope.launch {
+            val raw = repo.tabOrder.first()
+            val parsed = raw.split(",")
+                .map { it.trim() }
+                .mapNotNull { name -> runCatching { TabDest.valueOf(name) }.getOrNull() }
+                .distinct()
+            tabOrder = if (parsed.size >= 4) parsed.take(4) else DEFAULT_TAB_ORDER
+        }
+    }
+
+    /** Transient, unpersisted UI flag: whether the "More" overlay (Shell.kt) is
+     *  showing. Not a [Sheet] — it lists destinations rather than being one;
+     *  tapping a row inside it opens the real [Sheet] and clears this flag. */
+    var moreOpen by mutableStateOf(false)
+        private set
+
+    fun openMore() { moreOpen = true }
+    fun closeMore() { moreOpen = false }
+
     var chordInput by mutableStateOf("Cmaj7")
     var chordFretRange by mutableStateOf(0..DISPLAY_FRETS)
     var selectedShapeIndex by mutableStateOf<Int?>(null)
