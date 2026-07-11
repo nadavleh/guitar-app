@@ -66,18 +66,14 @@ import app.guitar.theory.PercussionMeter
 import app.guitar.theory.PercussionVoices
 
 /**
- * Drum-machine / samba-looper screen ("Rhythm" tab). A header [SegmentedRow] swaps
- * the body between three sections (Signal redesign, see
- * docs/superpowers/specs/2026-07-10-signal-gui-redesign-design.md §Screens→Rhythm):
- *  - **Pattern** — the 4-row × 16-cell step grid itself (2 bars of 2/4 in sixteenths
- *    by default). Tapping a cell cycles its voice (silent → voice 1 → … → silent);
- *    long-press clears the cell. A tinted column tracks the playhead while looping.
- *  - **Mixer** — per-instrument + per-voice volume (previously tucked behind a
- *    per-row popup menu).
- *  - **Kit** — add/remove instruments from the catalog (previously the footer's
- *    "+ Add instrument" dropdown).
- * None of the grid's gesture handlers or [SambaLooperState] calls changed — this is
- * a chrome-only regrouping of the same controls.
+ * Drum-machine / samba-looper screen ("Rhythm" tab). Pattern-only: the 4-row ×
+ * 16-cell step grid itself (2 bars of 2/4 in sixteenths by default). Tapping a
+ * cell cycles its voice (silent → voice 1 → … → silent); long-press clears the
+ * cell. A tinted column tracks the playhead while looping. Tapping an
+ * instrument's row label opens a voice popup (overall + per-voice volume,
+ * preview, and Remove); a "+ Add ▾" control in the header adds instruments from
+ * the catalog. (Restores the pre-Signal tap-to-mix interaction; see the reverted
+ * Signal Mixer/Kit segments this replaces.)
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -106,7 +102,6 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     val offsetY = remember { mutableFloatStateOf(0f) }
 
     var toneSheetOpen by remember { mutableStateOf(false) }
-    var section by remember { mutableStateOf(RhythmSection.Pattern) }
 
     Column(
         modifier = Modifier
@@ -127,15 +122,8 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(8.dp))
-        SegmentedRow(
-            options = RhythmSection.entries,
-            selected = section,
-            onSelect = { section = it },
-            label = { it.label },
-        )
-        Spacer(Modifier.height(8.dp))
 
-        // ----- Scrollable body: whichever section is selected -----
+        // ----- Scrollable body: the pattern grid + its controls -----
         // Wrapped so the TransportDock below stays pinned and visible instead of
         // scrolling away with the (potentially long) instrument grid + footer.
         Column(
@@ -144,18 +132,14 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
         ) {
-            when (section) {
-                RhythmSection.Pattern -> PatternSection(
-                    samba = samba,
-                    eraseMode = eraseMode,
-                    onEraseMode = { eraseMode = it },
-                    accentMode = accentMode,
-                    onAccentMode = { accentMode = it },
-                    scaleX = scaleX, scaleY = scaleY, offsetX = offsetX, offsetY = offsetY,
-                )
-                RhythmSection.Mixer -> MixerSection(samba)
-                RhythmSection.Kit -> KitSection(samba)
-            }
+            PatternSection(
+                samba = samba,
+                eraseMode = eraseMode,
+                onEraseMode = { eraseMode = it },
+                accentMode = accentMode,
+                onAccentMode = { accentMode = it },
+                scaleX = scaleX, scaleY = scaleY, offsetX = offsetX, offsetY = offsetY,
+            )
         }
 
         Spacer(Modifier.height(8.dp))
@@ -171,10 +155,6 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
         )
         if (toneSheetOpen) ToneSheet(state, onDismiss = { toneSheetOpen = false })
     }
-}
-
-private enum class RhythmSection(val label: String) {
-    Pattern("Pattern"), Mixer("Mixer"), Kit("Kit"),
 }
 
 // ---------- PATTERN section ----------
@@ -244,6 +224,27 @@ private fun PatternSection(
             }
         }
         OutlinedButton(onClick = { samba.clearAll() }) { Text("Clear all") }
+
+        // Add an instrument to the kit, sourced from the catalog.
+        var addMenu by remember { mutableStateOf(false) }
+        Box {
+            Button(onClick = { addMenu = true }) { Text("+ Add ▾") }
+            DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
+                val toAdd = samba.instrumentsToAdd()
+                if (toAdd.isEmpty()) {
+                    DropdownMenuItem(
+                        text = { Text("(all instruments added)") },
+                        enabled = false, onClick = {},
+                    )
+                }
+                for (inst in toAdd) {
+                    DropdownMenuItem(
+                        text = { Text(inst.displayName) },
+                        onClick = { samba.addInstrument(inst); addMenu = false },
+                    )
+                }
+            }
+        }
     }
 
     if (saveDialog) {
@@ -455,129 +456,6 @@ private fun PatternSection(
     }
 }
 
-// ---------- MIXER section ----------
-
-@Composable
-private fun MixerSection(samba: SambaLooperState) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        SectionLabel("Volume — per instrument & voice")
-        for (inst in samba.pattern.instruments) {
-            InstrumentMixerCard(samba, inst)
-        }
-        if (samba.pattern.instruments.isEmpty()) {
-            Text(
-                "No instruments in the kit yet — add some from the Kit tab.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun InstrumentMixerCard(samba: SambaLooperState, instrument: PercussionInstrument) {
-    val voices = PercussionVoices.voicesFor(instrument)
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
-            Text(
-                instrument.displayName,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(4.dp))
-            val vol = samba.volumeOf(instrument)
-            Text(
-                "Overall volume: ${(vol * 100).toInt()}%",
-                style = MaterialTheme.typography.labelMedium,
-            )
-            Slider(
-                value = vol,
-                onValueChange = { samba.setVolume(instrument, it) },
-                valueRange = 0f..1f,
-            )
-            HorizontalDivider()
-            Text(
-                "Per-voice volume (tap name to audition)",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
-            )
-            voices.forEachIndexed { idx, v ->
-                val vvol = samba.voiceVolumeOf(instrument, idx)
-                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                    Text(
-                        "${v.glyph}   ${v.displayName}   ·   ${(vvol * 100).toInt()}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.pointerInput(instrument, idx) {
-                            detectTapGestures(onTap = { samba.preview(instrument, idx) })
-                        },
-                    )
-                    Slider(
-                        value = vvol,
-                        onValueChange = { samba.setVoiceVolume(instrument, idx, it) },
-                        valueRange = 0f..1f,
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ---------- KIT section ----------
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun KitSection(samba: SambaLooperState) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        SectionLabel("Current kit")
-        for (inst in samba.pattern.instruments) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-            ) {
-                Text(inst.displayName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                OutlinedButton(onClick = { samba.removeInstrument(inst) }) { Text("Remove") }
-            }
-        }
-        if (samba.pattern.instruments.isEmpty()) {
-            Text(
-                "(kit is empty)",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Spacer(Modifier.height(6.dp))
-        HorizontalDivider()
-        Spacer(Modifier.height(6.dp))
-
-        SectionLabel("Add instrument")
-        val toAdd = samba.instrumentsToAdd()
-        if (toAdd.isEmpty()) {
-            Text(
-                "(all instruments added)",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                for (inst in toAdd) {
-                    OutlinedButton(onClick = { samba.addInstrument(inst) }) { Text(inst.displayName) }
-                }
-            }
-        }
-    }
-}
-
 private const val ROW_LABEL_DP = 128
 private const val ROW_HEIGHT_DP = 70   // per-instrument row: name + ▾ + M/S all fit
 private const val CAPTION_DP = 18      // bar/beat caption strip below the rows
@@ -673,9 +551,8 @@ private fun TranslateControl(samba: SambaLooperState) {
     }
 }
 
-/** Pattern-tab row: instrument name label + Mute/Solo toggles + its step cells.
- *  (The per-voice volume popup and the Remove action that used to live behind a
- *  tap on the name have moved to the Mixer / Kit sections respectively.) */
+/** Pattern-tab row: instrument name label (tap → voice popup with overall + per-voice
+ *  volume and Remove) + Mute/Solo toggles + its step cells. */
 @Composable
 private fun InstrumentRow(
     samba: SambaLooperState,
@@ -684,21 +561,86 @@ private fun InstrumentRow(
     accentMode: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val voices = PercussionVoices.voicesFor(instrument)
     val audible = samba.isAudible(instrument)
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        // ---- Row label: instrument name + Mute / Solo ----
+        // ---- Row label: instrument name (tap → voice popup) + Mute / Solo ----
         Column(
             modifier = Modifier.width(ROW_LABEL_DP.dp).fillMaxHeight().padding(end = 6.dp),
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(
-                instrument.displayName,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                color = if (audible) MaterialTheme.colorScheme.onBackground
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            var voiceMenu by remember { mutableStateOf(false) }
+            Box {
+                // Name + ▾ hints the voice popup; the whole row is the tap target.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .pointerInput(instrument) { detectTapGestures(onTap = { voiceMenu = true }) }
+                        .padding(vertical = 2.dp),
+                ) {
+                    Text(
+                        instrument.displayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        color = if (audible) MaterialTheme.colorScheme.onBackground
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(" ▾", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                // Voice menu: overall + per-voice volume, plus Remove. Tap outside to
+                // dismiss; stays open across slider drags so levels can be compared.
+                DropdownMenu(expanded = voiceMenu, onDismissRequest = { voiceMenu = false }) {
+                    // Overall instrument volume. Lives in the voice popup so the dense
+                    // step-grid stays uncluttered.
+                    Column(modifier = Modifier.width(260.dp).padding(horizontal = 12.dp, vertical = 4.dp)) {
+                        val vol = samba.volumeOf(instrument)
+                        Text(
+                            "Overall volume: ${(vol * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Slider(
+                            value = vol,
+                            onValueChange = { samba.setVolume(instrument, it) },
+                            valueRange = 0f..1f,
+                        )
+                    }
+                    HorizontalDivider()
+                    Text(
+                        "  Per-voice volume (tap name to audition)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    )
+                    // Each voice: its own level slider; the label auditions the voice
+                    // at its current effective gain so tuning is immediate.
+                    voices.forEachIndexed { idx, v ->
+                        val vvol = samba.voiceVolumeOf(instrument, idx)
+                        Column(modifier = Modifier.width(260.dp).padding(horizontal = 12.dp, vertical = 2.dp)) {
+                            Text(
+                                "${v.glyph}   ${v.displayName}   ·   ${(vvol * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.pointerInput(instrument, idx) {
+                                    detectTapGestures(onTap = { samba.preview(instrument, idx) })
+                                },
+                            )
+                            Slider(
+                                value = vvol,
+                                onValueChange = { samba.setVoiceVolume(instrument, idx, it) },
+                                valueRange = 0f..1f,
+                            )
+                        }
+                    }
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Remove ${instrument.displayName}") },
+                        onClick = { voiceMenu = false; samba.removeInstrument(instrument) },
+                    )
+                }
+            }
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ToggleTag("M", on = instrument in samba.muted,
