@@ -99,7 +99,9 @@ class TuningRepository(private val context: Context) {
      *  "light" rather than defaulting blindly to dark. */
     val themeMode: Flow<String> =
         context.tuningDataStore.data.map { prefs ->
-            prefs[keyThemeMode] ?: if (prefs[keyDarkTheme] ?: true) "dark" else "light"
+            // Never-configured installs default to LIGHT (user decision, v2.1.0);
+            // pre-theme_mode installs keep whatever dark_theme they had chosen.
+            prefs[keyThemeMode] ?: prefs[keyDarkTheme]?.let { if (it) "dark" else "light" } ?: "light"
         }
 
     suspend fun setThemeMode(value: String) {
@@ -219,10 +221,10 @@ class TuningRepository(private val context: Context) {
 
     private val keyTabOrder = stringPreferencesKey("tab_order")
 
-    /** Configured bottom-tab set + order, comma-joined (e.g. "Neck,Ear,Rhythm,Loop").
+    /** Configured bottom-tab set + order, comma-joined (e.g. "Neck,Ear,Rhythm,Tuner").
      *  "More" is fixed and not part of this list. Consumed by the Signal tab bar (M3). */
     val tabOrder: Flow<String> =
-        context.tuningDataStore.data.map { prefs -> prefs[keyTabOrder] ?: "Neck,Ear,Rhythm,Loop" }
+        context.tuningDataStore.data.map { prefs -> prefs[keyTabOrder] ?: "Neck,Ear,Rhythm,Tuner" }
 
     suspend fun setTabOrder(value: String) {
         context.tuningDataStore.edit { prefs -> prefs[keyTabOrder] = value }

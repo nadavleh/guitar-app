@@ -34,11 +34,128 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+/**
+ * Custom nav glyphs (task: "ear training symbol is a speaker… I need a small ear;
+ * drum machine should be a drum; fretboard needs a more resembling symbol").
+ * Stroke-drawn 24×24 [ImageVector]s in the Material-outlined weight; `Icon`'s tint
+ * paints over the path color, so they recolor like any stock icon.
+ */
+object ShellIcons {
+    private fun outlined(name: String, build: androidx.compose.ui.graphics.vector.ImageVector.Builder.() -> Unit) =
+        ImageVector.Builder(
+            name = name, defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).apply(build).build()
+
+    private val stroke = SolidColor(Color.Black)
+
+    /** A small ear: outer helix, lobe, and an inner-canal curve. */
+    val Ear: ImageVector by lazy {
+        outlined("ShellEar") {
+            path(stroke = stroke, strokeLineWidth = 1.8f,
+                strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                // Outer helix down to the lobe.
+                moveTo(17.5f, 10f)
+                curveTo(17.5f, 6.4f, 15f, 4f, 12f, 4f)
+                curveTo(9f, 4f, 6.5f, 6.4f, 6.5f, 10f)
+                curveTo(6.5f, 12.2f, 7.6f, 13.2f, 8.4f, 14.6f)
+                curveTo(9.1f, 15.8f, 9.2f, 17.3f, 10.3f, 18.4f)
+                curveTo(11.6f, 19.7f, 13.9f, 19.6f, 15f, 18.2f)
+            }
+            path(stroke = stroke, strokeLineWidth = 1.8f,
+                strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                // Inner curve (antihelix + canal).
+                moveTo(14.5f, 10f)
+                curveTo(14.5f, 8.1f, 13.4f, 7f, 12f, 7f)
+                curveTo(10.6f, 7f, 9.5f, 8.1f, 9.5f, 10f)
+                curveTo(9.5f, 11.4f, 10.5f, 11.9f, 11.2f, 13f)
+            }
+        }
+    }
+
+    /** A drum: elliptical head, tapered shell, and two crossed sticks above. */
+    val Drum: ImageVector by lazy {
+        outlined("ShellDrum") {
+            path(stroke = stroke, strokeLineWidth = 1.8f,
+                strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                // Head (ellipse) — two arcs.
+                moveTo(4.5f, 11.5f)
+                curveTo(4.5f, 9.8f, 7.9f, 8.5f, 12f, 8.5f)
+                curveTo(16.1f, 8.5f, 19.5f, 9.8f, 19.5f, 11.5f)
+                curveTo(19.5f, 13.2f, 16.1f, 14.5f, 12f, 14.5f)
+                curveTo(7.9f, 14.5f, 4.5f, 13.2f, 4.5f, 11.5f)
+                close()
+            }
+            path(stroke = stroke, strokeLineWidth = 1.8f,
+                strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                // Shell sides + bottom curve.
+                moveTo(4.5f, 11.5f)
+                lineTo(4.5f, 16.5f)
+                curveTo(4.5f, 18.2f, 7.9f, 19.5f, 12f, 19.5f)
+                curveTo(16.1f, 19.5f, 19.5f, 18.2f, 19.5f, 16.5f)
+                lineTo(19.5f, 11.5f)
+            }
+            path(stroke = stroke, strokeLineWidth = 1.8f,
+                strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                // Crossed sticks.
+                moveTo(8.5f, 10.5f); lineTo(16.5f, 4.5f)
+                moveTo(15.5f, 10.5f); lineTo(7.5f, 4.5f)
+            }
+        }
+    }
+
+    /** A fretboard: nut, two frets, three strings, and two inlay dots. */
+    val Fretboard: ImageVector by lazy {
+        outlined("ShellFretboard") {
+            path(stroke = stroke, strokeLineWidth = 1.8f,
+                strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                // Board outline.
+                moveTo(3.5f, 6.5f)
+                lineTo(20.5f, 6.5f)
+                lineTo(20.5f, 17.5f)
+                lineTo(3.5f, 17.5f)
+                close()
+                // Nut (thicker feel: doubled at the left edge).
+                moveTo(6f, 6.5f); lineTo(6f, 17.5f)
+                // Frets.
+                moveTo(11f, 6.5f); lineTo(11f, 17.5f)
+                moveTo(16f, 6.5f); lineTo(16f, 17.5f)
+            }
+            path(stroke = stroke, strokeLineWidth = 1.2f, strokeLineCap = StrokeCap.Round) {
+                // Strings.
+                moveTo(3.5f, 9.5f); lineTo(20.5f, 9.5f)
+                moveTo(3.5f, 12f); lineTo(20.5f, 12f)
+                moveTo(3.5f, 14.5f); lineTo(20.5f, 14.5f)
+            }
+            path(fill = stroke) {
+                // Inlay dots (filled).
+                moveTo(8.5f, 12f)
+                curveTo(8.5f, 11.4f, 9f, 10.9f, 9.6f, 10.9f)
+                curveTo(10.2f, 10.9f, 10.7f, 11.4f, 10.7f, 12f)
+                curveTo(10.7f, 12.6f, 10.2f, 13.1f, 9.6f, 13.1f)
+                curveTo(9f, 13.1f, 8.5f, 12.6f, 8.5f, 12f)
+                close()
+                moveTo(13.5f, 12f)
+                curveTo(13.5f, 11.4f, 14f, 10.9f, 14.6f, 10.9f)
+                curveTo(15.2f, 10.9f, 15.7f, 11.4f, 15.7f, 12f)
+                curveTo(15.7f, 12.6f, 15.2f, 13.1f, 14.6f, 13.1f)
+                curveTo(14f, 13.1f, 13.5f, 12.6f, 13.5f, 12f)
+                close()
+            }
+        }
+    }
+}
 
 /**
  * Signal bottom-tab shell (M3): 4 user-configurable tabs + a fixed "More" item,
@@ -56,18 +173,20 @@ import androidx.compose.ui.unit.sp
  *  navigation logic (openSheet/closeSheet/currentSheet) is untouched; this is
  *  purely a chrome-layer view over it. */
 enum class TabDest(val sheet: Sheet, val label: String, val icon: ImageVector) {
-    Neck(Sheet.Fretboard, "Neck", Icons.Outlined.GridView),
-    Ear(Sheet.EarTraining, "Ear", Icons.Outlined.Hearing),
-    Rhythm(Sheet.SambaLooper, "Rhythm", Icons.Outlined.GraphicEq),
+    // NOTE: enum NAMES are persisted in the tab_order pref — never rename them;
+    // only the display labels are user-facing.
+    Neck(Sheet.Fretboard, "Fretboard", ShellIcons.Fretboard),
+    Ear(Sheet.EarTraining, "Ear", ShellIcons.Ear),
+    Rhythm(Sheet.SambaLooper, "DrumLoop", ShellIcons.Drum),
     Loop(Sheet.Loop, "Loop", Icons.Outlined.Repeat),
     Tuner(Sheet.Tuner, "Tuner", Icons.Outlined.Speed),
     Decompose(Sheet.Decompose, "Decompose", Icons.Outlined.Extension),
 }
 
 /** Default tab set/order for a fresh install — matches [TuningRepository]'s
- *  persisted default ("Neck,Ear,Rhythm,Loop") so a never-configured install and
- *  a freshly-reset one look identical. */
-val DEFAULT_TAB_ORDER: List<TabDest> = listOf(TabDest.Neck, TabDest.Ear, TabDest.Rhythm, TabDest.Loop)
+ *  persisted default ("Neck,Ear,Rhythm,Tuner") so a never-configured install and
+ *  a freshly-reset one look identical. Loop lives in More by default. */
+val DEFAULT_TAB_ORDER: List<TabDest> = listOf(TabDest.Neck, TabDest.Ear, TabDest.Rhythm, TabDest.Tuner)
 
 /** One tab is "selected" when it's the open sheet; the bare Fretboard screen
  *  (currentSheet == null) counts as the Neck tab being selected — whether an

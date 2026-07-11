@@ -67,7 +67,7 @@ function defaultEq(): Record<SoundName, EqSettings> {
 }
 
 function defaultReverb(): Record<SoundName, number> {
-  return { Synth: 0.18, Acoustic: 0.18, Nylon: 0.18, Electric: 0.18 };
+  return { Synth: 0.01, Acoustic: 0.01, Nylon: 0.01, Electric: 0.01 }; // default 1% reverb
 }
 
 const LS_KEY = "chorect-web.v1";
@@ -94,7 +94,7 @@ function isThemeMode(v: unknown): v is ThemeMode {
 export type TabDestName = "Neck" | "Ear" | "Rhythm" | "Loop" | "Tuner" | "Decompose";
 export const ALL_TAB_DESTS: readonly TabDestName[] = ["Neck", "Ear", "Rhythm", "Loop", "Tuner", "Decompose"];
 /** Default tab set/order for a fresh install (matches Android's DEFAULT_TAB_ORDER). */
-export const DEFAULT_TAB_ORDER: readonly TabDestName[] = ["Neck", "Ear", "Rhythm", "Loop"];
+export const DEFAULT_TAB_ORDER: readonly TabDestName[] = ["Neck", "Ear", "Rhythm", "Tuner"];
 function isTabDestName(v: unknown): v is TabDestName {
   return typeof v === "string" && (ALL_TAB_DESTS as readonly string[]).includes(v);
 }
@@ -550,7 +550,7 @@ export class AppState {
     this.commit(() => {
       this.currentSheet = sheet;
       this.lastSheet = sheet;
-      if (sheet === Sheet.Fretboard && this.displayMode === DisplayMode.None) this.displayMode = DisplayMode.Chord;
+      // Fretboard opens EMPTY until the user picks a chord/scale (no auto-Chord).
     });
   }
   closeSheet(): void { this.commit(() => { this.currentSheet = null; }); }

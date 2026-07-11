@@ -95,7 +95,8 @@ fun FretboardSheet(state: AppState) {
     SheetBody {
         SheetHeader("Fretboard", state)
 
-        val modes = listOf(DisplayMode.Chord, DisplayMode.Scale, DisplayMode.Pick)
+        // "None" first: the board can be (and now starts) unlit — pick it to clear.
+        val modes = listOf(DisplayMode.None, DisplayMode.Chord, DisplayMode.Scale, DisplayMode.Pick)
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             modes.forEachIndexed { i, m ->
                 SegmentedButton(
@@ -104,6 +105,7 @@ fun FretboardSheet(state: AppState) {
                     shape = SegmentedButtonDefaults.itemShape(index = i, count = modes.size),
                     label = {
                         Text(when (m) {
+                            DisplayMode.None -> "None"
                             DisplayMode.Scale -> "Scale"
                             DisplayMode.Pick -> "Strum"
                             else -> "Chord"
@@ -115,6 +117,11 @@ fun FretboardSheet(state: AppState) {
         Spacer(Modifier.height(12.dp))
 
         when (state.displayMode) {
+            DisplayMode.None -> Text(
+                "Nothing lit — pick Chord, Scale or Strum to light the board.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             DisplayMode.Scale -> ScaleControls(state)
             DisplayMode.Pick -> PickControls(state)
             else -> ChordControls(state)

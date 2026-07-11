@@ -793,7 +793,14 @@ private fun Cell(
     }
     // Hit cells = act (per the Signal palette: hits are the primary/act color,
     // regardless of which voice — the printed glyph already distinguishes voices).
-    val fill = if (voice == null) emptyFill else MaterialTheme.colorScheme.primary
+    // Multicolor voices restored (user: "I miss the multicolors of the instruments
+    // voices") — voice 1 = act, voice 2 = blue, voice 3+ = teal, as pre-Signal.
+    val fill = when (voice) {
+        null -> emptyFill
+        0 -> MaterialTheme.colorScheme.primary
+        1 -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.secondary
+    }
     // Border precedence: playhead > accent ring (feedback teal) > none.
     val borderWidth = if (isPlayhead) 2.dp else if (accented) 2.dp else 0.dp
     val borderColor = when {

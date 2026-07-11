@@ -2,6 +2,9 @@ package app.guitar.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -111,6 +115,14 @@ fun TunerScreen(state: AppState, onBack: () -> Unit) {
 
         Spacer(Modifier.height(8.dp))
         // -------- Change tuning on the fly (no need to open Options) --------
+        // Height-capped + scrollable: with many custom tunings this used to grow
+        // unbounded and could push the bottom string row off-screen (user report).
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 96.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -131,6 +143,7 @@ fun TunerScreen(state: AppState, onBack: () -> Unit) {
                     label = { Text(name, maxLines = 1) },
                 )
             }
+        }
         }
 
         // -------- Dial + note label --------
@@ -334,8 +347,9 @@ private fun TuningRefRow(state: AppState, tuner: TunerState) {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
+            .horizontalScroll(rememberScrollState())
             .padding(8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Each open string of the current tuning, low → high (left → right), as an

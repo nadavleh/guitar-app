@@ -36,12 +36,13 @@ object SignalColors {
     val errorDark      = Color(0xFFD34D52)  // reddish, kept distinct from any act accent
 
     // Light
-    val bgLight        = Color(0xFFF4F6FB)
-    val surfaceLight   = Color(0xFFFFFFFF)
-    val surface2Light  = Color(0xFFE9EDF6)
-    val textLight      = Color(0xFF1C2233)
-    val mutedLight     = Color(0xFF5D6782)
-    val lineLight      = Color(0xFFD8DEED)
+    // Creamy warm light scheme (user feedback: the cool near-white read too bright).
+    val bgLight        = Color(0xFFF3EDDF)   // warm cream ground
+    val surfaceLight   = Color(0xFFFBF7EC)   // soft ivory cards
+    val surface2Light  = Color(0xFFEAE1CD)   // deeper cream insets
+    val textLight      = Color(0xFF2B241A)   // warm near-black ink
+    val mutedLight     = Color(0xFF7C7159)   // warm taupe secondary
+    val lineLight      = Color(0xFFDCD1B8)   // cream hairlines
     val onActLight     = Color(0xFFFFFFFF)
     val feedbackLight  = Color(0xFF159C8B)  // darkened teal, contrast on light ground
     val errorLight     = Color(0xFFB3282E)
@@ -68,6 +69,9 @@ enum class Accent(val dark: Color, val light: Color, val label: String) {
  *  it reacts live to the theme + accent choice (unlike the static [GuitarColors]
  *  compatibility layer below). */
 data class SignalPalette(
+    /** Whether this palette is the dark variant — components with their own
+     *  non-token art (e.g. the fretboard wood) switch on this. */
+    val isDark: Boolean,
     val bg: Color,
     val surface: Color,
     val surface2: Color,
@@ -78,6 +82,35 @@ data class SignalPalette(
     val onAct: Color,
     val feedback: Color,
 )
+
+/** Fretboard "wood" art palette — the neck's non-token colors. Two fixed sets:
+ *  the original dark walnut, and a cream-maple set for the light theme (user
+ *  feedback: the board stayed black in light mode). Selected in FretboardView via
+ *  [SignalPalette.isDark]; geometry and rendering are unchanged. */
+data class BoardColors(
+    val wood: Color,
+    val woodGrain: Color,
+    val nut: Color,
+    val fretWire: Color,
+    val inlay: Color,
+    val stringWound: Color,
+    val stringPlain: Color,
+) {
+    companion object {
+        val Dark = BoardColors(
+            wood = Color(0xFF3D2817), woodGrain = Color(0xFF2C1C10),
+            nut = Color(0xFF0A0A0B), fretWire = Color(0xFF6F6F75),
+            inlay = Color(0xFFE8E4D9),
+            stringWound = Color(0xFFC9A876), stringPlain = Color(0xFFDCC698),
+        )
+        val Light = BoardColors(
+            wood = Color(0xFFE9D9B8), woodGrain = Color(0xFFD8C49B),
+            nut = Color(0xFF4A4136), fretWire = Color(0xFF8B8B90),
+            inlay = Color(0xFF6B5B44),
+            stringWound = Color(0xFF8A6F45), stringPlain = Color(0xFF6E6046),
+        )
+    }
+}
 
 val LocalSignal = staticCompositionLocalOf<SignalPalette> {
     error("LocalSignal not provided — wrap content in GuitarTheme")
@@ -93,12 +126,14 @@ private fun signalPalette(dark: Boolean, accent: Accent): SignalPalette {
     }
     return if (dark) {
         SignalPalette(
+            isDark = true,
             bg = SignalColors.bgDark, surface = SignalColors.surfaceDark, surface2 = SignalColors.surface2Dark,
             text = SignalColors.textDark, muted = SignalColors.mutedDark, line = SignalColors.lineDark,
             act = accent.dark, onAct = SignalColors.onActDark, feedback = feedback,
         )
     } else {
         SignalPalette(
+            isDark = false,
             bg = SignalColors.bgLight, surface = SignalColors.surfaceLight, surface2 = SignalColors.surface2Light,
             text = SignalColors.textLight, muted = SignalColors.mutedLight, line = SignalColors.lineLight,
             act = accent.light, onAct = SignalColors.onActLight, feedback = feedback,

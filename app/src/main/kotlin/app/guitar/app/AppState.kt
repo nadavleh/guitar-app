@@ -197,7 +197,7 @@ class AppState(
 
     // ---------- Per-sound reverb amount (0..1 send) ----------
     private val reverb = java.util.EnumMap<GuitarSound, Float>(GuitarSound::class.java).apply {
-        GuitarSound.entries.forEach { put(it, 0.18f) }   // default matches the old fixed send
+        GuitarSound.entries.forEach { put(it, 0.01f) }   // default: barely-there reverb (user: init at 1%)
     }
 
     /** Bumped on every reverb change so the slider composable (keyed off it) recomposes. */
@@ -299,7 +299,7 @@ class AppState(
      *  repo flow directly too so the outer [GuitarTheme] wrap has it resolved
      *  before this AppState even exists; this mirror keeps the Settings screen's
      *  segmented control in sync with the same value. */
-    var themeMode by mutableStateOf(ThemeMode.Dark)
+    var themeMode by mutableStateOf(ThemeMode.Light)   // app defaults to light (v2.1.0)
         private set
 
     @JvmName("applyThemeMode")
@@ -661,8 +661,10 @@ class AppState(
         currentSheet = sheet
         lastSheet = sheet
         when (sheet) {
-            // Fretboard tool: keep whatever neck mode was last shown; default to Chord.
-            Sheet.Fretboard -> if (displayMode == DisplayMode.None) displayMode = DisplayMode.Chord
+            // Fretboard tool: keep whatever neck mode was last shown. Deliberately does
+            // NOT auto-light anything — the board opens empty until the user picks a
+            // chord/scale (and "Clear board" returns it to empty).
+            Sheet.Fretboard -> {}
             Sheet.Options -> {} // tunings/options doesn't change what's lit
             Sheet.Loop -> {}    // loop sheet plays its own audio; fretboard view unchanged
             Sheet.Tuner -> {}   // tuner reads the mic; fretboard view unchanged

@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -93,7 +95,7 @@ class MainActivity : ComponentActivity() {
             // Theme resolution: theme_mode is the source of truth ("dark"/"light"/
             // "auto"); repo.themeMode itself falls back to the old dark-only boolean
             // pref for installs that predate this setting (see TuningRepository).
-            val themeMode by repo.themeMode.collectAsState(initial = "dark")
+            val themeMode by repo.themeMode.collectAsState(initial = "light")
             val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
             val dark = when (themeMode) {
                 "light" -> false
@@ -473,6 +475,18 @@ private fun StatusBar(state: AppState) {
                     style = MaterialTheme.typography.titleSmall)
             }
             Spacer(Modifier.width(2.dp))
+        }
+        // Quick light/dark toggle (the full Dark/Light/Auto control lives in
+        // Settings -> Personalize). Shows the mode you'd switch TO.
+        val goingDark = state.themeMode != ThemeMode.Dark
+        IconButton(onClick = {
+            state.setThemeMode(if (goingDark) ThemeMode.Dark else ThemeMode.Light)
+        }) {
+            Icon(
+                if (goingDark) Icons.Outlined.DarkMode
+                else Icons.Outlined.LightMode,
+                contentDescription = if (goingDark) "Switch to dark theme" else "Switch to light theme",
+            )
         }
         // Sound/EQ/reverb settings, reachable everywhere — opens the shared
         // ToneSheet (replaces the old audio-quick dropdown button).

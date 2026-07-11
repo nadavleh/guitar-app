@@ -101,7 +101,8 @@ class SambaLooperState(
     private fun voiceKey(inst: PercussionInstrument, voiceIndex: Int) = "${inst.id}:$voiceIndex"
 
     /** Global level of an instrument (default full). */
-    fun volumeOf(inst: PercussionInstrument): Float = volumes[inst.id] ?: 1f
+    fun volumeOf(inst: PercussionInstrument): Float =
+        volumes[inst.id] ?: if (inst.id == "agogo") 0.1f else 1f   // agogô defaults quiet (user: 10%)
 
     /** Level of one voice (default full, or 50% for the soft tamborim voices). */
     fun voiceVolumeOf(inst: PercussionInstrument, voiceIndex: Int): Float =

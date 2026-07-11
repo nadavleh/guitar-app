@@ -55,7 +55,7 @@ export class EarTrainingState {
   earMixAll = false;
 
   progSubMode = EarSubMode.Progression;
-  earMode = EarMode.Practice;
+  earMode = EarMode.Challenge;   // opens in Progression Challenge by default
 
   includeMajor = true;
   includeMinor = true;
@@ -221,7 +221,7 @@ export class EarTrainingState {
     if (!parsed) return;
     const [root, q] = parsed;
     const tuning = this.deps.tuningProvider();
-    const shapes = this.gen(this.earStyle()).shapesFor(root, q, tuning, DISPLAY_FRETS);
+    const shapes = this.earShapes(this.gen(this.earStyle()).shapesFor(root, q, tuning, DISPLAY_FRETS));
     if (shapes.length === 0) return;
     const shape = this.prevPlayedShape == null
       ? (shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0])
@@ -294,6 +294,16 @@ export class EarTrainingState {
    *  of each pitch class, so a 6-string barre grip collapses to its 3–4 distinct chord
    *  tones instead of sounding all doubled strings at once (a cacophony by ear).
    *  (Mirrors EarTrainingState.earMidis on Android.) */
+  /** Ear-training voicing candidates: NEVER a full 6-string grip (doubled low strings
+   *  scramble into mud by ear), and prefer voicings whose bass sits at/above ~A2
+   *  (MIDI 45). Each filter falls back rather than emptying. (Mirrors Android.) */
+  private earShapes(shapes: ChordShape[]): ChordShape[] {
+    const compact0 = shapes.filter((sh) => sh.notes.filter((n) => n !== null).length <= 5);
+    const compact = compact0.length > 0 ? compact0 : shapes;
+    const high = compact.filter((sh) => Math.min(...sh.notes.filter((n) => n !== null).map((n) => n!.midi)) >= 45);
+    return high.length > 0 ? high : compact;
+  }
+
   private earMidis(shape: ChordShape): number[] {
     const midis = shape.notes.filter((n) => n !== null).map((n) => n!.midi).sort((a, b) => a - b);
     const seen = new Set<number>();
@@ -328,7 +338,7 @@ export class EarTrainingState {
     if (!parsed) return;
     const [root, q] = parsed;
     const tuning = this.deps.tuningProvider();
-    const shapes = this.gen(this.earStyle()).shapesFor(root, q, tuning, DISPLAY_FRETS);
+    const shapes = this.earShapes(this.gen(this.earStyle()).shapesFor(root, q, tuning, DISPLAY_FRETS));
     const sustain = Math.max(Math.floor(barMs * 0.9), 200);
     if (shapes.length === 0) {
       this.currentPlayingShape = null;
@@ -418,7 +428,7 @@ export class EarTrainingState {
     if (!parsed) return;
     const [root, q] = parsed;
     const tuning = this.deps.tuningProvider();
-    const shapes = this.gen(this.earStyle()).shapesFor(root, q, tuning, DISPLAY_FRETS);
+    const shapes = this.earShapes(this.gen(this.earStyle()).shapesFor(root, q, tuning, DISPLAY_FRETS));
     const sustain = Math.max(Math.floor(barMs * 0.9), 200);
     if (shapes.length === 0) {
       this.libShape = null;

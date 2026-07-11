@@ -51,7 +51,7 @@ const TAB_ICON: Record<TabDestName, IconName> = {
   Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose",
 };
 const TAB_LABEL: Record<TabDestName, string> = {
-  Neck: "Neck", Ear: "Ear", Rhythm: "Rhythm", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose",
+  Neck: "Fretboard", Ear: "Ear", Rhythm: "DrumLoop", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose",
 };
 /** One-line description shown under each destination's title in the More sheet. */
 const TAB_SUBTITLE: Record<TabDestName, string> = {
@@ -627,8 +627,8 @@ export class App {
 
   private fillFretboardSheet(sheet: HTMLElement): void {
     sheet.appendChild(segmented<DisplayMode>(
-      [{ value: DisplayMode.Chord, label: "Chord" }, { value: DisplayMode.Scale, label: "Scale" }, { value: DisplayMode.Pick, label: "Strum" }],
-      this.state.displayMode === DisplayMode.None ? DisplayMode.Chord : this.state.displayMode,
+      [{ value: DisplayMode.None, label: "None" }, { value: DisplayMode.Chord, label: "Chord" }, { value: DisplayMode.Scale, label: "Scale" }, { value: DisplayMode.Pick, label: "Strum" }],
+      this.state.displayMode,
       (v) => this.state.setDisplayMode(v),
     ));
     sheet.appendChild(el("div", { class: "v-gap-12" }));

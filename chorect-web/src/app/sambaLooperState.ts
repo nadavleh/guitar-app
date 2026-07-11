@@ -145,7 +145,7 @@ export class SambaLooperState {
   }
 
   /** Global level of an instrument (default full). */
-  volumeOf(inst: PercussionInstrument): number { return this.volumes.get(inst.id) ?? 1; }
+  volumeOf(inst: PercussionInstrument): number { return this.volumes.get(inst.id) ?? (inst.id === "agogo" ? 0.1 : 1); } // agogô defaults quiet
   /** Level of one voice (default full, or 50% for the soft tamborim voices). */
   voiceVolumeOf(inst: PercussionInstrument, voiceIndex: number): number {
     return this.volumes.get(this.voiceKey(inst, voiceIndex)) ?? SambaLooperState.defaultVoiceVolume(inst.id, voiceIndex);

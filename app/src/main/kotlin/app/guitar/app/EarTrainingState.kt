@@ -83,7 +83,7 @@ class EarTrainingState(
     var progSubMode by mutableStateOf(EarSubMode.Progression)
 
     /** Practice (free play) vs Challenge (scored rounds) — applies to the active tab. */
-    var earMode by mutableStateOf(EarMode.Practice)
+    var earMode by mutableStateOf(EarMode.Challenge)   // opens in Progression Challenge by default
 
     /** Switch tabs: reset to Practice and stop any audio so modes don't bleed together. */
     fun switchTab(sub: EarSubMode) {
@@ -156,6 +156,16 @@ class EarTrainingState(
     /** Thin a guitar voicing for EAR TRAINING playback: keep only the LOWEST occurrence
      *  of each pitch class, so a 6-string barre grip collapses to its 3–4 distinct chord
      *  tones instead of sounding all doubled strings at once (a cacophony by ear). */
+    /** Ear-training voicing candidates: NEVER a full 6-string grip (its doubled low
+     *  strings scramble into mud by ear), and prefer voicings whose bass sits at or
+     *  above ~A2 (MIDI 45). Each filter falls back rather than emptying the list. */
+    private fun earShapes(shapes: List<app.guitar.theory.ChordShape>): List<app.guitar.theory.ChordShape> {
+        val compact = shapes.filter { sh -> sh.notes.count { it != null } <= 5 }.ifEmpty { shapes }
+        return compact.filter { sh ->
+            (sh.notes.mapNotNull { it?.midi?.value }.minOrNull() ?: 0) >= 45
+        }.ifEmpty { compact }
+    }
+
     private fun earMidis(shape: app.guitar.theory.ChordShape): List<Int> {
         val midis = shape.notes.mapNotNull { it?.midi?.value }.sorted()
         val seen = HashSet<Int>()
@@ -309,7 +319,7 @@ class EarTrainingState(
         val parsed = ChordLibrary.parse(resolved.symbol) ?: return
         val (root, q) = parsed
         val tuning = tuningProvider()
-        val shapes = ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
+        val shapes = earShapes(ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuning, frets = DISPLAY_FRETS))
         if (shapes.isEmpty()) return
         val shape = if (prevPlayedShape == null) {
             shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.first()
@@ -380,7 +390,7 @@ class EarTrainingState(
         val parsed = ChordLibrary.parse(symbol) ?: return
         val (root, q) = parsed
         val tuning = tuningProvider()
-        val shapes = ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
+        val shapes = earShapes(ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuning, frets = DISPLAY_FRETS))
         val sustain = (barMs * 0.9).toInt().coerceAtLeast(200)
         if (shapes.isEmpty()) {
             // Exotic chord with no playable guitar voicing: sound the chord tones as a block.
@@ -468,7 +478,7 @@ class EarTrainingState(
         val parsed = ChordLibrary.parse(symbol) ?: return
         val (root, q) = parsed
         val tuning = tuningProvider()
-        val shapes = ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
+        val shapes = earShapes(ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuning, frets = DISPLAY_FRETS))
         if (shapes.isEmpty()) {
             // Fallback for exotic chords with no playable guitar voicing (some
             // advanced-progression chords): sound the chord tones as a block.

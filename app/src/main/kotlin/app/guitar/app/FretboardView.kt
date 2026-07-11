@@ -122,6 +122,8 @@ fun FretboardView(
     camera: FretboardCamera? = null,
 ) {
     val measurer = rememberTextMeasurer()
+    // Board art follows the theme: dark walnut (original) vs cream maple (light).
+    val board = if (LocalSignal.current.isDark) BoardColors.Dark else BoardColors.Light
 
     val minScale = 0.5f                                   // zoom out: neck → half the viewport
     val maxScale = (tuning.stringCount / 2f).coerceAtLeast(1.5f)  // zoom in: ~2 strings tall
@@ -239,9 +241,9 @@ fun FretboardView(
         fun mx(x: Float) = if (leftHanded) w - x else x
 
         // ---------- Wood + grain ----------
-        drawRect(color = GuitarColors.wood, size = Size(w, h))
+        drawRect(color = board.wood, size = Size(w, h))
         // Subtle horizontal grain — a few low-alpha streaks at varying y, varying alpha
-        val grainColor = GuitarColors.woodGrain
+        val grainColor = board.woodGrain
         val grainBands = listOf(
             0.07f to 0.10f, 0.18f to 0.06f, 0.27f to 0.08f, 0.38f to 0.05f,
             0.49f to 0.09f, 0.61f to 0.06f, 0.73f to 0.08f, 0.84f to 0.05f, 0.92f to 0.07f
@@ -258,7 +260,7 @@ fun FretboardView(
         // Open-string band separator (between open column and the nut)
         val openSepX = mx(openWidth)
         drawLine(
-            color = GuitarColors.fretWire.copy(alpha = 0.5f),
+            color = board.fretWire.copy(alpha = 0.5f),
             start = Offset(openSepX, 0f),
             end = Offset(openSepX, h),
             strokeWidth = 1f
@@ -267,7 +269,7 @@ fun FretboardView(
         // ---------- Nut ----------
         val nutLeft = mx(if (leftHanded) openWidth + nutWidth else openWidth)
         drawRect(
-            color = GuitarColors.nut,
+            color = board.nut,
             topLeft = Offset(nutLeft, 0f),
             size = Size(nutWidth, h)
         )
@@ -276,7 +278,7 @@ fun FretboardView(
         for (f in 1..numFrets) {
             val x = mx(openWidth + nutWidth + f * fretSpacing)
             drawLine(
-                color = GuitarColors.fretWire,
+                color = board.fretWire,
                 start = Offset(x, 0f),
                 end = Offset(x, h),
                 strokeWidth = 2.2f
@@ -289,19 +291,19 @@ fun FretboardView(
         val inlayR = max(3f, unit * 0.12f)
         for (f in singleDots) if (f <= numFrets) {
             val x = mx(openWidth + nutWidth + (f - 0.5f) * fretSpacing)
-            drawCircle(GuitarColors.inlay.copy(alpha = 0.6f), radius = inlayR, center = Offset(x, h / 2))
+            drawCircle(board.inlay.copy(alpha = 0.6f), radius = inlayR, center = Offset(x, h / 2))
         }
         for (f in doubleDots) if (f <= numFrets) {
             val x = mx(openWidth + nutWidth + (f - 0.5f) * fretSpacing)
-            drawCircle(GuitarColors.inlay.copy(alpha = 0.6f), radius = inlayR, center = Offset(x, h * 0.32f))
-            drawCircle(GuitarColors.inlay.copy(alpha = 0.6f), radius = inlayR, center = Offset(x, h * 0.68f))
+            drawCircle(board.inlay.copy(alpha = 0.6f), radius = inlayR, center = Offset(x, h * 0.32f))
+            drawCircle(board.inlay.copy(alpha = 0.6f), radius = inlayR, center = Offset(x, h * 0.68f))
         }
 
         // ---------- Fret numbers (marker frets, bottom edge) ----------
         // Position is hard to tell in the zoomed portrait view, so number the
         // marker frets in the strip below the lowest string.
         val fretNumStyle = TextStyle(
-            color = GuitarColors.inlay.copy(alpha = 0.85f),
+            color = board.inlay.copy(alpha = 0.85f),
             fontSize = (stringSpacing * 0.28f).toSp(),
             fontWeight = FontWeight.SemiBold,
         )
@@ -330,14 +332,14 @@ fun FretboardView(
                 val thickness = 4.0f - (s * 0.5f)            // 4.0, 3.5, 3.0 for s=0,1,2
                 // Base bronze line
                 drawLine(
-                    color = GuitarColors.stringWound,
+                    color = board.stringWound,
                     start = Offset(0f, y),
                     end = Offset(w, y),
                     strokeWidth = thickness
                 )
                 // Winding hatches (slightly darker bronze, dashed)
                 drawLine(
-                    color = GuitarColors.stringWound.copy(red = 0.6f, green = 0.45f, blue = 0.25f).copy(alpha = 0.8f),
+                    color = board.stringWound.copy(red = 0.6f, green = 0.45f, blue = 0.25f).copy(alpha = 0.8f),
                     start = Offset(0f, y),
                     end = Offset(w, y),
                     strokeWidth = thickness * 0.85f,
@@ -354,7 +356,7 @@ fun FretboardView(
                 val plainIdx = s - woundCutoff               // 0,1,2 for top three
                 val thickness = 2.1f - (plainIdx * 0.3f)     // 2.1, 1.8, 1.5
                 drawLine(
-                    color = GuitarColors.stringPlain,
+                    color = board.stringPlain,
                     start = Offset(0f, y),
                     end = Offset(w, y),
                     strokeWidth = thickness
@@ -399,7 +401,7 @@ fun FretboardView(
                     if (mark.isRoot) {
                         // Pearl inner ring for the root, makes it pop
                         drawCircle(
-                            color = GuitarColors.inlay,
+                            color = board.inlay,
                             radius = dotR * 0.78f,
                             center = Offset(cx, cy),
                             style = Stroke(width = 1.5f)
