@@ -5,7 +5,7 @@
 // Tap hit-testing inverts that transform back into neck-local coordinates, exactly
 // like the Compose version maps pointer coords back through its graphicsLayer.
 
-import { Colors, withAlpha } from "./theme";
+import { Colors, withAlpha, boardColors, BoardPalette } from "./theme";
 import { FretMark, MarkKind } from "./marks";
 import { Tuning, FretPosition, fp, midiPitchClass, spellPc, stringCount } from "../theory";
 
@@ -311,10 +311,11 @@ export class FretboardCanvas {
   draw(): void {
     if (!this.data || this.boxW === 0) return;
     const ctx = this.ctx;
+    const board = boardColors();
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, this.boxW, this.boxH);
-    ctx.fillStyle = Colors.background;
+    ctx.fillStyle = board.bg;
     ctx.fillRect(0, 0, this.boxW, this.boxH);
 
     const cx = this.boxW / 2;
@@ -325,11 +326,11 @@ export class FretboardCanvas {
     ctx.scale(this.scale, this.scale);
     ctx.translate(-cx, -cy);
     ctx.translate(x0, y0);
-    this.drawNeck(ctx);
+    this.drawNeck(ctx, board);
     ctx.restore();
   }
 
-  private drawNeck(ctx: CanvasRenderingContext2D): void {
+  private drawNeck(ctx: CanvasRenderingContext2D, board: BoardPalette): void {
     const d = this.data!;
     const sc = stringCount(d.tuning);
     const numFrets = d.numFrets;
@@ -347,7 +348,7 @@ export class FretboardCanvas {
     const mx = (x: number) => (d.leftHanded ? w - x : x);
 
     // wood + grain
-    ctx.fillStyle = Colors.wood;
+    ctx.fillStyle = board.wood;
     ctx.fillRect(0, 0, w, h);
     const grain: [number, number][] = [
       [0.07, 0.10], [0.18, 0.06], [0.27, 0.08], [0.38, 0.05], [0.49, 0.09],
@@ -355,7 +356,7 @@ export class FretboardCanvas {
     ];
     ctx.lineWidth = 1.2;
     for (const [yFrac, alpha] of grain) {
-      ctx.strokeStyle = withAlpha(Colors.woodGrain, alpha);
+      ctx.strokeStyle = withAlpha(board.woodGrain, alpha);
       ctx.beginPath();
       ctx.moveTo(0, h * yFrac);
       ctx.lineTo(w, h * yFrac);
@@ -363,24 +364,24 @@ export class FretboardCanvas {
     }
 
     // open-string separator
-    line(ctx, mx(openWidth), 0, mx(openWidth), h, withAlpha(Colors.fretWire, 0.5), 1);
+    line(ctx, mx(openWidth), 0, mx(openWidth), h, withAlpha(board.fretWire, 0.5), 1);
 
     // nut
     const nutLeft = mx(d.leftHanded ? openWidth + nutWidth : openWidth);
-    ctx.fillStyle = Colors.nut;
+    ctx.fillStyle = board.nut;
     ctx.fillRect(nutLeft, 0, nutWidth, h);
 
     // fret wires
     for (let f = 1; f <= numFrets; f++) {
       const x = mx(openWidth + nutWidth + f * fretSpacing);
-      line(ctx, x, 0, x, h, Colors.fretWire, 2.2);
+      line(ctx, x, 0, x, h, board.fretWire, 2.2);
     }
 
     // inlays
     const singleDots = [3, 5, 7, 9, 15, 17, 19, 21];
     const doubleDots = [12, 24];
     const inlayR = Math.max(3, unit * 0.12);
-    ctx.fillStyle = withAlpha(Colors.inlay, 0.6);
+    ctx.fillStyle = withAlpha(board.inlay, 0.6);
     for (const f of singleDots) {
       if (f > numFrets) continue;
       const x = mx(openWidth + nutWidth + (f - 0.5) * fretSpacing);
@@ -395,7 +396,7 @@ export class FretboardCanvas {
 
     // Fret numbers at the marker frets (bottom edge) — position is hard to tell
     // when zoomed, so number the markers.
-    ctx.fillStyle = withAlpha(Colors.inlay, 0.85);
+    ctx.fillStyle = withAlpha(board.inlay, 0.85);
     ctx.font = `600 ${Math.max(9, stringSpacing * 0.28)}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
@@ -412,7 +413,7 @@ export class FretboardCanvas {
       const isWound = s < woundCutoff;
       if (isWound) {
         const thickness = 4.0 - s * 0.5;
-        line(ctx, 0, y, w, y, Colors.stringWound, thickness);
+        line(ctx, 0, y, w, y, board.stringWound, thickness);
         ctx.setLineDash([2.5, 1.5]);
         line(ctx, 0, y, w, y, withAlpha("#996F40", 0.8), thickness * 0.85);
         ctx.setLineDash([]);
@@ -420,7 +421,7 @@ export class FretboardCanvas {
       } else {
         const plainIdx = s - woundCutoff;
         const thickness = 2.1 - plainIdx * 0.3;
-        line(ctx, 0, y, w, y, Colors.stringPlain, thickness);
+        line(ctx, 0, y, w, y, board.stringPlain, thickness);
         line(ctx, 0, y - thickness * 0.3, w, y - thickness * 0.3, "#F3E9CC", 0.6);
       }
     }
@@ -443,7 +444,7 @@ export class FretboardCanvas {
         ctx.fillStyle = fill;
         circle(ctx, mxp, myp, dotR);
         if (mark.isRoot) {
-          ctx.strokeStyle = Colors.inlay;
+          ctx.strokeStyle = board.inlay;
           ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.arc(mxp, myp, dotR * 0.78, 0, Math.PI * 2);
@@ -497,7 +498,7 @@ export class FretboardCanvas {
     }
 
     // fret-number row
-    ctx.fillStyle = Colors.background;
+    ctx.fillStyle = board.bg;
     ctx.fillRect(0, h, w, numberStripH);
     ctx.fillStyle = Colors.textSecondary;
     ctx.font = `500 ${numberStripH * 0.55}px system-ui, sans-serif`;

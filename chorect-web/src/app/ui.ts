@@ -175,6 +175,26 @@ export class App {
       this.loop.loadProgressionIntoLoop(symbols);
       state.openSheet(Sheet.Loop);
     });
+    // Quick light/dark toggle (the full Dark/Light/Auto control lives in
+    // Settings -> Personalize). Shows the mode you'd switch TO — mirrors
+    // MainActivity's IconButton exactly: sun while dark (tap -> Light), moon
+    // while light/auto (tap -> Dark). Self-contained: it swaps its own icon on
+    // click rather than waiting for a render() pass, since the header is built
+    // once here and isn't touched by the state-driven re-render loop.
+    const themeToggleBtn = el("button", {
+      class: "btn icon",
+      "aria-label": "Toggle theme",
+      title: "Toggle theme",
+    });
+    const refreshThemeToggleIcon = () => {
+      clear(themeToggleBtn);
+      themeToggleBtn.appendChild(icon(state.themeMode === "Dark" ? "sun" : "moon", 18));
+    };
+    refreshThemeToggleIcon();
+    themeToggleBtn.addEventListener("click", () => {
+      state.setThemeMode(state.themeMode === "Dark" ? "Light" : "Dark");
+      refreshThemeToggleIcon();
+    });
     const header = el("div", { class: "app-header" }, [
       el("span", { class: "app-brand" }, ["chorect"]),
       el("span", { class: "app-byline" }, [
@@ -186,6 +206,8 @@ export class App {
           rel: "noopener",
         }, ["@nadavileh"]),
       ]),
+      el("span", { class: "spacer" }),
+      themeToggleBtn,
     ]);
     const appRoot = el("div", { class: "app-root" }, [this.railEl, this.contentEl]);
     const shell = el("div", { class: "app-shell" }, [header, appRoot]);

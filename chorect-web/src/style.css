@@ -48,14 +48,16 @@
 }
 
 /* Light theme: Signal light tokens (act/feedback darkened for contrast).
+   Creamy warm scheme — mirrors Theme.kt SignalColors light EXACTLY (user
+   feedback: the earlier cool near-white read too bright).
    (The wooden fretboard canvas keeps its own palette either way.) */
 :root.light {
-  --bg: #F4F6FB;
-  --surface: #FFFFFF;
-  --surface-elev: #E9EDF6;
-  --divider: #D8DEED;
-  --text-primary: #1C2233;
-  --text-secondary: #5D6782;
+  --bg: #F3EDDF;
+  --surface: #FBF7EC;
+  --surface-elev: #EAE1CD;
+  --divider: #DCD1B8;
+  --text-primary: #2B241A;
+  --text-secondary: #7C7159;
   --text-disabled: #A9AFC7;
 
   --act: #E03E39;
@@ -849,6 +851,16 @@ select.et-select {
 }
 .drum-load-pop .lrow { display: flex; align-items: center; gap: 6px; padding: 7px 10px; cursor: pointer; border-radius: 6px; }
 .drum-load-pop .lrow:hover { background: rgba(255,255,255,0.05); }
+/* Per-instrument voice popup (v2.1.0 drums restore): opened by tapping the
+   row's instrument-name label; overall + per-voice volume sliders, tap-to-
+   preview labels, and Remove. */
+.drum-voice-pop {
+  position: absolute; z-index: 30; margin-top: 4px; width: 240px;
+  background: var(--surface); border: 1px solid var(--divider); border-radius: 12px;
+  padding: 10px 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+.drum-voice-pop .vrow { padding: 6px 4px; cursor: pointer; border-radius: 6px; }
+.drum-voice-pop .vrow:hover { background: rgba(255,255,255,0.05); }
 
 /* ---------- Progression looper ---------- */
 

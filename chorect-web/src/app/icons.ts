@@ -32,15 +32,20 @@ export type IconName =
   | "restart"
   | "close"
   | "add"
-  | "mic";
+  | "mic"
+  | "sun"
+  | "moon";
 
 const PATH: Record<IconName, string> = {
-  // Fretboard grid (was NAV_ICONS.fretboard).
-  neck: '<rect x="3" y="4" width="18" height="16" rx="1"/><line x1="3" y1="9.3" x2="21" y2="9.3"/><line x1="3" y1="14.6" x2="21" y2="14.6"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/>',
-  // Ear / listening glyph (unchanged).
-  ear: '<path d="M4 10v4h3l5 4V6L7 10H4z"/><path d="M16 8.5a4 4 0 0 1 0 7"/><path d="M18.5 6a7.5 7.5 0 0 1 0 12"/>',
-  // Drum bars (was NAV_ICONS.drums — Rhythm tab = the samba/drum looper).
-  rhythm: '<line x1="5" y1="20" x2="5" y2="11"/><line x1="10" y1="20" x2="10" y2="4"/><line x1="15" y1="20" x2="15" y2="13"/><line x1="20" y1="20" x2="20" y2="8"/>',
+  // Fretboard board — mirrors Android ShellIcons.Fretboard (board outline +
+  // nut + 2 frets + 3 strings + 2 inlay dots).
+  neck: '<path d="M3.5 6.5 L20.5 6.5 L20.5 17.5 L3.5 17.5 Z M6 6.5 L6 17.5 M11 6.5 L11 17.5 M16 6.5 L16 17.5"/><path d="M3.5 9.5 L20.5 9.5 M3.5 12 L20.5 12 M3.5 14.5 L20.5 14.5" stroke-width="1.2"/><circle cx="9.6" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="12" r="1.1" fill="currentColor" stroke="none"/>',
+  // Ear outline — mirrors Android ShellIcons.Ear (outer helix + lobe, inner
+  // antihelix/canal curve).
+  ear: '<path d="M17.5 10 C17.5 6.4 15 4 12 4 C9 4 6.5 6.4 6.5 10 C6.5 12.2 7.6 13.2 8.4 14.6 C9.1 15.8 9.2 17.3 10.3 18.4 C11.6 19.7 13.9 19.6 15 18.2"/><path d="M14.5 10 C14.5 8.1 13.4 7 12 7 C10.6 7 9.5 8.1 9.5 10 C9.5 11.4 10.5 11.9 11.2 13"/>',
+  // Drum — mirrors Android ShellIcons.Drum (elliptical head, tapered shell,
+  // crossed sticks above).
+  rhythm: '<path d="M4.5 11.5 C4.5 9.8 7.9 8.5 12 8.5 C16.1 8.5 19.5 9.8 19.5 11.5 C19.5 13.2 16.1 14.5 12 14.5 C7.9 14.5 4.5 13.2 4.5 11.5 Z"/><path d="M4.5 11.5 L4.5 16.5 C4.5 18.2 7.9 19.5 12 19.5 C16.1 19.5 19.5 18.2 19.5 16.5 L19.5 11.5"/><path d="M8.5 10.5 L16.5 4.5 M15.5 10.5 L7.5 4.5"/>',
   // Loop arrows (unchanged).
   loop: '<polyline points="17 2 21 6 17 10"/><path d="M3 12V10a4 4 0 0 1 4-4h14"/><polyline points="7 22 3 18 7 14"/><path d="M21 12v2a4 4 0 0 1-4 4H3"/>',
   // Tuner dial + needle (unchanged).
@@ -78,6 +83,11 @@ const PATH: Record<IconName, string> = {
   add: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   // Tuner mic-permission panel (Signal T10): replaces the "🎤" emoji glyph.
   mic: '<path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M6 11a6 6 0 0 0 12 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/>',
+  // Header quick theme toggle (v2.1.0): sun shown when dark (tap -> Light),
+  // moon shown when light/auto (tap -> Dark) — mirrors Android's
+  // Icons.Outlined.LightMode/DarkMode quick toggle in MainActivity.
+  sun: '<circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
+  moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
 };
 
 /**

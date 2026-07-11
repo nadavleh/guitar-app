@@ -140,8 +140,11 @@ export class AppState {
    *  source (see `load()`), mirroring Android's AppState.darkTheme. */
   darkTheme = true;
   /** UI theme mode (Settings' Personalize section): Dark/Light/Auto. "Auto"
-   *  resolves against `prefers-color-scheme` in ui.ts's render(). */
-  themeMode: ThemeMode = "Dark";
+   *  resolves against `prefers-color-scheme` in ui.ts's render(). Fresh
+   *  installs default to Light (v2.1.0); a never-configured profile falls
+   *  back through the `darkTheme` migration in `load()`, so existing users
+   *  keep whatever they already had. */
+  themeMode: ThemeMode = "Light";
   /** ACT accent (Personalize / Settings). "coral" is the default. */
   accent: AccentName = "coral";
   /** User-configurable tab set + order (Settings' "Tabs & order" editor); the

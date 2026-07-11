@@ -1,21 +1,17 @@
-// Drum-machine screen, ported from app/.../SambaLooperScreen.kt (Signal redesign,
-// see docs/superpowers/specs/2026-07-10-signal-gui-redesign-design.md
-// §Screens → Rhythm). A header `segmented()` control swaps the body between
-// three sections:
-//  - **Pattern** — the step grid itself (tap a cell to cycle its voice, or
-//    clear in Erase mode; long-press/right-click clears), a dismissible
-//    gesture-legend banner, and a compact swing/metronome card. Save…/Load…/
-//    Clear all/Erase/Accent stay reachable in this section's header.
-//  - **Mixer** — per-instrument + per-voice volume (previously tucked behind a
-//    per-row popup opened by tapping the instrument name).
-//  - **Kit** — add/remove instruments (previously the footer's dropdown).
-// None of the grid's gesture handlers or SambaLooperState calls changed — this
-// is a chrome-only regrouping of the same controls (mirrors Android T8).
+// Drum-machine screen, ported from app/.../SambaLooperScreen.kt. Pattern-only
+// (v2.1.0 restores the pre-Signal interaction, dropping the Signal redesign's
+// Mixer/Kit segments — see commit b02d227 on Android): the step grid itself
+// (tap a cell to cycle its voice, or clear in Erase mode; long-press/right-
+// click clears), a dismissible gesture-legend banner, and a compact
+// swing/metronome card. Tapping an instrument's row label opens a voice
+// popup (overall + per-voice volume, tap-to-preview, Remove); a "+ Add ▾"
+// control in the header row adds instruments from the catalog. Save…/Load…/
+// Clear all/Erase/Accent stay in the same header row.
 
 import { SambaLooperState } from "./sambaLooperState";
 import { EarTrainingState } from "./earTrainingState";
 import { Colors } from "./theme";
-import { el, btn, slider, segmented, labelSm } from "./dom";
+import { el, btn, slider } from "./dom";
 import { icon } from "./icons";
 import { transportDock, toneSheet } from "./transport";
 import { AppState } from "./appState";
@@ -31,27 +27,22 @@ const TIME_SIGNATURES: [number, number][] = [
 
 const LONG_PRESS_MS = 450;
 
-type RhythmSection = "pattern" | "mixer" | "kit";
-const RHYTHM_SECTIONS: { value: RhythmSection; label: string }[] = [
-  { value: "pattern", label: "Pattern" },
-  { value: "mixer", label: "Mixer" },
-  { value: "kit", label: "Kit" },
-];
-
-/** Whether the Pattern section's gesture-legend banner has been dismissed.
- *  Module-level (not an instance field) — mirrors Android's
- *  `remember { mutableStateOf(false) }` inside `PatternSection`, which resets
- *  every time that composable enters composition (i.e. every screen visit);
- *  `SambaLooperUI` itself is a single long-lived instance (see ui.ts), so a
- *  plain module-level flag is the equivalent "resets on reload, not on every
- *  rerender" behavior (same pattern as transport.ts's bpmExpanded/eqExpanded). */
+/** Whether the gesture-legend banner has been dismissed. Module-level (not an
+ *  instance field) — mirrors Android's `remember { mutableStateOf(false) }`
+ *  inside PatternSection, which resets every time that composable enters
+ *  composition (i.e. every screen visit); `SambaLooperUI` itself is a single
+ *  long-lived instance (see ui.ts), so a plain module-level flag is the
+ *  equivalent "resets on reload, not on every rerender" behavior (same
+ *  pattern as transport.ts's bpmExpanded/eqExpanded). */
 let legendDismissed = false;
 
 export class SambaLooperUI {
-  private section: RhythmSection = "pattern";
   private eraseMode = false;
   private accentMode = false;
+  /** Instrument id whose voice popup (overall + per-voice volume, Remove) is open. */
+  private openVoiceMenu: string | null = null;
   private loadMenuOpen = false;
+  private addMenuOpen = false;
   private saveOpen = false;
   private saveName = "";
   /** Shared lane scroll position, preserved across the full re-renders. */
@@ -78,16 +69,10 @@ export class SambaLooperUI {
     ]));
 
     screen.appendChild(el("div", { class: "v-gap-8" }));
-    screen.appendChild(segmented<RhythmSection>(
-      RHYTHM_SECTIONS, this.section, (v) => { this.section = v; this.rerender(); },
-    ));
 
     const body = el("div", { class: "et-scroll" });
     screen.appendChild(body);
-
-    if (this.section === "pattern") body.appendChild(this.patternSection());
-    else if (this.section === "mixer") body.appendChild(this.mixerSection());
-    else body.appendChild(this.kitSection());
+    body.appendChild(this.patternSection());
 
     // Transport dock (Signal move #2): BPM lives here now — samba reads `bpm`
     // live every slot (see SambaLooperState.start()), so no restart is needed
@@ -105,8 +90,7 @@ export class SambaLooperUI {
     if (this.toneSheetOpen) container.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.rerender(); }));
 
     // Keep all step lanes scrolled together (fixed-size cells scroll horizontally
-    // so they stay a consistent size regardless of viewport width). Only present
-    // in the Pattern section; a no-op elsewhere.
+    // so they stay a consistent size regardless of viewport width).
     const lanes = Array.from(screen.querySelectorAll<HTMLElement>(".drum-cells"));
     for (const lane of lanes) {
       lane.scrollLeft = this.laneScrollLeft;
@@ -132,12 +116,12 @@ export class SambaLooperUI {
       document.removeEventListener("pointerdown", this.outsideCloser, true);
       this.outsideCloser = null;
     }
-    if (this.loadMenuOpen || this.saveOpen) {
+    if (this.openVoiceMenu !== null || this.loadMenuOpen || this.addMenuOpen || this.saveOpen) {
       const onDoc = (e: Event) => {
-        if (!(e.target as HTMLElement).closest(".drum-load-pop")) {
+        if (!(e.target as HTMLElement).closest(".drum-voice-pop, .drum-load-pop")) {
           document.removeEventListener("pointerdown", onDoc, true);
           if (this.outsideCloser === onDoc) this.outsideCloser = null;
-          this.loadMenuOpen = false; this.saveOpen = false;
+          this.openVoiceMenu = null; this.loadMenuOpen = false; this.addMenuOpen = false; this.saveOpen = false;
           this.rerender();
         }
       };
@@ -154,8 +138,7 @@ export class SambaLooperUI {
     const s = this.samba;
     const wrap = el("div", {});
 
-    // Section header: Erase / Accent / Save… / Load… / Clear all (same calls
-    // the old always-visible footer used — just relocated here per spec).
+    // Header row: Erase / Accent / Save… / Load… / Clear all / + Add ▾.
     const erase = this.eraseMode
       ? btn("Erase ✓", () => { this.eraseMode = false; this.rerender(); }, "btn primary")
       : btn("Erase", () => { this.eraseMode = true; this.accentMode = false; this.rerender(); });
@@ -164,10 +147,11 @@ export class SambaLooperUI {
       : btn("Accent", () => { this.accentMode = true; this.eraseMode = false; this.rerender(); });
     wrap.appendChild(el("div", { class: "et-row-gap" }, [
       erase, accent, this.saveControl(), this.loadControl(), btn("Clear all", () => s.clearAll()),
+      this.addInstrumentControl(),
     ]));
 
-    // Dismissible gesture-legend banner (per spec: "one dismissible gesture-
-    // legend banner"), module-level flag — see the `legendDismissed` doc above.
+    // Dismissible gesture-legend banner (module-level flag — see the
+    // `legendDismissed` doc above).
     if (!legendDismissed) {
       const closeBtn = el("button", { class: "tune-btn", "aria-label": "Dismiss" }, [icon("close", 16)]);
       closeBtn.addEventListener("click", () => { legendDismissed = true; this.rerender(); });
@@ -187,8 +171,7 @@ export class SambaLooperUI {
     for (const inst of s.pattern.instruments) wrap.appendChild(this.instrumentRow(inst));
     wrap.appendChild(el("div", { class: "drum-caption" }, [s.meter.describe()]));
 
-    // Compact card: tap-tempo + metronome + swing (Pattern-only tools, moved
-    // out of the always-visible header/footer per spec).
+    // Compact card: tap-tempo + metronome + swing.
     const swingActive = s.meter.beatUnit === 4 && s.meter.division === 16;
     const swingSlider = slider(0, 100, s.swing, (v) => s.setSwing(v));
     swingSlider.disabled = !swingActive;
@@ -264,18 +247,23 @@ export class SambaLooperUI {
     return el("div", { class: "drum-setup-row" }, [bars, time, division, shift]);
   }
 
-  /** Pattern-tab row: instrument name label + Mute/Solo toggles + its step cells.
-   *  (Per-voice volume and Remove now live in the Mixer / Kit sections respectively.) */
+  /** Instrument row: name label (tap → voice popup with overall + per-voice
+   *  volume, tap-to-preview, and Remove) + Mute/Solo toggles + its step cells. */
   private instrumentRow(inst: PercussionInstrument): HTMLElement {
     const s = this.samba;
     const audible = s.isAudible(inst);
+
+    const name = el("span", { class: "name" }, [inst.displayName + " ▾"]);
+    name.addEventListener("click", () => { this.openVoiceMenu = this.openVoiceMenu === inst.id ? null : inst.id; this.rerender(); });
+    const labelInner = el("div", {}, [name]);
+    if (this.openVoiceMenu === inst.id) labelInner.appendChild(this.voicePopup(inst));
 
     const mTag = el("button", { class: s.muted.has(inst.id) ? "ms-tag on-m" : "ms-tag" }, ["M"]);
     mTag.addEventListener("click", () => s.toggleMute(inst));
     const sTag = el("button", { class: s.soloed.has(inst.id) ? "ms-tag on-s" : "ms-tag" }, ["S"]);
     sTag.addEventListener("click", () => s.toggleSolo(inst));
-    const label = el("div", { class: audible ? "drum-label" : "drum-label dim" }, [
-      el("div", { class: "name" }, [inst.displayName]),
+    const label = el("div", { class: audible ? "drum-label" : "drum-label dim", style: "position:relative" }, [
+      labelInner,
       el("div", { class: "drum-ms" }, [mTag, sTag]),
     ]);
 
@@ -297,21 +285,23 @@ export class SambaLooperUI {
   }
 
   /** UNTOUCHED gesture logic (tap = cycle/erase/accent; long-press/right-click
-   *  = clear) — only the fill/border coloring changed (Signal recolor: hit
-   *  cells are always the act color regardless of voice, since the printed
-   *  glyph already distinguishes voices; the accent ring is the feedback color). */
+   *  = clear) — per-voice multicolor fill restored (voice 0/1/else ->
+   *  primary/scaleTone/chordTone), the pre-Signal mapping. */
   private cell(inst: PercussionInstrument, slot: number, beatIndex: number, isBeatStart: boolean): HTMLElement {
     const s = this.samba;
     const voice = s.pattern.voiceAt(inst, slot);
     const accented = s.pattern.isAccented(inst, slot);
     const isPlayhead = s.currentSlot === slot;
     // Empty cells brightened (were near-invisible on black) and tinted per beat-group
-    // so the quarter-note grouping reads at a glance (#7): first 16th of each beat is
+    // so the quarter-note grouping reads at a glance: first 16th of each beat is
     // brightest; alternating beats step between two shades.
     const emptyFill = isBeatStart ? "rgba(120,128,144,0.55)"
       : beatIndex % 2 === 0 ? "rgba(120,128,144,0.42)"
       : "rgba(120,128,144,0.30)";
-    const fill = voice === null ? emptyFill : Colors.primary;
+    const fill = voice === null ? emptyFill
+      : voice === 0 ? Colors.primary
+      : voice === 1 ? Colors.scaleTone
+      : Colors.chordTone;
     const cls = "drum-cell" + (isPlayhead ? " playhead" : "") + (accented ? " accent" : "");
     const c = el("div", { class: cls, style: `background:${fill}` },
       [voice !== null ? voiceOf(inst, voice).glyph : ""]);
@@ -342,10 +332,64 @@ export class SambaLooperUI {
     return c;
   }
 
+  /** Voice popup: overall instrument volume, per-voice volume (tap the label
+   *  to audition), and a Remove action — opened by tapping the row's name. */
+  private voicePopup(inst: PercussionInstrument): HTMLElement {
+    const s = this.samba;
+    const vol = s.volumeOf(inst);
+    const pop = el("div", { class: "drum-voice-pop" }, [
+      el("div", { style: "font-weight:600;font-size:13px" }, [`Overall volume: ${Math.round(vol * 100)}%`]),
+      slider(0, 1, vol, (v) => s.setVolume(inst, v), 0.01),
+      el("div", { class: "divider-line" }),
+      el("div", { class: "ans-label" }, ["Per-voice volume (tap name to audition)"]),
+    ]);
+    voicesFor(inst).forEach((v, idx) => {
+      const src = s.usesSample(inst, idx) ? "sample" : "synth";
+      const vvol = s.voiceVolumeOf(inst, idx);
+      const label = el("span", { style: "flex:1" }, [`${v.glyph}   ${v.displayName}   ·   ${Math.round(vvol * 100)}%`]);
+      const row = el("div", { class: "vrow", style: "display:flex;align-items:center;gap:8px" }, [
+        label,
+        el("span", { style: `font-size:10px;color:${s.usesSample(inst, idx) ? Colors.primary : Colors.textSecondary}` }, [src]),
+      ]);
+      label.addEventListener("click", (e) => { e.stopPropagation(); s.preview(inst, idx); });
+      pop.appendChild(row);
+      pop.appendChild(slider(0, 1, vvol, (val) => s.setVoiceVolume(inst, idx, val), 0.01));
+    });
+    // Remove this instrument from the kit.
+    pop.appendChild(el("div", { class: "divider-line" }));
+    const remove = el("div", { class: "vrow", style: `color:${Colors.textSecondary}` }, [`Remove ${inst.displayName}`]);
+    remove.addEventListener("click", (e) => { e.stopPropagation(); this.openVoiceMenu = null; s.removeInstrument(inst); this.rerender(); });
+    pop.appendChild(remove);
+    return pop;
+  }
+
+  /** "+ Add ▾" button + dropdown of catalog instruments not yet in the kit. */
+  private addInstrumentControl(): HTMLElement {
+    const s = this.samba;
+    const wrap = el("div", { style: "position:relative" });
+    wrap.appendChild(btn(this.addMenuOpen ? "+ Add ✕" : "+ Add ▾", () => {
+      this.addMenuOpen = !this.addMenuOpen; this.loadMenuOpen = false; this.saveOpen = false; this.rerender();
+    }, "btn primary"));
+    if (this.addMenuOpen) {
+      const pop = el("div", { class: "drum-load-pop" });
+      const toAdd = s.instrumentsToAdd();
+      if (toAdd.length === 0) {
+        pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary)" }, ["(all instruments added)"]));
+      }
+      for (const inst of toAdd) {
+        const row = el("div", { class: "lrow" }, [inst.displayName]);
+        row.addEventListener("click", () => { s.addInstrument(inst); this.addMenuOpen = false; this.rerender(); });
+        pop.appendChild(row);
+      }
+      wrap.appendChild(pop);
+    }
+    return wrap;
+  }
+
   private saveControl(): HTMLElement {
     const s = this.samba;
     const wrap = el("div", { style: "position:relative" });
-    wrap.appendChild(btn(this.saveOpen ? "Save ✕" : "Save…", () => { this.saveOpen = !this.saveOpen; this.loadMenuOpen = false; this.rerender(); }));
+    wrap.appendChild(btn(this.saveOpen ? "Save ✕" : "Save…", () => { this.saveOpen = !this.saveOpen; this.loadMenuOpen = false; this.addMenuOpen = false; this.rerender(); }));
     if (this.saveOpen) {
       const input = el("input", { type: "text", placeholder: "Beat name", style: "width:150px" }) as HTMLInputElement;
       input.value = this.saveName;
@@ -362,7 +406,7 @@ export class SambaLooperUI {
   private loadControl(): HTMLElement {
     const s = this.samba;
     const wrap = el("div", { style: "position:relative" });
-    wrap.appendChild(btn(this.loadMenuOpen ? "Load ✕" : "Load…", () => { this.loadMenuOpen = !this.loadMenuOpen; this.saveOpen = false; this.rerender(); }));
+    wrap.appendChild(btn(this.loadMenuOpen ? "Load ✕" : "Load…", () => { this.loadMenuOpen = !this.loadMenuOpen; this.saveOpen = false; this.addMenuOpen = false; this.rerender(); }));
     if (this.loadMenuOpen) {
       const pop = el("div", { class: "drum-load-pop" });
       for (const b of BUILTIN_PATTERNS) {
@@ -381,77 +425,6 @@ export class SambaLooperUI {
       }
       if (saved.size === 0) pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary)" }, ["(no saved beats yet)"]));
       wrap.appendChild(pop);
-    }
-    return wrap;
-  }
-
-  // ---------- MIXER section ----------
-
-  private mixerSection(): HTMLElement {
-    const s = this.samba;
-    const wrap = el("div", {});
-    wrap.appendChild(labelSm("Volume — per instrument & voice"));
-    if (s.pattern.instruments.length === 0) {
-      wrap.appendChild(el("div", { class: "et-muted" }, ["No instruments in the kit yet — add some from the Kit section."]));
-      return wrap;
-    }
-    for (const inst of s.pattern.instruments) wrap.appendChild(this.mixerCard(inst));
-    return wrap;
-  }
-
-  private mixerCard(inst: PercussionInstrument): HTMLElement {
-    const s = this.samba;
-    const vol = s.volumeOf(inst);
-    const card = el("div", { class: "et-card", style: `background:var(--surface2)` }, [
-      el("div", { style: "font-weight:600" }, [inst.displayName]),
-      el("div", { class: "label-sm" }, [`Overall volume: ${Math.round(vol * 100)}%`]),
-      slider(0, 1, vol, (v) => s.setVolume(inst, v), 0.01),
-      el("div", { class: "divider-line" }),
-      el("div", { class: "ans-label" }, ["Per-voice volume (tap name to audition)"]),
-    ]);
-    voicesFor(inst).forEach((v, idx) => {
-      const src = s.usesSample(inst, idx) ? "sample" : "synth";
-      const vvol = s.voiceVolumeOf(inst, idx);
-      const label = el("span", { style: "flex:1;cursor:pointer" }, [`${v.glyph}   ${v.displayName}   ·   ${Math.round(vvol * 100)}%`]);
-      label.addEventListener("click", () => s.preview(inst, idx));
-      const row = el("div", { class: "row", style: "margin-top:6px" }, [
-        label,
-        el("span", { style: `font-size:10px;color:${s.usesSample(inst, idx) ? "var(--act)" : "var(--muted)"}` }, [src]),
-      ]);
-      card.appendChild(row);
-      card.appendChild(slider(0, 1, vvol, (val) => s.setVoiceVolume(inst, idx, val), 0.01));
-    });
-    return card;
-  }
-
-  // ---------- KIT section ----------
-
-  private kitSection(): HTMLElement {
-    const s = this.samba;
-    const wrap = el("div", {});
-    wrap.appendChild(labelSm("Current kit"));
-    if (s.pattern.instruments.length === 0) {
-      wrap.appendChild(el("div", { class: "et-muted" }, ["(kit is empty)"]));
-    } else {
-      for (const inst of s.pattern.instruments) {
-        wrap.appendChild(el("div", { class: "row", style: "margin:4px 0" }, [
-          el("span", { style: "flex:1" }, [inst.displayName]),
-          btn("Remove", () => s.removeInstrument(inst)),
-        ]));
-      }
-    }
-
-    wrap.appendChild(el("div", { class: "divider-line" }));
-    wrap.appendChild(labelSm("Add instrument"));
-    const toAdd = s.instrumentsToAdd();
-    if (toAdd.length === 0) {
-      wrap.appendChild(el("div", { class: "et-muted" }, ["(all instruments added)"]));
-    } else {
-      wrap.appendChild(el("div", { class: "chip-row" }, toAdd.map((inst) => {
-        const b = el("button", { class: "chip" }, [inst.displayName]);
-        b.addEventListener("click", () => s.addInstrument(inst));
-        return b;
-      })));
     }
     return wrap;
   }
