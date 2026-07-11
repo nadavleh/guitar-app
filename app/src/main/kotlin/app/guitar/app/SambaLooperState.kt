@@ -47,8 +47,6 @@ class SambaLooperState(
     var bpm by mutableStateOf(70)
     /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
     var swing by mutableStateOf(0)
-    /** Metronome click on each beat (accented on bar downbeats). */
-    var metronome by mutableStateOf(false)
     var isPlaying by mutableStateOf(false)
         private set
 
@@ -251,10 +249,6 @@ class SambaLooperState(
         scope.launch { repo.deleteDrumPattern(name) }
     }
 
-    // Metronome click buffers (lazy; accented downbeat vs plain beat).
-    private val clickAccent by lazy { synth.metronomeClick(accent = true) }
-    private val clickBeat by lazy { synth.metronomeClick(accent = false) }
-
     /** Frames until a buffer first reaches 90 % of its peak. Aligned hits sit at
      *  ~3 ms; crescendo articulations (shake rolls, long scrapes) bloom much later
      *  and are started early so their accent lands on the grid. */
@@ -287,10 +281,6 @@ class SambaLooperState(
             val sr = 44100
             fun scheduleSlot(snapshot: PercussionPattern, slot: Int, delayMs: Long) {
                 val baseFrames = (delayMs * sr / 1000).toInt()
-                if (metronome && slot % snapshot.meter.slotsPerBeat == 0) {
-                    val click = if (slot % snapshot.meter.slotsPerBar == 0) clickAccent else clickBeat
-                    audio.playSamplesAt(click, 1f, baseFrames)
-                }
                 for (inst in snapshot.instruments) {
                     if (!isAudible(inst)) continue
                     val v = snapshot.voiceAt(inst, slot) ?: continue

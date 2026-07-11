@@ -72,6 +72,9 @@ function defaultReverb(): Record<SoundName, number> {
 
 const LS_KEY = "chorect-web.v1";
 
+/** Default Play-mode quick-chord palette: the open-chord workhorses. */
+export const DEFAULT_CHORD_SLOTS: readonly string[] = ["C", "G", "Am", "F", "D", "Em", "E", "A"];
+
 /** The 5 user-swappable ACT accents (see style.css `[data-accent]` overrides
  *  and app/.../Theme.kt `Accent`). "coral" is the default and maps to no
  *  `data-accent` attribute at all. */
@@ -120,6 +123,7 @@ interface Persisted {
   challengeScores: ChallengeScore[];
   drumPatterns: Record<string, string>;
   drumVolumes: Record<string, number>;
+  chordSlots?: string[];
 }
 
 export class AppState {
@@ -161,6 +165,11 @@ export class AppState {
 
   pickedPositions = new Set<string>(); // fpKey strings
   mutedStrings = new Set<number>();
+  /** Play-mode quick-chord slots (chord symbols), applied via applyChordSlot. Persisted. */
+  chordSlots: string[] = [...DEFAULT_CHORD_SLOTS];
+  /** Index of the slot whose grip is currently on the board (highlights its chip);
+   *  −1 once the grip is hand-edited or cleared. */
+  activeChordSlot = -1;
 
   voicingStyle = VoicingStyle.Standard;
 
@@ -269,6 +278,10 @@ export class AppState {
       if (p.drumVolumes) for (const [k, v] of Object.entries(p.drumVolumes)) {
         if (typeof v === "number") this.drumVolumes.set(k, Math.min(Math.max(v, 0), 1));
       }
+      if (Array.isArray(p.chordSlots) && p.chordSlots.length === DEFAULT_CHORD_SLOTS.length &&
+          p.chordSlots.every((s) => typeof s === "string" && parseChord(s) !== null)) {
+        this.chordSlots = p.chordSlots.slice();
+      }
       // Resolve the saved tuning name against presets + customs for the current instrument.
       const name = p.tuningName ?? Tunings.defaultNameFor(this.instrument);
       const resolved = Tunings.allPresets.get(name) ?? this.customTunings.get(name) ?? Tunings.defaultFor(this.instrument);
@@ -303,6 +316,7 @@ export class AppState {
       challengeScores: this.challengeScores,
       drumPatterns: Object.fromEntries(this.drumPatterns),
       drumVolumes: Object.fromEntries(this.drumVolumes),
+      chordSlots: this.chordSlots,
     };
     localStorage.setItem(LS_KEY, JSON.stringify(p));
   }
@@ -588,6 +602,7 @@ export class AppState {
       const key = fpKey(pos);
       if (this.pickedPositions.has(key)) this.pickedPositions.delete(key);
       else this.pickedPositions.add(key);
+      this.activeChordSlot = -1;   // hand-edited grip — no slot owns it anymore
     });
   }
 
@@ -602,11 +617,58 @@ export class AppState {
         }
         this.mutedStrings.add(stringIdx);
       }
+      this.activeChordSlot = -1;
     });
   }
 
   clearPicked(): void {
-    this.commit(() => { this.pickedPositions.clear(); this.mutedStrings.clear(); });
+    this.commit(() => { this.pickedPositions.clear(); this.mutedStrings.clear(); this.activeChordSlot = -1; });
+  }
+
+  // ---------- play mode: sweep-to-strum + quick chord slots ----------
+
+  /** Sweep-to-strum: pluck [stringIdx] with the current grip — the highest picked
+   *  fret on that string, or the open string when nothing is picked (like a real
+   *  guitar with a partial grip). Returns the fret that sounded, or null when the
+   *  string is muted / out of range (silence). */
+  pluckString(stringIdx: number): number | null {
+    if (stringIdx < 0 || stringIdx >= stringCount(this.liveTuning)) return null;
+    if (this.mutedStrings.has(stringIdx)) return null;
+    let fret = 0;
+    for (const key of this.pickedPositions) {
+      const [s, f] = key.split(",").map((x) => parseInt(x, 10));
+      if (s === stringIdx && f > fret) fret = f;
+    }
+    const n = noteAt(this.liveTuning, fp(stringIdx, fret));
+    this.audio.playNote(n.midi, this.ringSustainMs, this.timbre);
+    return fret;
+  }
+
+  /** Apply quick-chord slot [index]: set the chord's first voicing on the board as
+   *  the picked grip (+ muted ✕ on unplayed strings), ready to strum. */
+  applyChordSlot(index: number): void {
+    const symbol = this.chordSlots[index];
+    if (symbol === undefined) return;
+    const parsed = parseChord(symbol);
+    if (!parsed) return;
+    const shape = this.chordGenerator().shapesFor(parsed[0], parsed[1], this.liveTuning, DISPLAY_FRETS)[0];
+    if (!shape) return;
+    this.commit(() => {
+      this.pickedPositions = new Set(shape.frets.flatMap((f, s) => (f === null ? [] : [fpKey(fp(s, f))])));
+      this.mutedStrings = new Set(shape.frets.flatMap((f, s) => (f === null ? [s] : [])));
+      this.activeChordSlot = index;
+    });
+  }
+
+  /** Reassign quick-chord slot [index] to [symbol] (must parse as a chord); persisted. */
+  setChordSlot(index: number, symbol: string): void {
+    const trimmed = symbol.trim();
+    if (index < 0 || index >= this.chordSlots.length) return;
+    if (!parseChord(trimmed)) return;
+    this.commit(() => {
+      this.chordSlots[index] = trimmed;
+      if (this.activeChordSlot === index) this.activeChordSlot = -1;
+    });
   }
 
   strumPicked(arpeggio = false): void {

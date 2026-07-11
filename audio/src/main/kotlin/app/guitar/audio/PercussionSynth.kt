@@ -52,20 +52,6 @@ class PercussionSynth(val sampleRate: Int = 44100) {
         )
     }
 
-    /** Metronome click: a short bright tick. [accent] (bar downbeat) is higher-pitched
-     *  and slightly louder than the plain beat click. */
-    fun metronomeClick(accent: Boolean): FloatArray {
-        val freq = if (accent) 1900.0 else 1300.0
-        val amp = if (accent) 0.55 else 0.42
-        val n = (sampleRate * 0.03).toInt()
-        val out = FloatArray(n)
-        for (i in 0 until n) {
-            val t = i.toDouble() / sampleRate
-            out[i] = (sin(2 * PI * freq * t) * exp(-180.0 * t) * amp).toFloat()
-        }
-        return fadeOut(out)
-    }
-
     // ---- voices ----
 
     /** Low boom: fundamental sine + a noisy strike transient, exponential decay. */

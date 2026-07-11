@@ -33,6 +33,9 @@ const val MIDI_MIN = 28   // E1
 const val MIDI_MAX = 84   // C6
 const val DISPLAY_FRETS = 14
 
+/** Default Play-mode quick-chord palette: the open-chord workhorses. */
+val DEFAULT_CHORD_SLOTS = listOf("C", "G", "Am", "F", "D", "Em", "E", "A")
+
 enum class Highlight { Chord, Scale, None }
 enum class LabelMode { Notes, Intervals, Empty }
 
@@ -616,6 +619,7 @@ class AppState(
         // Picking a fret on a string un-mutes it — the two are mutually exclusive.
         if (pos.stringIndex in mutedStrings) mutedStrings = mutedStrings - pos.stringIndex
         pickedPositions = if (pos in pickedPositions) pickedPositions - pos else pickedPositions + pos
+        activeChordSlot = -1   // hand-edited grip — no slot owns it anymore
     }
 
     /** Toggle a string's muted (X) state. Muting clears any picks on that string. */
@@ -627,11 +631,74 @@ class AppState(
             pickedPositions = pickedPositions.filterNot { it.stringIndex == stringIdx }.toSet()
             mutedStrings + stringIdx
         }
+        activeChordSlot = -1
     }
 
     fun clearPicked() {
         pickedPositions = emptySet()
         mutedStrings = emptySet()
+        activeChordSlot = -1
+    }
+
+    // ---------- Play mode: sweep-to-strum + quick chord slots ----------
+
+    /** Quick-chord slots shown in Play (strum) mode — chord symbols the user can
+     *  apply to the board with one tap via [applyChordSlot]. Persisted. */
+    var chordSlots by mutableStateOf(DEFAULT_CHORD_SLOTS)
+        private set
+    /** Index of the slot whose grip is currently on the board (highlights its chip);
+     *  −1 once the grip is hand-edited or cleared. */
+    var activeChordSlot by mutableStateOf(-1)
+        private set
+
+    init {
+        // Restore persisted quick-chord slots once on startup (unset/invalid → defaults).
+        scope.launch {
+            repo.chordSlots.first()?.let { saved ->
+                if (saved.size == DEFAULT_CHORD_SLOTS.size && saved.all { ChordLibrary.parse(it) != null }) {
+                    chordSlots = saved
+                }
+            }
+        }
+    }
+
+    /** Sweep-to-strum: pluck [stringIdx] with the current grip — the highest picked
+     *  fret on that string, or the open string when nothing is picked (like a real
+     *  guitar with a partial grip). Returns the fret that sounded, or null when the
+     *  string is muted / out of range (silence). */
+    fun pluckString(stringIdx: Int): Int? {
+        if (stringIdx < 0 || stringIdx >= liveTuning.stringCount) return null
+        if (stringIdx in mutedStrings) return null
+        val fret = pickedPositions.filter { it.stringIndex == stringIdx }.maxOfOrNull { it.fret } ?: 0
+        val note = Fretboard.noteAt(liveTuning, FretPosition(stringIdx, fret))
+        audio.playNote(note.midi.value, durationMillis = ringSustainMs, timbre = timbre)
+        return fret
+    }
+
+    /** Apply quick-chord slot [index]: set the chord's first voicing on the board as
+     *  the picked grip (+ muted ✕ on unplayed strings), ready to strum. */
+    fun applyChordSlot(index: Int) {
+        val symbol = chordSlots.getOrNull(index) ?: return
+        val (root, quality) = ChordLibrary.parse(symbol) ?: return
+        val shape = loopShapeGen.shapesFor(root, quality, liveTuning, frets = DISPLAY_FRETS)
+            .firstOrNull() ?: return
+        pickedPositions = shape.frets
+            .mapIndexedNotNull { s, f -> f?.let { FretPosition(s, it) } }
+            .toSet()
+        mutedStrings = shape.frets
+            .mapIndexedNotNull { s, f -> if (f == null) s else null }
+            .toSet()
+        activeChordSlot = index
+    }
+
+    /** Reassign quick-chord slot [index] to [symbol] (must parse as a chord); persisted. */
+    fun setChordSlot(index: Int, symbol: String) {
+        val trimmed = symbol.trim()
+        if (index !in chordSlots.indices) return
+        if (ChordLibrary.parse(trimmed) == null) return
+        chordSlots = chordSlots.toMutableList().also { it[index] = trimmed }
+        if (activeChordSlot == index) activeChordSlot = -1
+        scope.launch { repo.setChordSlots(chordSlots) }
     }
 
     fun strumPicked(arpeggio: Boolean = false) {

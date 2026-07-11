@@ -294,12 +294,17 @@ object PercussionTiming {
      * Swing only operates when a quarter-note beat is split into exactly four 16th
      * notes ([PercussionMeter.beatUnit] == 4 and [PercussionMeter.division] == 16);
      * any other meter plays straight. Within each beat the four 16ths sit at the
-     * nominal positions 0, ¼, ½, ¾ of the beat. As [swingPercent] rises 0→100 the
-     * 1st and 3rd 16ths stay anchored, the 2nd is delayed toward ⅓ of the beat
-     * (+1/12 beat at 100 %), and the 4th is advanced (made early) toward ⅔ of the
-     * beat (−1/12 beat at 100 %). Equivalently the per-beat slot durations scale by
-     * [1+s/3, 1−s/3, 1−s/3, 1+s/3] where s = swingPercent/100, so each beat — and
-     * thus the whole loop — keeps its total length; only the inner onsets move.
+     * nominal positions 0, ¼, ½, ¾ of the beat. Samba microtiming studies (Gerischer;
+     * Naveda/Gouyon) show the played feel keeps the 1st AND 2nd 16ths on the grid and
+     * ANTICIPATES the 3rd and (more so) the 4th — the propulsive "pushing" samba lilt.
+     * As [swingPercent] rises 0→100 the 3rd 16th moves up to −0.25 slot (−1/16 beat)
+     * early and the 4th up to −0.4 slot (−1/10 beat) early (≈2× the deviations
+     * measured in performance, so the slider max is clearly audible). Beat boundaries
+     * stay anchored, so each beat — and thus the whole loop — keeps its total length.
+     *
+     * (This replaces an earlier model that delayed the 2nd 16th toward a triplet ⅓
+     * while advancing the 4th — at high percentages the middle notes bunched together
+     * and the groove sounded lopsided rather than swung.)
      */
     fun swungSlotMs(slot: Int, bpm: Int, swingPercent: Int, meter: PercussionMeter): Long {
         val base = slotMs(bpm, meter.division)
@@ -307,14 +312,14 @@ object PercussionTiming {
         if (meter.beatUnit != 4 || meter.division != 16) return base.coerceAtLeast(1L)
         val s = swingPercent.coerceIn(0, 100) / 100.0
         // Each 16th's onset, in ms from loop start, rounded independently — so the
-        // anchors (beat start, half-beat, beat boundary) stay exactly on grid and the
-        // rounding never accumulates. The slot's duration is the gap to the next onset.
+        // anchors (beat start, quarter-beat, beat boundary) stay exactly on grid and
+        // the rounding never accumulates. The slot's duration is the gap to the next onset.
         fun onsetMs(k: Int): Long {
             val offsetSlots = when (k % 4) {
                 0 -> 0.0              // 1st 16th: anchored on the beat
-                1 -> 1.0 + s / 3.0    // 2nd: delayed ¼→⅓ of the beat
-                2 -> 2.0              // 3rd: anchored on the half-beat
-                else -> 3.0 - s / 3.0 // 4th: advanced ¾→⅔ of the beat
+                1 -> 1.0              // 2nd: anchored on the grid
+                2 -> 2.0 - s * 0.25   // 3rd: anticipated (early)
+                else -> 3.0 - s * 0.4 // 4th: anticipated more
             }
             return Math.round(((k / 4) * 4 + offsetSlots) * base)
         }

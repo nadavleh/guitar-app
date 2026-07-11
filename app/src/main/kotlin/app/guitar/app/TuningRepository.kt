@@ -166,6 +166,21 @@ class TuningRepository(private val context: Context) {
         }
     }
 
+    private val keyChordSlots = stringPreferencesKey("chord_slots")
+
+    /** Play-mode quick-chord slots, comma-joined chord symbols; null when never set
+     *  (caller falls back to the built-in defaults). */
+    val chordSlots: Flow<List<String>?> =
+        context.tuningDataStore.data.map { prefs ->
+            prefs[keyChordSlots]?.split(",")?.map { it.trim() }
+        }
+
+    suspend fun setChordSlots(slots: List<String>) {
+        context.tuningDataStore.edit { prefs ->
+            prefs[keyChordSlots] = slots.joinToString(",")
+        }
+    }
+
     private val keyTapOnTouchDown = booleanPreferencesKey("tap_on_touch_down")
 
     /** Whether tapping the fretboard plays on touch-down (true) or tap-release

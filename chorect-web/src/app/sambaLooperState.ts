@@ -30,8 +30,6 @@ export class SambaLooperState {
   pattern: PercussionPattern = TELECOTECO_1;
   bpm = 70;
   swing = 0;
-  /** Metronome click on each beat (accented on bar downbeats). */
-  metronome = false;
   isPlaying = false;
   currentSlot = -1;
 
@@ -47,10 +45,6 @@ export class SambaLooperState {
     }
     this.notify();
   }
-  toggleMetronome() { this.metronome = !this.metronome; this.notify(); }
-  private clickAccent: Float32Array | null = null;
-  private clickBeat: Float32Array | null = null;
-
   /** Seconds until a buffer first reaches 90% of its peak (crescendos bloom late). */
   private peakOffsetCache = new Map<string, number>();
   private peakOffsetSec(inst: PercussionInstrument, voiceIndex: number, buf: Float32Array): number {
@@ -271,12 +265,6 @@ export class SambaLooperState {
     const token = this.token;
     this.notify();
     const scheduleSlot = (snapshot: PercussionPattern, slot: number, when: number) => {
-      if (this.metronome && slot % snapshot.meter.slotsPerBeat === 0) {
-        const accent = slot % snapshot.meter.slotsPerBar === 0;
-        if (!this.clickAccent) this.clickAccent = this.synth.metronomeClick(true);
-        if (!this.clickBeat) this.clickBeat = this.synth.metronomeClick(false);
-        this.deps.audio.playSamples(accent ? this.clickAccent : this.clickBeat, 1, when);
-      }
       for (const inst of snapshot.instruments) {
         if (!this.isAudible(inst)) continue;
         const v = snapshot.voiceAt(inst, slot);

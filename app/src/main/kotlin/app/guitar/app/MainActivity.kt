@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -30,16 +32,19 @@ import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -303,6 +308,9 @@ fun App(audio: AudioEngine) {
                     leftHanded = state.leftHanded,
                     playOnTouchDown = state.tapOnTouchDown,
                     mutedStrings = if (state.displayMode == DisplayMode.Pick) state.mutedStrings else emptySet(),
+                    // Play mode: sweep across the strings to strum the current grip.
+                    strumMode = state.displayMode == DisplayMode.Pick,
+                    onStrumPluck = { s -> state.pluckString(s) },
                 )
             }
             SelectedPositionInfo(state.liveTuning, state.selectedPosition, parsedChord)
@@ -570,6 +578,7 @@ private fun PositionScroller(label: String, onPrev: () -> Unit, onNext: () -> Un
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PickActionBar(state: AppState) {
     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -579,6 +588,62 @@ private fun PickActionBar(state: AppState) {
             .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
+        // Quick chords: one tap lights that chord's grip on the board — then sweep
+        // the neck to strum it. The ✎ chip flips to edit mode, where tapping a
+        // chip reassigns its chord symbol instead of applying it.
+        var editSlots by remember { mutableStateOf(false) }
+        var editingSlot by remember { mutableStateOf(-1) }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            state.chordSlots.forEachIndexed { i, sym ->
+                FilterChip(
+                    selected = state.activeChordSlot == i,
+                    onClick = { if (editSlots) editingSlot = i else state.applyChordSlot(i) },
+                    label = { Text(if (editSlots) "✎ $sym" else sym) },
+                )
+            }
+            FilterChip(
+                selected = editSlots,
+                onClick = { editSlots = !editSlots },
+                label = { Text("✎") },
+            )
+        }
+        if (editingSlot >= 0) {
+            var text by remember(editingSlot) { mutableStateOf(state.chordSlots[editingSlot]) }
+            val parses = ChordLibrary.parse(text.trim()) != null
+            AlertDialog(
+                onDismissRequest = { editingSlot = -1 },
+                title = { Text("Quick chord ${editingSlot + 1}") },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = text,
+                            onValueChange = { text = it },
+                            label = { Text("Chord symbol (e.g. Am7)") },
+                            singleLine = true,
+                        )
+                        if (!parses) {
+                            Text(
+                                "Not a chord symbol I can parse yet",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = parses,
+                        onClick = { state.setChordSlot(editingSlot, text); editingSlot = -1 },
+                    ) { Text("Save") }
+                },
+                dismissButton = { TextButton(onClick = { editingSlot = -1 }) { Text("Cancel") } },
+            )
+        }
+        Spacer(Modifier.height(4.dp))
         // Per-string mute toggles (red ✕ at the nut), then the strum transport.
         StringMuteRow(state)
         Spacer(Modifier.height(4.dp))

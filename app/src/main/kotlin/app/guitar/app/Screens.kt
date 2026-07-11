@@ -107,7 +107,7 @@ fun FretboardSheet(state: AppState) {
                         Text(when (m) {
                             DisplayMode.None -> "None"
                             DisplayMode.Scale -> "Scale"
-                            DisplayMode.Pick -> "Strum"
+                            DisplayMode.Pick -> "Play"
                             else -> "Chord"
                         })
                     },
@@ -118,7 +118,7 @@ fun FretboardSheet(state: AppState) {
 
         when (state.displayMode) {
             DisplayMode.None -> Text(
-                "Nothing lit — pick Chord, Scale or Strum to light the board.",
+                "Nothing lit — pick Chord, Scale or Play to light the board.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -294,8 +294,10 @@ private fun ScaleControls(state: AppState) {
 private fun PickControls(state: AppState) {
     Column {
         Text(
-            "Tap any fret on the neck to add or remove it from your selection, " +
-                "mute whole strings below, then strum or arpeggiate the set.",
+            "Tap any fret to add or remove it from your grip (or tap a quick-chord " +
+                "button below the neck), mute whole strings, then SWEEP across the " +
+                "strings to strum — each string plucks as your finger crosses it. " +
+                "Unpicked strings ring open.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

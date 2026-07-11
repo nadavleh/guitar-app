@@ -107,6 +107,10 @@ export class App {
   private fretCanvasEl = el("canvas", { class: "fretboard" });
   private fretboard: FretboardCanvas;
 
+  /** Play-mode quick-chord chips: edit toggle + which slot's rename popup is open. */
+  private editChordSlots = false;
+  private editingChordSlot = -1;
+
   private tuner: TunerState | null = null;
   private tunerDialCanvas: HTMLCanvasElement | null = null;
   private tunerNoteEl: HTMLElement | null = null;
@@ -454,6 +458,9 @@ export class App {
         if (this.state.displayMode === DisplayMode.Pick) this.state.togglePick(pos);
         else this.state.tapPosition(pos);
       },
+      // Play mode: sweep across the strings to strum the current grip.
+      strumMode: this.state.displayMode === DisplayMode.Pick,
+      onStrumPluck: (s) => this.state.pluckString(s),
     };
     this.fretboard.setData(data);
 
@@ -527,10 +534,54 @@ export class App {
     (arpBtn as HTMLButtonElement).disabled = !canStrum;
     (clearBtn as HTMLButtonElement).disabled = this.state.pickedPositions.size === 0 && this.state.mutedStrings.size === 0;
     return el("div", { class: "context-bar" }, [
+      this.quickChordRow(),
+      el("div", { class: "v-gap-8" }),
       this.muteRow(),
       el("div", { class: "v-gap-8" }),
       el("div", { class: "row" }, [el("div", { class: "spacer", style: "" }, [counts]), strumBtn, arpBtn, clearBtn]),
     ]);
+  }
+
+  /** Play-mode quick chords: one tap lights that chord's grip on the board —
+   *  then sweep the neck to strum it. The ✎ chip flips to edit mode, where
+   *  tapping a chip reassigns its chord symbol instead of applying it. */
+  private quickChordRow(): HTMLElement {
+    const row = el("div", { class: "chip-row", style: "position:relative" });
+    this.state.chordSlots.forEach((sym, i) => {
+      const active = this.state.activeChordSlot === i;
+      const chip = el("button", { class: active ? "chip selected" : "chip" }, [
+        this.editChordSlots ? `✎ ${sym}` : sym,
+      ]);
+      chip.addEventListener("click", () => {
+        if (this.editChordSlots) { this.editingChordSlot = i; this.render(); }
+        else this.state.applyChordSlot(i);
+      });
+      row.appendChild(chip);
+    });
+    const edit = el("button", { class: this.editChordSlots ? "chip selected" : "chip" }, ["✎"]);
+    edit.addEventListener("click", () => {
+      this.editChordSlots = !this.editChordSlots;
+      this.editingChordSlot = -1;
+      this.render();
+    });
+    row.appendChild(edit);
+    if (this.editingChordSlot >= 0) {
+      const idx = this.editingChordSlot;
+      const input = el("input", { type: "text", style: "width:110px" }) as HTMLInputElement;
+      input.value = this.state.chordSlots[idx];
+      const save = btn("Save", () => {
+        this.state.setChordSlot(idx, input.value);   // no-op if it doesn't parse
+        this.editingChordSlot = -1;
+        this.editChordSlots = false;
+        this.render();
+      }, "btn primary");
+      const cancel = btn("✕", () => { this.editingChordSlot = -1; this.render(); });
+      row.appendChild(el("div", { class: "drum-load-pop", style: "display:flex;gap:6px;padding:8px;position:absolute;right:0;top:100%;z-index:5" }, [
+        el("span", { style: "align-self:center;font-size:12px;color:var(--text-secondary)" }, [`Slot ${idx + 1}:`]),
+        input, save, cancel,
+      ]));
+    }
+    return row;
   }
 
   private muteRow(): HTMLElement {
@@ -649,7 +700,7 @@ export class App {
 
   private fillFretboardSheet(sheet: HTMLElement): void {
     sheet.appendChild(segmented<DisplayMode>(
-      [{ value: DisplayMode.None, label: "None" }, { value: DisplayMode.Chord, label: "Chord" }, { value: DisplayMode.Scale, label: "Scale" }, { value: DisplayMode.Pick, label: "Strum" }],
+      [{ value: DisplayMode.None, label: "None" }, { value: DisplayMode.Chord, label: "Chord" }, { value: DisplayMode.Scale, label: "Scale" }, { value: DisplayMode.Pick, label: "Play" }],
       this.state.displayMode,
       (v) => this.state.setDisplayMode(v),
     ));
@@ -741,7 +792,9 @@ export class App {
 
   private fillPickControls(sheet: HTMLElement): void {
     sheet.appendChild(el("div", { style: `color:var(--muted)` }, [
-      "Tap any fret on the neck to add or remove it from your selection, mute whole strings below, then strum or arpeggiate the set.",
+      "Tap any fret to add or remove it from your grip (or tap a quick-chord button below the neck), " +
+      "mute whole strings, then SWEEP across the strings to strum — each string plucks as the pointer " +
+      "crosses it. Unpicked strings ring open.",
     ]));
     sheet.appendChild(el("div", { class: "v-gap-8" }));
     sheet.appendChild(el("div", {}, [`Picked: ${this.state.pickedPositions.size}` + (this.state.mutedStrings.size ? `   ·   muted: ${this.state.mutedStrings.size}` : "")]));

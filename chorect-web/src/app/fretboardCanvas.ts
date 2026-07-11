@@ -15,6 +15,7 @@ const NUT_FRAC = 0.022;
 const STRING_DP = 42;
 const FRET_NUMBER_DP = 18;
 const TAP_SLOP = 6; // px of movement before a press becomes a drag, not a tap
+const PLUCK_LIFE_MS = 1400; // lifetime of a pluck's ripple/glow feedback (Fretboard v3)
 
 export interface FretboardData {
   tuning: Tuning;
@@ -25,6 +26,13 @@ export interface FretboardData {
   playOnTouchDown: boolean;
   mutedStrings: Set<number>;
   onTap: (pos: FretPosition) => void;
+  /** Play-mode sweep (v2.2): when true, a single-pointer drag across the strings
+   *  plucks each string it crosses instead of panning (pinch/wheel still zoom;
+   *  a clean tap still fires onTap). */
+  strumMode?: boolean;
+  /** Resolves what sounds when a sweep crosses a string: play it and return the
+   *  fret that sounded (drives the ripple), or null for silence (muted). */
+  onStrumPluck?: (stringIndex: number) => number | null;
 }
 
 export class FretboardCanvas {
@@ -50,6 +58,13 @@ export class FretboardCanvas {
   private pinchDist = 0;
   private pinchCentroid = { x: 0, y: 0 };
 
+  // Pluck feedback (ripple + glow + string shimmer, Fretboard v3). A rAF loop
+  // runs ONLY while a pluck is alive — idle cost stays zero.
+  private plucks: { pos: FretPosition; t0: number }[] = [];
+  private rafId = 0;
+  // Hover ghost (mouse only): previews the note name before you commit.
+  private hover: FretPosition | null = null;
+
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d")!;
     const ro = new ResizeObserver(() => this.resize());
@@ -57,6 +72,18 @@ export class FretboardCanvas {
     this.bindPointer();
     canvas.addEventListener("wheel", (e) => this.onWheel(e), { passive: false });
   }
+
+  private addPluck(pos: FretPosition): void {
+    this.plucks.push({ pos, t0: performance.now() });
+    if (!this.rafId) this.pluckTick();
+  }
+
+  private pluckTick = (): void => {
+    const now = performance.now();
+    this.plucks = this.plucks.filter((p) => now - p.t0 < PLUCK_LIFE_MS);
+    this.draw();
+    this.rafId = this.plucks.length ? requestAnimationFrame(this.pluckTick) : 0;
+  };
 
   setData(data: FretboardData): void {
     const tuningChanged = !this.data || stringCount(this.data.tuning) !== stringCount(data.tuning);
@@ -143,6 +170,9 @@ export class FretboardCanvas {
     c.addEventListener("pointermove", (e) => this.onPointerMove(e));
     c.addEventListener("pointerup", (e) => this.onPointerUp(e));
     c.addEventListener("pointercancel", (e) => this.onPointerUp(e));
+    c.addEventListener("pointerleave", () => {
+      if (this.hover) { this.hover = null; this.draw(); }
+    });
   }
 
   private localXY(e: MouseEvent): { x: number; y: number } {
@@ -157,9 +187,10 @@ export class FretboardCanvas {
     if (this.pointers.size === 1) {
       this.pressStart = p;
       this.dragged = false;
-      if (this.data?.playOnTouchDown) {
+      // In strum mode taps fire on release only (a press may become a sweep).
+      if (this.data?.playOnTouchDown && !this.data.strumMode) {
         const pos = this.hit(p.x, p.y);
-        if (pos) this.data.onTap(pos);
+        if (pos) { this.data.onTap(pos); this.addPluck(pos); }
       }
     } else if (this.pointers.size === 2) {
       this.beginPinch();
@@ -167,7 +198,18 @@ export class FretboardCanvas {
   }
 
   private onPointerMove(e: PointerEvent): void {
-    if (!this.pointers.has(e.pointerId)) return;
+    if (!this.pointers.has(e.pointerId)) {
+      // No pressed pointer → mouse hover: ghost the note under the cursor.
+      if (e.pointerType === "mouse" && e.buttons === 0) {
+        const p = this.localXY(e);
+        const h = this.hit(p.x, p.y);
+        if (h?.stringIndex !== this.hover?.stringIndex || h?.fret !== this.hover?.fret) {
+          this.hover = h;
+          this.draw();
+        }
+      }
+      return;
+    }
     const p = this.localXY(e);
     const prev = this.pointers.get(e.pointerId)!;
     this.pointers.set(e.pointerId, p);
@@ -176,16 +218,41 @@ export class FretboardCanvas {
       this.updatePinch();
       return;
     }
-    // single pointer: pan once moved past the tap slop
+    // single pointer past the tap slop: strum-sweep in Play mode, else pan
     if (this.pressStart) {
       const dx0 = p.x - this.pressStart.x;
       const dy0 = p.y - this.pressStart.y;
       if (!this.dragged && Math.hypot(dx0, dy0) > TAP_SLOP) this.dragged = true;
       if (this.dragged) {
-        this.offsetX += p.x - prev.x;
-        this.offsetY += p.y - prev.y;
-        this.clampOffsets();
-        this.draw();
+        if (this.data?.strumMode) {
+          this.strumCross(prev, p);
+        } else {
+          this.offsetX += p.x - prev.x;
+          this.offsetY += p.y - prev.y;
+          this.clampOffsets();
+          this.draw();
+        }
+      }
+    }
+  }
+
+  /** Pluck every string the pointer crossed between two screen points (Play mode). */
+  private strumCross(prev: { x: number; y: number }, cur: { x: number; y: number }): void {
+    const d = this.data;
+    if (!d?.onStrumPluck) return;
+    const sc = stringCount(d.tuning);
+    const a = this.screenToNeck(prev.x, prev.y);
+    const b = this.screenToNeck(cur.x, cur.y);
+    if (b.u < 0 || b.u > this.neckW0) return;
+    const numberStripH = this.neckH0 * (FRET_NUMBER_DP / (sc * STRING_DP + FRET_NUMBER_DP));
+    const h = this.neckH0 - numberStripH;
+    const stringSpacing = h / sc;
+    const firstStringY = stringSpacing / 2;
+    for (let s = 0; s < sc; s++) {
+      const ys = firstStringY + (sc - 1 - s) * stringSpacing;
+      if ((a.v - ys) * (b.v - ys) < 0) {
+        const fret = d.onStrumPluck(s);
+        if (fret !== null) this.addPluck(fp(s, fret));
       }
     }
   }
@@ -203,10 +270,12 @@ export class FretboardCanvas {
       return;
     }
     if (this.pointers.size === 0) {
-      const wasTap = !this.dragged && this.pressStart && p && !this.data?.playOnTouchDown;
+      const wasTap = !this.dragged && this.pressStart && p &&
+        (this.data?.strumMode || !this.data?.playOnTouchDown);
       if (wasTap && this.data) {
         const pos = this.hit(p!.x, p!.y);
-        if (pos) this.data.onTap(pos);
+        // No ripple on Play-mode taps — they toggle the grip, nothing sounds.
+        if (pos) { this.data.onTap(pos); if (!this.data.strumMode) this.addPluck(pos); }
       }
       this.pressStart = null;
       this.dragged = false;
@@ -347,8 +416,12 @@ export class FretboardCanvas {
     const unit = Math.min(stringSpacing, fretSpacing);
     const mx = (x: number) => (d.leftHanded ? w - x : x);
 
-    // wood + grain
-    ctx.fillStyle = board.wood;
+    // wood + grain (v3: vertical light gradient — material, not flat fill)
+    const woodGrad = ctx.createLinearGradient(0, 0, 0, h);
+    woodGrad.addColorStop(0, board.woodA);
+    woodGrad.addColorStop(0.5, board.woodB);
+    woodGrad.addColorStop(1, board.woodA);
+    ctx.fillStyle = woodGrad;
     ctx.fillRect(0, 0, w, h);
     const grain: [number, number][] = [
       [0.07, 0.10], [0.18, 0.06], [0.27, 0.08], [0.38, 0.05], [0.49, 0.09],
@@ -371,10 +444,13 @@ export class FretboardCanvas {
     ctx.fillStyle = board.nut;
     ctx.fillRect(nutLeft, 0, nutWidth, h);
 
-    // fret wires
+    // fret wires (v3: two-tone metal — dark body, bright leading edge)
     for (let f = 1; f <= numFrets; f++) {
       const x = mx(openWidth + nutWidth + f * fretSpacing);
-      line(ctx, x, 0, x, h, board.fretWire, 2.2);
+      ctx.fillStyle = board.fretWireDark;
+      ctx.fillRect(x - 1.6, 0, 3.2, h);
+      ctx.fillStyle = board.fretWire;
+      ctx.fillRect(x - 1.6, 0, 1.4, h);
     }
 
     // inlays
@@ -426,8 +502,10 @@ export class FretboardCanvas {
       }
     }
 
-    // marks
+    // marks (v3 ranking: roots larger w/ pearl ring; chord tones filled; scale
+    // tones hollow rings so the hierarchy reads at a glance)
     const dotR = unit * 0.40;
+    const rootR = unit * 0.46;
     const labelPx = unit * 0.42;
     for (const [key, mark] of d.marks) {
       const pos = parseKey(key);
@@ -440,24 +518,51 @@ export class FretboardCanvas {
         ctx.arc(mxp, myp, dotR, 0, Math.PI * 2);
         ctx.stroke();
       } else {
-        const fill = mark.isRoot ? Colors.rootTone : mark.kind === MarkKind.Scale ? Colors.scaleTone : Colors.chordTone;
-        ctx.fillStyle = fill;
-        circle(ctx, mxp, myp, dotR);
-        if (mark.isRoot) {
-          ctx.strokeStyle = board.inlay;
-          ctx.lineWidth = 1.5;
+        const hollow = mark.kind === MarkKind.Scale && !mark.isRoot;
+        const r = mark.isRoot ? rootR : dotR;
+        if (hollow) {
+          // hollow scale tone: translucent knock-back + colored ring
+          ctx.fillStyle = board.scaleFill;
+          circle(ctx, mxp, myp, r - 1.2);
+          ctx.strokeStyle = Colors.scaleTone;
+          ctx.lineWidth = 2.4;
           ctx.beginPath();
-          ctx.arc(mxp, myp, dotR * 0.78, 0, Math.PI * 2);
+          ctx.arc(mxp, myp, r, 0, Math.PI * 2);
           ctx.stroke();
+        } else {
+          ctx.fillStyle = mark.isRoot ? Colors.rootTone : Colors.chordTone;
+          circle(ctx, mxp, myp, r);
+          if (mark.isRoot) {
+            ctx.strokeStyle = board.inlay;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(mxp, myp, r * 0.78, 0, Math.PI * 2);
+            ctx.stroke();
+          }
         }
         if (mark.label) {
-          ctx.fillStyle = Colors.textPrimary;
+          ctx.fillStyle = hollow ? Colors.scaleTone : Colors.textPrimary;
           ctx.font = `bold ${labelPx}px system-ui, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText(mark.label, mxp, myp);
         }
       }
+    }
+
+    // hover ghost (mouse): preview the note name before committing a tap
+    if (this.hover && !d.marks.has(`${this.hover.stringIndex},${this.hover.fret}`)) {
+      const [hx, hy] = this.positionToPixel(this.hover, w, h, sc, numFrets, d.leftHanded);
+      const midi = d.tuning.openStrings[this.hover.stringIndex].midi + this.hover.fret;
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = Colors.chordTone;
+      circle(ctx, hx, hy, dotR);
+      ctx.fillStyle = Colors.textPrimary;
+      ctx.font = `bold ${labelPx}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(spellPc(midiPitchClass(midi)), hx, hy);
+      ctx.globalAlpha = 1;
     }
 
     // open-string labels (left of nut)
@@ -485,6 +590,34 @@ export class FretboardCanvas {
         const y = firstStringY + (sc - 1 - s) * stringSpacing;
         ctx.fillText("✕", xCol, y);
       }
+    }
+
+    // pluck ripples + glow + string shimmer (age-driven, v3; rAF loop in pluckTick)
+    const now = performance.now();
+    for (const p of this.plucks) {
+      const age = (now - p.t0) / 1000;
+      if (age < 0 || age > PLUCK_LIFE_MS / 1000) continue;
+      if (p.pos.fret > numFrets || p.pos.stringIndex >= sc) continue;
+      const [px, py] = this.positionToPixel(p.pos, w, h, sc, numFrets, d.leftHanded);
+      // expanding ripple ring
+      ctx.strokeStyle = Colors.primary;
+      ctx.globalAlpha = Math.max(0, 0.5 - age * 0.45);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px, py, unit * (0.5 + age * 1.6), 0, Math.PI * 2);
+      ctx.stroke();
+      // glow bloom that decays like the ring-out
+      const glow = ctx.createRadialGradient(px, py, 1, px, py, unit * 0.95);
+      glow.addColorStop(0, Colors.primary);
+      glow.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.globalAlpha = Math.max(0, 0.55 - age * 0.4);
+      ctx.fillStyle = glow;
+      circle(ctx, px, py, unit * 0.95);
+      // shimmer traveling outward along the string
+      const spread = unit * (2 + age * 8);
+      ctx.globalAlpha = Math.max(0, 0.5 - age * 0.5);
+      line(ctx, px - spread, py, px + spread, py, Colors.primary, 2.2);
+      ctx.globalAlpha = 1;
     }
 
     // selected ring

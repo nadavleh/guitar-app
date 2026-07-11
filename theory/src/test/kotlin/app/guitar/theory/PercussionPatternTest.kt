@@ -227,27 +227,29 @@ class PercussionPatternTest {
         }
     }
 
-    @Test fun `full swing stretches the 1st and 4th gaps and compresses the 2nd and 3rd`() {
+    @Test fun `full swing anticipates the 3rd and 4th 16ths and keeps the beat length`() {
+        val base = PercussionTiming.slotMs(120)
         val d0 = PercussionTiming.swungSlotMs(0, 120, 100, swingMeter)  // 1st → 2nd
         val d1 = PercussionTiming.swungSlotMs(1, 120, 100, swingMeter)  // 2nd → 3rd
         val d2 = PercussionTiming.swungSlotMs(2, 120, 100, swingMeter)  // 3rd → 4th
         val d3 = PercussionTiming.swungSlotMs(3, 120, 100, swingMeter)  // 4th → next beat
-        assertEquals(d0, d3)              // the two stretched gaps match
-        assertEquals(d1, d2)              // the two compressed gaps match
-        assertTrue(d0 > d1, "stretched gap $d0 should exceed compressed gap $d1")
-        assertEquals(d0 + d1 + d2 + d3, PercussionTiming.slotMs(120) * 4)  // beat length intact
+        assertEquals(base, d0)            // 2nd 16th stays on the grid (samba doesn't delay it)
+        assertTrue(d1 < base, "2nd→3rd gap $d1 should shrink (3rd comes early)")
+        assertTrue(d3 > base, "4th→beat gap $d3 should stretch (4th comes early)")
+        assertEquals(d0 + d1 + d2 + d3, base * 4)  // beat length intact
     }
 
-    @Test fun `full swing puts the 2nd 16th a third of a beat in and the 4th two thirds in`() {
-        // beat = four 16ths = 4 × 125 = 500 ms. Onsets are cumulative slot durations.
-        val beatMs = PercussionTiming.slotMs(120) * 4   // 500
+    @Test fun `full swing onsets sit at the samba microtiming positions`() {
+        // Onsets are cumulative slot durations; slot-unit positions [0, 1, 1.75, 2.6]
+        // (3rd 16th −0.25 slot, 4th −0.4 slot at 100 %).
+        val base = PercussionTiming.slotMs(120)   // 125 ms
         fun onset(slot: Int) = (0 until slot).sumOf { PercussionTiming.swungSlotMs(it, 120, 100, swingMeter) }
-        assertEquals(0L, onset(0))                        // 1st anchored at beat start
-        // 2nd delayed from 1/4 (125) to ~1/3 (166) of the beat.
-        assertTrue(kotlin.math.abs(onset(1) - beatMs / 3) <= 1, "2nd 16th onset ${onset(1)} ≉ ${beatMs / 3}")
-        assertEquals(beatMs / 2, onset(2))                // 3rd anchored at half the beat
-        // 4th advanced (early) from 3/4 (375) to ~2/3 (333) of the beat.
-        assertTrue(kotlin.math.abs(onset(3) - 2 * beatMs / 3) <= 1, "4th 16th onset ${onset(3)} ≉ ${2 * beatMs / 3}")
+        assertEquals(0L, onset(0))                              // 1st anchored at beat start
+        assertEquals(base, onset(1))                            // 2nd anchored at 1/4
+        assertEquals(Math.round(1.75 * base), onset(2))         // 3rd anticipated
+        assertEquals(Math.round(2.60 * base), onset(3))         // 4th anticipated more
+        // the anticipation must grow through the beat: 4th shifts earlier than the 3rd
+        assertTrue((2 * base - onset(2)) < (3 * base - onset(3)))
     }
 
     @Test fun `swing pattern repeats every beat`() {

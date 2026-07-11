@@ -84,30 +84,38 @@ data class SignalPalette(
 )
 
 /** Fretboard "wood" art palette — the neck's non-token colors. Two fixed sets:
- *  the original dark walnut, and a cream-maple set for the light theme (user
- *  feedback: the board stayed black in light mode). Selected in FretboardView via
- *  [SignalPalette.isDark]; geometry and rendering are unchanged. */
+ *  dark walnut and cream maple (light theme), selected in FretboardView via
+ *  [SignalPalette.isDark]. Fretboard-v3 material pass: the wood is a vertical
+ *  [woodA]→[woodB]→[woodA] gradient, frets are two-tone metal ([fretWire] bright
+ *  edge over [fretWireDark]), the dark-theme nut is bone (real nuts aren't black),
+ *  and hollow scale-tone dots knock the wood back with [scaleFill]. */
 data class BoardColors(
-    val wood: Color,
+    val woodA: Color,
+    val woodB: Color,
     val woodGrain: Color,
     val nut: Color,
     val fretWire: Color,
+    val fretWireDark: Color,
     val inlay: Color,
     val stringWound: Color,
     val stringPlain: Color,
+    /** Translucent backing inside hollow (scale-tone) dots so the label stays legible. */
+    val scaleFill: Color,
 ) {
     companion object {
         val Dark = BoardColors(
-            wood = Color(0xFF3D2817), woodGrain = Color(0xFF2C1C10),
-            nut = Color(0xFF0A0A0B), fretWire = Color(0xFF6F6F75),
+            woodA = Color(0xFF4A3320), woodB = Color(0xFF33200F), woodGrain = Color(0xFF2C1C10),
+            nut = Color(0xFFEDE6D6), fretWire = Color(0xFF9B9BA3), fretWireDark = Color(0xFF5A5A61),
             inlay = Color(0xFFE8E4D9),
             stringWound = Color(0xFFC9A876), stringPlain = Color(0xFFDCC698),
+            scaleFill = Color(0xB810141E),
         )
         val Light = BoardColors(
-            wood = Color(0xFFE9D9B8), woodGrain = Color(0xFFD8C49B),
-            nut = Color(0xFF4A4136), fretWire = Color(0xFF8B8B90),
+            woodA = Color(0xFFF0E2C0), woodB = Color(0xFFDFC99C), woodGrain = Color(0xFFD8C49B),
+            nut = Color(0xFF4A4136), fretWire = Color(0xFFA9A9AF), fretWireDark = Color(0xFF6E6E74),
             inlay = Color(0xFF6B5B44),
             stringWound = Color(0xFF8A6F45), stringPlain = Color(0xFF6E6046),
+            scaleFill = Color(0xC7FBF7EC),
         )
     }
 }

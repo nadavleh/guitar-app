@@ -35,7 +35,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -406,7 +405,7 @@ private fun PatternSection(
 
     Spacer(Modifier.height(8.dp))
 
-    // ----- Compact card: swing / metronome / tap-tempo / zoom -----
+    // ----- Compact card: swing / tap-tempo / zoom -----
     val swingActive = samba.meter.beatUnit == 4 && samba.meter.division == 16
     val zoomed = scaleX.floatValue > 1.001f || scaleY.floatValue > 1.001f ||
         offsetX.floatValue != 0f || offsetY.floatValue != 0f
@@ -415,13 +414,6 @@ private fun PatternSection(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 // Tap-tempo: tap along; BPM follows the average tap interval.
                 OutlinedButton(onClick = { samba.tapTempo() }) { Text("Tap tempo") }
-                Spacer(Modifier.width(6.dp))
-                // Metronome click on each beat (accented downbeats).
-                FilterChip(
-                    selected = samba.metronome,
-                    onClick = { samba.metronome = !samba.metronome },
-                    label = { Text("Metro") },
-                )
                 Spacer(Modifier.weight(1f))
                 if (zoomed) {
                     TextButton(onClick = {
@@ -433,9 +425,9 @@ private fun PatternSection(
             Spacer(Modifier.height(4.dp))
             // ----- Swing (Brazilian 16th-note swing; 0 = straight) -----
             // Only meaningful on a 1/16 grid (a quarter-note beat split into four 16ths):
-            // it holds the 1st & 3rd 16ths in place, delays the 2nd, and pulls the 4th
-            // early — straight → triplet lilt. On any other division it does nothing, so
-            // the slider is disabled and the label says why.
+            // it keeps the 1st & 2nd 16ths on the grid and pulls the 3rd and (more so)
+            // the 4th early — the samba anticipation feel. On any other division it does
+            // nothing, so the slider is disabled and the label says why.
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
                     when {
@@ -673,10 +665,26 @@ private fun InstrumentRow(
                     accentMode = accentMode,
                     modifier = Modifier.weight(1f).fillMaxHeight().padding(1.dp),
                 )
-                // Beat separators: a gap after each beat; a wider gap at each bar line.
+                // Beat separators: a visible vertical rule after each beat (each group
+                // of four 16ths), heavier at bar lines, so the quarter-note divisions
+                // read clearly — not just a gap.
                 if ((slot + 1) % slotsPerBeat == 0 && slot != slots - 1) {
-                    val w = if ((slot + 1) % slotsPerBar == 0) 6.dp else 3.dp
-                    Spacer(Modifier.width(w))
+                    val isBar = (slot + 1) % slotsPerBar == 0
+                    Box(
+                        modifier = Modifier.width(if (isBar) 8.dp else 5.dp).fillMaxHeight(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            Modifier
+                                .width(if (isBar) 2.5.dp else 1.5.dp)
+                                .fillMaxHeight()
+                                .background(
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                        alpha = if (isBar) 0.8f else 0.5f
+                                    )
+                                )
+                        )
+                    }
                 }
             }
         }

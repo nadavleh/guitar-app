@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
@@ -14,11 +14,11 @@ android {
         targetSdk = 34
         // major.minor.patch versioning. Bump MINOR for new features, PATCH for
         // bug fixes of existing features, MAJOR for breaking redesigns. Previous
-        // releases are kept in /releases — never delete them. versionCode is a
+        // releases are kept in /releases â€” never delete them. versionCode is a
         // monotonically increasing integer: major*10000 + minor*100 + patch
         // (e.g. 1.2.0 = 10200, 1.2.1 = 10201, 2.0.0 = 20000).
-        versionCode = 20100
-        versionName = "2.1.0"
+        versionCode = 20200
+        versionName = "2.2.0"
     }
 
     buildTypes {
@@ -28,8 +28,8 @@ android {
     }
 
     // Name the built APK after the app + version instead of the default
-    // "app-debug.apk" — e.g. Chorect_beta_V1.0.apk. Tracks versionName, so the
-    // next build (1.1, 2.0, …) is named automatically.
+    // "app-debug.apk" â€” e.g. Chorect_beta_V1.0.apk. Tracks versionName, so the
+    // next build (1.1, 2.0, â€¦) is named automatically.
     applicationVariants.all {
         val variant = this
         outputs.all {

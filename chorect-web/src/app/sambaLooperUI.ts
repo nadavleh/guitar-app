@@ -3,7 +3,7 @@
 // Mixer/Kit segments — see commit b02d227 on Android): the step grid itself
 // (tap a cell to cycle its voice, or clear in Erase mode; long-press/right-
 // click clears), a dismissible gesture-legend banner, and a compact
-// swing/metronome card. Tapping an instrument's row label opens a voice
+// swing/tap-tempo card. Tapping an instrument's row label opens a voice
 // popup (overall + per-voice volume, tap-to-preview, Remove); a "+ Add ▾"
 // control in the header row adds instruments from the catalog. Save…/Load…/
 // Clear all/Erase/Accent stay in the same header row.
@@ -171,14 +171,13 @@ export class SambaLooperUI {
     for (const inst of s.pattern.instruments) wrap.appendChild(this.instrumentRow(inst));
     wrap.appendChild(el("div", { class: "drum-caption" }, [s.meter.describe()]));
 
-    // Compact card: tap-tempo + metronome + swing.
+    // Compact card: tap-tempo + swing.
     const swingActive = s.meter.beatUnit === 4 && s.meter.division === 16;
     const swingSlider = slider(0, 100, s.swing, (v) => s.setSwing(v));
     swingSlider.disabled = !swingActive;
     wrap.appendChild(el("div", { class: "et-card", style: `background:var(--surface2);margin-top:8px` }, [
       el("div", { class: "row" }, [
         btn("Tap tempo", () => s.tapTempo()),
-        btn(s.metronome ? "Metro ✓" : "Metro", () => s.toggleMetronome(), s.metronome ? "btn primary" : "btn"),
       ]),
       el("div", { class: "label-sm" }, [
         !swingActive ? "Swing: 1/16 grid only" : s.swing === 0 ? "Swing: straight" : `Swing: ${s.swing}% (16ths)`,
@@ -274,10 +273,11 @@ export class SambaLooperUI {
     const perBeat = Math.max(slotsPerBeat, 1);
     for (let slot = 0; slot < slots; slot++) {
       cells.appendChild(this.cell(inst, slot, Math.floor(slot / perBeat), slot % perBeat === 0));
-      // Beat separators: a gap after each beat; a wider gap at each bar line.
+      // Beat separators: a visible vertical rule after each beat (each group of four
+      // 16ths), heavier at bar lines, so the quarter-note divisions read clearly.
       if ((slot + 1) % slotsPerBeat === 0 && slot !== slots - 1) {
-        const w = (slot + 1) % slotsPerBar === 0 ? 6 : 3;
-        cells.appendChild(el("div", { class: "drum-gap", style: `flex:0 0 ${w}px` }));
+        const isBar = (slot + 1) % slotsPerBar === 0;
+        cells.appendChild(el("div", { class: isBar ? "drum-div bar" : "drum-div" }));
       }
     }
 

@@ -159,15 +159,18 @@ const withBogus = withCuica.encode() + "|bogus=" + Array.from({ length: withCuic
 const rtBogus = PercussionPattern.decode(withBogus);
 check("decode skips unknown instrument ids", rtBogus !== null && rtBogus.instruments.every((i) => i.id !== "bogus"));
 
-// --- Swing: anchors 1st/3rd, delays 2nd, advances 4th; preserves loop length; 1/16 only ---
+// --- Swing (samba microtiming): anchors 1st/2nd, anticipates 3rd & 4th; preserves loop length; 1/16 only ---
 const straightSum = Array.from({ length: 16 }, (_, i) => swungSlotMs(i, 100, 0, M)).reduce((a, b) => a + b, 0);
 const swungSum = Array.from({ length: 16 }, (_, i) => swungSlotMs(i, 100, 60, M)).reduce((a, b) => a + b, 0);
 check("straight slot = base slotMs", Math.abs(swungSlotMs(0, 100, 0, M) - slotMs(100)) < 1.5);
 check("swing preserves total loop length (±a few ms rounding)", Math.abs(straightSum - swungSum) <= 16);
-// at 100%, 1st→2nd gap stretches and 2nd→3rd compresses (and they mirror across the beat)
+// at 100%: 2nd 16th stays on the grid, 3rd comes early, 4th earlier still; beat length intact
 const g0 = swungSlotMs(0, 100, 100, M), g1 = swungSlotMs(1, 100, 100, M), g2 = swungSlotMs(2, 100, 100, M), g3 = swungSlotMs(3, 100, 100, M);
-check("full swing: stretched 1st/4th gaps exceed compressed 2nd/3rd, beat length intact",
-  g0 > g1 && g0 === g3 && g1 === g2 && g0 + g1 + g2 + g3 === slotMs(100) * 4);
+const onset2 = g0 + g1, onset3 = g0 + g1 + g2;
+check("full swing: 2nd anchored, 3rd/4th anticipated (4th more), beat length intact",
+  g0 === slotMs(100) && onset2 < 2 * slotMs(100) && onset3 < 3 * slotMs(100) &&
+  (2 * slotMs(100) - onset2) < (3 * slotMs(100) - onset3) &&
+  g0 + g1 + g2 + g3 === slotMs(100) * 4);
 // non-1/16 grids ignore swing entirely
 const eighths = new PercussionMeter(2, 2, 4, 8);
 check("swing does nothing off a 1/16 grid", swungSlotMs(1, 100, 100, eighths) === slotMs(100, 8));

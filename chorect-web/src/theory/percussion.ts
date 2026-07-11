@@ -362,10 +362,13 @@ export function loopMs(bpm: number): number {
  *
  * Swing only operates when a quarter-note beat is split into exactly four 16th notes
  * (beatUnit === 4 and division === 16); any other meter plays straight. Within each
- * beat the four 16ths sit at 0, ¼, ½, ¾ of the beat. As `swingPercent` rises 0→100
- * the 1st and 3rd stay anchored, the 2nd is delayed toward ⅓ of the beat (+1/12 at
- * 100 %), and the 4th is advanced (made early) toward ⅔ (−1/12 at 100 %). Onsets are
- * rounded independently so the anchors stay on-grid and the loop length is preserved.
+ * beat the four 16ths sit at 0, ¼, ½, ¾ of the beat. Samba microtiming studies
+ * (Gerischer; Naveda/Gouyon) show the played feel keeps the 1st AND 2nd 16ths on the
+ * grid and ANTICIPATES the 3rd and (more so) the 4th — the propulsive samba lilt.
+ * As `swingPercent` rises 0→100 the 3rd 16th moves up to −0.25 slot early and the 4th
+ * up to −0.4 slot early. Onsets are rounded independently so the anchors stay on-grid
+ * and the loop length is preserved. (Replaces the earlier delayed-2nd/advanced-4th
+ * model, whose bunched mid-beat notes sounded lopsided at high percentages.)
  */
 export function swungSlotMs(slot: number, bpm: number, swingPercent: number, meter: PercussionMeter): number {
   const base = slotMs(bpm, meter.division);
@@ -373,7 +376,7 @@ export function swungSlotMs(slot: number, bpm: number, swingPercent: number, met
   const sw = Math.min(Math.max(swingPercent, 0), 100) / 100;
   const onsetMs = (k: number): number => {
     const pos = k % 4;
-    const offsetSlots = pos === 0 ? 0 : pos === 1 ? 1 + sw / 3 : pos === 2 ? 2 : 3 - sw / 3;
+    const offsetSlots = pos === 0 ? 0 : pos === 1 ? 1 : pos === 2 ? 2 - sw * 0.25 : 3 - sw * 0.4;
     return Math.round((Math.floor(k / 4) * 4 + offsetSlots) * base);
   };
   return Math.max(onsetMs(slot + 1) - onsetMs(slot), 1);

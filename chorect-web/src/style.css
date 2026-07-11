@@ -830,6 +830,17 @@ select.et-select {
 .drum-cell.playhead { border-color: var(--text-primary); }
 .drum-cell.accent { border-color: var(--feedback); font-weight: 700; font-size: 18px; }
 .drum-cells.dim { opacity: 0.4; }
+/* Quarter-note division rule between each group of four 16th cells; heavier at bar lines. */
+.drum-div {
+  flex: 0 0 5px; align-self: stretch;
+  background: linear-gradient(to right, transparent calc(50% - 0.75px), var(--text-secondary) calc(50% - 0.75px), var(--text-secondary) calc(50% + 0.75px), transparent calc(50% + 0.75px));
+  opacity: 0.55;
+}
+.drum-div.bar {
+  flex: 0 0 8px;
+  background: linear-gradient(to right, transparent calc(50% - 1.25px), var(--text-secondary) calc(50% - 1.25px), var(--text-secondary) calc(50% + 1.25px), transparent calc(50% + 1.25px));
+  opacity: 0.85;
+}
 .drum-caption { font-size: 11px; color: var(--text-secondary); margin: 4px 0 0 138px; }
 .drum-setup-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 8px 0; }
 .drum-setup-item { display: flex; align-items: center; gap: 6px; }
