@@ -333,6 +333,18 @@ class EarTrainingState(
         playEarChord(earMidis(shape), root.value, sustainProvider())
     }
 
+    /** Famous songs built on the CURRENT progression (from the library data), for the
+     *  "Songs" popup available in both Practice and Challenge. Best-effort across
+     *  generators: diatonic by degrees, advanced by name, circle by matching window. */
+    fun currentProgressionSongs(): List<app.guitar.theory.SongExample> = when {
+        advancedMode -> advProg?.let { app.guitar.theory.ProgressionSongs.forAdvanced(it.name) } ?: emptyList()
+        circleMode -> advProg?.let { np ->
+            app.guitar.theory.EarTraining.CIRCLE_WINDOWS.firstOrNull { it.romanLine == np.romanLine }
+                ?.let { app.guitar.theory.ProgressionSongs.forCircleWindow(it.id) }
+        } ?: emptyList()
+        else -> progProgression?.let { app.guitar.theory.ProgressionSongs.forDiatonic(it) } ?: emptyList()
+    }
+
     // ---------- Library preview player ----------
     // A SEPARATE, self-contained looper for the progression-library dialog. It never
     // touches the quiz looper's state (progResolved / currentBar / currentPlayingShape /

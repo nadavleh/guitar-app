@@ -776,6 +776,29 @@ export class EarTrainingUI {
   /** Signal move: reveal cards first, then the action strip, then the
    *  generator summary card (tap to configure) — mirrors Android's
    *  ProgressionView ordering exactly. */
+  /** "Songs ♪" button that pops a modal listing famous songs built on the CURRENT
+   *  progression (library data). Used in Practice and Challenge, all generators. */
+  private songsButton(): HTMLElement {
+    return btn("Songs ♪", () => this.showSongsPopup());
+  }
+
+  private showSongsPopup(): void {
+    const songs = this.ear.currentProgressionSongs();
+    const body = songs.length
+      ? el("div", {}, songs.map((sg) => el("div", { style: "font-size:14px;padding:2px 0" }, [`•  ${sg.title} — ${sg.artist}`])))
+      : el("div", { class: "et-muted" }, ["No songs are listed for this progression yet."]);
+    const closeBtn = btn("Close", () => scrim.remove(), "btn primary");
+    const card = el("div", { class: "et-card", style: "max-width:480px;max-height:75vh;overflow:auto;margin:auto" }, [
+      el("div", { style: "font-weight:700;font-size:16px;margin-bottom:8px" }, ["Songs with this progression"]),
+      body,
+      el("div", { style: "text-align:right;margin-top:10px" }, [closeBtn]),
+    ]);
+    card.addEventListener("click", (e) => e.stopPropagation());
+    const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:60" }, [card]);
+    scrim.addEventListener("click", () => scrim.remove());
+    document.body.appendChild(scrim);
+  }
+
   private progressionView(parent: HTMLElement): void {
     const ear = this.ear;
     if (!ear.hasGenerated) {
@@ -811,6 +834,7 @@ export class EarTrainingUI {
       nextBtn,
       btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
       btn("→ Looper", () => this.onToLooper(ear.progResolved.map((rc) => rc.symbol))),
+      this.songsButton(),
     ]));
 
     parent.appendChild(this.transposeRow());
@@ -898,6 +922,7 @@ export class EarTrainingUI {
     parent.appendChild(el("div", { class: "et-row-gap" }, [
       btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
       btn("Re-roll", () => ear.rerollChallengeQuestion()),
+      this.songsButton(),
     ]));
     // Transpose shifts the key/chords but not the degrees, so it's safe in the challenge.
     parent.appendChild(this.transposeRow());
@@ -1051,6 +1076,7 @@ export class EarTrainingUI {
     parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:8px" }, [
       advPrevBtn,
       btn("Next →", () => ear.nextAdvancedProgression()),
+      this.songsButton(),
     ]));
     parent.appendChild(this.transposeRow());
     parent.appendChild(el("div", { class: "v-gap-8" }));
@@ -1085,6 +1111,7 @@ export class EarTrainingUI {
       parent.appendChild(el("div", { class: "row" }, [got, missed]));
     } else {
       parent.appendChild(btn(ear.advChIndex === ear.advChallengeTotal - 1 ? "See score →" : "Next →", () => ear.advanceAdvChallenge(), "btn primary"));
+      parent.appendChild(this.songsButton());
     }
   }
 

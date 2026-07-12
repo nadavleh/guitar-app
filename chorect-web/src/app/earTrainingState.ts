@@ -11,6 +11,7 @@ import {
   EarTrainingDegrees, degreeRoot, resolve as resolveDegree, resolveProgression,
   randomProgression, romanLabel, randomAdvanced, randomCircleOfFifths, resolveNamed,
   majorRelativeDegree, degreeFromMajorRelative,
+  SongExample, songsForDiatonic, songsForAdvanced, songsForCircleWindow, CIRCLE_WINDOWS, namedRomanLine,
   N2cChallenge, randomN2c, n2cAnswerLabel, n2cChordSymbol, n2cTestNote, n2cLabel,
   N2C_MAJOR_TEST_OFFSETS, N2C_MINOR_TEST_OFFSETS,
   inversionCount, inversionMidis,
@@ -1031,6 +1032,20 @@ export class EarTrainingState {
   /** True when a "special" generator (advanced or circle) is active. The I→iii drill
    *  is NOT special — it uses the diatonic view. */
   get specialProgMode(): boolean { return this.advancedMode || this.circleMode; }
+
+  /** Famous songs built on the CURRENT progression (library data) — for the Songs popup
+   *  in Practice and Challenge. Best-effort across generators: diatonic by degrees,
+   *  advanced by name, circle by matching the roman line to a window. */
+  currentProgressionSongs(): SongExample[] {
+    if (this.advancedMode) return this.advProg ? songsForAdvanced(this.advProg.name) : [];
+    if (this.circleMode) {
+      if (!this.advProg) return [];
+      const line = namedRomanLine(this.advProg);
+      const win = CIRCLE_WINDOWS.find((w) => w.romanLine === line);
+      return win ? songsForCircleWindow(win.id) : [];
+    }
+    return this.progProgression ? songsForDiatonic(this.progProgression) : [];
+  }
   setAdvancedMode(v: boolean) { this.advancedMode = v; if (v) { this.circleMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
   setCircleMode(v: boolean) { this.circleMode = v; if (v) { this.advancedMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
   setIiiFocusMode(v: boolean) { this.iiiFocusMode = v; if (v) { this.advancedMode = false; this.circleMode = false; } this.stopLoop(); this.notify(); }

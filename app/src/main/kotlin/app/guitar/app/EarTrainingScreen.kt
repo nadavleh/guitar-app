@@ -481,6 +481,7 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
                 onClick = { state.loadProgressionIntoLoop(ear.progResolved.map { it.symbol }) },
                 contentPadding = COMPACT_BUTTON_PADDING,
             ) { Text("→ Looper") }
+            ProgressionSongsButton(ear)
         }
 
         Spacer(Modifier.height(10.dp))
@@ -535,6 +536,37 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
 /** Compact content padding shared by the Progression action-strip buttons
  *  (Signal restyle — a tighter, "chip-like" footprint for a 4-button FlowRow). */
 private val COMPACT_BUTTON_PADDING = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+
+/** "Songs ♪" button + popup listing famous songs built on the CURRENT progression
+ *  (from the library data). Available in Practice and Challenge, all generators. */
+@Composable
+private fun ProgressionSongsButton(ear: EarTrainingState) {
+    var open by remember { mutableStateOf(false) }
+    OutlinedButton(onClick = { open = true }, contentPadding = COMPACT_BUTTON_PADDING) { Text("Songs ♪") }
+    if (open) {
+        val songs = ear.currentProgressionSongs()
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { open = false },
+            confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } },
+            title = { Text("Songs with this progression") },
+            text = {
+                if (songs.isEmpty()) {
+                    Text("No songs are listed for this progression yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                        songs.forEach {
+                            Text("•  ${it.title} — ${it.artist}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(vertical = 2.dp))
+                        }
+                    }
+                }
+            },
+        )
+    }
+}
 
 /** "Random ▾" key picker that collapses the 12 fixed keys into a dropdown. */
 @Composable
@@ -1368,6 +1400,7 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         ) {
             OutlinedButton(onClick = { ear.playProgKeyCadence() }) { Text("Hear ${ear.progCadenceLabel()}") }
             OutlinedButton(onClick = { ear.rerollChallengeQuestion() }) { Text("Re-roll") }
+            ProgressionSongsButton(ear)
             // Transpose works here too — it shifts the key/chords but not the
             // degrees, so it never gives away the answer.
             TransposeClicker(ear)
@@ -1975,6 +2008,7 @@ private fun AdvancedProgressionView(state: AppState, ear: EarTrainingState) {
                 enabled = ear.canGoPrevAdvanced,
             ) { Text("← Prev") }
             OutlinedButton(onClick = { ear.nextAdvancedProgression() }) { Text("Next →") }
+            ProgressionSongsButton(ear)
         }
         Spacer(Modifier.height(10.dp))
         TransposeClicker(ear)
@@ -2029,6 +2063,8 @@ private fun AdvancedChallengeView(state: AppState, ear: EarTrainingState) {
                 Text(if (ear.advChIndex == ear.advChallengeTotal - 1) "See score →" else "Next →")
             }
         }
+        Spacer(Modifier.height(8.dp))
+        ProgressionSongsButton(ear)
         Spacer(Modifier.height(20.dp))
     }
 }
