@@ -701,12 +701,15 @@ class AppState(
         scope.launch { repo.setChordSlots(chordSlots) }
     }
 
-    fun strumPicked(arpeggio: Boolean = false) {
+    /** Strum the current picked grip. [up] = up-strum (high string sounds first,
+     *  high→low pitch); default is a down-strum (low→high). Muted strings excluded. */
+    fun strumPicked(up: Boolean = false, arpeggio: Boolean = false) {
         if (pickedPositions.isEmpty()) return
-        val midis = pickedPositions
+        val ordered = pickedPositions
             .filter { it.stringIndex < liveTuning.stringCount && it.stringIndex !in mutedStrings }
             .sortedWith(compareBy({ it.stringIndex }, { it.fret }))
-            .map { Fretboard.noteAt(liveTuning, it).midi.value }
+            .let { if (up) it.asReversed() else it }
+        val midis = ordered.map { Fretboard.noteAt(liveTuning, it).midi.value }
         if (midis.isNotEmpty()) {
             audio.playChord(
                 midis,

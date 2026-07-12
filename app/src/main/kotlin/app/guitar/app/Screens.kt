@@ -311,7 +311,8 @@ private fun PickControls(state: AppState) {
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val canStrum = state.pickedPositions.any { it.stringIndex !in state.mutedStrings }
-            Button(onClick = { state.strumPicked(arpeggio = false) }, enabled = canStrum) { Text("Strum") }
+            Button(onClick = { state.strumPicked(up = false) }, enabled = canStrum) { Text("Strum ↓") }
+            Button(onClick = { state.strumPicked(up = true) }, enabled = canStrum) { Text("Strum ↑") }
             OutlinedButton(onClick = { state.strumPicked(arpeggio = true) }, enabled = canStrum) { Text("Arpeggio") }
             OutlinedButton(onClick = { state.clearPicked() }, enabled = state.pickedPositions.isNotEmpty() || state.mutedStrings.isNotEmpty()) { Text("Clear") }
         }

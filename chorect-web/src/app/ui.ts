@@ -527,10 +527,12 @@ export class App {
   private pickActionBar(): HTMLElement {
     const canStrum = [...this.state.pickedPositions].some((k) => !this.state.mutedStrings.has(parseInt(k.split(",")[0], 10)));
     const counts = `Picked: ${this.state.pickedPositions.size}` + (this.state.mutedStrings.size ? `  ·  muted: ${this.state.mutedStrings.size}` : "");
-    const strumBtn = btn("Strum", () => this.state.strumPicked(false), "btn primary");
-    const arpBtn = btn("Arp", () => this.state.strumPicked(true));
+    const strumDownBtn = btn("Strum ↓", () => this.state.strumPicked(false, false), "btn primary");
+    const strumUpBtn = btn("Strum ↑", () => this.state.strumPicked(true, false), "btn primary");
+    const arpBtn = btn("Arp", () => this.state.strumPicked(false, true));
     const clearBtn = btn("Clear", () => this.state.clearPicked());
-    (strumBtn as HTMLButtonElement).disabled = !canStrum;
+    (strumDownBtn as HTMLButtonElement).disabled = !canStrum;
+    (strumUpBtn as HTMLButtonElement).disabled = !canStrum;
     (arpBtn as HTMLButtonElement).disabled = !canStrum;
     (clearBtn as HTMLButtonElement).disabled = this.state.pickedPositions.size === 0 && this.state.mutedStrings.size === 0;
     return el("div", { class: "context-bar" }, [
@@ -538,7 +540,7 @@ export class App {
       el("div", { class: "v-gap-8" }),
       this.muteRow(),
       el("div", { class: "v-gap-8" }),
-      el("div", { class: "row" }, [el("div", { class: "spacer", style: "" }, [counts]), strumBtn, arpBtn, clearBtn]),
+      el("div", { class: "row" }, [el("div", { class: "spacer", style: "" }, [counts]), strumDownBtn, strumUpBtn, arpBtn, clearBtn]),
     ]);
   }
 

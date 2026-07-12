@@ -671,11 +671,14 @@ export class AppState {
     });
   }
 
-  strumPicked(arpeggio = false): void {
+  /** Strum the current picked grip. `up` = up-strum (high string first, high→low
+   *  pitch); default down-strum (low→high). Muted strings excluded. */
+  strumPicked(up = false, arpeggio = false): void {
     const positions = [...this.pickedPositions]
       .map((k) => fp(parseInt(k.split(",")[0], 10), parseInt(k.split(",")[1], 10)))
       .filter((p) => p.stringIndex < stringCount(this.liveTuning) && !this.mutedStrings.has(p.stringIndex))
       .sort((a, b) => (a.stringIndex - b.stringIndex) || (a.fret - b.fret));
+    if (up) positions.reverse();
     const midis = positions.map((p) => noteAt(this.liveTuning, p).midi);
     if (midis.length) {
       this.audio.playChord(midis, arpeggio ? Math.max(this.strumMs * 4, 100) : this.strumMs, this.ringSustainMs, this.timbre);
