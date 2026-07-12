@@ -1296,7 +1296,7 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
             return@Column
         }
 
-        // ---- done screen (after Q15 advance) ----
+        // ---- done screen (after the last question advances) ----
         if (ear.challengeIndex >= ear.challengeTotal) {
             val highScores by state.challengeScores.collectAsState(initial = emptyList())
             ChallengeDoneCard(
