@@ -1339,13 +1339,21 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedButton(
+            Button(
                 onClick = { ear.previousChallengeQuestion() },
                 enabled = ear.canGoPrevChallenge,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFC0392B), contentColor = Color.White,
+                    disabledContainerColor = Color(0xFFC0392B).copy(alpha = 0.4f),
+                    disabledContentColor = Color.White.copy(alpha = 0.7f),
+                ),
                 modifier = Modifier.weight(1f),
             ) { Text("← Prev") }
             Button(
                 onClick = { ear.advanceChallenge() },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2E9E4F), contentColor = Color.White,
+                ),
                 modifier = Modifier.weight(1f),
             ) { Text(if (ear.challengeIndex == ear.challengeTotal - 1) "See score →" else "Next →") }
         }
@@ -1438,12 +1446,30 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
 
         Spacer(Modifier.height(10.dp))
 
-        // #4: always allowed — any bars you haven't answered are credited as correct.
-        Button(
-            onClick = { ear.advanceChallenge() },
+        // Bottom nav: reddish Prev + greenish Next question (matches the top nav) so Prev
+        // is present and visible at the bottom too. #4: advancing is always allowed — any
+        // bars you haven't answered are credited as correct.
+        Row(
             modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(if (ear.challengeIndex == ear.challengeTotal - 1) "See score →" else "Next question →")
+            Button(
+                onClick = { ear.previousChallengeQuestion() },
+                enabled = ear.canGoPrevChallenge,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFC0392B), contentColor = Color.White,
+                    disabledContainerColor = Color(0xFFC0392B).copy(alpha = 0.4f),
+                    disabledContentColor = Color.White.copy(alpha = 0.7f),
+                ),
+                modifier = Modifier.weight(1f),
+            ) { Text("← Prev question") }
+            Button(
+                onClick = { ear.advanceChallenge() },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2E9E4F), contentColor = Color.White,
+                ),
+                modifier = Modifier.weight(1f),
+            ) { Text(if (ear.challengeIndex == ear.challengeTotal - 1) "See score →" else "Next question →") }
         }
         Text(
             "Unanswered bars count as correct.",

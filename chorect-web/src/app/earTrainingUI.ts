@@ -880,13 +880,18 @@ export class EarTrainingUI {
 
     parent.appendChild(el("div", { class: "v-gap-8" }));
 
-    // Question navigation pinned up top: an accidental "Next" can be undone
-    // (← Prev restores that question's saved answers) without scrolling down.
+    // Question navigation: Prev = reddish pill, Next = greenish pill (filled like the
+    // Challenge segment button, tinted) so Next is never mistaken for it and Prev is
+    // clearly visible (the old plain-dark ← Prev was nearly invisible). Pinned up top
+    // AND repeated at the bottom (below the answer pad) so Prev is reachable there too.
+    const tintRed = (b: HTMLElement) => { b.style.background = "#c0392b"; b.style.color = "#fff"; b.style.border = "none"; };
+    const tintGreen = (b: HTMLElement) => { b.style.background = "#2e9e4f"; b.style.color = "#fff"; b.style.border = "none"; };
+    const lastQ = ear.challengeIndex === ear.challengeTotal - 1;
     const prevBtn = btn("← Prev", () => ear.previousChallengeQuestion(), "btn");
-    prevBtn.style.flex = "1";
+    prevBtn.style.flex = "1"; tintRed(prevBtn);
     if (!ear.canGoPrevChallenge) prevBtn.disabled = true;
-    const nextTopBtn = btn(ear.challengeIndex === ear.challengeTotal - 1 ? "See score →" : "Next →", () => ear.advanceChallenge(), "btn primary");
-    nextTopBtn.style.flex = "1";
+    const nextTopBtn = btn(lastQ ? "See score →" : "Next →", () => ear.advanceChallenge(), "btn");
+    nextTopBtn.style.flex = "1"; tintGreen(nextTopBtn);
     parent.appendChild(el("div", { class: "row", style: "gap:8px" }, [prevBtn, nextTopBtn]));
 
     // Tools row: Hear the cadence · Re-roll · Transpose (Signal move — one row).
@@ -915,7 +920,14 @@ export class EarTrainingUI {
     parent.appendChild(this.challengeAnswerPad(this.challengeSelectedBar));
 
     parent.appendChild(el("div", { class: "v-gap-8" }));
-    parent.appendChild(btn(ear.challengeIndex === ear.challengeTotal - 1 ? "See score →" : "Next question →", () => ear.advanceChallenge(), "btn primary"));
+    // Bottom nav: reddish Prev + greenish Next question (same tinted-pill styling as the
+    // top nav) so Prev is present and visible at the bottom of the page too.
+    const prevBottom = btn("← Prev question", () => ear.previousChallengeQuestion(), "btn");
+    prevBottom.style.flex = "1"; tintRed(prevBottom);
+    if (!ear.canGoPrevChallenge) prevBottom.disabled = true;
+    const nextBottom = btn(lastQ ? "See score →" : "Next question →", () => ear.advanceChallenge(), "btn");
+    nextBottom.style.flex = "1"; tintGreen(nextBottom);
+    parent.appendChild(el("div", { class: "row", style: "gap:8px" }, [prevBottom, nextBottom]));
     parent.appendChild(el("div", { class: "et-muted", style: "margin-top:2px" }, ["Unanswered bars count as correct."]));
     parent.appendChild(el("div", { class: "v-gap-12" }));
     this.fretboardPanel(parent);
