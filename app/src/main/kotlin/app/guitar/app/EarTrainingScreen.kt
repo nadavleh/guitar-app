@@ -31,6 +31,8 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -450,13 +452,26 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // #7: ← Prev restores the previously generated progression (reveals reset).
-            OutlinedButton(
+            // #7: Prev/Next get transparent red/green tints so they're clearly distinct
+            // from the accent Play button in the transport dock (users misclicked Next
+            // for Play). ← Prev restores the previously generated progression.
+            Button(
                 onClick = { ear.previousProgression() },
                 enabled = ear.canGoPrevProgression,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFD32F2F).copy(alpha = 0.16f),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
                 contentPadding = COMPACT_BUTTON_PADDING,
-            ) { Text("← Prev") }
-            OutlinedButton(onClick = { ear.nextProgression() }, contentPadding = COMPACT_BUTTON_PADDING) { Text("Next →") }
+            ) { Text("← Prev progression") }
+            Button(
+                onClick = { ear.nextProgression() },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2E7D32).copy(alpha = 0.18f),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                contentPadding = COMPACT_BUTTON_PADDING,
+            ) { Text("Next progression →") }
             // #1: hear the tonic — plays I-V-I (or i-V-i) in the current key.
             OutlinedButton(onClick = { ear.playProgKeyCadence() }, contentPadding = COMPACT_BUTTON_PADDING) {
                 Text("Hear ${ear.progCadenceLabel()}")

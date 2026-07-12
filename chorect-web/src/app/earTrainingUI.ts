@@ -796,12 +796,19 @@ export class EarTrainingUI {
     parent.appendChild(el("div", { class: "v-gap-8" }));
 
     // ---- Action strip directly under the cards ----
-    // #7: ← Prev (left of Next) restores the previously generated progression.
-    const prevBtn = btn("← Prev", () => ear.previousProgression());
+    // #7: Prev/Next get transparent red/green tints so they're clearly distinct from
+    // the accent Play button (users misclicked Next for Play). ← Prev restores the
+    // previously generated progression.
+    const prevBtn = btn("← Prev progression", () => ear.previousProgression());
     prevBtn.disabled = !ear.canGoPrevProgression;
+    prevBtn.style.background = "rgba(211,47,47,0.16)";
+    prevBtn.style.borderColor = "rgba(211,47,47,0.5)";
+    const nextBtn = btn("Next progression →", () => ear.nextProgression());
+    nextBtn.style.background = "rgba(46,125,50,0.18)";
+    nextBtn.style.borderColor = "rgba(46,125,50,0.5)";
     parent.appendChild(el("div", { class: "et-row-gap" }, [
       prevBtn,
-      btn("Next →", () => ear.nextProgression()),
+      nextBtn,
       btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
       btn("→ Looper", () => this.onToLooper(ear.progResolved.map((rc) => rc.symbol))),
     ]));
