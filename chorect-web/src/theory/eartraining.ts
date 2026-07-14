@@ -1,6 +1,6 @@
 // Ear-training theory, ported from theory/.../EarTraining.kt.
 
-import { PitchClass, pcOf, spellPc } from "./core";
+import { PitchClass, pcOf, spellPc, Accidental } from "./core";
 import { Rng, defaultRng } from "./random";
 
 export enum TrainingMode { Major = "Major", Minor = "Minor" }
@@ -187,7 +187,9 @@ export function namedRomanLine(np: NamedProgression): string {
 export function resolveNamed(np: NamedProgression, key: PitchClass): ResolvedChord[] {
   return np.chords.map((c) => {
     const root = pcOf(key + c.semitone);
-    return { symbol: spellPc(root) + c.quality, romanLabel: c.roman, root };
+    // Spell the root to match the roman's accidental (bVII → Bb, #IV → F#).
+    const prefer: Accidental = c.roman.includes("#") ? "sharp" : c.roman.includes("b") ? "flat" : "sharp";
+    return { symbol: spellPc(root, prefer) + c.quality, romanLabel: c.roman, root };
   });
 }
 
@@ -347,7 +349,8 @@ export const CIRCLE_WINDOWS: CircleWindow[] = (() => {
 export function resolveCircleWindow(win: CircleWindow, key: PitchClass): ResolvedChord[] {
   return win.chords.map((ch) => {
     const root = pcOf(key + ch.semitone);
-    return { symbol: spellPc(root) + ch.quality, romanLabel: ch.roman, root };
+    const prefer: Accidental = ch.roman.includes("#") ? "sharp" : ch.roman.includes("b") ? "flat" : "sharp";
+    return { symbol: spellPc(root, prefer) + ch.quality, romanLabel: ch.roman, root };
   });
 }
 

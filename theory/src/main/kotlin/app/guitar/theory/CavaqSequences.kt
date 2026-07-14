@@ -38,9 +38,11 @@ object CavaqSequences {
             ac(0, "", "I"), ac(9, "7", "VI7"), ac(2, "m", "ii"), ac(7, "7", "V7"),
             ac(7, "m", "v"), ac(0, "7", "I7"), ac(5, "", "IV"), ac(5, "m", "iv"),
             ac(4, "m", "iii"), ac(9, "7", "VI7"), ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I")),
-        // ii–V–I (major), the fundamental jazz/choro cadence.
-        seq("ii_v_i_maj", "II–V–I Maior", "II–V–I (Major)", TrainingMode.Major,
-            ac(2, "m7", "ii7"), ac(7, "7", "V7"), ac(0, "maj7", "Imaj7")),
+        // Médio — extended minor sequence (Cm C7 Fm Bb7 Eb Ab Dm7b5 G7 Cm):
+        // i I7 iv bVII7 bIII bVI iiø V7 i — the minor circle-of-fifths cadence.
+        seq("medio_min", "Sequência Médio (Menor)", "Extended Minor (Médio)", TrainingMode.Minor,
+            ac(0, "m", "i"), ac(0, "7", "I7"), ac(5, "m", "iv"), ac(10, "7", "bVII7"),
+            ac(3, "", "bIII"), ac(8, "", "bVI"), ac(2, "m7b5", "iiø"), ac(7, "7", "V7"), ac(0, "m", "i")),
         // Campo harmônico — the diatonic field, for scale/mode study.
         seq("campo_maj", "Campo Harmônico Maior", "Harmonic Field (Major)", TrainingMode.Major,
             ac(0, "", "I"), ac(2, "m", "ii"), ac(4, "m", "iii"), ac(5, "", "IV"),

@@ -357,6 +357,10 @@ button:disabled:active { filter: none; }
   padding: 6px 10px;
 }
 .btn.icon { padding: 4px 12px; font-size: 18px; }
+/* Native <select> dropdowns (e.g. the cavaquinho sequence picker): theme the control
+   AND its option list so the default white popup is readable in dark mode. */
+select.btn { background: var(--surface2); color: var(--text-primary); }
+select.btn option { background: var(--surface2); color: var(--text-primary); }
 
 .chip {
   background: var(--surface-elev);

@@ -245,10 +245,13 @@ object EarTraining {
         /** Roman-numeral line, e.g. "I – bVII – IV". */
         val romanLine: String get() = chords.joinToString("  –  ") { it.roman }
 
-        /** Realise the progression in [key] as concrete, playable chords. */
+        /** Realise the progression in [key] as concrete, playable chords. Spell the root
+         *  to match the roman's accidental (a "b" roman like bVII → flat root Bb). */
         fun resolve(key: PitchClass): List<ResolvedChord> = chords.map { c ->
             val root = PitchClass.of(key.value + c.semitone)
-            ResolvedChord(NoteSpeller.spell(root) + c.quality, c.roman, root)
+            val prefer = if (c.roman.contains('#')) Accidental.SHARP
+                         else if (c.roman.contains('b')) Accidental.FLAT else Accidental.SHARP
+            ResolvedChord(NoteSpeller.spell(root, prefer) + c.quality, c.roman, root)
         }
     }
 
@@ -464,10 +467,13 @@ object EarTraining {
      *  progression-library viewer. [id] ("W1".."W7") keys its song list. Carries
      *  its [chords] so the library's preview player can sound and voice it. */
     data class CircleWindow(val id: String, val romanLine: String, val chords: List<AdvChord>) {
-        /** Realise the window in [key] as concrete, playable chords (major-key spelling). */
+        /** Realise the window in [key] as concrete, playable chords; spell the root to
+         *  match the roman's accidental (bVII → Bb, #IV → F#). */
         fun resolve(key: PitchClass): List<ResolvedChord> = chords.map { c ->
             val root = PitchClass.of(key.value + c.semitone)
-            ResolvedChord(NoteSpeller.spell(root) + c.quality, c.roman, root)
+            val prefer = if (c.roman.contains('#')) Accidental.SHARP
+                         else if (c.roman.contains('b')) Accidental.FLAT else Accidental.SHARP
+            ResolvedChord(NoteSpeller.spell(root, prefer) + c.quality, c.roman, root)
         }
     }
 

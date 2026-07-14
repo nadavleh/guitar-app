@@ -27,6 +27,15 @@ class CavaqSequencesTest {
         assertEquals("C", chords.last())
     }
 
+    @Test fun `medio minor resolves to the Betto Correa extended minor sequence in C`() {
+        val chords = CavaqSequences.byId("medio_min")!!.prog.resolve(PitchClass.C).map { it.symbol }
+        assertEquals(listOf("Cm", "C7", "Fm", "Bb7", "Eb", "Ab", "Dm7b5", "G7", "Cm"), chords)
+    }
+
+    @Test fun `II-V-I sequence was removed`() {
+        assertEquals(null, CavaqSequences.byId("ii_v_i_maj"))
+    }
+
     @Test fun `transposing quadradinho to D gives D B7 Em A7`() {
         val chords = CavaqSequences.byId("quadradinho_maj")!!.prog.resolve(PitchClass.D).map { it.symbol }
         assertEquals(listOf("D", "B7", "Em", "A7"), chords)

@@ -47,9 +47,9 @@ object CavaqSongs {
     /** Functional families each taught sequence (by id) covers. */
     private val SEQUENCE_FAMILIES: Map<String, Set<String>> = mapOf(
         "quadradinho_maj" to setOf("ii-V-I", "I-vi-ii-V"),
-        "ii_v_i_maj" to setOf("ii-V-I"),
         "basic_min" to setOf("minor-cadence"),
         "medio_maj" to setOf("ii-V-I", "circle"),
+        "medio_min" to setOf("minor-cadence", "circle"),
         "campo_maj" to emptySet(),
     )
 
