@@ -222,6 +222,12 @@ export class App {
       state.setThemeMode(state.themeMode === "Dark" ? "Light" : "Dark");
       refreshThemeToggleIcon();
     });
+    const shortcutsBtn = el("button", {
+      title: "Keyboard shortcuts (?)",
+      "aria-label": "Keyboard shortcuts",
+      style: "background:transparent;border:none;color:var(--text-primary);font-size:18px;cursor:pointer;padding:4px 8px",
+    }, ["⌨"]);
+    shortcutsBtn.addEventListener("click", () => this.toggleShortcuts());
     const header = el("div", { class: "app-header" }, [
       el("span", { class: "app-brand" }, ["chorect"]),
       el("span", { style: "font-size:11px;opacity:0.6;margin-left:6px;align-self:flex-end;padding-bottom:2px" }, [`v${APP_VERSION}`]),
@@ -235,6 +241,7 @@ export class App {
         }, ["@nadavileh"]),
       ]),
       el("span", { class: "spacer" }),
+      shortcutsBtn,
       themeToggleBtn,
     ]);
     const appRoot = el("div", { class: "app-root" }, [this.railEl, this.contentEl]);
@@ -295,30 +302,97 @@ export class App {
     window.addEventListener("pointercancel", release, true);
   }
 
-  /** #8: spacebar toggles play/stop of the active screen's loop — the drum looper,
-   *  the chord Loop, and the ear-training progression loop. Ignored while typing in
-   *  an input. preventDefault also stops the page scrolling and stops a still-focused
-   *  Play button from re-activating (which would double-toggle). */
+  /** Physical-keyboard shortcuts (web). Space toggles play/stop; arrows/number keys
+   *  navigate the active screen (positions, progression, quick-chord slots); "?" opens
+   *  the shortcuts help. Ignored while typing in an input. The ear-training CHALLENGE
+   *  answer pad has its own always-attached handler (EarTrainingUI.attachChallengeKeys),
+   *  so we skip Ear-progression arrows while a challenge is in flight to avoid clashes. */
   private setupSpacebarShortcut(): void {
     document.addEventListener("keydown", (e) => {
-      if (e.code !== "Space" || e.repeat) return;
+      if (e.repeat) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+
+      // "?" (Shift+/) toggles the shortcuts help from anywhere.
+      if (e.key === "?") { e.preventDefault(); this.toggleShortcuts(); return; }
+
       const sheet = this.state.currentSheet;
-      if (sheet === Sheet.SambaLooper) {
-        e.preventDefault();
-        if (this.samba.isPlaying) this.samba.stop(); else this.samba.start();
-      } else if (sheet === Sheet.Loop) {
-        e.preventDefault();
-        if (this.loop.isLooping) this.loop.stopLoop(); else this.loop.startLoop();
-      } else if (sheet === Sheet.EarTraining && this.ear.progSubMode === EarSubMode.Progression) {
-        e.preventDefault();
-        if (this.ear.isLooping) this.ear.stopLoop(); else this.ear.startLoop();
-      } else if (sheet === Sheet.CavaqProgressions) {
-        e.preventDefault();
-        this.cavaq.toggle();
+      const digit = e.key >= "1" && e.key <= "9" ? Number(e.key) - 1 : -1;
+
+      if (e.code === "Space") {
+        if (sheet === Sheet.SambaLooper) { e.preventDefault(); if (this.samba.isPlaying) this.samba.stop(); else this.samba.start(); }
+        else if (sheet === Sheet.Loop) { e.preventDefault(); if (this.loop.isLooping) this.loop.stopLoop(); else this.loop.startLoop(); }
+        else if (sheet === Sheet.EarTraining && this.ear.progSubMode === EarSubMode.Progression) { e.preventDefault(); if (this.ear.isLooping) this.ear.stopLoop(); else this.ear.startLoop(); }
+        else if (sheet === Sheet.CavaqProgressions) { e.preventDefault(); this.cavaq.toggle(); }
+        return;
+      }
+
+      // Cavaquinho Progressions: ←/→ neck position, ↑/↓ transpose, digits play a chord.
+      if (sheet === Sheet.CavaqProgressions) {
+        if (e.key === "ArrowLeft") { e.preventDefault(); this.cavaq.nudgePosition(-1); }
+        else if (e.key === "ArrowRight") { e.preventDefault(); this.cavaq.nudgePosition(1); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); this.cavaq.shiftKey(1); }
+        else if (e.key === "ArrowDown") { e.preventDefault(); this.cavaq.shiftKey(-1); }
+        else if (digit >= 0 && digit < this.cavaq.resolved.length) { e.preventDefault(); this.cavaq.playBar(digit); }
+        return;
+      }
+
+      // Ear-training PRACTICE progression: ←/→ prev/next, digits play a bar.
+      // (Challenge bar navigation lives in EarTrainingUI's own handler.)
+      if (sheet === Sheet.EarTraining && this.ear.progSubMode === EarSubMode.Progression && !this.ear.challengeActive) {
+        const adv = this.ear.specialProgMode;
+        if (e.key === "ArrowLeft") { e.preventDefault(); if (adv) this.ear.previousAdvancedProgression(); else this.ear.previousProgression(); }
+        else if (e.key === "ArrowRight") { e.preventDefault(); if (adv) this.ear.nextAdvancedProgression(); else this.ear.nextProgression(); }
+        else if (digit >= 0 && digit < this.ear.progResolved.length) { e.preventDefault(); this.ear.playBarOnce(digit); }
+        return;
+      }
+
+      // Play mode (Neck screen, Pick display): ←/→ cycle quick-chord slots, digits apply.
+      if ((sheet === null || sheet === Sheet.Fretboard) && this.state.displayMode === DisplayMode.Pick) {
+        const n = this.state.chordSlots.length;
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          e.preventDefault();
+          const cur = this.state.activeChordSlot < 0 ? 0 : this.state.activeChordSlot;
+          this.state.applyChordSlot(((cur + (e.key === "ArrowRight" ? 1 : -1)) % n + n) % n);
+        } else if (digit >= 0 && digit < n) { e.preventDefault(); this.state.applyChordSlot(digit); }
+        return;
       }
     });
+  }
+
+  /** Toggle the keyboard-shortcuts help popup. Lists the bindings for the active screen. */
+  private shortcutsScrim: HTMLElement | null = null;
+  private toggleShortcuts(): void {
+    if (this.shortcutsScrim) { this.shortcutsScrim.remove(); this.shortcutsScrim = null; return; }
+    const sheet = this.state.currentSheet;
+    const rows: [string, string][] = [["?", "Show / hide this help"]];
+    if (sheet === Sheet.CavaqProgressions) {
+      rows.push(["Space", "Play / stop"], ["← →", "Previous / next neck position"],
+        ["↑ ↓", "Transpose up / down a semitone"], ["1–9", "Play that chord"]);
+    } else if (sheet === Sheet.EarTraining && this.ear.progSubMode === EarSubMode.Progression) {
+      rows.push(["Space", "Play / stop the progression"]);
+      if (this.ear.challengeActive) rows.push(["← →", "Select previous / next bar (and play it)"], ["1–7", "Answer the selected bar"], ["Enter", "Commit (extension mode)"], ["Esc", "Cancel pending answer"]);
+      else rows.push(["← →", "Previous / next progression"], ["1–4", "Play that bar"]);
+    } else if (sheet === Sheet.SambaLooper || sheet === Sheet.Loop) {
+      rows.push(["Space", "Play / stop the loop"]);
+    } else if (sheet === null || sheet === Sheet.Fretboard) {
+      rows.push(["← →", "Previous / next quick-chord slot (Play mode)"], ["1–8", "Apply that quick-chord slot"]);
+    }
+    const body = el("div", {}, rows.map(([k, d]) => el("div", { style: "display:flex;gap:12px;padding:3px 0;font-size:14px" }, [
+      el("kbd", { style: "min-width:56px;font-weight:700;font-family:monospace" }, [k]),
+      el("span", { style: "flex:1;color:var(--text-secondary)" }, [d]),
+    ])));
+    const close = btn("Close", () => this.toggleShortcuts(), "btn primary");
+    const card = el("div", { class: "et-card", style: "max-width:420px;margin:auto;background:var(--surface-elev);color:var(--text-primary)" }, [
+      el("div", { style: "font-weight:700;font-size:16px;margin-bottom:8px" }, ["⌨  Keyboard shortcuts"]),
+      body,
+      el("div", { style: "text-align:right;margin-top:10px" }, [close]),
+    ]);
+    card.addEventListener("click", (e) => e.stopPropagation());
+    const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:70" }, [card]);
+    scrim.addEventListener("click", () => this.toggleShortcuts());
+    document.body.appendChild(scrim);
+    this.shortcutsScrim = scrim;
   }
 
   /** Coalesced, press-aware render request. Prefer this over render() for state changes. */
@@ -393,14 +467,6 @@ export class App {
     return dest === "Neck";
   }
 
-  /** "More" is selected whenever the open sheet isn't one of the current 4
-   *  tabs (e.g. Tuner/Decompose when not tabbed, or Options). */
-  private isMoreSelected(): boolean {
-    const sheet = this.state.currentSheet;
-    if (sheet === null) return false;
-    return !this.state.tabOrder.some((d) => TAB_SHEET[d] === sheet);
-  }
-
   /** One rail/tab-bar item. A fresh element every call — the same item is
    *  independently built for the rail and the tab bar (a DOM node can only
    *  live in one parent), so renderNav() calls this twice per destination. */
@@ -416,18 +482,22 @@ export class App {
   private renderNav(): void {
     clear(this.railEl);
     clear(this.tabbarEl);
-    for (const dest of this.state.tabOrder) {
-      const active = this.isTabSelected(dest);
-      const onClick = () => this.state.openSheet(TAB_SHEET[dest]);
-      this.railEl.appendChild(this.navItem(TAB_ICON[dest], TAB_LABEL[dest], active, onClick));
-      this.tabbarEl.appendChild(this.navItem(TAB_ICON[dest], TAB_LABEL[dest], active, onClick));
+    // Show the ENTIRE menu directly (no "More" overflow on web): the user's tab order
+    // first, then every remaining destination available for the current instrument,
+    // and finally Stats + Settings (which used to live inside More).
+    const ordered = [...this.state.tabOrder, ...ALL_TAB_DESTS.filter((d) => !this.state.tabOrder.includes(d))]
+      .filter((d) => availableFor(d, this.state.instrument));
+    const add = (icon: IconName, label: string, active: boolean, onClick: () => void) => {
+      this.railEl.appendChild(this.navItem(icon, label, active, onClick));
+      this.tabbarEl.appendChild(this.navItem(icon, label, active, onClick));
+    };
+    for (const dest of ordered) {
+      add(TAB_ICON[dest], TAB_LABEL[dest], this.isTabSelected(dest), () => this.state.openSheet(TAB_SHEET[dest]));
     }
-    const moreActive = this.isMoreSelected();
-    this.railEl.appendChild(this.navItem("more", "More", moreActive, () => this.openMore()));
-    this.tabbarEl.appendChild(this.navItem("more", "More", moreActive, () => this.openMore()));
+    add("stats", "Stats", false, () => { this.moreStatsOpen = true; this.render(); });
+    add("settings", "Settings", this.state.currentSheet === Sheet.Options, () => this.state.openSheet(Sheet.Options));
   }
 
-  private openMore(): void { this.moreOpen = true; this.render(); }
   private closeMore(): void { this.moreOpen = false; this.moreStatsOpen = false; this.render(); }
 
   // ---------- fretboard view ----------
@@ -703,6 +773,12 @@ export class App {
       if (this.moreStatsOpen) {
         this.sheetLayer.appendChild(renderChallengeStatsOverlay(this.state, () => { this.moreStatsOpen = false; this.render(); }));
       }
+      return;
+    }
+    // Challenge stats can be opened straight from the nav (the full menu is visible now,
+    // so there's no "More" sheet to nest it in).
+    if (this.moreStatsOpen) {
+      this.sheetLayer.appendChild(renderChallengeStatsOverlay(this.state, () => { this.moreStatsOpen = false; this.render(); }));
       return;
     }
     if (route === Sheet.Fretboard || route === Sheet.Options) {

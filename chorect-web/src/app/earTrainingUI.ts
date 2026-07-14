@@ -331,6 +331,13 @@ export class EarTrainingUI {
         this.padPickedDeg = majDeg; this.padPickedRoman = roman;
         if (!needsExt) { ear.guessChallengeKeyboard(bar, majDeg, roman, null); this.resetPad(); }
         this.rerender();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        // Move the selected answer bar (and play it) with the arrow keys.
+        e.preventDefault();
+        const d = e.key === "ArrowLeft" ? -1 : 1;
+        this.challengeSelectedBar = Math.min(Math.max(this.challengeSelectedBar + d, 0), 3);
+        ear.playBarOnce(this.challengeSelectedBar);
+        this.rerender();
       } else if (e.key === "Escape") {
         e.preventDefault();
         this.resetPad();
@@ -995,7 +1002,8 @@ export class EarTrainingUI {
     const col = el("div", { class: "et-slot" }, [
       el("div", { class: "ans-label" }, [`Bar ${i + 1}`]),
       box,
-      btn("▶", () => ear.playBarOnce(i)),
+      // Playing a bar also selects it, so it becomes the target of the answer keyboard.
+      btn("▶", () => { onSelect(); ear.playBarOnce(i); }),
     ]);
     if (verdict !== null) {
       const answer = ear.progResolved[i]?.romanLabel ?? "";

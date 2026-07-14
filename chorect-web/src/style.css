@@ -203,7 +203,11 @@ body {
   right: 0;
   bottom: 0;
   z-index: 5;
-  grid-template-columns: repeat(5, 1fr);
+  /* The full menu is shown directly (no More overflow), so lay items out in a single
+     horizontally-scrollable row rather than a fixed 5-column grid. */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(60px, 1fr);
+  overflow-x: auto;
   height: var(--tabbar-h);
   background: var(--bg);
   border-top: 1px solid var(--line);
