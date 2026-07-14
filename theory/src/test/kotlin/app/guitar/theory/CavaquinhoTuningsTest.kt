@@ -46,9 +46,9 @@ class CavaquinhoTuningsTest {
         }
     }
 
-    @Test fun `defaultFor Cavaquinho is DGBe`() {
-        assertEquals(Tunings.cavaqDgbe, Tunings.defaultFor(Instrument.Cavaquinho))
-        assertEquals("DGBe", Tunings.defaultNameFor(Instrument.Cavaquinho))
+    @Test fun `defaultFor Cavaquinho is DGBD (Brazilian/samba standard)`() {
+        assertEquals(Tunings.cavaqDgbd, Tunings.defaultFor(Instrument.Cavaquinho))
+        assertEquals("DGBD", Tunings.defaultNameFor(Instrument.Cavaquinho))
     }
 
     @Test fun `chord shape generator works on cavaquinho tunings with span 5`() {

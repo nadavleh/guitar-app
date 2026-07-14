@@ -26,8 +26,8 @@ export const cavaqDgbe = tuningOf("D4", "G4", "B4", "E5");
 export const cavaqDgbd = tuningOf("D4", "G4", "B4", "D5");
 
 export const cavaquinhoPresets: ReadonlyMap<string, Tuning> = new Map([
-  ["DGBe", cavaqDgbe],
   ["DGBD", cavaqDgbd],
+  ["DGBe", cavaqDgbe],
 ]);
 
 export function presetsFor(instrument: Instrument): ReadonlyMap<string, Tuning> {
@@ -35,11 +35,11 @@ export function presetsFor(instrument: Instrument): ReadonlyMap<string, Tuning> 
 }
 
 export function defaultFor(instrument: Instrument): Tuning {
-  return instrument === Instrument.Guitar ? standard : cavaqDgbe;
+  return instrument === Instrument.Guitar ? standard : cavaqDgbd;
 }
 
 export function defaultNameFor(instrument: Instrument): string {
-  return instrument === Instrument.Guitar ? "Standard" : "DGBe";
+  return instrument === Instrument.Guitar ? "Standard" : "DGBD";
 }
 
 /** Union of all presets across instruments, for name → Tuning lookups. */
