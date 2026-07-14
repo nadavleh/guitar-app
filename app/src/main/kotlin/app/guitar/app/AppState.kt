@@ -92,10 +92,23 @@ class AppState(
         tuningName = defaultName
         liveTuning = defaultTuning
         isEditedTuning = false
+        if (value == Instrument.Cavaquinho) applyCavaquinhoFretboardDefaults()
+        else displayMode = DisplayMode.None   // guitar opens with an empty board
         scope.launch {
             repo.setInstrument(value.name)
             repo.setSelected(defaultName)
         }
+    }
+
+    /** Cavaquinho opens the fretboard on the G-major chord, shown by position with
+     *  interval labels (a useful starting point for the samba/choro repertoire), rather
+     *  than the empty board the guitar uses. */
+    fun applyCavaquinhoFretboardDefaults() {
+        chordInput = "G"
+        displayMode = DisplayMode.Chord
+        chordView = ChordScaleView.Positions
+        labelMode = LabelMode.Intervals
+        chordPositionIndex = 0
     }
 
     /** A/B test toggle: true = new voice-graph audio engine, false = legacy engine.

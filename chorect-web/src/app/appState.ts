@@ -15,7 +15,7 @@ import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../au
 
 export const DISPLAY_FRETS = 14;
 /** App version shown beside the header wordmark. Keep in sync with package.json on release. */
-export const APP_VERSION = "2.8.2";
+export const APP_VERSION = "2.8.3";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 
@@ -204,6 +204,9 @@ export class AppState {
 
   constructor(public readonly audio: WebAudioEngine) {
     this.load();
+    // Cavaquinho opens on the G-major chord (by position, intervals); the display
+    // state isn't persisted, so this seeds the default each launch for cavaquinho.
+    if (this.instrument === Instrument.Cavaquinho) this.applyCavaquinhoFretboardDefaults();
     if (this.sound !== "Synth") {
       this.applySound(this.sound);
     } else {
@@ -372,7 +375,19 @@ export class AppState {
       this.liveTuning = Tunings.defaultFor(value);
       this.isEditedTuning = false;
       this.chordPositionIndex = 0;
+      if (value === Instrument.Cavaquinho) this.applyCavaquinhoFretboardDefaults();
+      else this.displayMode = DisplayMode.None;   // guitar opens with an empty board
     });
+  }
+
+  /** Cavaquinho opens the fretboard on the G-major chord, shown by position with
+   *  interval labels, rather than the empty board the guitar uses. */
+  applyCavaquinhoFretboardDefaults(): void {
+    this.chordInput = "G";
+    this.displayMode = DisplayMode.Chord;
+    this.chordView = ChordScaleView.Positions;
+    this.labelMode = LabelMode.Intervals;
+    this.chordPositionIndex = 0;
   }
 
   selectTuning(name: string, tuning: Tuning): void {

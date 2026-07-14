@@ -177,16 +177,26 @@ fun App(audio: AudioEngine) {
             if (persistedVoicingShell) app.guitar.theory.VoicingStyle.Shell
             else app.guitar.theory.VoicingStyle.Standard
     }
-    LaunchedEffect(persistedLabelMode) {
-        state.labelMode = runCatching { LabelMode.valueOf(persistedLabelMode) }.getOrDefault(LabelMode.Notes)
-    }
     LaunchedEffect(persistedA4) { state.a4Hz = persistedA4 }
     LaunchedEffect(persistedSustain) { state.ringSustainMs = persistedSustain }
     LaunchedEffect(persistedStrum) { state.strumMs = persistedStrum }
     LaunchedEffect(persistedTapOnTouchDown) { state.tapOnTouchDown = persistedTapOnTouchDown }
-    LaunchedEffect(persistedInstrument) {
-        state.instrument = runCatching { app.guitar.theory.Instrument.valueOf(persistedInstrument) }
+    // Instrument + label restore, combined so cavaquinho can seed its fretboard default
+    // (G by position, intervals) ONCE on first resolution — after which the user's own
+    // label choice is honored. Guitar just restores the persisted label mode.
+    var cavaqDefaultSeeded by remember { mutableStateOf(false) }
+    LaunchedEffect(persistedInstrument, persistedLabelMode) {
+        val inst = runCatching { app.guitar.theory.Instrument.valueOf(persistedInstrument) }
             .getOrDefault(app.guitar.theory.Instrument.Guitar)
+        state.instrument = inst
+        val persistedLabel = runCatching { LabelMode.valueOf(persistedLabelMode) }.getOrDefault(LabelMode.Notes)
+        if (inst == app.guitar.theory.Instrument.Cavaquinho) {
+            if (!cavaqDefaultSeeded) { cavaqDefaultSeeded = true; state.applyCavaquinhoFretboardDefaults() }
+            else state.labelMode = persistedLabel
+        } else {
+            cavaqDefaultSeeded = false
+            state.labelMode = persistedLabel
+        }
     }
     DisposableEffect(Unit) { onDispose { audio.stop() } }
 
