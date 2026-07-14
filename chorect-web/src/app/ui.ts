@@ -3,7 +3,7 @@
 // <canvas> element is persistent across renders so its zoom/pan survives.
 
 import {
-  AppState, DisplayMode, LabelMode, Sheet, ChordScaleView, DISPLAY_FRETS, TabDestName, ALL_TAB_DESTS,
+  AppState, DisplayMode, LabelMode, Sheet, ChordScaleView, DISPLAY_FRETS, APP_VERSION, TabDestName, ALL_TAB_DESTS,
   ThemeMode, ALL_THEME_MODES, AccentName, ALL_ACCENTS,
 } from "./appState";
 import { icon, IconName } from "./icons";
@@ -224,6 +224,7 @@ export class App {
     });
     const header = el("div", { class: "app-header" }, [
       el("span", { class: "app-brand" }, ["chorect"]),
+      el("span", { style: "font-size:11px;opacity:0.6;margin-left:6px;align-self:flex-end;padding-bottom:2px" }, [`v${APP_VERSION}`]),
       el("span", { class: "app-byline" }, [
         "made by ",
         el("a", {

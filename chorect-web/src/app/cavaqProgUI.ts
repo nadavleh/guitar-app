@@ -6,7 +6,7 @@ import { CavaqProgState } from "./cavaqProgState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { shapeMarks } from "./marks";
 import { el, btn, slider, labelSm } from "./dom";
-import { CAVAQ_SEQUENCES, noteAt } from "../theory";
+import { CAVAQ_SEQUENCES, noteAt, cavaqSongsForSequence } from "../theory";
 
 const DISPLAY_FRETS = 14;
 
@@ -26,9 +26,11 @@ export class CavaqProgUI {
     const screen = el("div", { class: "tool-screen" });
 
     // ---- Header ----
-    screen.appendChild(el("div", { class: "tool-topbar" }, [
-      el("h2", {}, ["Progressions"]),
-    ]));
+    const songsBtn = btn("Songs ♪", () => this.showSongsPopup());
+    const topbar = el("div", { class: "tool-topbar" }, [el("h2", {}, ["Progressions"])]);
+    topbar.appendChild(el("span", { style: "flex:1" }));
+    topbar.appendChild(songsBtn);
+    screen.appendChild(topbar);
 
     // ---- Sequence picker ----
     const sel = el("select", { class: "btn", style: "width:100%;margin-top:6px" });
@@ -99,6 +101,28 @@ export class CavaqProgUI {
       numFrets: DISPLAY_FRETS, playOnTouchDown: false, mutedStrings: new Set<number>(),
       onTap: (pos) => s.audio.playNote(noteAt(s.liveTuning, pos).midi, s.ringSustainMs),
     });
+  }
+
+  /** Popup of curated samba songs whose functional family matches the current sequence. */
+  private showSongsPopup(): void {
+    const songs = cavaqSongsForSequence(this.cp.sequenceId);
+    const body = songs.length
+      ? el("div", {}, songs.map((sg) =>
+          el("div", { style: "font-size:14px;padding:2px 0" }, [`•  ${sg.title} — ${sg.artist}  (${sg.keyLabel})`])))
+      : el("div", { class: "et-muted" }, ["No curated songs match this sequence yet."]);
+    const closeBtn = btn("Close", () => scrim.remove(), "btn primary");
+    const card = el("div", {
+      class: "et-card",
+      style: "max-width:480px;max-height:75vh;overflow:auto;margin:auto;background:var(--surface-elev);color:var(--text-primary)",
+    }, [
+      el("div", { style: "font-weight:700;font-size:16px;margin-bottom:8px" }, [`Samba songs — ${this.cp.sequence.nameEn}`]),
+      body,
+      el("div", { style: "text-align:right;margin-top:10px" }, [closeBtn]),
+    ]);
+    card.addEventListener("click", (e) => e.stopPropagation());
+    const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:60" }, [card]);
+    scrim.addEventListener("click", () => scrim.remove());
+    document.body.appendChild(scrim);
   }
 
   private navBtn(text: string, onClick: () => void, disabled: boolean): HTMLButtonElement {

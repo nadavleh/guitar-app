@@ -1669,9 +1669,8 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+            // Major/Minor shift sits on the LEFT; the bar label fills the rest, right-aligned.
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text("Bar ${bar + 1} answer", style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.weight(1f))
                 FilterChip(
                     selected = !ear.keyboardMinor,
                     onClick = { if (ear.keyboardMinor) ear.toggleKeyboardShift() },
@@ -1683,6 +1682,9 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
                     onClick = { if (!ear.keyboardMinor) ear.toggleKeyboardShift() },
                     label = { Text("⇧ Minor") },
                 )
+                Text("Bar ${bar + 1} answer", style = MaterialTheme.typography.labelMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    modifier = Modifier.weight(1f))
             }
             Spacer(Modifier.height(8.dp))
             // Degree grid — 4 columns (I ii iii IV / V vi vii° / …), plus the

@@ -576,7 +576,17 @@ export class ChordShapeGenerator {
       });
     }
 
-    return results.sort((a, b) => {
+    // Prefer full (no-mute) voicings on 4-string instruments (cavaquinho): when at
+    // least one all-strings-sounding voicing exists for this chord, drop the muted
+    // ones; otherwise tolerate at most one muted string. (6-string guitar keeps every
+    // voicing — muting is normal there.)
+    let kept = results;
+    if (stringCount(tuning) === 4) {
+      const full = results.filter((sh) => sh.mutedCount === 0);
+      kept = full.length ? full : results.filter((sh) => sh.mutedCount <= 1);
+    }
+
+    return kept.sort((a, b) => {
       if (a.hasRootInBass !== b.hasRootInBass) return a.hasRootInBass ? -1 : 1;
       if (a.position !== b.position) return a.position - b.position;
       if (a.mutedCount !== b.mutedCount) return a.mutedCount - b.mutedCount;
@@ -588,11 +598,13 @@ export class ChordShapeGenerator {
     let played = 0;
     let minFretted = Number.MAX_SAFE_INTEGER;
     let maxFretted = Number.MIN_SAFE_INTEGER;
+    let hasOpen = false;
     const playedPcs = new Set<PitchClass>();
     for (let i = 0; i < shapeFrets.length; i++) {
       const f = shapeFrets[i];
       if (f === null) continue;
       played++;
+      if (f === 0) hasOpen = true;
       if (f > 0) {
         if (f < minFretted) minFretted = f;
         if (f > maxFretted) maxFretted = f;
@@ -601,8 +613,13 @@ export class ChordShapeGenerator {
     }
     const minStrings = this.style === VoicingStyle.Shell ? 2 : this.minStringsPlayed;
     if (played < minStrings) return false;
+    // An open string only makes sense in first position: a shape may NOT combine an
+    // open string (fret 0) with any note fretted above the 3rd fret.
+    if (hasOpen && maxFretted !== Number.MIN_SAFE_INTEGER && maxFretted > 3) return false;
     if (minFretted !== Number.MAX_SAFE_INTEGER) {
-      if (maxFretted - minFretted > this.maxFretSpan) return false;
+      const span = maxFretted - minFretted;
+      // Cap the fretted span at maxFretSpan and never allow more than 5 frets.
+      if (span > this.maxFretSpan || span > 5) return false;
     }
     if (this.style === VoicingStyle.Standard && this.requireAllChordTones && !containsAll(playedPcs, chordPcs)) return false;
     if (!containsAll(playedPcs, essentialPcs)) return false;

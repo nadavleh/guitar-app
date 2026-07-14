@@ -7,6 +7,7 @@ export * from "./random";
 export * from "./eartraining";
 export * from "./progressionSongs";
 export * from "./cavaqSequences";
+export * from "./cavaqSongs";
 export * from "./inversions";
 export * from "./note2chord";
 export * from "./voiceLeading";

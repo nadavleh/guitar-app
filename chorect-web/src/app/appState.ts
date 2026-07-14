@@ -14,6 +14,8 @@ import * as Tunings from "../theory/tunings";
 import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../audio";
 
 export const DISPLAY_FRETS = 14;
+/** App version shown beside the header wordmark. Keep in sync with package.json on release. */
+export const APP_VERSION = "2.6.0";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 
