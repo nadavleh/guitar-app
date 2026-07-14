@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -65,6 +66,8 @@ fun CavaqProgressionsScreen(state: AppState, onBack: () -> Unit) {
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
             )
+            CavaqSongsButton(cp.sequenceId)
+            Spacer(Modifier.width(4.dp))
             OutlinedButton(onClick = { cp.stop(); onBack() }) { Text("Back") }
         }
         Spacer(Modifier.height(8.dp))
@@ -147,6 +150,38 @@ fun CavaqProgressionsScreen(state: AppState, onBack: () -> Unit) {
             )
         }
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+/** "Songs ♪" button → popup of curated samba songs matching the current sequence's family. */
+@Composable
+private fun CavaqSongsButton(sequenceId: String) {
+    var open by remember { mutableStateOf(false) }
+    OutlinedButton(onClick = { open = true }) { Text("Songs ♪") }
+    if (open) {
+        val songs = app.guitar.theory.CavaqSongs.forSequence(sequenceId)
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { open = false },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { open = false }) { Text("Close") }
+            },
+            title = { Text("Samba songs with this progression") },
+            text = {
+                if (songs.isEmpty()) {
+                    Text("No curated songs match this sequence yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                        songs.forEach {
+                            Text("•  ${it.title} — ${it.artist}  (${it.keyLabel})",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(vertical = 2.dp))
+                        }
+                    }
+                }
+            },
+        )
     }
 }
 

@@ -5,67 +5,75 @@ Songs pulled from **CifraClub → Mais acessadas → Samba**
 **functional progression** (Roman numerals relative to the song's key), so it can be
 transposed to any key on the cavaquinho and matched to a functional sequence.
 
-> **Status:** initial curation (top 10 most-accessed). This is a *reviewable* document —
-> the functional reductions simplify extended/altered/slash voicings to their harmonic
-> role (e.g. `A6(9)` → `I`, `G7` → `♭VII7`, `Bm7(♭5)` → `iiø`). Passing diminished chords
-> and inversions are noted but not always given their own degree. Correct anything that
-> reads wrong; once settled it becomes the data source for the **Songs** button on the
-> cavaquinho **Progressions** screen.
+> **Status:** top-30 most-accessed (2026-07). This is a *reviewable* document — the
+> functional reductions simplify extended/altered/slash/dim voicings to their harmonic role.
+> Correct anything that reads wrong; it is the source behind the **Songs** button on the
+> cavaquinho **Progressions** screen (`theory/CavaqSongs`). The `family` column is the tag the
+> button matches against.
 >
-> **Roman notation:** uppercase = major, lowercase = minor, `7` = dominant 7th,
-> `maj7`/`M7` = major 7th, `º` = diminished, `ø` = half-diminished (m7♭5),
-> `V7/x` = secondary dominant of `x`, `♭` = flatted (borrowed) degree.
+> **Roman notation:** uppercase = major, lowercase = minor, `7` = dominant, `maj7` = major 7th,
+> `°` = diminished, `ø` = half-diminished, `V7/x` = secondary dominant, `b` = flat (borrowed);
+> minor degrees are named relative to the major scale (`bIII`, `bVI`, `bVII`).
+>
+> **Families:** `ii-V-I` (turnarounds / ii–V), `I-vi-ii-V` (rhythm-changes),
+> `circle` (circle-of-fifths / secondary-dominant chains), `IV-iv` (major↔minor subdominant),
+> `minor-cadence` (minor `iv–iiø–V–i` / `i–V–i`), `I-IV-vamp`, `minor-vamp`.
 
-## The library
+## The library (top 30)
 
-| # | Song | Artist | Key | Core functional progression | Family / notes |
-|---|------|--------|-----|-----------------------------|----------------|
-| 1 | O Mundo É Um Moinho | Cartola | A major | `ii7 – V7 – iii7 – I – IV – ii7 – V7` | ii–V turnaround with a chromatic descending intro; jazz-samba |
-| 2 | Eu e Você Sempre | Jorge Aragão | E major | `I – v7 – IV – iv – I` | major→minor subdominant (`IV – iv`) cliché |
-| 3 | Meu Lugar | Arlindo Cruz | A minor | `i7 – IV7 – iv7 – ♭VII7 – ♭III – iiø – V7 (→ i)` | descending circle-of-fifths cadence (relative C major) |
-| 4 | Disritmia | Martinho da Vila | G minor | `i7 – IV7` vamp, then `iv – ♭VII7 – ♭III – ♭VI – iiø – V7 – i` | minor circle-of-fifths cadence |
-| 5 | Nos Braços da Batucada | Arlindo Cruz | C major | `I – vi7 – ii7 – V7` | **rhythm-changes turnaround** `I–vi–ii–V` (matches library key `[1,6,2,5]`) |
-| 6 | Deixa a Vida Me Levar | Zeca Pagodinho | E major | `I – V7 – ii7 – V7 – I` · chorus `IV – I – ii7 – V7 – I` | plain diatonic; roda-de-samba staple |
-| 7 | Trem das Onze | Adoniran Barbosa | A minor | `i – V7 – i` · cadence `iv – iiø – i` | classic minor samba/samba-de-breque |
-| 8 | Fulminante | Mumuzinho | E major | `I – IV` vamp, chorus `IV – V7 – iii7 – vi7 – V7 – IV` | I–IV pagode vamp + vi turn |
-| 9 | Lucidez | Jorge Aragão | E major | `I – V7/V – ii7 – V7 – I` · chorus circle `iii – VI7 – ii – V7` | secondary-dominant circle |
-| 10 | Problema Emocional | Reinaldo | D major | `I – iiiø – V7/ii – ii – V7/… circle … – V7 – I` | dense secondary-dominant circle of fifths |
+| # | Song | Artist | Key | Core functional progression | Family |
+|---|------|--------|-----|-----------------------------|--------|
+| 1 | O Mundo É Um Moinho | Cartola | A | `ii7 – V7 – iii7 – I – IV – ii7 – V7` | ii-V-I |
+| 2 | Eu e Você Sempre | Jorge Aragão | E | `I – v7 – IV – iv – I` | IV-iv |
+| 3 | Meu Lugar | Arlindo Cruz | Am | `i7 – IV7 – iv7 – bVII7 – bIII – iiø – V7` | circle |
+| 4 | Disritmia | Martinho da Vila | Gm | `i7 – IV7` · `iv – bVII7 – bIII – bVI – iiø – V7 – i` | circle |
+| 5 | Nos Braços da Batucada | Arlindo Cruz | C | `I – vi7 – ii7 – V7` | I-vi-ii-V |
+| 6 | Deixa a Vida Me Levar | Zeca Pagodinho | E | `I – V7 – ii7 – V7 – I` | ii-V-I |
+| 7 | Trem das Onze | Adoniran Barbosa | Am | `i – V7 – i` · `iv – iiø – i` | minor-cadence |
+| 8 | Fulminante | Mumuzinho | E | `I – IV` vamp · `IV – V7 – iii7 – vi7 – V7 – IV` | I-IV-vamp |
+| 9 | Lucidez | Jorge Aragão | E | `I – V7/V – ii7 – V7 – I` | ii-V-I |
+| 10 | Problema Emocional | Reinaldo | D | secondary-dominant circle → `V7 – I` | circle |
+| 11 | Preciso Me Encontrar | Cartola | Dm | `i – iv6 – iv – #iv° – V7 (i)` | minor-cadence |
+| 12 | Água de Chuva No Mar | Beth Carvalho | C | `I – ii7 – V7` · `IV – I – V7/ii – ii – V7` | ii-V-I |
+| 13 | Retalhos de Cetim | Benito Di Paula | Am | `i – v – i – bIII7 – bVImaj7 – #iv° – V7 – i` | minor-cadence |
+| 14 | Laços do Amor | Fundo de Quintal | C | `vi – V7/vi – I – IV – v/ii` | I-vi-ii-V |
+| 15 | O Show Tem Que Continuar | Fundo de Quintal | C | `I – ii7 – V7` (chromatic passing dims) | ii-V-I |
+| 16 | Enredo Do Meu Samba | Jorge Aragão | A | circle of fifths / secondary dominants | circle |
+| 17 | Antigas Paixões | Fundo de Quintal | D | `I – IV – iv – V7/V – I – V7/ii – V7/V` | IV-iv |
+| 18 | Não Deixe O Samba Morrer | Alcione | Bm | `i – iv – iiø – V7 – i` | minor-cadence |
+| 19 | Ezequiel 47 | Thiago Brito | Gm | `i – bVII – bVI` (descending vamp) | minor-vamp |
+| 20 | Você Me Vira a Cabeça | Alcione | F#m | `i – V7 – i – iv – bVII7 – bIII – bVI – iiø – V7` | circle |
+| 21 | Já é | Jorge Aragão | D | `IV – V7 – iii7 – v7 – I7` | ii-V-I |
+| 22 | Se a Fila Andar | Toninho Geraes | Bb | `I – V7/V – ii – V7` | ii-V-I |
+| 23 | Ah! Como Eu Amei | Benito Di Paula | Bb | `I (line cliché) – IV – I – ii – V` | ii-V-I |
+| 24 | O Bem | Arlindo Cruz | D | `vi7 – ii7 – V7 – I – V7/ii` | I-vi-ii-V |
+| 25 | Iracema | Adoniran Barbosa | Bm | `i – V7 – i – I7 – iv – V7 – i – bVI7 – V7` | minor-cadence |
+| 26 | Mais Feliz | Zeca Pagodinho | G | `I – V7/V – iv – V7 – I` · `I7 – IV – iv – I` | IV-iv |
+| 27 | As Rosas Não Falam | Cartola | Dm | `i – iv – V7/V – V7 – i` | minor-cadence |
+| 28 | Tiro ao Álvaro | Adoniran Barbosa | Bb | `I – vi – ii – V` (chorus) · `I – V7/ii – ii – V7` | I-vi-ii-V |
+| 29 | Será Que É Amor | Arlindo Cruz | A | `I – iiiø – V7/ii – V7/V – V7` | ii-V-I |
+| 30 | Carinhoso | Pixinguinha | G | `ii7 – V7 – I` (D section) · I line cliché | ii-V-I |
 
-## Grouping by functional family (for the future Songs button)
+## Family → taught cavaquinho sequence (Songs-button mapping)
 
-Once the reductions are confirmed, songs cluster into a handful of functional families the
-cavaquinho **Progressions** sequences already teach:
+| Sequence (id) | Chords | Matched families |
+|---|---|---|
+| Quadradinho (`quadradinho_maj`) | I VI7 ii V7 | `ii-V-I`, `I-vi-ii-V` |
+| II–V–I (`ii_v_i_maj`) | ii V I | `ii-V-I` |
+| Basic minor (`basic_min`) | i I7 iv V7 | `minor-cadence` |
+| Médio (`medio_maj`) | 13-chord | `ii-V-I`, `circle` |
+| Harmonic field (`campo_maj`) | I ii iii IV V vi vii° | — (scale exercise) |
 
-- **ii–V–I / turnarounds** — O Mundo É Um Moinho (1), Nos Braços da Batucada (5),
-  Deixa a Vida Me Levar (6), Lucidez (9).
-- **I – vi – ii – V (rhythm changes)** — Nos Braços da Batucada (5) → maps to the existing
-  diatonic library key `[1,6,2,5]`.
-- **Circle-of-fifths cadence** (major or minor) — Meu Lugar (3), Disritmia (4),
-  Problema Emocional (10). Related to the app's *Circle* generator.
-- **Major↔minor subdominant (`IV – iv`)** — Eu e Você Sempre (2).
-- **Minor tonic cadence (`iv – iiø – i`)** — Trem das Onze (7).
-- **I–IV pagode vamp** — Fulminante (8).
+Families `IV-iv`, `I-IV-vamp`, `minor-vamp` have no taught sequence yet, so those songs don't
+appear in the button until a matching sequence is added.
 
 ## Sources
 
-Chord sheets (relative paths under `https://www.cifraclub.com.br`):
-
-1. `/cartola/o-mundo-um-moinho/`
-2. `/jorge-aragao/eu-voce-sempre/`
-3. `/arlindo-cruz/o-meu-lugar/`
-4. `/martinho-da-vila/disritimia/`
-5. `/arlindo-cruz/nos-bracos-da-batucada/`
-6. `/zeca-pagodinho/deixa-vida-me-levar/`
-7. `/adoniran-barbosa/trem-das-onze/`
-8. `/mumuzinho/fulminante/`
-9. `/jorge-aragao/lucidez/`
-10. `/reinaldo/problema-emocional/`
+All under `https://www.cifraclub.com.br` (ranks 1–30 of the weekly samba ranking). Individual
+paths omitted for brevity — searchable by "Artist — Title" on CifraClub.
 
 ## Next steps
 
-1. **Review** the functional reductions above (fix any wrong Roman analysis).
-2. **Expand** beyond the top 10 (the ranking list has more; easy to add rows).
-3. **Wire the Songs button** on the cavaquinho Progressions screen: for the currently
-   selected functional sequence, list the curated songs whose family/progression matches
-   (best-effort — the ranking mixes many progressions, so some songs won't match any of
-   the taught sequences and simply won't appear until their family is added).
+1. **Review** the functional reductions (fix any wrong Roman analysis).
+2. Optionally add sequences for the `IV-iv` / `I-IV-vamp` families so more songs surface.
+3. Expand past the top 30 as desired.
