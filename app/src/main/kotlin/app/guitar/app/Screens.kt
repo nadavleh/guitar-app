@@ -397,7 +397,7 @@ private fun TabOrderEditor(state: AppState) {
                 }
             }
         }
-        val unpicked = TabDest.entries.filter { it !in pending }
+        val unpicked = TabDest.entries.filter { it !in pending && it.availableFor(state) }
         if (unpicked.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
             unpicked.forEach { dest ->
