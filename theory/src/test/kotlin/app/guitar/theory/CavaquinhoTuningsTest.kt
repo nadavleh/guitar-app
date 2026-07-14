@@ -46,7 +46,7 @@ class CavaquinhoTuningsTest {
         }
     }
 
-    @Test fun `defaultFor Cavaquinho is DGBD (Brazilian/samba standard)`() {
+    @Test fun `defaultFor Cavaquinho is DGBD (Brazilian samba standard)`() {
         assertEquals(Tunings.cavaqDgbd, Tunings.defaultFor(Instrument.Cavaquinho))
         assertEquals("DGBD", Tunings.defaultNameFor(Instrument.Cavaquinho))
     }
