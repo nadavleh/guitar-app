@@ -81,7 +81,7 @@ class ChordShapeGenerator(
             }
 
             enumerate(candidates) { shapeFrets ->
-                if (!isValid(shapeFrets, chordPcs, essentialPcs, tuning)) return@enumerate
+                if (!isValid(shapeFrets, chordPcs, essentialPcs, tuning, root)) return@enumerate
                 if (!seen.add(shapeFrets)) return@enumerate
                 results.add(
                     ChordShape(
@@ -95,24 +95,23 @@ class ChordShapeGenerator(
             }
         }
 
-        // Prefer full (no-mute) voicings on 4-string instruments (cavaquinho): muted
-        // strings should be rare, so when at least one all-strings-sounding voicing
-        // exists for this chord, drop the muted ones entirely; otherwise tolerate at
-        // most one muted string. (6-string guitar keeps every voicing — muting is
-        // normal there.)
-        val kept = if (tuning.stringCount == 4) {
-            val full = results.filter { it.mutedCount == 0 }
-            if (full.isNotEmpty()) full else results.filter { it.mutedCount <= 1 }
-        } else {
-            results
-        }
-
-        return kept.sortedWith(
+        val ranked = results.sortedWith(
             compareByDescending<ChordShape> { it.hasRootInBass }
                 .thenBy { it.position }
                 .thenBy { it.mutedCount }
                 .thenBy { it.fretSpan }
         )
+        // 4-string instruments (cavaquinho): present a CAGED-like canonical set. Prefer
+        // full (no-mute) voicings — muting should be rare — then keep the single best
+        // voicing at each distinct neck position and cap at 5, so the position scroller
+        // steps through up to 5 canonical shapes spread along the neck. (6-string guitar
+        // keeps every voicing.)
+        if (tuning.stringCount != 4) return ranked
+        val full = ranked.filter { it.mutedCount == 0 }
+        val base = if (full.isNotEmpty()) full else ranked.filter { it.mutedCount <= 1 }
+        val bestPerPosition = LinkedHashMap<Int, ChordShape>()
+        for (sh in base) bestPerPosition.putIfAbsent(sh.position, sh)
+        return bestPerPosition.values.sortedBy { it.position }.take(5)
     }
 
     private fun isValid(
@@ -120,12 +119,14 @@ class ChordShapeGenerator(
         chordPcs: Set<PitchClass>,
         essentialPcs: Set<PitchClass>,
         tuning: Tuning,
+        root: PitchClass,
     ): Boolean {
         var played = 0
         var minFretted = Int.MAX_VALUE
         var maxFretted = Int.MIN_VALUE
         var hasOpen = false
         val playedPcs = HashSet<PitchClass>()
+        val midis = arrayOfNulls<Int>(shapeFrets.size)
         for (i in shapeFrets.indices) {
             val f = shapeFrets[i] ?: continue
             played++
@@ -134,22 +135,35 @@ class ChordShapeGenerator(
                 if (f < minFretted) minFretted = f
                 if (f > maxFretted) maxFretted = f
             }
-            playedPcs.add(Fretboard.noteAt(tuning, FretPosition(i, f)).pitchClass)
+            val note = Fretboard.noteAt(tuning, FretPosition(i, f))
+            midis[i] = note.midi.value
+            playedPcs.add(note.pitchClass)
         }
         // In Shell mode we allow fewer strings (2 jazz "guide tones" voicings are valid).
         val minStrings = if (style == VoicingStyle.Shell) 2 else minStringsPlayed
         if (played < minStrings) return false
+        // Don't double the SAME note (unison) on two physically adjacent strings.
+        for (i in 0 until shapeFrets.size - 1) {
+            val a = midis[i]; val b = midis[i + 1]
+            if (a != null && b != null && a == b) return false
+        }
         // An open string only makes sense in first position: a shape may NOT combine
         // an open string (fret 0) with any note fretted above the 3rd fret.
         if (hasOpen && maxFretted != Int.MIN_VALUE && maxFretted > 3) return false
         if (minFretted != Int.MAX_VALUE) {
             val span = maxFretted - minFretted
-            // Cap the fretted span at maxFretSpan and never allow more than 5 frets.
-            if (span > maxFretSpan || span > 5) return false
+            // Cap the fretted span at maxFretSpan; hard cap 5 (guitar) / 4 (cavaquinho, 4-string).
+            val hardCap = if (tuning.stringCount == 4) 4 else 5
+            if (span > maxFretSpan || span > hardCap) return false
         }
-        // All-chord-tones rule applies in Standard mode only.
-        if (style == VoicingStyle.Standard && requireAllChordTones &&
-            !playedPcs.containsAll(chordPcs)) return false
+        // All-chord-tones rule (Standard mode). The tonic is mandatory; the perfect 5th
+        // is the only tone we may drop, and only when the chord has more tones than
+        // strings allow (extended chords) — triads/6ths/7ths keep every tone.
+        if (style == VoicingStyle.Standard && requireAllChordTones) {
+            val need = if (chordPcs.size <= tuning.stringCount) chordPcs
+                       else chordPcs - PitchClass((root.value + 7) % 12)
+            if (!playedPcs.containsAll(need)) return false
+        }
         // Essential tones must always be present (chordPcs in Standard, shell subset in Shell).
         if (!playedPcs.containsAll(essentialPcs)) return false
         return true
