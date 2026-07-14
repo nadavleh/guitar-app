@@ -30,8 +30,8 @@ export interface CavaqProgDeps {
 
 export class CavaqProgState {
   sequenceId = CAVAQ_SEQUENCES[0].id;
-  /** Tonic the sequence is transposed to (starts in C = 0). */
-  key: PitchClass = 0;
+  /** Tonic the sequence is transposed to (starts in G — the common cavaquinho key). */
+  key: PitchClass = 7;
   /** Net semitones transposed from C (for the counter display). */
   transpose = 0;
   bpm = 100;

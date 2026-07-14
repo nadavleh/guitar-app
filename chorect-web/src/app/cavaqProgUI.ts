@@ -48,7 +48,7 @@ export class CavaqProgUI {
       btn("−", () => cp.shiftKey(-1), "btn"),
       btn("+", () => cp.shiftKey(+1), "btn"),
       el("span", { style: "flex:1" }),
-      btn("Reset to C", () => cp.chooseKey(0), "btn text"),
+      btn("Reset to G", () => cp.chooseKey(7), "btn text"),
     ]));
 
     // ---- Tempo ----

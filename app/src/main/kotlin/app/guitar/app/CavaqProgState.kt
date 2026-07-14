@@ -40,8 +40,8 @@ class CavaqProgState(
 ) {
     var sequenceId by mutableStateOf(CavaqSequences.ALL.first().id)
         private set
-    /** Tonic the sequence is transposed to (starts in C). */
-    var key by mutableStateOf(PitchClass.C)
+    /** Tonic the sequence is transposed to (starts in G — the common cavaquinho key). */
+    var key by mutableStateOf(PitchClass.G)
         private set
     /** Net semitones transposed from C (for the counter display). */
     var transpose by mutableStateOf(0)

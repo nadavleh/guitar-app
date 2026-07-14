@@ -82,7 +82,7 @@ fun CavaqProgressionsScreen(state: AppState, onBack: () -> Unit) {
             OutlinedButton(onClick = { cp.shiftKey(-1) }) { Text("−") }
             OutlinedButton(onClick = { cp.shiftKey(+1) }) { Text("+") }
             Spacer(Modifier.weight(1f))
-            OutlinedButton(onClick = { cp.chooseKey(PitchClass.C) }) { Text("Reset to C") }
+            OutlinedButton(onClick = { cp.chooseKey(PitchClass.G) }) { Text("Reset to G") }
         }
         Spacer(Modifier.height(8.dp))
 
