@@ -6,7 +6,7 @@ import { AppState, ChallengeScore, CHALLENGE_SCORE_ORDER } from "./appState";
 import { EarTrainingState, EarSubMode, EarMode } from "./earTrainingState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { shapeMarks } from "./marks";
-import { el, btn, segmented, switchRow, labelSm } from "./dom";
+import { el, btn, segmented, switchRow, labelSm, songLinkRow } from "./dom";
 import { transportDock, toneSheet } from "./transport";
 import { icon } from "./icons";
 import { renderChallengeStatsOverlay } from "./statsOverlay";
@@ -787,8 +787,7 @@ export class EarTrainingUI {
     // Curated hits first; PDF-imported extras fold behind a "Show more" button.
     const songs = this.ear.currentProgressionSongs();
     const extra = this.ear.currentProgressionImportedSongs();
-    const songRow = (sg: SongExample) =>
-      el("div", { style: "font-size:14px;padding:2px 0" }, [`•  ${sg.title} — ${sg.artist}`]);
+    const songRow = (sg: SongExample) => songLinkRow(sg.title, sg.artist);
     const body = el("div", {});
     if (!songs.length && !extra.length) {
       body.appendChild(el("div", { class: "et-muted" }, ["No songs are listed for this progression yet."]));

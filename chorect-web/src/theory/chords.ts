@@ -568,7 +568,7 @@ export class ChordShapeGenerator {
       }
 
       this.enumerate(candidates, (shapeFrets) => {
-        if (!this.isValid(shapeFrets, chordPcs, essentialPcs, tuning)) return;
+        if (!this.isValid(shapeFrets, chordPcs, essentialPcs, tuning, root)) return;
         const key = shapeFrets.map((f) => (f === null ? "x" : f)).join(",");
         if (seen.has(key)) return;
         seen.add(key);
@@ -576,30 +576,31 @@ export class ChordShapeGenerator {
       });
     }
 
-    // Prefer full (no-mute) voicings on 4-string instruments (cavaquinho): when at
-    // least one all-strings-sounding voicing exists for this chord, drop the muted
-    // ones; otherwise tolerate at most one muted string. (6-string guitar keeps every
-    // voicing — muting is normal there.)
-    let kept = results;
-    if (stringCount(tuning) === 4) {
-      const full = results.filter((sh) => sh.mutedCount === 0);
-      kept = full.length ? full : results.filter((sh) => sh.mutedCount <= 1);
-    }
-
-    return kept.sort((a, b) => {
+    const ranked = results.sort((a, b) => {
       if (a.hasRootInBass !== b.hasRootInBass) return a.hasRootInBass ? -1 : 1;
       if (a.position !== b.position) return a.position - b.position;
       if (a.mutedCount !== b.mutedCount) return a.mutedCount - b.mutedCount;
       return a.fretSpan - b.fretSpan;
     });
+    // 4-string instruments (cavaquinho): present a CAGED-like canonical set — prefer
+    // full (no-mute) voicings, then the single best voicing at each distinct neck
+    // position, capped at 5, so the position scroller steps through up to 5 canonical
+    // shapes spread along the neck. (6-string guitar keeps every voicing.)
+    if (stringCount(tuning) !== 4) return ranked;
+    const full = ranked.filter((sh) => sh.mutedCount === 0);
+    const base = full.length ? full : ranked.filter((sh) => sh.mutedCount <= 1);
+    const bestPerPosition = new Map<number, ChordShape>();
+    for (const sh of base) if (!bestPerPosition.has(sh.position)) bestPerPosition.set(sh.position, sh);
+    return [...bestPerPosition.values()].sort((a, b) => a.position - b.position).slice(0, 5);
   }
 
-  private isValid(shapeFrets: (number | null)[], chordPcs: Set<PitchClass>, essentialPcs: Set<PitchClass>, tuning: Tuning): boolean {
+  private isValid(shapeFrets: (number | null)[], chordPcs: Set<PitchClass>, essentialPcs: Set<PitchClass>, tuning: Tuning, root: PitchClass): boolean {
     let played = 0;
     let minFretted = Number.MAX_SAFE_INTEGER;
     let maxFretted = Number.MIN_SAFE_INTEGER;
     let hasOpen = false;
     const playedPcs = new Set<PitchClass>();
+    const midis: (number | null)[] = new Array(shapeFrets.length).fill(null);
     for (let i = 0; i < shapeFrets.length; i++) {
       const f = shapeFrets[i];
       if (f === null) continue;
@@ -609,19 +610,32 @@ export class ChordShapeGenerator {
         if (f < minFretted) minFretted = f;
         if (f > maxFretted) maxFretted = f;
       }
-      playedPcs.add(midiPitchClass(noteAt(tuning, fp(i, f)).midi));
+      const m = noteAt(tuning, fp(i, f)).midi;
+      midis[i] = m;
+      playedPcs.add(midiPitchClass(m));
     }
     const minStrings = this.style === VoicingStyle.Shell ? 2 : this.minStringsPlayed;
     if (played < minStrings) return false;
+    // Don't double the SAME note (unison) on two physically adjacent strings.
+    for (let i = 0; i < shapeFrets.length - 1; i++) {
+      if (midis[i] !== null && midis[i + 1] !== null && midis[i] === midis[i + 1]) return false;
+    }
     // An open string only makes sense in first position: a shape may NOT combine an
     // open string (fret 0) with any note fretted above the 3rd fret.
     if (hasOpen && maxFretted !== Number.MIN_SAFE_INTEGER && maxFretted > 3) return false;
     if (minFretted !== Number.MAX_SAFE_INTEGER) {
       const span = maxFretted - minFretted;
-      // Cap the fretted span at maxFretSpan and never allow more than 5 frets.
-      if (span > this.maxFretSpan || span > 5) return false;
+      // Cap the fretted span at maxFretSpan; hard cap 5 (guitar) / 4 (cavaquinho, 4-string).
+      const hardCap = stringCount(tuning) === 4 ? 4 : 5;
+      if (span > this.maxFretSpan || span > hardCap) return false;
     }
-    if (this.style === VoicingStyle.Standard && this.requireAllChordTones && !containsAll(playedPcs, chordPcs)) return false;
+    // All-chord-tones (Standard). Tonic mandatory; the perfect 5th is the only tone we
+    // may drop, and only for extended chords with more tones than strings.
+    if (this.style === VoicingStyle.Standard && this.requireAllChordTones) {
+      const need = chordPcs.size <= stringCount(tuning) ? chordPcs
+        : new Set([...chordPcs].filter((pc) => pc !== (((root + 7) % 12) as PitchClass)));
+      if (!containsAll(playedPcs, need)) return false;
+    }
     if (!containsAll(playedPcs, essentialPcs)) return false;
     return true;
   }

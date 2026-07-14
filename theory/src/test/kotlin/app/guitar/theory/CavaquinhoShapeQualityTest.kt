@@ -5,41 +5,57 @@ import kotlin.test.assertTrue
 
 /**
  * Guards the cavaquinho (DGBD, the default tuning) shape-quality rules:
- *  1. a shape may not combine an open string (fret 0) with any note above the 3rd fret;
- *  2. the fretted span may not exceed 5;
- *  3. muted strings are rare — at most one per shape.
+ *  1. no open string (fret 0) combined with a note above the 3rd fret;
+ *  2. fretted span <= 4;
+ *  3. at most one muted string;
+ *  4. no unison (same note) on two physically adjacent strings;
+ *  5. at most 5 canonical shapes per chord (CAGED-like set);
+ *  6. the tonic is always present.
  */
 class CavaquinhoShapeQualityTest {
 
     private val tuning = Tunings.cavaqDgbd
     private val gen = ChordShapeGenerator()
-    private val symbols = listOf(
-        "C", "G", "F", "D", "A", "E", "Am", "Dm", "Em", "Gm", "Bm",
-        "G7", "A7", "D7", "E7", "C7", "B7", "Dm7", "Am7", "Cmaj7", "Fmaj7",
-        "Bm7b5", "Cdim", "Am6", "C6",
-    )
+    private val triads = listOf("C", "G", "F", "D", "A", "E", "B", "Am", "Dm", "Em", "Gm", "Bm", "Cm", "F#m")
+    private val sevenths = listOf("G7", "A7", "D7", "E7", "C7", "B7", "Dm7", "Am7", "Em7", "Cmaj7", "Fmaj7", "Bm7b5", "Cdim", "Am6", "C6")
 
     @Test fun `every DGBD voicing obeys the shape-quality rules`() {
-        for (sym in symbols) {
+        for (sym in triads + sevenths) {
             val (root, q) = ChordLibrary.parse(sym) ?: continue
             val shapes = gen.shapesFor(root, q, tuning, frets = 14)
             for (sh in shapes) {
                 val frets = sh.frets
                 val fretted = frets.filterNotNull().filter { it > 0 }
                 val hasOpen = frets.any { it == 0 }
-                // Rule 1: no open string together with a note above the 3rd fret.
                 if (hasOpen && fretted.isNotEmpty()) {
-                    assertTrue(fretted.max() <= 3,
-                        "$sym $frets: open string combined with a note above fret 3")
+                    assertTrue(fretted.max() <= 3, "$sym $frets: open string with a note above fret 3")
                 }
-                // Rule 2: fretted span <= 5.
                 if (fretted.size >= 2) {
-                    assertTrue(fretted.max() - fretted.min() <= 5,
-                        "$sym $frets: fretted span exceeds 5")
+                    assertTrue(fretted.max() - fretted.min() <= 4, "$sym $frets: fretted span exceeds 4")
                 }
-                // Rule 3: at most one muted string.
                 assertTrue(sh.mutedCount <= 1, "$sym $frets: more than one muted string")
+                // No unison on adjacent strings.
+                val midis = sh.notes.map { it?.midi?.value }
+                for (i in 0 until midis.size - 1) {
+                    val a = midis[i]; val b = midis[i + 1]
+                    if (a != null && b != null) assertTrue(a != b, "$sym $frets: unison on adjacent strings")
+                }
+                // Tonic always present.
+                val pcs = sh.notes.filterNotNull().map { it.pitchClass }
+                assertTrue(root in pcs, "$sym $frets: missing the tonic")
             }
+        }
+    }
+
+    @Test fun `at most five canonical shapes per major and minor chord`() {
+        for (sym in triads) {
+            val (root, q) = ChordLibrary.parse(sym) ?: continue
+            val shapes = gen.shapesFor(root, q, tuning, frets = 14)
+            assertTrue(shapes.isNotEmpty(), "$sym produced no cavaquinho voicing")
+            assertTrue(shapes.size <= 5, "$sym produced ${shapes.size} shapes (expected <= 5)")
+            // Canonical shapes sit at distinct neck positions.
+            assertTrue(shapes.map { it.position }.toSet().size == shapes.size,
+                "$sym has duplicate-position shapes")
         }
     }
 

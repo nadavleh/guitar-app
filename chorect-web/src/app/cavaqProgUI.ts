@@ -5,7 +5,7 @@ import { AppState } from "./appState";
 import { CavaqProgState } from "./cavaqProgState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { shapeMarks } from "./marks";
-import { el, btn, slider, labelSm } from "./dom";
+import { el, btn, slider, labelSm, songLinkRow } from "./dom";
 import { CAVAQ_SEQUENCES, noteAt, cavaqSongsForSequence } from "../theory";
 
 const DISPLAY_FRETS = 14;
@@ -107,8 +107,7 @@ export class CavaqProgUI {
   private showSongsPopup(): void {
     const songs = cavaqSongsForSequence(this.cp.sequenceId);
     const body = songs.length
-      ? el("div", {}, songs.map((sg) =>
-          el("div", { style: "font-size:14px;padding:2px 0" }, [`•  ${sg.title} — ${sg.artist}  (${sg.keyLabel})`])))
+      ? el("div", {}, songs.map((sg) => songLinkRow(sg.title, sg.artist, `  (${sg.keyLabel})`)))
       : el("div", { class: "et-muted" }, ["No curated songs match this sequence yet."]);
     const closeBtn = btn("Close", () => scrim.remove(), "btn primary");
     const card = el("div", {
