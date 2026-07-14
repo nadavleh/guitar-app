@@ -1484,7 +1484,8 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                     answer = if (verdict != null) ear.progResolved.getOrNull(i)?.romanLabel else null,
                     selected = selectedBar == i,
                     onTap = { selectedBar = i },
-                    onPlay = { ear.playBarOnce(i) },
+                    // Playing a bar also selects it, so it's the target of the answer pad.
+                    onPlay = { selectedBar = i; ear.playBarOnce(i) },
                     modifier = Modifier.weight(1f),
                 )
             }
