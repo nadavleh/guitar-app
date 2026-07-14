@@ -285,6 +285,8 @@ fun App(audio: AudioEngine) {
             SambaLooperScreen(state, onBack = { state.closeSheet() })
         } else if (state.currentSheet == Sheet.Decompose) {
             DecomposeScreen(state, onBack = { state.closeSheet() })
+        } else if (state.currentSheet == Sheet.CavaqProgressions) {
+            CavaqProgressionsScreen(state, onBack = { state.closeSheet() })
         } else {
             StatusBar(state)
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -386,6 +388,7 @@ private fun sheetLabel(s: Sheet): String = when (s) {
     Sheet.Fretboard -> "Fretboard"
     Sheet.Loop -> "Loop"
     Sheet.Options -> "Settings"
+    Sheet.CavaqProgressions -> "Progressions"
     Sheet.Tuner -> "Tuner"
     Sheet.EarTraining -> "Ear Training"
     Sheet.SambaLooper -> "Drums"

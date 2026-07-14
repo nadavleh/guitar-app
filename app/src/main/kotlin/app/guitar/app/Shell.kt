@@ -17,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.QueueMusic
+import app.guitar.theory.Instrument
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Hearing
 import androidx.compose.material.icons.outlined.MoreHoriz
@@ -181,6 +183,15 @@ enum class TabDest(val sheet: Sheet, val label: String, val icon: ImageVector) {
     Loop(Sheet.Loop, "Loop", Icons.Outlined.Repeat),
     Tuner(Sheet.Tuner, "Tuner", Icons.Outlined.Speed),
     Decompose(Sheet.Decompose, "Decompose", Icons.Outlined.Extension),
+    // Cavaquinho-only (filtered in the tab editor + More by instrument).
+    CavaqProgressions(Sheet.CavaqProgressions, "Progressions", Icons.Outlined.QueueMusic),
+}
+
+/** Destinations that only make sense for a specific instrument — hidden from the tab
+ *  editor and the More overlay unless that instrument is active. */
+fun TabDest.availableFor(state: AppState): Boolean = when (this) {
+    TabDest.CavaqProgressions -> state.instrument == Instrument.Cavaquinho
+    else -> true
 }
 
 /** Default tab set/order for a fresh install — matches [TuningRepository]'s
@@ -317,6 +328,7 @@ private fun destSubtitle(dest: TabDest): String = when (dest) {
     TabDest.Ear -> "Progression, interval & chord ear training"
     TabDest.Rhythm -> "Samba percussion drum-machine looper"
     TabDest.Loop -> "Chord-progression looper"
+    TabDest.CavaqProgressions -> "Cavaquinho functional sequences — looper + neck"
     TabDest.Tuner -> "Chromatic tuner with cents needle"
     TabDest.Decompose -> "Chord-tone breakdown reference"
 }
@@ -329,7 +341,9 @@ private fun destSubtitle(dest: TabDest): String = when (dest) {
  */
 @Composable
 fun MoreScreen(state: AppState) {
-    val extra = remember(state.tabOrder) { TabDest.entries.filter { it !in state.tabOrder } }
+    val extra = remember(state.tabOrder, state.instrument) {
+        TabDest.entries.filter { it !in state.tabOrder && it.availableFor(state) }
+    }
     var statsOpen by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {

@@ -29,8 +29,8 @@ object Tunings {
     val cavaqDgbd = Tuning.of("D4", "G4", "B4", "D5")
 
     val cavaquinhoPresets: Map<String, Tuning> = linkedMapOf(
+        "DGBD" to cavaqDgbd,   // Brazilian/samba standard — the app default
         "DGBe" to cavaqDgbe,
-        "DGBD" to cavaqDgbd,
     )
 
     /** Preset tunings filtered by instrument. */
@@ -42,13 +42,13 @@ object Tunings {
     /** Default tuning when the user switches to the given instrument. */
     fun defaultFor(instrument: Instrument): Tuning = when (instrument) {
         Instrument.Guitar     -> standard
-        Instrument.Cavaquinho -> cavaqDgbe
+        Instrument.Cavaquinho -> cavaqDgbd
     }
 
     /** Default tuning-preset NAME when switching to the given instrument. */
     fun defaultNameFor(instrument: Instrument): String = when (instrument) {
         Instrument.Guitar     -> "Standard"
-        Instrument.Cavaquinho -> "DGBe"
+        Instrument.Cavaquinho -> "DGBD"
     }
 
     /** Union of all preset tunings across all instruments. Used for name → Tuning

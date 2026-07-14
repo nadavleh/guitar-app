@@ -18,6 +18,8 @@ import { SambaLooperUI } from "./sambaLooperUI";
 import { DecomposeUI } from "./decomposeUI";
 import { LoopState } from "./loopState";
 import { LoopUI } from "./loopUI";
+import { CavaqProgState } from "./cavaqProgState";
+import { CavaqProgUI } from "./cavaqProgUI";
 import { loadDrumSample } from "./drumSamples";
 import { Timbres } from "../audio";
 import { Colors, withAlpha } from "./theme";
@@ -46,12 +48,13 @@ const TAB_SHEET: Record<TabDestName, Sheet> = {
   Loop: Sheet.Loop,
   Tuner: Sheet.Tuner,
   Decompose: Sheet.Decompose,
+  CavaqProgressions: Sheet.CavaqProgressions,
 };
 const TAB_ICON: Record<TabDestName, IconName> = {
-  Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose",
+  Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose", CavaqProgressions: "note",
 };
 const TAB_LABEL: Record<TabDestName, string> = {
-  Neck: "Fretboard", Ear: "Ear", Rhythm: "DrumLoop", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose",
+  Neck: "Fretboard", Ear: "Ear", Rhythm: "DrumLoop", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose", CavaqProgressions: "Progressions",
 };
 /** One-line description shown under each destination's title in the More sheet. */
 const TAB_SUBTITLE: Record<TabDestName, string> = {
@@ -61,7 +64,16 @@ const TAB_SUBTITLE: Record<TabDestName, string> = {
   Loop: "Chord-progression looper",
   Tuner: "Chromatic tuner with cents needle",
   Decompose: "Chord-tone breakdown reference",
+  CavaqProgressions: "Cavaquinho functional sequences — looper + neck",
 };
+
+/** Whether a tab destination is available for the current instrument. The
+ *  cavaquinho Progressions screen only makes sense on cavaquinho (mirrors
+ *  Android's TabDest.availableFor). */
+function availableFor(dest: TabDestName, instrument: Instrument): boolean {
+  if (dest === "CavaqProgressions") return instrument === Instrument.Cavaquinho;
+  return true;
+}
 
 // Settings → Personalize (Signal T12): Theme Auto resolution + accent swatches.
 
@@ -137,6 +149,8 @@ export class App {
   private decomposeUI: DecomposeUI;
   private loop: LoopState;
   private loopUI: LoopUI;
+  private cavaq: CavaqProgState;
+  private cavaqUI: CavaqProgUI;
 
   constructor(private state: AppState, root: HTMLElement) {
     this.fretboard = new FretboardCanvas(this.fretCanvasEl);
@@ -175,6 +189,15 @@ export class App {
       saveVolume: (key, value) => state.setDrumVolume(key, value),
     });
     this.sambaUI = new SambaLooperUI(this.samba, state, this.ear, () => state.closeSheet());
+    this.cavaq = new CavaqProgState({
+      audio: state.audio,
+      tuningProvider: () => state.liveTuning,
+      sustainProvider: () => state.ringSustainMs,
+      strumProvider: () => state.strumMs,
+      timbreProvider: () => (state.instrument === Instrument.Cavaquinho ? Timbres.Cavaquinho : Timbres.Guitar),
+      onChange: () => this.scheduleRender(),
+    });
+    this.cavaqUI = new CavaqProgUI(state, this.cavaq);
     this.decomposeUI = new DecomposeUI(state, this.ear, () => state.closeSheet(), (symbols) => {
       this.loop.loadProgressionIntoLoop(symbols);
       state.openSheet(Sheet.Loop);
@@ -290,6 +313,9 @@ export class App {
       } else if (sheet === Sheet.EarTraining && this.ear.progSubMode === EarSubMode.Progression) {
         e.preventDefault();
         if (this.ear.isLooping) this.ear.stopLoop(); else this.ear.startLoop();
+      } else if (sheet === Sheet.CavaqProgressions) {
+        e.preventDefault();
+        this.cavaq.toggle();
       }
     });
   }
@@ -334,6 +360,7 @@ export class App {
     // Leaving the Ear screen halts its looper but keeps all state (Kotlin DisposableEffect).
     if (route !== Sheet.EarTraining && this.ear.isLooping) this.ear.stopLoop();
     if (route !== Sheet.SambaLooper && this.samba.isPlaying) this.samba.stop();
+    if (route !== Sheet.CavaqProgressions && this.cavaq.isPlaying) this.cavaq.stop();
 
     this.renderNav();
     // Preserve the scroll position of any long scrollable pane across full rebuilds.
@@ -345,6 +372,7 @@ export class App {
     else if (route === Sheet.EarTraining) this.earUI.render(this.contentEl);
     else if (route === Sheet.SambaLooper) this.sambaUI.render(this.contentEl);
     else if (route === Sheet.Decompose) this.decomposeUI.render(this.contentEl);
+    else if (route === Sheet.CavaqProgressions) this.cavaqUI.render(this.contentEl);
     else this.renderFretboardView();
 
     const newScroll = this.contentEl.querySelector(".et-scroll");
@@ -624,7 +652,7 @@ export class App {
       el("h2", {}, ["More"]),
       btn("✕", () => this.closeMore(), "btn text"),
     ]));
-    const extra = ALL_TAB_DESTS.filter((d) => !this.state.tabOrder.includes(d));
+    const extra = ALL_TAB_DESTS.filter((d) => !this.state.tabOrder.includes(d) && availableFor(d, this.state.instrument));
     for (const dest of extra) {
       sheet.appendChild(this.moreRow(TAB_ICON[dest], TAB_LABEL[dest], TAB_SUBTITLE[dest], () => {
         this.state.openSheet(TAB_SHEET[dest]);
@@ -990,7 +1018,7 @@ export class App {
       ]));
     });
 
-    const unpicked = ALL_TAB_DESTS.filter((d) => !pending.includes(d));
+    const unpicked = ALL_TAB_DESTS.filter((d) => !pending.includes(d) && availableFor(d, s.instrument));
     for (const dest of unpicked) {
       const canAdd = pending.length < 4;
       const cb = el("input", { type: "checkbox" });
@@ -1176,6 +1204,7 @@ export class App {
       case Sheet.EarTraining: return "Ear";
       case Sheet.SambaLooper: return "Drums";
       case Sheet.Decompose: return "Decompose";
+      case Sheet.CavaqProgressions: return "Progressions";
     }
   }
 }

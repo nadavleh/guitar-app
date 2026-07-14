@@ -397,7 +397,7 @@ private fun TabOrderEditor(state: AppState) {
                 }
             }
         }
-        val unpicked = TabDest.entries.filter { it !in pending }
+        val unpicked = TabDest.entries.filter { it !in pending && it.availableFor(state) }
         if (unpicked.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
             unpicked.forEach { dest ->
@@ -425,8 +425,13 @@ private fun TabOrderEditor(state: AppState) {
 fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
     var editorOpen by remember { mutableStateOf(false) }
     var saveName by remember { mutableStateOf("") }
+    // Saveable scroll so adjusting a string (which can re-measure/recreate the bottom-
+    // sheet content) doesn't jump the Settings sheet back to the top.
+    val scroll = androidx.compose.runtime.saveable.rememberSaveable(
+        saver = androidx.compose.foundation.ScrollState.Saver,
+    ) { androidx.compose.foundation.ScrollState(0) }
 
-    SheetBody {
+    SheetBody(scrollState = scroll) {
         SheetHeader("Settings", state)
 
         // ----- Personalize -----
@@ -1159,12 +1164,15 @@ private fun BuildByDegreePanel(state: AppState) {
 // ---------- helpers ----------
 
 @Composable
-private fun SheetBody(content: @Composable () -> Unit) {
+private fun SheetBody(
+    scrollState: androidx.compose.foundation.ScrollState = rememberScrollState(),
+    content: @Composable () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(max = 600.dp)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         content()

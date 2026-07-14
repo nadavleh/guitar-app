@@ -44,7 +44,7 @@ enum class DisplayMode { None, Chord, Scale, Pick }
 
 /** Which bottom sheet (or full-screen route) is currently open (null = none).
  *  Loop and Tuner are full-screen; the others are bottom sheets. */
-enum class Sheet { Fretboard, Options, Loop, Tuner, EarTraining, SambaLooper, Decompose }
+enum class Sheet { Fretboard, Options, Loop, Tuner, EarTraining, SambaLooper, Decompose, CavaqProgressions }
 
 /** UI theme mode (Settings → Personalize). Auto follows the system light/dark
  *  setting (resolved in MainActivity via `isSystemInDarkTheme()`); Dark/Light
@@ -432,6 +432,18 @@ class AppState(
         SambaLooperState(audio = audio, scope = scope, repo = repo, sampleLoader = drumSampleLoader)
     }
 
+    /** App-lifetime cavaquinho Progressions state (functional-sequence looper + neck). */
+    val cavaqProg: CavaqProgState by lazy {
+        CavaqProgState(
+            audio = audio,
+            scope = scope,
+            tuningProvider = { liveTuning },
+            sustainProvider = { ringSustainMs },
+            strumProvider = { strumMs },
+            timbreProvider = { timbre },
+        )
+    }
+
     @JvmName("applyA4Hz")
     fun setA4Hz(value: Float) {
         val clamped = value.coerceIn(435f, 445f)
@@ -741,6 +753,7 @@ class AppState(
             Sheet.EarTraining -> {} // ear training plays its own audio
             Sheet.SambaLooper -> {} // drum machine plays its own audio
             Sheet.Decompose -> {}   // chord-decomposition reference; plays its own audio
+            Sheet.CavaqProgressions -> {} // cavaquinho progressions; plays its own audio
         }
     }
 
