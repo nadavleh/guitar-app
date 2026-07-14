@@ -367,10 +367,11 @@ export class EarTrainingUI {
       this.rerender();
     };
 
+    // Major/Minor shift sits on the LEFT; the bar label fills the rest on the right.
     const header = el("div", { class: "row" }, [
-      el("span", { class: "ans-label", style: "flex:1" }, [`Bar ${bar + 1} answer`]),
       chip("Major", !ear.keyboardMinor, () => { if (ear.keyboardMinor) ear.toggleKeyboardShift(); }),
       chip("⇧ Minor", ear.keyboardMinor, () => { if (!ear.keyboardMinor) ear.toggleKeyboardShift(); }),
+      el("span", { class: "ans-label", style: "flex:1;text-align:right" }, [`Bar ${bar + 1} answer`]),
     ]);
 
     const grid = el("div", { class: "et-pad-grid" }, ear.keyboardKeys().map(([majDeg, roman]) =>
@@ -808,7 +809,7 @@ export class EarTrainingUI {
       }
     }
     const closeBtn = btn("Close", () => scrim.remove(), "btn primary");
-    const card = el("div", { class: "et-card", style: "max-width:480px;max-height:75vh;overflow:auto;margin:auto" }, [
+    const card = el("div", { class: "et-card", style: "max-width:480px;max-height:75vh;overflow:auto;margin:auto;background:var(--surface-elev);color:var(--text-primary)" }, [
       el("div", { style: "font-weight:700;font-size:16px;margin-bottom:8px" }, ["Songs with this progression"]),
       body,
       el("div", { style: "text-align:right;margin-top:10px" }, [closeBtn]),

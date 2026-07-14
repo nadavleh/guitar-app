@@ -416,6 +416,12 @@ private fun StatusBar(state: AppState) {
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.primary,
         )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            "v${BuildConfig.VERSION_NAME}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.width(8.dp))
         // Byline: the handle is tappable and opens Nadav's Instagram.
         val context = LocalContext.current
