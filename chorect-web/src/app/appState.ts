@@ -33,7 +33,7 @@ export const CHALLENGE_SCORE_ORDER = (a: ChallengeScore, b: ChallengeScore): num
 
 export enum DisplayMode { None = "None", Chord = "Chord", Scale = "Scale", Pick = "Pick" }
 export enum LabelMode { Notes = "Notes", Intervals = "Intervals", Empty = "Empty" }
-export enum Sheet { Fretboard = "Fretboard", Options = "Options", Tuner = "Tuner", Loop = "Loop", EarTraining = "EarTraining", SambaLooper = "SambaLooper", Decompose = "Decompose" }
+export enum Sheet { Fretboard = "Fretboard", Options = "Options", Tuner = "Tuner", Loop = "Loop", EarTraining = "EarTraining", SambaLooper = "SambaLooper", Decompose = "Decompose", CavaqProgressions = "CavaqProgressions" }
 export enum ChordScaleView { AllNotes = "AllNotes", Positions = "Positions" }
 
 /** Selectable guitar sound: "Synth" is the Karplus-Strong synth voice (always
@@ -94,8 +94,8 @@ function isThemeMode(v: unknown): v is ThemeMode {
 /** One user-configurable tab destination — names mirror Android's `TabDest`
  *  enum (Shell.kt) EXACTLY, so a tab-order value round-trips identically on
  *  both platforms. "More" is not a TabDest; it's the fixed 5th nav item. */
-export type TabDestName = "Neck" | "Ear" | "Rhythm" | "Loop" | "Tuner" | "Decompose";
-export const ALL_TAB_DESTS: readonly TabDestName[] = ["Neck", "Ear", "Rhythm", "Loop", "Tuner", "Decompose"];
+export type TabDestName = "Neck" | "Ear" | "Rhythm" | "Loop" | "Tuner" | "Decompose" | "CavaqProgressions";
+export const ALL_TAB_DESTS: readonly TabDestName[] = ["Neck", "Ear", "Rhythm", "Loop", "Tuner", "Decompose", "CavaqProgressions"];
 /** Default tab set/order for a fresh install (matches Android's DEFAULT_TAB_ORDER). */
 export const DEFAULT_TAB_ORDER: readonly TabDestName[] = ["Neck", "Ear", "Rhythm", "Tuner"];
 function isTabDestName(v: unknown): v is TabDestName {
