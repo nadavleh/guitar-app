@@ -783,10 +783,30 @@ export class EarTrainingUI {
   }
 
   private showSongsPopup(): void {
+    // Curated hits first; PDF-imported extras fold behind a "Show more" button.
     const songs = this.ear.currentProgressionSongs();
-    const body = songs.length
-      ? el("div", {}, songs.map((sg) => el("div", { style: "font-size:14px;padding:2px 0" }, [`•  ${sg.title} — ${sg.artist}`])))
-      : el("div", { class: "et-muted" }, ["No songs are listed for this progression yet."]);
+    const extra = this.ear.currentProgressionImportedSongs();
+    const songRow = (sg: SongExample) =>
+      el("div", { style: "font-size:14px;padding:2px 0" }, [`•  ${sg.title} — ${sg.artist}`]);
+    const body = el("div", {});
+    if (!songs.length && !extra.length) {
+      body.appendChild(el("div", { class: "et-muted" }, ["No songs are listed for this progression yet."]));
+    } else {
+      songs.forEach((sg) => body.appendChild(songRow(sg)));
+      if (extra.length) {
+        const moreWrap = el("div", {});
+        const moreBtn = btn(`Show ${extra.length} more from the songbook ▾`, () => {
+          moreWrap.remove();
+          if (songs.length) {
+            body.appendChild(el("hr", { style: "border:none;border-top:1px solid var(--divider);margin:6px 0" }));
+            body.appendChild(el("div", { class: "et-muted", style: "font-size:12px;padding:2px 0" }, ["More from the songbook"]));
+          }
+          extra.forEach((sg) => body.appendChild(songRow(sg)));
+        }, "btn");
+        moreWrap.appendChild(el("div", { style: "margin-top:6px" }, [moreBtn]));
+        body.appendChild(moreWrap);
+      }
+    }
     const closeBtn = btn("Close", () => scrim.remove(), "btn primary");
     const card = el("div", { class: "et-card", style: "max-width:480px;max-height:75vh;overflow:auto;margin:auto" }, [
       el("div", { style: "font-weight:700;font-size:16px;margin-bottom:8px" }, ["Songs with this progression"]),

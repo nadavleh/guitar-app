@@ -11,7 +11,7 @@ import {
   EarTrainingDegrees, degreeRoot, resolve as resolveDegree, resolveProgression,
   randomProgression, romanLabel, randomAdvanced, randomCircleOfFifths, resolveNamed,
   majorRelativeDegree, degreeFromMajorRelative,
-  SongExample, songsForDiatonic, songsForAdvanced, songsForCircleWindow, CIRCLE_WINDOWS, namedRomanLine,
+  SongExample, songsForDiatonic, songsForAdvanced, songsForCircleWindow, importedSongsForDiatonic, CIRCLE_WINDOWS, namedRomanLine,
   N2cChallenge, randomN2c, n2cAnswerLabel, n2cChordSymbol, n2cTestNote, n2cLabel,
   N2C_MAJOR_TEST_OFFSETS, N2C_MINOR_TEST_OFFSETS,
   inversionCount, inversionMidis,
@@ -1045,6 +1045,13 @@ export class EarTrainingState {
       return win ? songsForCircleWindow(win.id) : [];
     }
     return this.progProgression ? songsForDiatonic(this.progProgression) : [];
+  }
+
+  /** PDF-imported EXTRA songs for the current progression, shown behind "Show more"
+   *  in the Songs popup. Diatonic only (advanced/circle have no imported extras). */
+  currentProgressionImportedSongs(): SongExample[] {
+    if (this.advancedMode || this.circleMode) return [];
+    return this.progProgression ? importedSongsForDiatonic(this.progProgression) : [];
   }
   setAdvancedMode(v: boolean) { this.advancedMode = v; if (v) { this.circleMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
   setCircleMode(v: boolean) { this.circleMode = v; if (v) { this.advancedMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }

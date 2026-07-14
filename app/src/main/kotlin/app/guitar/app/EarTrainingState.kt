@@ -345,6 +345,13 @@ class EarTrainingState(
         else -> progProgression?.let { app.guitar.theory.ProgressionSongs.forDiatonic(it) } ?: emptyList()
     }
 
+    /** PDF-imported EXTRA songs for the current progression, shown behind "Show more"
+     *  in the Songs popup. Diatonic only (advanced/circle have no imported extras). */
+    fun currentProgressionImportedSongs(): List<app.guitar.theory.SongExample> = when {
+        advancedMode || circleMode -> emptyList()
+        else -> progProgression?.let { app.guitar.theory.ProgressionSongs.importedForDiatonic(it) } ?: emptyList()
+    }
+
     // ---------- Library preview player ----------
     // A SEPARATE, self-contained looper for the progression-library dialog. It never
     // touches the quiz looper's state (progResolved / currentBar / currentPlayingShape /

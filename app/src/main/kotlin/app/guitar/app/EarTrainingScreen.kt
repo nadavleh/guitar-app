@@ -544,13 +544,16 @@ private fun ProgressionSongsButton(ear: EarTrainingState) {
     var open by remember { mutableStateOf(false) }
     OutlinedButton(onClick = { open = true }, contentPadding = COMPACT_BUTTON_PADDING) { Text("Songs ♪") }
     if (open) {
+        // Curated hits first; PDF-imported extras fold behind a "Show more" expander.
         val songs = ear.currentProgressionSongs()
+        val extra = ear.currentProgressionImportedSongs()
+        var showExtra by remember(songs, extra) { mutableStateOf(false) }
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { open = false },
             confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } },
             title = { Text("Songs with this progression") },
             text = {
-                if (songs.isEmpty()) {
+                if (songs.isEmpty() && extra.isEmpty()) {
                     Text("No songs are listed for this progression yet.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -560,6 +563,26 @@ private fun ProgressionSongsButton(ear: EarTrainingState) {
                             Text("•  ${it.title} — ${it.artist}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(vertical = 2.dp))
+                        }
+                        if (extra.isNotEmpty()) {
+                            if (!showExtra) {
+                                TextButton(onClick = { showExtra = true }, contentPadding = COMPACT_BUTTON_PADDING) {
+                                    Text("Show ${extra.size} more from the songbook ▾")
+                                }
+                            } else {
+                                if (songs.isNotEmpty()) {
+                                    androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+                                    Text("More from the songbook",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 2.dp))
+                                }
+                                extra.forEach {
+                                    Text("•  ${it.title} — ${it.artist}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.padding(vertical = 2.dp))
+                                }
+                            }
                         }
                     }
                 }
