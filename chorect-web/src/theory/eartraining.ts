@@ -52,11 +52,13 @@ export const MAJOR_DEGREES: Map<number, DegreeInfo> = new Map([
 export const MINOR_DEGREES: Map<number, DegreeInfo> = new Map([
   [1, di("i", "m", "m7", "m9")],
   [2, di("ii°", "dim", "m7b5", "m7b5")],
-  [3, di("III", "", "maj7", "maj9")],
+  // Roman numerals named RELATIVE TO THE MAJOR SCALE: lowered natural-minor degrees carry
+  // a flat (bIII, bVI, bVII). Qualities are natural-minor diatonic (v is minor).
+  [3, di("bIII", "", "maj7", "maj9")],
   [4, di("iv", "m", "m7", "m9")],
-  [5, di("V", "", "7", "7")],
-  [6, di("VI", "", "maj7", "maj9")],
-  [7, di("VII", "", "7", "7")],
+  [5, di("v", "m", "m7", "m9")],
+  [6, di("bVI", "", "maj7", "maj9")],
+  [7, di("bVII", "", "7", "7")],
 ]);
 
 const MAJOR_SCALE_SEMITONES = [0, 2, 4, 5, 7, 9, 11];
@@ -72,8 +74,11 @@ export function romanLabel(triadRoman: string, quality: string): string {
   if (triadRoman.endsWith("°")) {
     return quality === "m7b5" ? `${triadRoman}7` : triadRoman + quality;
   }
-  const firstIsLower = triadRoman[0] === triadRoman[0].toLowerCase() && triadRoman[0] !== triadRoman[0].toUpperCase();
-  if (firstIsLower && quality.startsWith("m") && quality !== "m7b5") {
+  // Ignore any leading accidental (b/#) when deciding major/minor case, so
+  // "bIII"+"maj7" → "bIIImaj7" (major) and "v"+"m7" → "v7" (minor).
+  const core = triadRoman.replace(/^[b#]+/, "");
+  const firstIsLower = core.length > 0 && core[0] === core[0].toLowerCase() && core[0] !== core[0].toUpperCase();
+  if (firstIsLower && quality.startsWith("m") && !quality.startsWith("maj") && quality !== "m7b5") {
     return triadRoman + quality.replace(/^m/, "");
   }
   return triadRoman + quality;

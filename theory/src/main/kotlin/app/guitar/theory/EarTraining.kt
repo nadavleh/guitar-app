@@ -76,12 +76,13 @@ object EarTraining {
     val MINOR_DEGREES: Map<Int, DegreeInfo> = mapOf(
         1 to DegreeInfo("i",    "m",   "m7",   "m9"),
         2 to DegreeInfo("ii°",  "dim", "m7b5", "m7b5"),
-        3 to DegreeInfo("III",  "",    "maj7", "maj9"),
+        // Roman numerals are named RELATIVE TO THE MAJOR SCALE: the lowered natural-minor
+        // degrees carry a flat (bIII, bVI, bVII). Qualities are natural-minor diatonic.
+        3 to DegreeInfo("bIII", "",    "maj7", "maj9"),
         4 to DegreeInfo("iv",   "m",   "m7",   "m9"),
-        // Harmonic minor V — most common in cadences. Pure natural-minor v is m7.
-        5 to DegreeInfo("V",    "",    "7",    "7"),
-        6 to DegreeInfo("VI",   "",    "maj7", "maj9"),
-        7 to DegreeInfo("VII",  "",    "7",    "7"),
+        5 to DegreeInfo("v",    "m",   "m7",   "m9"),
+        6 to DegreeInfo("bVI",  "",    "maj7", "maj9"),
+        7 to DegreeInfo("bVII", "",    "7",    "7"),
     )
 
     private val MAJOR_SCALE_SEMITONES = intArrayOf(0, 2, 4, 5, 7, 9, 11)
@@ -95,14 +96,20 @@ object EarTraining {
     }
 
     /** Build the displayed Roman label for a non-triad level: e.g. "ii"+"m7" → "ii7", "V"+"7" → "V7". */
-    fun romanLabel(triadRoman: String, quality: String): String = when {
-        // Diminished: "vii°" / "ii°" + m7b5 → "vii°7" / "ii°7"
-        triadRoman.endsWith("°") -> if (quality == "m7b5") "${triadRoman}7" else triadRoman + quality
-        // Lowercase (minor) Roman: the "m" prefix is redundant — strip it.
-        // "ii" + "m7" → "ii7"; "vi" + "m9" → "vi9"
-        triadRoman[0].isLowerCase() && quality.startsWith("m") && quality != "m7b5" ->
-            triadRoman + quality.removePrefix("m")
-        else -> triadRoman + quality
+    fun romanLabel(triadRoman: String, quality: String): String {
+        // Ignore any leading accidental (b/#) when deciding major/minor case, so
+        // "bIII"+"maj7" → "bIIImaj7" (major) and "v"+"m7" → "v7" (minor).
+        val core = triadRoman.trimStart('b', '#')
+        return when {
+            // Diminished: "vii°" / "ii°" + m7b5 → "vii°7" / "ii°7"
+            triadRoman.endsWith("°") -> if (quality == "m7b5") "${triadRoman}7" else triadRoman + quality
+            // Lowercase (minor) Roman: the "m" prefix is redundant — strip it (but never
+            // from "maj7"/"maj9"). "ii" + "m7" → "ii7"; "vi" + "m9" → "vi9".
+            core.isNotEmpty() && core[0].isLowerCase() &&
+                quality.startsWith("m") && !quality.startsWith("maj") && quality != "m7b5" ->
+                triadRoman + quality.removePrefix("m")
+            else -> triadRoman + quality
+        }
     }
 
     /**

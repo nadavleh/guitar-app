@@ -113,16 +113,18 @@ class EarTrainingTest {
         assertEquals("i", r.romanLabel)
     }
 
-    @Test fun `V in A minor triad uses harmonic dominant`() {
+    @Test fun `v in A minor triad is natural-minor Em`() {
+        // Minor mode is labeled relative to the major scale and uses natural-minor
+        // qualities: the 5th is a minor v (Em in A minor), not a harmonic-minor V.
         val r = EarTraining.resolve(5, PitchClass.A, TrainingMode.Minor, ChordTypeLevel.Triads)
-        assertEquals("E", r.symbol)
-        assertEquals("V", r.romanLabel)
+        assertEquals("Em", r.symbol)
+        assertEquals("v", r.romanLabel)
     }
 
-    @Test fun `V7 in A minor is E7`() {
+    @Test fun `v7 in A minor is Em7`() {
         val r = EarTraining.resolve(5, PitchClass.A, TrainingMode.Minor, ChordTypeLevel.Sevenths)
-        assertEquals("E7", r.symbol)
-        assertEquals("V7", r.romanLabel)
+        assertEquals("Em7", r.symbol)
+        assertEquals("v7", r.romanLabel)
     }
 
     @Test fun `ii°7 in A minor is Bm7b5`() {
@@ -131,10 +133,10 @@ class EarTrainingTest {
         assertEquals("ii°7", r.romanLabel)
     }
 
-    @Test fun `IIImaj7 in A minor is Cmaj7`() {
+    @Test fun `bIIImaj7 in A minor is Cmaj7`() {
         val r = EarTraining.resolve(3, PitchClass.A, TrainingMode.Minor, ChordTypeLevel.Sevenths)
         assertEquals("Cmaj7", r.symbol)
-        assertEquals("IIImaj7", r.romanLabel)
+        assertEquals("bIIImaj7", r.romanLabel)
     }
 
     @Test fun `I extended uses an allowed diatonic extension`() {
