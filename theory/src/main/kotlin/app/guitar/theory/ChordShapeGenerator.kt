@@ -106,17 +106,28 @@ class ChordShapeGenerator(
                 .thenBy { it.mutedCount }
                 .thenBy { it.fretSpan }
         )
-        // 4-string instruments (cavaquinho): present a CAGED-like canonical set. Prefer
-        // full (no-mute) voicings — muting should be rare — then keep the single best
-        // voicing at each distinct neck position and cap at 5, so the position scroller
-        // steps through up to 5 canonical shapes spread along the neck. (6-string guitar
-        // keeps every voicing.)
+        // 4-string instruments (cavaquinho): keep up to 5 DISTINCT voicings, preferring
+        // the most compact (fewest-fret-span) ones — then lower neck position, then
+        // root-in-bass. Distinct inversions that happen to start on the same fret are all
+        // kept (they're genuinely different shapes, e.g. Amaj7 root-in-bass vs 7th-in-bass).
+        // Prefer full (no-mute) voicings; tolerate ≤1 mute only if no full voicing exists.
+        // (6-string guitar keeps every voicing.)
         if (tuning.stringCount != 4) return ranked
         val full = ranked.filter { it.mutedCount == 0 }
         val base = if (full.isNotEmpty()) full else ranked.filter { it.mutedCount <= 1 }
-        val bestPerPosition = LinkedHashMap<Int, ChordShape>()
-        for (sh in base) bestPerPosition.putIfAbsent(sh.position, sh)
-        return bestPerPosition.values.sortedBy { it.position }.take(5)
+        // Dedupe by VOICING SHAPE (interval pattern per string), so the same shape an
+        // octave up collapses to one — but distinct inversions are all kept. `base` is
+        // ordered low→high, so the kept instance of each shape is its lowest position.
+        fun signature(sh: ChordShape): List<Int?> = sh.notes.map { n ->
+            n?.let { ((it.pitchClass.value - root.value) % 12 + 12) % 12 }
+        }
+        return base.distinctBy { signature(it) }
+            .sortedWith(
+                compareBy<ChordShape> { it.fretSpan }
+                    .thenBy { it.position }
+                    .thenByDescending { it.hasRootInBass }
+            )
+            .take(5)
     }
 
     private fun isValid(

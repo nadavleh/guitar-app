@@ -587,16 +587,25 @@ export class ChordShapeGenerator {
       if (a.mutedCount !== b.mutedCount) return a.mutedCount - b.mutedCount;
       return a.fretSpan - b.fretSpan;
     });
-    // 4-string instruments (cavaquinho): present a CAGED-like canonical set — prefer
-    // full (no-mute) voicings, then the single best voicing at each distinct neck
-    // position, capped at 5, so the position scroller steps through up to 5 canonical
-    // shapes spread along the neck. (6-string guitar keeps every voicing.)
+    // 4-string instruments (cavaquinho): keep up to 5 DISTINCT voicings, preferring the
+    // most compact (fewest-fret-span) ones — then lower neck position, then root-in-bass.
+    // Distinct inversions that share a starting fret are all kept (different shapes).
+    // Prefer full (no-mute) voicings; tolerate ≤1 mute only if no full voicing exists.
     if (stringCount(tuning) !== 4) return ranked;
     const full = ranked.filter((sh) => sh.mutedCount === 0);
     const base = full.length ? full : ranked.filter((sh) => sh.mutedCount <= 1);
-    const bestPerPosition = new Map<number, ChordShape>();
-    for (const sh of base) if (!bestPerPosition.has(sh.position)) bestPerPosition.set(sh.position, sh);
-    return [...bestPerPosition.values()].sort((a, b) => a.position - b.position).slice(0, 5);
+    // Dedupe by VOICING SHAPE (interval pattern per string): octave copies collapse, but
+    // distinct inversions are all kept. `base` is low→high so the kept instance is lowest.
+    const seen = new Set<string>();
+    const uniq: ChordShape[] = [];
+    for (const sh of base) {
+      const sig = sh.notes.map((n) => (n === null ? "x" : (((midiPitchClass(n.midi) - root) % 12 + 12) % 12))).join(",");
+      if (!seen.has(sig)) { seen.add(sig); uniq.push(sh); }
+    }
+    uniq.sort((a, b) =>
+      (a.fretSpan - b.fretSpan) || (a.position - b.position) ||
+      (a.hasRootInBass === b.hasRootInBass ? 0 : a.hasRootInBass ? -1 : 1));
+    return uniq.slice(0, 5);
   }
 
   private isValid(shapeFrets: (number | null)[], chordPcs: Set<PitchClass>, essentialPcs: Set<PitchClass>, tuning: Tuning, root: PitchClass): boolean {

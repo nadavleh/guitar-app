@@ -15,7 +15,7 @@ import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../au
 
 export const DISPLAY_FRETS = 14;
 /** App version shown beside the header wordmark. Keep in sync with package.json on release. */
-export const APP_VERSION = "2.9.0";
+export const APP_VERSION = "2.9.1";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 

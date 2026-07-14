@@ -53,9 +53,10 @@ class CavaquinhoShapeQualityTest {
             val shapes = gen.shapesFor(root, q, tuning, frets = 14)
             assertTrue(shapes.isNotEmpty(), "$sym produced no cavaquinho voicing")
             assertTrue(shapes.size <= 5, "$sym produced ${shapes.size} shapes (expected <= 5)")
-            // Canonical shapes sit at distinct neck positions.
-            assertTrue(shapes.map { it.position }.toSet().size == shapes.size,
-                "$sym has duplicate-position shapes")
+            // The canonical shapes are all DISTINCT voicings (different inversions may
+            // share a starting fret, so we compare the full fret pattern, not position).
+            assertTrue(shapes.map { it.frets }.toSet().size == shapes.size,
+                "$sym has duplicate shapes")
         }
     }
 
