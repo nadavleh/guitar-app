@@ -534,9 +534,14 @@ export class ChordShapeGenerator {
     }
 
     const chordPcs = new Set<PitchClass>(notesFrom(quality, root));
+    // Standard: every chord tone EXCEPT the perfect 5th, which is optional once the chord
+    // has 4+ tones (so 7ths form compact closed voicings). Triads keep all three.
+    const fifthPc = (((root + 7) % 12) as PitchClass);
     const essentialPcs: Set<PitchClass> =
       this.style === VoicingStyle.Standard
-        ? chordPcs
+        ? ((chordPcs.size >= 4 && chordPcs.has(fifthPc))
+            ? new Set([...chordPcs].filter((pc) => pc !== fifthPc))
+            : chordPcs)
         : new Set([...essentialShellIntervals(quality)].map((iv) => pcPlus(root, iv)));
 
     const firstFret = Math.max(fretRange?.[0] ?? 0, 0);
@@ -629,11 +634,15 @@ export class ChordShapeGenerator {
       const hardCap = stringCount(tuning) === 4 ? 4 : 5;
       if (span > this.maxFretSpan || span > hardCap) return false;
     }
-    // All-chord-tones (Standard). Tonic mandatory; the perfect 5th is the only tone we
-    // may drop, and only for extended chords with more tones than strings.
+    // All-chord-tones (Standard). Tonic mandatory; the PERFECT 5th is optional whenever
+    // the chord has 4+ tones and contains one — lets 7ths/6ths/extensions form compact
+    // closed voicings (many drop the 5th) instead of wide grips. Triads keep all three;
+    // diminished / m7b5 keep their flatted 5th (a defining tone).
     if (this.style === VoicingStyle.Standard && this.requireAllChordTones) {
-      const need = chordPcs.size <= stringCount(tuning) ? chordPcs
-        : new Set([...chordPcs].filter((pc) => pc !== (((root + 7) % 12) as PitchClass)));
+      const fifth = (((root + 7) % 12) as PitchClass);
+      const need = (chordPcs.size >= 4 && chordPcs.has(fifth))
+        ? new Set([...chordPcs].filter((pc) => pc !== fifth))
+        : chordPcs;
       if (!containsAll(playedPcs, need)) return false;
     }
     if (!containsAll(playedPcs, essentialPcs)) return false;

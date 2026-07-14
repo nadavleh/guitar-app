@@ -42,7 +42,12 @@ class ChordShapeGenerator(
         }
         val chordPcs: Set<PitchClass> = quality.notesFrom(root).toSet()
         val essentialPcs: Set<PitchClass> = when (style) {
-            VoicingStyle.Standard -> chordPcs   // require every chord tone
+            // Standard: every chord tone EXCEPT the perfect 5th, which is optional once the
+            // chord has 4+ tones (so 7ths form compact closed voicings). Triads keep all.
+            VoicingStyle.Standard -> {
+                val fifth = PitchClass((root.value + 7) % 12)
+                if (chordPcs.size >= 4 && fifth in chordPcs) chordPcs - fifth else chordPcs
+            }
             VoicingStyle.Shell -> essentialShellIntervals(quality).map { root + it }.toSet()
         }
         val firstFret = (fretRange?.first ?: 0).coerceAtLeast(0)
@@ -156,12 +161,14 @@ class ChordShapeGenerator(
             val hardCap = if (tuning.stringCount == 4) 4 else 5
             if (span > maxFretSpan || span > hardCap) return false
         }
-        // All-chord-tones rule (Standard mode). The tonic is mandatory; the perfect 5th
-        // is the only tone we may drop, and only when the chord has more tones than
-        // strings allow (extended chords) — triads/6ths/7ths keep every tone.
+        // All-chord-tones rule (Standard mode). The tonic is mandatory; the PERFECT 5th
+        // is optional whenever the chord has 4+ tones and actually contains one — this
+        // lets 7ths (and 6ths/extensions) form the compact closed voicings a cavaquinho
+        // player uses (many drop the 5th), instead of wide 4-fret grips. Triads keep all
+        // three tones; diminished / m7b5 keep their (flatted) 5th, which is a defining tone.
         if (style == VoicingStyle.Standard && requireAllChordTones) {
-            val need = if (chordPcs.size <= tuning.stringCount) chordPcs
-                       else chordPcs - PitchClass((root.value + 7) % 12)
+            val fifth = PitchClass((root.value + 7) % 12)
+            val need = if (chordPcs.size >= 4 && fifth in chordPcs) chordPcs - fifth else chordPcs
             if (!playedPcs.containsAll(need)) return false
         }
         // Essential tones must always be present (chordPcs in Standard, shell subset in Shell).
