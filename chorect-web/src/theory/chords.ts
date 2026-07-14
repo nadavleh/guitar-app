@@ -596,11 +596,11 @@ export class ChordShapeGenerator {
     const base = full.length ? full : ranked.filter((sh) => sh.mutedCount <= 1);
     // Dedupe by VOICING SHAPE (interval pattern per string): octave copies collapse, but
     // distinct inversions are all kept. `base` is low→high so the kept instance is lowest.
-    const seen = new Set<string>();
+    const seenSig = new Set<string>();
     const uniq: ChordShape[] = [];
     for (const sh of base) {
       const sig = sh.notes.map((n) => (n === null ? "x" : (((midiPitchClass(n.midi) - root) % 12 + 12) % 12))).join(",");
-      if (!seen.has(sig)) { seen.add(sig); uniq.push(sh); }
+      if (!seenSig.has(sig)) { seenSig.add(sig); uniq.push(sh); }
     }
     uniq.sort((a, b) =>
       (a.fretSpan - b.fretSpan) || (a.position - b.position) ||
