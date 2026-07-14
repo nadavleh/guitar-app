@@ -12,8 +12,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.guitar.theory.ChordQuality
@@ -237,4 +240,41 @@ fun SelectedPositionInfo(
         "  ·  ${intervalName(interval)} relative to ${NoteSpeller.spell(root)}"
     } ?: ""
     Text("string $stringNum · $openOrFret · $noteName$tail", style = MaterialTheme.typography.bodySmall)
+}
+
+/**
+ * One song-list row shared by every "Songs" popup. The "Title — Artist" text opens a
+ * YouTube search for the song (tap); long-press copies "Title — Artist" to the clipboard
+ * so you can search it yourself. [suffix] is appended to the label (e.g. "  (A)").
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun SongLinkRow(title: String, artist: String, suffix: String = "") {
+    val context = LocalContext.current
+    val label = "$title — $artist$suffix"
+    Text(
+        "▶  $label",
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .combinedClickable(
+                onClick = {
+                    val q = android.net.Uri.encode("$title $artist")
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse("https://www.youtube.com/results?search_query=$q"),
+                            ),
+                        )
+                    }
+                },
+                onLongClick = {
+                    val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                        as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("song", label))
+                },
+            ),
+    )
 }

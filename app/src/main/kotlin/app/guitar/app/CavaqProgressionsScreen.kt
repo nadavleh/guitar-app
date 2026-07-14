@@ -173,11 +173,7 @@ private fun CavaqSongsButton(sequenceId: String) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-                        songs.forEach {
-                            Text("•  ${it.title} — ${it.artist}  (${it.keyLabel})",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(vertical = 2.dp))
-                        }
+                        songs.forEach { SongLinkRow(it.title, it.artist, "  (${it.keyLabel})") }
                     }
                 }
             },
