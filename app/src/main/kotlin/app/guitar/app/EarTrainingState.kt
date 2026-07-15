@@ -67,7 +67,7 @@ class EarTrainingState(
 
     // ---- Voicing / variety options (apply to progression playback & generation) ----
     /** Use shell (jazz drop-2) voicings for ear-training chords. */
-    var earShellVoicing by mutableStateOf(false)
+    var earShellVoicing by mutableStateOf(true)   // shell voicings (root+3rd+7th) default for now
     /** Mix everything: randomize chord-type level (triad/7th/extended) per bar AND
      *  randomize voicing (standard/shell) per chord. Overrides the single selections. */
     var earMixAll by mutableStateOf(false)
@@ -127,9 +127,11 @@ class EarTrainingState(
     private var loopJob: Job? = null
     private val rng = Random.Default
 
-    /** Tracks the last voicing played so the next chord can be picked by voice-leading.
-     *  Persists across loop iterations so the wrap (bar 4 → bar 1) also flows. */
-    private var prevPlayedShape: app.guitar.theory.ChordShape? = null
+    /** Voice-led shapes for the CURRENT progression, one per bar — built once (per
+     *  progression/voicing/tuning) so the loop AND every slot button sound the identical
+     *  voicing. See [ensureProgShapes]. */
+    private var progShapes: List<app.guitar.theory.ChordShape?> = emptyList()
+    private var progShapesSig: String = ""
 
     /** Live broadcast: the shape currently being played by the progression looper.
      *  Compose can observe this to display the chord on the fretboard. */
@@ -230,7 +232,6 @@ class EarTrainingState(
         keyRevealed = false
         modeRevealed = false
         currentBar = 0
-        prevPlayedShape = null
         if (isLooping) { stopLoop(); startLoop() }
     }
 
@@ -306,31 +307,57 @@ class EarTrainingState(
             val newRoot = PitchClass.of(root.value + n)
             ResolvedChord(NoteSpeller.spell(newRoot) + q.symbol, rc.romanLabel, newRoot)
         }
-        prevPlayedShape = null
         if (isLooping) { stopLoop(); startLoop() }
     }
 
-    /** Resolve the [idx]-th chord of the current progression to a shape (using
-     *  voice-leading from whatever last played in the loop, or E-shape if none),
-     *  play it once, and update [lastShownShape] so the optional fretboard panel
-     *  shows it. */
-    fun playBarOnce(idx: Int) {
-        val resolved = progResolved.getOrNull(idx) ?: return
-        val parsed = ChordLibrary.parse(resolved.symbol) ?: return
-        val (root, q) = parsed
+    /** Rebuild the per-bar voice-led shapes only when the progression / voicing / tuning
+     *  changed, so the loop and slot buttons keep sounding the identical cached voicings. */
+    private fun ensureProgShapes() {
+        val t = tuningProvider()
+        val sig = progResolved.joinToString(",") { it.symbol } +
+            "|" + (if (earMixAll) "mix" else if (earShellVoicing) "shell" else "std") +
+            "|" + t.openStrings.joinToString(",") { it.midi.value.toString() }
+        if (sig != progShapesSig) { buildProgShapes(); progShapesSig = sig }
+    }
+
+    private fun buildProgShapes() {
+        val style = earStyle()
         val tuning = tuningProvider()
-        val shapes = earShapes(ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuning, frets = DISPLAY_FRETS))
-        if (shapes.isEmpty()) return
-        val shape = if (prevPlayedShape == null) {
-            shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.first()
-        } else {
-            shapes[app.guitar.theory.VoiceLeading.pickMinMovement(prevPlayedShape!!, shapes)]
+        var prev: app.guitar.theory.ChordShape? = null
+        progShapes = progResolved.map { rc ->
+            val parsed = ChordLibrary.parse(rc.symbol) ?: return@map null
+            val (root, q) = parsed
+            val shapes = earShapes(ChordShapeGenerator(style = style).shapesFor(root, q, tuning, frets = DISPLAY_FRETS))
+            if (shapes.isEmpty()) return@map null
+            val shape = if (prev == null) shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.first()
+                        else shapes[app.guitar.theory.VoiceLeading.pickMinMovement(prev!!, shapes)]
+            prev = shape
+            shape
         }
-        prevPlayedShape = shape
-        lastShownShape = shape
+    }
+
+    /** Sound bar [idx] using its precomputed voice-led shape (block-tone fallback), shared
+     *  by the loop and every slot button so they always sound the same voicing. */
+    private fun soundBar(idx: Int, sustain: Int) {
+        val rc = progResolved.getOrNull(idx) ?: return
+        val parsed = ChordLibrary.parse(rc.symbol)
+        val rootPc = parsed?.first?.value ?: 0
+        val shape = progShapes.getOrNull(idx)
+        currentPlayingShape = shape
+        if (shape != null) {
+            lastShownShape = shape
+            playEarChord(earMidis(shape), rootPc, sustain)
+        } else if (parsed != null) {
+            val rootMidi = 52 + rootPc
+            playEarChord(parsed.second.intervals.map { rootMidi + it.semitones }, rootPc, sustain)
+        }
+    }
+
+    /** Play the [idx]-th chord once — same voice-led shape the loop uses for that bar. */
+    fun playBarOnce(idx: Int) {
+        ensureProgShapes()
         currentBar = idx
-        // Deduped voicing (never a full barre) + optional root boost.
-        playEarChord(earMidis(shape), root.value, sustainProvider())
+        soundBar(idx, sustainProvider())
     }
 
     /** Famous songs built on the CURRENT progression (from the library data), for the
@@ -355,7 +382,6 @@ class EarTrainingState(
     // ---------- Library preview player ----------
     // A SEPARATE, self-contained looper for the progression-library dialog. It never
     // touches the quiz looper's state (progResolved / currentBar / currentPlayingShape /
-    // prevPlayedShape), so previewing a library row can't corrupt an in-progress quiz.
 
     /** Which library row is currently previewing (its key, e.g. "maj:1,5,6,4"), or null. */
     var libPlayingId by mutableStateOf<String?>(null)
@@ -464,18 +490,18 @@ class EarTrainingState(
     fun startLoop() {
         if (isLooping) return
         if (progResolved.isEmpty()) nextProgression()
-        prevPlayedShape = null   // reset voice-leading state so first chord = E-shape
+        ensureProgShapes()
         isLooping = true
         loopJob = scope.launch {
             val beatMs = (60_000L / progBpm.coerceAtLeast(10))
             // One chord per bar; 4 beats per bar.
             val barMs = beatMs * 4
+            val sustain = (barMs * 0.9).toInt().coerceAtLeast(200)
             while (isLooping) {
                 for (i in progResolved.indices) {
                     if (!isLooping) break
                     currentBar = i
-                    val resolved = progResolved[i]
-                    playChordOnce(resolved.symbol, barMs)
+                    soundBar(i, sustain)
                     delay(barMs)
                 }
             }
@@ -490,47 +516,9 @@ class EarTrainingState(
         audio.stop()
     }
 
-    /** Pick the next chord's voicing via voice-leading (first chord = E-shape), play it,
-     *  and broadcast it on [currentPlayingShape] so any observer (e.g. the live fretboard)
-     *  can show what's being heard. */
-    private fun playChordOnce(symbol: String, barMs: Long) {
-        val parsed = ChordLibrary.parse(symbol) ?: return
-        val (root, q) = parsed
-        val tuning = tuningProvider()
-        val shapes = earShapes(ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuning, frets = DISPLAY_FRETS))
-        if (shapes.isEmpty()) {
-            // Fallback for exotic chords with no playable guitar voicing (some
-            // advanced-progression chords): sound the chord tones as a block.
-            currentPlayingShape = null
-            val rootMidi = 52 + root.value
-            val midis = q.intervals.map { rootMidi + it.semitones }
-            playEarChord(midis, root.value, (barMs * 0.9).toInt().coerceAtLeast(200))
-            return
-        }
-        val shape = if (prevPlayedShape == null) {
-            shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.first()
-        } else {
-            shapes[app.guitar.theory.VoiceLeading.pickMinMovement(prevPlayedShape!!, shapes)]
-        }
-        prevPlayedShape = shape
-        currentPlayingShape = shape
-        lastShownShape = shape
-        // Deduped voicing (never a full barre) + optional root boost.
-        playEarChord(earMidis(shape), root.value, (barMs * 0.9).toInt().coerceAtLeast(200))
-    }
-
-    /** Play the [idx]-th chord of the current progression as a block built directly
-     *  from its chord tones — guarantees any quality (incl. exotic advanced ones)
-     *  sounds, regardless of guitar-voicing availability. */
+    /** Play the [idx]-th chord once — same voice-led shape the loop uses for that bar. */
     fun playProgChordDirect(idx: Int) {
-        val rc = progResolved.getOrNull(idx) ?: return
-        val (root, q) = ChordLibrary.parse(rc.symbol) ?: return
-        val rootMidi = 52 + root.value
-        val midis = q.intervals.map { rootMidi + it.semitones }
-        scope.launch {
-            audio.playChord(midis, strumDelayMillis = strumProvider(),
-                sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
-        }
+        playBarOnce(idx)
     }
 
     // ---------- Note2Chord trainer ----------
@@ -1336,7 +1324,6 @@ class EarTrainingState(
         progResolved = snap.resolved
         progTranspose = 0
         advRevealed = false
-        prevPlayedShape = null
         if (isLooping) { stopLoop(); startLoop() }
     }
 
@@ -1364,7 +1351,6 @@ class EarTrainingState(
         progTranspose = 0
         advRevealed = false
         hasGenerated = true
-        prevPlayedShape = null
         if (isLooping) { stopLoop(); startLoop() }
     }
 

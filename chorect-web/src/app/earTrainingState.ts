@@ -52,8 +52,14 @@ export class EarTrainingState {
   private rng = defaultRng;
 
   // voicing / variety
-  earShellVoicing = false;
+  earShellVoicing = true;   // shell voicings (root + 3rd + 7th) are the default for now
   earMixAll = false;
+
+  /** Voice-led shapes for the CURRENT progression, one per bar — built once when the
+   *  progression changes so the loop AND every slot/chord button sound the identical
+   *  voicing. Rebuilt via [buildProgShapes]. */
+  private progShapes: (ChordShape | null)[] = [];
+  private progShapesSig = "";
 
   progSubMode = EarSubMode.Progression;
   earMode = EarMode.Challenge;   // opens in Progression Challenge by default
@@ -86,7 +92,6 @@ export class EarTrainingState {
   currentPlayingShape: ChordShape | null = null;
   lastShownShape: ChordShape | null = null;
 
-  private prevPlayedShape: ChordShape | null = null;
   private loopToken = 0;
   private cadenceToken = 0;
 
@@ -145,7 +150,6 @@ export class EarTrainingState {
     this.keyRevealed = false;
     this.modeRevealed = false;
     this.currentBar = 0;
-    this.prevPlayedShape = null;
     if (this.isLooping) { this.stopLoop(); this.startLoop(); }
     this.notify();
   }
@@ -210,28 +214,62 @@ export class EarTrainingState {
       const newRoot = pc(root);
       return { symbol: spellPc(newRoot) + q.symbol, romanLabel: rc.romanLabel, root: newRoot };
     });
-    this.prevPlayedShape = null;
     if (this.isLooping) { this.stopLoop(); this.startLoop(); }
     this.notify();
   }
 
-  playBarOnce(idx: number) {
-    const resolved = this.progResolved[idx];
-    if (!resolved) return;
-    const parsed = parseChord(resolved.symbol);
-    if (!parsed) return;
-    const [root, q] = parsed;
+  /** (Re)build the per-bar voice-led shapes for the current progression. One voicing
+   *  style is chosen for the whole progression so the loop and the slot buttons match. */
+  /** Rebuild the per-bar shapes only when the progression / voicing / tuning changed,
+   *  so the loop and slot buttons keep sounding the identical (cached) voicings. */
+  private ensureProgShapes() {
+    const t = this.deps.tuningProvider();
+    const sig = this.progResolved.map((r) => r.symbol).join(",") +
+      "|" + (this.earMixAll ? "mix" : this.earShellVoicing ? "shell" : "std") +
+      "|" + t.openStrings.map((n) => n.midi).join(",");
+    if (sig !== this.progShapesSig) { this.buildProgShapes(); this.progShapesSig = sig; }
+  }
+
+  private buildProgShapes() {
+    const style = this.earStyle();
     const tuning = this.deps.tuningProvider();
-    const shapes = this.earShapes(this.gen(this.earStyle()).shapesFor(root, q, tuning, DISPLAY_FRETS));
-    if (shapes.length === 0) return;
-    const shape = this.prevPlayedShape == null
-      ? (shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0])
-      : shapes[pickMinMovement(this.prevPlayedShape, shapes)];
-    this.prevPlayedShape = shape;
-    this.lastShownShape = shape;
+    let prev: ChordShape | null = null;
+    this.progShapes = this.progResolved.map((rc) => {
+      const parsed = parseChord(rc.symbol);
+      if (!parsed) return null;
+      const [root, q] = parsed;
+      const shapes = this.earShapes(this.gen(style).shapesFor(root, q, tuning, DISPLAY_FRETS));
+      if (shapes.length === 0) return null;
+      const shape = prev == null
+        ? (shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0])
+        : shapes[pickMinMovement(prev, shapes)];
+      prev = shape;
+      return shape;
+    });
+  }
+
+  /** Sound bar [idx] using its precomputed voice-led shape (block-tone fallback). Shared
+   *  by the loop and every slot/chord button so they always sound the same voicing. */
+  private soundBar(idx: number, sustainMs: number) {
+    const rc = this.progResolved[idx];
+    if (!rc) return;
+    const parsed = parseChord(rc.symbol);
+    const root = parsed ? parsed[0] : 0;
+    const shape = this.progShapes[idx] ?? null;
+    this.currentPlayingShape = shape;
+    if (shape) {
+      this.lastShownShape = shape;
+      this.playEarChord(this.earMidis(shape), root, sustainMs);
+    } else if (parsed) {
+      const rootMidi = 52 + root;
+      this.playEarChord(parsed[1].intervals.map((iv) => rootMidi + iv), root, sustainMs);
+    }
+  }
+
+  playBarOnce(idx: number) {
+    this.ensureProgShapes();
     this.currentBar = idx;
-    // Deduped voicing (never a full barre) + optional root boost.
-    this.playEarChord(this.earMidis(shape), root, this.deps.sustainProvider());
+    this.soundBar(idx, this.deps.sustainProvider());
     this.notify();
   }
 
@@ -263,7 +301,7 @@ export class EarTrainingState {
   startLoop() {
     if (this.isLooping) return;
     if (this.progResolved.length === 0) this.nextProgression();
-    this.prevPlayedShape = null;
+    this.ensureProgShapes();
     this.isLooping = true;
     this.loopToken++;
     const token = this.loopToken;
@@ -271,12 +309,13 @@ export class EarTrainingState {
     void (async () => {
       const beatMs = 60000 / Math.max(this.progBpm, 10);
       const barMs = beatMs * 4;
+      const sustain = Math.max(Math.floor(barMs * 0.9), 200);
       while (this.isLooping && token === this.loopToken) {
         for (let i = 0; i < this.progResolved.length; i++) {
           if (!this.isLooping || token !== this.loopToken) break;
           this.currentBar = i;
           this.notify();
-          this.playChordOnce(this.progResolved[i].symbol, barMs);
+          this.soundBar(i, sustain);
           await sleep(barMs);
         }
       }
@@ -334,39 +373,9 @@ export class EarTrainingState {
     this.deps.audio.playChord(midis, this.deps.strumProvider(), sustainMs, Timbres.Clarity);
   }
 
-  private playChordOnce(symbol: string, barMs: number) {
-    const parsed = parseChord(symbol);
-    if (!parsed) return;
-    const [root, q] = parsed;
-    const tuning = this.deps.tuningProvider();
-    const shapes = this.earShapes(this.gen(this.earStyle()).shapesFor(root, q, tuning, DISPLAY_FRETS));
-    const sustain = Math.max(Math.floor(barMs * 0.9), 200);
-    if (shapes.length === 0) {
-      this.currentPlayingShape = null;
-      const rootMidi = 52 + root;
-      const midis = q.intervals.map((iv) => rootMidi + iv);
-      this.playEarChord(midis, root, sustain);
-      return;
-    }
-    const shape = this.prevPlayedShape == null
-      ? (shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0])
-      : shapes[pickMinMovement(this.prevPlayedShape, shapes)];
-    this.prevPlayedShape = shape;
-    this.currentPlayingShape = shape;
-    this.lastShownShape = shape;
-    // Deduped voicing (never a full barre) + optional root boost.
-    this.playEarChord(this.earMidis(shape), root, sustain);
-  }
-
+  /** Play bar [idx] as a one-shot — same voice-led shape the loop uses for that bar. */
   playProgChordDirect(idx: number) {
-    const rc = this.progResolved[idx];
-    if (!rc) return;
-    const parsed = parseChord(rc.symbol);
-    if (!parsed) return;
-    const [root, q] = parsed;
-    const rootMidi = 52 + root;
-    const midis = q.intervals.map((iv) => rootMidi + iv);
-    this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), Timbres.Clarity);
+    this.playBarOnce(idx);
   }
 
   // ---------- Library preview player ----------
@@ -1076,7 +1085,6 @@ export class EarTrainingState {
     this.progResolved = snap.resolved;
     this.progTranspose = 0;
     this.advRevealed = false;
-    this.prevPlayedShape = null;
     if (this.isLooping) { this.stopLoop(); this.startLoop(); }
     this.notify();
   }
@@ -1100,7 +1108,6 @@ export class EarTrainingState {
     this.progTranspose = 0;
     this.advRevealed = false;
     this.hasGenerated = true;
-    this.prevPlayedShape = null;
     if (this.isLooping) { this.stopLoop(); this.startLoop(); }
     this.notify();
   }
