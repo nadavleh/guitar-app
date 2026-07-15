@@ -992,11 +992,13 @@ export class EarTrainingUI {
     const ear = this.ear;
     const verdict = ear.challengeBarCorrect(i);
     const selected = selectedBar === i;
+    const playhead = ear.isLooping && ear.currentBar === i;   // playing "head" highlight
     const label = ear.challengeGuessLabel[i];
     const border = verdict === true ? "var(--act)" : verdict === false ? "var(--root-tone)" : selected ? "var(--act)" : "var(--line)";
+    const bg = playhead ? BG_PRIMARY : label == null ? BG_HIDDEN : "var(--surface2)";
     const box = el("div", {
       class: "et-barsq",
-      style: `border-color:${border};border-width:${selected && verdict === null ? "3px" : "2px"};background:${label == null ? BG_HIDDEN : "var(--surface2)"}`,
+      style: `border-color:${border};border-width:${selected && verdict === null ? "3px" : "2px"};background:${bg}${playhead ? ";box-shadow:0 0 0 3px var(--act)" : ""}`,
     }, [label ?? "?"]);
     box.addEventListener("click", onSelect);
     const col = el("div", { class: "et-slot" }, [

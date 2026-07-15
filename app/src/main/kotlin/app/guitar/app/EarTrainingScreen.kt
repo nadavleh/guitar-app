@@ -1483,6 +1483,7 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                     verdict = verdict,
                     answer = if (verdict != null) ear.progResolved.getOrNull(i)?.romanLabel else null,
                     selected = selectedBar == i,
+                    playhead = ear.isLooping && ear.currentBar == i,   // playing "head"
                     onTap = { selectedBar = i },
                     // Playing a bar also selects it, so it's the target of the answer pad.
                     onPlay = { selectedBar = i; ear.playBarOnce(i) },
@@ -1577,11 +1578,13 @@ private fun BarSquare(
     verdict: Boolean?,
     answer: String?,
     selected: Boolean = false,
+    playhead: Boolean = false,
     onTap: () -> Unit,
     onPlay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val border = when {
+        playhead -> MaterialTheme.colorScheme.primary
         verdict == true  -> MaterialTheme.colorScheme.primary
         verdict == false -> MaterialTheme.colorScheme.error
         selected -> MaterialTheme.colorScheme.primary
@@ -1597,10 +1600,13 @@ private fun BarSquare(
                 .height(54.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(
-                    if (label == null) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                    else MaterialTheme.colorScheme.surfaceVariant,
+                    when {
+                        playhead -> MaterialTheme.colorScheme.primaryContainer
+                        label == null -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    },
                 )
-                .border(if (selected && verdict == null) 3.dp else 2.dp, border, RoundedCornerShape(8.dp))
+                .border(if (playhead || (selected && verdict == null)) 3.dp else 2.dp, border, RoundedCornerShape(8.dp))
                 .clickable { onTap() },
             contentAlignment = Alignment.Center,
         ) {
