@@ -39,6 +39,15 @@ class ProgressionSongsTest {
         }
     }
 
+    @Test fun `every SUS and ADVANCED II progression has songs and resolves to parseable chords`() {
+        for (p in EarTraining.SUS_PROGRESSIONS + EarTraining.ADVANCED2_PROGRESSIONS) {
+            assertClean("category ${p.name}", ProgressionSongs.forAdvanced(p.name))
+            for (rc in p.resolve(PitchClass.C)) {
+                assertTrue(ChordLibrary.parse(rc.symbol) != null, "${p.name}: unparseable ${rc.symbol}")
+            }
+        }
+    }
+
     @Test fun `every circle-of-fifths window has song examples`() {
         for (w in EarTraining.CIRCLE_WINDOWS) {
             assertClean("circle ${w.id} (${w.romanLine})", ProgressionSongs.forCircleWindow(w.id))

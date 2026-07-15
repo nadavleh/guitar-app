@@ -479,6 +479,22 @@ object ProgressionSongs {
             s("Blue Moon", "Rodgers & Hart"),
             s("Heart and Soul", "Hoagy Carmichael & Frank Loesser"),
         ),
+        // ---- SUS category ----
+        "Sus Resolution" to listOf(s("We Can Work It Out", "The Beatles")),
+        "Suspended Lift" to listOf(s("We Are Never Ever Getting Back Together", "Taylor Swift")),
+        "Sus Bookends" to listOf(s("House of Cards", "Radiohead")),
+        "Dorian Sus Vamp" to listOf(s("Sun", "Caribou")),
+        "Mixolydian Sus" to listOf(s("Lightning Bolt", "Jake Bugg")),
+        // ---- ADVANCED II category (maj7 / min9 / modal) ----
+        "Maj7 Pop" to listOf(s("Believe", "Cher")),
+        "Maj7 Climb" to listOf(s("Haven't Met You Yet", "Michael Bublé")),
+        "Backdoor Maj7" to listOf(s("My Cherie Amour", "Stevie Wonder")),
+        "Minor-9 Vamp" to listOf(s("Fake Plastic Trees", "Radiohead")),
+        "Add9 Roots" to listOf(s("The Way It Is", "Bruce Hornsby")),
+        "Dorian Vamp" to listOf(s("Song 2", "Blur")),
+        "Mixolydian Two" to listOf(s("Take It or Leave It", "The Strokes")),
+        "Lydian Bright" to listOf(s("Man on the Moon", "R.E.M.")),
+        "Phrygian Dark" to listOf(s("London Calling", "The Clash")),
     )
 
     /** Circle-of-fifths windows, keyed by [EarTraining.CircleWindow.id]. Each of the

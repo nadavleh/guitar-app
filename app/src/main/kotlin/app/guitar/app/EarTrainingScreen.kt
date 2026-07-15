@@ -260,7 +260,9 @@ private fun SubModeChipRow(ear: EarTrainingState) {
 
 /** Short label for the current progression generator. */
 private fun generatorLabel(ear: EarTrainingState): String = when {
-    ear.advancedMode -> "Advanced"
+    ear.advancedMode -> when (ear.advCategory) {
+        "sus" -> "Sus chords"; "advanced2" -> "Advanced II"; else -> "Advanced"
+    }
     ear.circleMode -> "Circle of 5ths"
     ear.iiiFocusMode -> "I → iii focus"
     else -> "Diatonic"
@@ -268,6 +270,8 @@ private fun generatorLabel(ear: EarTrainingState): String = when {
 
 /** One-line teaching caption for the current progression generator. */
 private fun generatorCaption(ear: EarTrainingState): String = when {
+    ear.advancedMode && ear.advCategory == "sus" -> "Progressions built on suspended (sus2/sus4) chords."
+    ear.advancedMode && ear.advCategory == "advanced2" -> "Richer colours: major-7th, minor-9th and modal (Dorian/Mixolydian/Lydian/Phrygian)."
     ear.advancedMode -> "Borrowed chords, secondary dominants & jazz turnarounds, each with a note."
     ear.circleMode -> "Circle-of-fifths windows built around secondary dominants (V7 of the next chord)."
     ear.iiiFocusMode -> "Drill for hearing the I→iii move — every progression opens with I then iii (major)."
@@ -290,6 +294,10 @@ private fun GeneratorDropdown(ear: EarTrainingState, modifier: Modifier = Modifi
                 onClick = { ear.chooseIiiFocusMode(true); open = false })
             DropdownMenuItem(text = { Text("Advanced (non-diatonic)") },
                 onClick = { ear.chooseAdvancedMode(true); open = false })
+            DropdownMenuItem(text = { Text("Advanced II (maj7 / min9 / modal)") },
+                onClick = { ear.chooseAdvancedCategory("advanced2"); open = false })
+            DropdownMenuItem(text = { Text("Sus chords") },
+                onClick = { ear.chooseAdvancedCategory("sus"); open = false })
             DropdownMenuItem(text = { Text("Circle of fifths — secondary dominants") },
                 onClick = { ear.chooseCircleMode(true); open = false })
         }

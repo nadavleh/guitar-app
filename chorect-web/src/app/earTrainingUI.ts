@@ -169,12 +169,15 @@ export class EarTrainingUI {
   /** Short label for the current progression generator. */
   private generatorLabel(): string {
     const ear = this.ear;
-    return ear.advancedMode ? "Advanced" : ear.circleMode ? "Circle of 5ths" : ear.iiiFocusMode ? "I → iii focus" : "Diatonic";
+    if (ear.advancedMode) return ear.advCategory === "sus" ? "Sus chords" : ear.advCategory === "advanced2" ? "Advanced II" : "Advanced";
+    return ear.circleMode ? "Circle of 5ths" : ear.iiiFocusMode ? "I → iii focus" : "Diatonic";
   }
 
   /** One-line teaching caption for the current progression generator. */
   private generatorCaption(): string {
     const ear = this.ear;
+    if (ear.advancedMode && ear.advCategory === "sus") return "Progressions built on suspended (sus2/sus4) chords.";
+    if (ear.advancedMode && ear.advCategory === "advanced2") return "Richer colours: major-7th, minor-9th and modal (Dorian/Mixolydian/Lydian/Phrygian).";
     return ear.advancedMode
       ? "Borrowed chords, secondary dominants & jazz turnarounds, each with a note."
       : ear.circleMode
@@ -186,17 +189,23 @@ export class EarTrainingUI {
 
   private generatorSelect(): HTMLSelectElement {
     const ear = this.ear;
-    const gen = ear.advancedMode ? "advanced" : ear.circleMode ? "circle" : ear.iiiFocusMode ? "iiifocus" : "diatonic";
+    const gen = ear.advancedMode
+      ? (ear.advCategory === "sus" ? "sus" : ear.advCategory === "advanced2" ? "advanced2" : "advanced")
+      : ear.circleMode ? "circle" : ear.iiiFocusMode ? "iiifocus" : "diatonic";
     return select(
       [
         { value: "diatonic", label: "Generator: Diatonic" },
         { value: "iiifocus", label: "Generator: I → iii focus" },
         { value: "advanced", label: "Generator: Advanced (non-diatonic)" },
+        { value: "advanced2", label: "Generator: Advanced II (maj7 / min9 / modal)" },
+        { value: "sus", label: "Generator: Sus chords" },
         { value: "circle", label: "Generator: Circle — secondary dominants" },
       ],
       gen,
       (v) => {
         if (v === "advanced") ear.setAdvancedMode(true);
+        else if (v === "advanced2") ear.setAdvancedCategory("advanced2");
+        else if (v === "sus") ear.setAdvancedCategory("sus");
         else if (v === "circle") ear.setCircleMode(true);
         else if (v === "iiifocus") ear.setIiiFocusMode(true);
         else { ear.setAdvancedMode(false); ear.setCircleMode(false); ear.setIiiFocusMode(false); }

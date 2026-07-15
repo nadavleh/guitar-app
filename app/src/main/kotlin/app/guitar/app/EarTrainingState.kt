@@ -1286,7 +1286,17 @@ class EarTrainingState(
      *  advanced-style self-marked views. The I→iii drill is NOT special (diatonic view). */
     val specialProgMode: Boolean get() = advancedMode || circleMode
 
-    fun chooseAdvancedMode(on: Boolean) { advancedMode = on; if (on) { circleMode = false; iiiFocusMode = false }; stopLoop() }
+    /** Which advanced pool [advancedMode] draws from: "advanced" (non-diatonic),
+     *  "sus" (suspended chords), or "advanced2" (maj7 / min9 / modal colours). */
+    var advCategory by mutableStateOf("advanced")
+        private set
+
+    /** Enter an advanced category (sets [advancedMode]); [cat] picks the draw pool. */
+    fun chooseAdvancedCategory(cat: String) {
+        advCategory = cat; advancedMode = true; circleMode = false; iiiFocusMode = false; stopLoop()
+    }
+
+    fun chooseAdvancedMode(on: Boolean) { advancedMode = on; if (on) { advCategory = "advanced"; circleMode = false; iiiFocusMode = false }; stopLoop() }
     fun chooseCircleMode(on: Boolean) { circleMode = on; if (on) { advancedMode = false; iiiFocusMode = false }; stopLoop() }
     /** Enter/leave the I→iii drill; clears the special generators and returns to the
      *  diatonic view. */
@@ -1339,7 +1349,12 @@ class EarTrainingState(
                 canGoPrevAdvanced = true
             }
         }
-        val np = if (circleMode) EarTraining.randomCircleOfFifths(rng) else EarTraining.randomAdvanced(rng)
+        val np = when {
+            circleMode -> EarTraining.randomCircleOfFifths(rng)
+            advCategory == "sus" -> EarTraining.randomSus(rng)
+            advCategory == "advanced2" -> EarTraining.randomAdvanced2(rng)
+            else -> EarTraining.randomAdvanced(rng)
+        }
         val key = fixedKey ?: PitchClass(rng.nextInt(12))
         advProg = np
         progKey = key

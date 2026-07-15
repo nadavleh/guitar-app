@@ -304,6 +304,49 @@ export function randomAdvanced(rng: Rng = defaultRng): NamedProgression {
   return ADVANCED_PROGRESSIONS[rng.int(ADVANCED_PROGRESSIONS.length)];
 }
 
+/** SUS category — progressions built on suspended (sus2/sus4) chords. */
+export const SUS_PROGRESSIONS: NamedProgression[] = [
+  adv("Sus Resolution", "A suspended I that relaxes back to the plain I — the 4th falls to the 3rd.",
+    TrainingMode.Major, [c(0, "", "I"), c(0, "sus4", "Isus4"), c(0, "", "I")]),
+  adv("Suspended Lift", "A sus4 on the V adds tension before landing on vi.",
+    TrainingMode.Major, [c(0, "", "I"), c(7, "sus4", "Vsus4"), c(9, "m", "vi")]),
+  adv("Sus Bookends", "Sus2 colour on the tonic and a sus4 subdominant, framed by the plain I.",
+    TrainingMode.Major, [c(0, "", "I"), c(0, "sus2", "Isus2"), c(5, "sus4", "IVsus4"), c(0, "", "I")]),
+  adv("Dorian Sus Vamp", "A minor-key sus vamp with Dorian's bright major IV.",
+    TrainingMode.Minor, [c(0, "m", "i"), c(0, "sus4", "isus4"), c(7, "m", "v"), c(5, "", "IV")]),
+  adv("Mixolydian Sus", "A sus4 subdominant over a Mixolydian I–V feel.",
+    TrainingMode.Major, [c(5, "sus4", "IVsus4"), c(5, "", "IV"), c(0, "", "I"), c(7, "", "V")]),
+];
+
+/** ADVANCED II category — maj7 / min9 / modal (Dorian, Mixolydian, Lydian, Phrygian) colours. */
+export const ADVANCED2_PROGRESSIONS: NamedProgression[] = [
+  adv("Maj7 Pop", "A dreamy maj7 on the tonic softens a I–IV–V.",
+    TrainingMode.Major, [c(0, "", "I"), c(0, "maj7", "Imaj7"), c(5, "", "IV"), c(7, "", "V")]),
+  adv("Maj7 Climb", "A lush IVmaj7 rising through V to vi.",
+    TrainingMode.Major, [c(0, "", "I"), c(5, "maj7", "IVmaj7"), c(7, "", "V"), c(9, "m", "vi")]),
+  adv("Backdoor Maj7", "IVmaj7 and a borrowed bVIImaj7 resolve to Imaj7 — the soul/backdoor sound.",
+    TrainingMode.Major, [c(5, "maj7", "IVmaj7"), c(10, "maj7", "bVIImaj7"), c(0, "maj7", "Imaj7")]),
+  adv("Minor-9 Vamp", "A wistful iim9 rocking against the tonic.",
+    TrainingMode.Major, [c(2, "m9", "iim9"), c(0, "", "I"), c(2, "m9", "iim9"), c(0, "", "I")]),
+  adv("Add9 Roots", "Open add9 shapes with a borrowed bVIImaj7 — the Bruce-Hornsby colour.",
+    TrainingMode.Major, [c(0, "add9", "Iadd9"), c(10, "maj7", "bVIImaj7"), c(5, "add9", "IVadd9")]),
+  adv("Dorian Vamp", "Minor tonic with Dorian's bright major IV (and bVII, bIII).",
+    TrainingMode.Minor, [c(0, "m", "i"), c(10, "", "bVII"), c(3, "", "bIII"), c(5, "", "IV")]),
+  adv("Mixolydian Two", "Major with a bVII and a Mixolydian II — bright and modal.",
+    TrainingMode.Major, [c(0, "", "I"), c(10, "", "bVII"), c(2, "", "II"), c(0, "", "I")]),
+  adv("Lydian Bright", "The floating Lydian sound: I rocking to a major II (from the raised 4th).",
+    TrainingMode.Major, [c(0, "", "I"), c(2, "", "II"), c(0, "", "I"), c(2, "", "II")]),
+  adv("Phrygian Dark", "Minor tonic sliding to a bII — the Spanish/metal Phrygian colour.",
+    TrainingMode.Minor, [c(0, "m", "i"), c(1, "", "bII")]),
+];
+
+export function randomSus(rng: Rng = defaultRng): NamedProgression {
+  return SUS_PROGRESSIONS[rng.int(SUS_PROGRESSIONS.length)];
+}
+export function randomAdvanced2(rng: Rng = defaultRng): NamedProgression {
+  return ADVANCED2_PROGRESSIONS[rng.int(ADVANCED2_PROGRESSIONS.length)];
+}
+
 /** Diatonic chords of a major key by DESCENDING fifths: I–IV–vii°–iii–vi–ii–V, then
  *  back to I (the "circle of fifths"). */
 export const CIRCLE_OF_FIFTHS: AdvChord[] = [

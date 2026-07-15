@@ -9,7 +9,7 @@ import {
   parseChord, QUALITIES, spellPc,
   TrainingMode, ChordTypeLevel, Progression, ResolvedChord, NamedProgression,
   EarTrainingDegrees, degreeRoot, resolve as resolveDegree, resolveProgression,
-  randomProgression, romanLabel, randomAdvanced, randomCircleOfFifths, resolveNamed,
+  randomProgression, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
   majorRelativeDegree, degreeFromMajorRelative,
   SongExample, songsForDiatonic, songsForAdvanced, songsForCircleWindow, importedSongsForDiatonic, CIRCLE_WINDOWS, namedRomanLine,
   N2cChallenge, randomN2c, n2cAnswerLabel, n2cChordSymbol, n2cTestNote, n2cLabel,
@@ -1053,7 +1053,11 @@ export class EarTrainingState {
     if (this.advancedMode || this.circleMode) return [];
     return this.progProgression ? importedSongsForDiatonic(this.progProgression) : [];
   }
-  setAdvancedMode(v: boolean) { this.advancedMode = v; if (v) { this.circleMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
+  /** Which advanced pool advancedMode draws from: "advanced" | "sus" | "advanced2". */
+  advCategory: "advanced" | "sus" | "advanced2" = "advanced";
+  setAdvancedMode(v: boolean) { this.advancedMode = v; if (v) { this.advCategory = "advanced"; this.circleMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
+  /** Enter an advanced category (sets advancedMode); cat picks the draw pool. */
+  setAdvancedCategory(cat: "advanced" | "sus" | "advanced2") { this.advCategory = cat; this.advancedMode = true; this.circleMode = false; this.iiiFocusMode = false; this.stopLoop(); this.notify(); }
   setCircleMode(v: boolean) { this.circleMode = v; if (v) { this.advancedMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
   setIiiFocusMode(v: boolean) { this.iiiFocusMode = v; if (v) { this.advancedMode = false; this.circleMode = false; } this.stopLoop(); this.notify(); }
 
@@ -1083,7 +1087,10 @@ export class EarTrainingState {
       this.advHistory.push({ np: this.advProg, key: this.progKey, resolved: this.progResolved });
       while (this.advHistory.length > 20) this.advHistory.shift();
     }
-    const np = this.circleMode ? randomCircleOfFifths(this.rng) : randomAdvanced(this.rng);
+    const np = this.circleMode ? randomCircleOfFifths(this.rng)
+      : this.advCategory === "sus" ? randomSus(this.rng)
+      : this.advCategory === "advanced2" ? randomAdvanced2(this.rng)
+      : randomAdvanced(this.rng);
     const key = this.fixedKey ?? this.rng.int(12);
     this.advProg = np;
     this.progKey = key;

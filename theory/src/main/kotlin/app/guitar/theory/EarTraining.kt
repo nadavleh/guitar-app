@@ -418,6 +418,50 @@ object EarTraining {
     fun randomAdvanced(rng: kotlin.random.Random): NamedProgression =
         ADVANCED_PROGRESSIONS[rng.nextInt(ADVANCED_PROGRESSIONS.size)]
 
+    /** SUS category — progressions built on suspended (sus2/sus4) chords. Curated from
+     *  Nadav's "Top 96" list; inversions are treated as the base chord. */
+    val SUS_PROGRESSIONS: List<NamedProgression> = listOf(
+        adv("Sus Resolution", "A suspended I that relaxes back to the plain I — the 4th falls to the 3rd.",
+            TrainingMode.Major, AdvChord(0, "", "I"), AdvChord(0, "sus4", "Isus4"), AdvChord(0, "", "I")),
+        adv("Suspended Lift", "A sus4 on the V adds tension before landing on vi.",
+            TrainingMode.Major, AdvChord(0, "", "I"), AdvChord(7, "sus4", "Vsus4"), AdvChord(9, "m", "vi")),
+        adv("Sus Bookends", "Sus2 colour on the tonic and a sus4 subdominant, framed by the plain I.",
+            TrainingMode.Major, AdvChord(0, "", "I"), AdvChord(0, "sus2", "Isus2"), AdvChord(5, "sus4", "IVsus4"), AdvChord(0, "", "I")),
+        adv("Dorian Sus Vamp", "A minor-key sus vamp with Dorian's bright major IV.",
+            TrainingMode.Minor, AdvChord(0, "m", "i"), AdvChord(0, "sus4", "isus4"), AdvChord(7, "m", "v"), AdvChord(5, "", "IV")),
+        adv("Mixolydian Sus", "A sus4 subdominant over a Mixolydian I–V feel.",
+            TrainingMode.Major, AdvChord(5, "sus4", "IVsus4"), AdvChord(5, "", "IV"), AdvChord(0, "", "I"), AdvChord(7, "", "V")),
+    )
+
+    /** ADVANCED II category — richer colours: major-7th, minor-9th and MODAL progressions
+     *  (Dorian / Mixolydian / Lydian / Phrygian). Curated from Nadav's "Top 96" list. */
+    val ADVANCED2_PROGRESSIONS: List<NamedProgression> = listOf(
+        adv("Maj7 Pop", "A dreamy maj7 on the tonic softens a I–IV–V.",
+            TrainingMode.Major, AdvChord(0, "", "I"), AdvChord(0, "maj7", "Imaj7"), AdvChord(5, "", "IV"), AdvChord(7, "", "V")),
+        adv("Maj7 Climb", "A lush IVmaj7 rising through V to vi.",
+            TrainingMode.Major, AdvChord(0, "", "I"), AdvChord(5, "maj7", "IVmaj7"), AdvChord(7, "", "V"), AdvChord(9, "m", "vi")),
+        adv("Backdoor Maj7", "IVmaj7 and a borrowed bVIImaj7 resolve to Imaj7 — the soul/backdoor sound.",
+            TrainingMode.Major, AdvChord(5, "maj7", "IVmaj7"), AdvChord(10, "maj7", "bVIImaj7"), AdvChord(0, "maj7", "Imaj7")),
+        adv("Minor-9 Vamp", "A wistful iim9 rocking against the tonic.",
+            TrainingMode.Major, AdvChord(2, "m9", "iim9"), AdvChord(0, "", "I"), AdvChord(2, "m9", "iim9"), AdvChord(0, "", "I")),
+        adv("Add9 Roots", "Open add9 shapes with a borrowed bVIImaj7 — the Bruce-Hornsby colour.",
+            TrainingMode.Major, AdvChord(0, "add9", "Iadd9"), AdvChord(10, "maj7", "bVIImaj7"), AdvChord(5, "add9", "IVadd9")),
+        adv("Dorian Vamp", "Minor tonic with Dorian's bright major IV (and bVII, bIII).",
+            TrainingMode.Minor, AdvChord(0, "m", "i"), AdvChord(10, "", "bVII"), AdvChord(3, "", "bIII"), AdvChord(5, "", "IV")),
+        adv("Mixolydian Two", "Major with a bVII and a Mixolydian II — bright and modal.",
+            TrainingMode.Major, AdvChord(0, "", "I"), AdvChord(10, "", "bVII"), AdvChord(2, "", "II"), AdvChord(0, "", "I")),
+        adv("Lydian Bright", "The floating Lydian sound: I rocking to a major II (from the raised 4th).",
+            TrainingMode.Major, AdvChord(0, "", "I"), AdvChord(2, "", "II"), AdvChord(0, "", "I"), AdvChord(2, "", "II")),
+        adv("Phrygian Dark", "Minor tonic sliding to a bII — the Spanish/metal Phrygian colour.",
+            TrainingMode.Minor, AdvChord(0, "m", "i"), AdvChord(1, "", "bII")),
+    )
+
+    fun randomSus(rng: kotlin.random.Random): NamedProgression =
+        SUS_PROGRESSIONS[rng.nextInt(SUS_PROGRESSIONS.size)]
+
+    fun randomAdvanced2(rng: kotlin.random.Random): NamedProgression =
+        ADVANCED2_PROGRESSIONS[rng.nextInt(ADVANCED2_PROGRESSIONS.size)]
+
     /** The seven diatonic chords of a major key arranged by DESCENDING fifths
      *  (each root a fifth below the previous / a fourth above): I–IV–vii°–iii–vi–ii–V,
      *  then back to I. This is the "circle of fifths" cycle. */

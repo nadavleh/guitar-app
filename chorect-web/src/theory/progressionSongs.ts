@@ -464,6 +464,22 @@ const ADVANCED: Record<string, SongExample[]> = {
     s("Blue Moon", "Rodgers & Hart"),
     s("Heart and Soul", "Hoagy Carmichael & Frank Loesser"),
   ],
+  // ---- SUS category ----
+  "Sus Resolution": [s("We Can Work It Out", "The Beatles")],
+  "Suspended Lift": [s("We Are Never Ever Getting Back Together", "Taylor Swift")],
+  "Sus Bookends": [s("House of Cards", "Radiohead")],
+  "Dorian Sus Vamp": [s("Sun", "Caribou")],
+  "Mixolydian Sus": [s("Lightning Bolt", "Jake Bugg")],
+  // ---- ADVANCED II category (maj7 / min9 / modal) ----
+  "Maj7 Pop": [s("Believe", "Cher")],
+  "Maj7 Climb": [s("Haven't Met You Yet", "Michael Bublé")],
+  "Backdoor Maj7": [s("My Cherie Amour", "Stevie Wonder")],
+  "Minor-9 Vamp": [s("Fake Plastic Trees", "Radiohead")],
+  "Add9 Roots": [s("The Way It Is", "Bruce Hornsby")],
+  "Dorian Vamp": [s("Song 2", "Blur")],
+  "Mixolydian Two": [s("Take It or Leave It", "The Strokes")],
+  "Lydian Bright": [s("Man on the Moon", "R.E.M.")],
+  "Phrygian Dark": [s("London Calling", "The Clash")],
 };
 
 /** Circle-of-fifths windows, keyed by CircleWindow.id ("W1".."W7"). */
