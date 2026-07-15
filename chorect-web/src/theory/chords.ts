@@ -401,81 +401,35 @@ export function cavaquinhoShapesFor(root: PitchClass, quality: ChordQuality, tun
   return sortByPosition(out);
 }
 
-// ---------- Jazz drop-2 shell voicings ----------
+// ---------- Jazz shell voicings (root + 3rd + 7th, no 5th) ----------
 
-const JAZZ_TABLE: Record<string, OffsetVoicing[]> = {
-  maj7: [
-    { name: "maj7 drop-2 root-pos (5-R-3-7)", rootString: 3, offsets: [null, null, 0, 0, 0, 2] },
-    { name: "maj7 drop-2 1st-inv (7-3-5-R)", rootString: 5, offsets: [null, null, 1, 1, 0, 0] },
-    { name: "maj7 drop-2 2nd-inv (R-5-7-3)", rootString: 2, offsets: [null, null, 0, 2, 2, 2] },
-    { name: "maj7 drop-2 3rd-inv (3-7-R-5)", rootString: 4, offsets: [null, null, 1, 3, 0, 2] },
-    { name: "maj7 drop-2 middle-4 (R-5-7-3)", rootString: 1, offsets: [null, 0, 2, 1, 2, null] },
-  ],
-  m7: [
-    { name: "m7 drop-2 root-pos (5-R-b3-b7)", rootString: 3, offsets: [null, null, 0, 0, -1, 1] },
-    { name: "m7 drop-2 1st-inv (b7-b3-5-R)", rootString: 5, offsets: [null, null, 0, 0, 0, 0] },
-    { name: "m7 drop-2 2nd-inv (R-5-b7-b3)", rootString: 2, offsets: [null, null, 0, 2, 1, 1] },
-    { name: "m7 drop-2 3rd-inv (b3-b7-R-5)", rootString: 4, offsets: [null, null, 0, 2, 0, 2] },
-    { name: "m7 drop-2 middle-4 (R-5-b7-b3)", rootString: 1, offsets: [null, 0, 2, 0, 1, null] },
-  ],
-  dom7: [
-    { name: "7 drop-2 root-pos (5-R-3-b7)", rootString: 3, offsets: [null, null, 0, 0, 0, 1] },
-    { name: "7 drop-2 1st-inv (b7-3-5-R)", rootString: 5, offsets: [null, null, 0, 1, 0, 0] },
-    { name: "7 drop-2 2nd-inv (R-5-b7-3)", rootString: 2, offsets: [null, null, 0, 2, 1, 2] },
-    { name: "7 drop-2 3rd-inv (3-b7-R-5)", rootString: 4, offsets: [null, null, 1, 2, 0, 2] },
-    { name: "7 drop-2 middle-4 (R-5-b7-3)", rootString: 1, offsets: [null, 0, 2, 0, 2, null] },
-  ],
-  m7b5: [
-    { name: "m7b5 drop-2 root-pos (b5-R-b3-b7)", rootString: 3, offsets: [null, null, -1, 0, -1, 1] },
-    { name: "m7b5 drop-2 1st-inv (b7-b3-b5-R)", rootString: 5, offsets: [null, null, 0, 0, -1, 0] },
-    { name: "m7b5 drop-2 2nd-inv (R-b5-b7-b3)", rootString: 2, offsets: [null, null, 0, 1, 1, 1] },
-    { name: "m7b5 drop-2 3rd-inv (b3-b7-R-b5)", rootString: 4, offsets: [null, null, 0, 2, 0, 1] },
-  ],
-  dim7: [
-    { name: "dim7 drop-2 (b3-bb7-R-b5)", rootString: 4, offsets: [null, null, 0, 1, 0, 1] },
-    { name: "dim7 A-shape (R-b5-bb7-b3)", rootString: 1, offsets: [null, 0, 1, 2, 1, null] },
-  ],
-  sixth: [
-    { name: "6 drop-2 root-pos (5-R-3-6)", rootString: 3, offsets: [null, null, 0, 0, 0, 0] },
-    { name: "6 drop-2 1st-inv (6-3-5-R)", rootString: 5, offsets: [null, null, -1, 1, 0, 0] },
-    { name: "6 drop-2 2nd-inv (R-5-6-3)", rootString: 2, offsets: [null, null, 0, 2, 0, 2] },
-    { name: "6 drop-2 3rd-inv (3-6-R-5)", rootString: 4, offsets: [null, null, 1, 1, 0, 2] },
-  ],
-  minor6: [
-    { name: "m6 drop-2 root-pos (5-R-b3-6)", rootString: 3, offsets: [null, null, 0, 0, -1, 0] },
-    { name: "m6 drop-2 1st-inv (6-b3-5-R)", rootString: 5, offsets: [null, null, -1, 0, 0, 0] },
-    { name: "m6 drop-2 2nd-inv (R-5-6-b3)", rootString: 2, offsets: [null, null, 0, 2, 0, 1] },
-    { name: "m6 drop-2 3rd-inv (b3-6-R-5)", rootString: 4, offsets: [null, null, 0, 1, 0, 2] },
-  ],
-  ninth: [
-    { name: "9 standard (R-3-b7-9-5)", rootString: 1, offsets: [null, 0, -1, 0, 0, 0] },
-  ],
-};
-
-function jazzTableFor(symbol: string): OffsetVoicing[] | null {
-  switch (symbol) {
-    case "maj7": return JAZZ_TABLE.maj7;
-    case "m7": case "min7": return JAZZ_TABLE.m7;
-    case "7": return JAZZ_TABLE.dom7;
-    case "m7b5": return JAZZ_TABLE.m7b5;
-    case "dim7": return JAZZ_TABLE.dim7;
-    case "6": return JAZZ_TABLE.sixth;
-    case "m6": return JAZZ_TABLE.minor6;
-    case "9": return JAZZ_TABLE.ninth;
-    default: return null;
-  }
-}
-
+/** True shell voicings on standard guitar (EADGBE): the root on a bass string plus the
+ *  3rd and 7th (guide tones) above it, with the 5th OMITTED. Two shapes — root on the 6th
+ *  string, root on the 5th string. Derived from the chord's 3rd and 7th (or 6th for 6/dim7),
+ *  so it covers maj7/7/m7/mMaj7/m7b5/dim7/6/m6. Triads (no 7th/6th) have no shell and fall
+ *  through to CAGED. Standard tuning only. (jazzguitar.be shell-chords lesson.) */
 export function jazzShellVoicingsFor(root: PitchClass, quality: ChordQuality, tuning: Tuning, maxFrets: number): ChordShape[] {
   if (!tuningsEqual(tuning, standard)) return [];
-  const table = jazzTableFor(quality.symbol);
-  if (!table) return [];
+  const ints = new Set(quality.intervals);
+  const third = ints.has(IV.maj3) ? 4 : ints.has(IV.min3) ? 3 : null;
+  if (third === null) return [];
+  const seventh = ints.has(IV.maj7) ? 11 : ints.has(IV.min7) ? 10 : ints.has(IV.maj6) ? 9 : null;
+  if (seventh === null) return [];
+  // Fret offset (relative to the root fret) of a note `iv` semitones above the root, on a
+  // string tuned `openGap` semitones above the root string, kept small (-5..+6).
+  const off = (openGap: number, iv: number): number => {
+    let o = ((iv - openGap) % 12 + 12) % 12;
+    if (o > 6) o -= 12;
+    return o;
+  };
+  // EADGBE gaps: 6th-root uses E(root)/D(7th,+10)/G(3rd,+15); 5th-root uses A/G(7th,+10)/B(3rd,+14).
+  const shapes: OffsetVoicing[] = [
+    { name: "shell 6th-string root (R-7-3)", rootString: 0, offsets: [0, null, off(10, seventh), off(15, third), null, null] },
+    { name: "shell 5th-string root (R-7-3)", rootString: 1, offsets: [null, 0, null, off(10, seventh), off(14, third), null] },
+  ];
   const out: ChordShape[] = [];
-  for (const v of table) {
-    const s = buildOffsetShape({
-      offsets: v.offsets, rootString: v.rootString,
-      root, quality, tuning, maxFrets, templateName: v.name,
-    });
+  for (const v of shapes) {
+    const s = buildOffsetShape({ offsets: v.offsets, rootString: v.rootString, root, quality, tuning, maxFrets, templateName: v.name });
     if (s) out.push(s);
   }
   return sortByPosition(out);
@@ -485,25 +439,24 @@ export function jazzShellVoicingsFor(root: PitchClass, quality: ChordQuality, tu
 
 export enum VoicingStyle { Standard = "Standard", Shell = "Shell" }
 
+/** Shell essentials = ROOT + 3rd + 7th (or 6th), with the (perfect or altered) 5th dropped. */
 export function essentialShellIntervals(quality: ChordQuality): Set<Interval> {
   const ints = new Set(quality.intervals);
   const essential = new Set<Interval>();
+  essential.add(IV.P1);                                   // root (in the bass)
   if (ints.has(IV.maj3)) essential.add(IV.maj3);
   if (ints.has(IV.min3)) essential.add(IV.min3);
-  if (ints.has(IV.maj2)) essential.add(IV.maj2);
-  if (ints.has(IV.P4)) essential.add(IV.P4);
+  if (ints.has(IV.maj2)) essential.add(IV.maj2);          // sus2
+  if (ints.has(IV.P4)) essential.add(IV.P4);              // sus4
   if (ints.has(IV.maj7)) essential.add(IV.maj7);
   if (ints.has(IV.min7)) essential.add(IV.min7);
-  const sym = quality.symbol;
-  if ((sym === "dim" || sym === "dim7" || sym === "m7b5") && ints.has(IV.TT)) essential.add(IV.TT);
-  if (sym === "dim7" && ints.has(IV.maj6)) essential.add(IV.maj6);
-  if (sym === "aug" && ints.has(IV.min6)) essential.add(IV.min6);
+  if (!ints.has(IV.maj7) && !ints.has(IV.min7) && ints.has(IV.maj6)) essential.add(IV.maj6);
+  if (quality.symbol === "aug" && ints.has(IV.min6)) essential.add(IV.min6);
   if (ints.has(IV.b9)) essential.add(IV.b9);
   if (ints.has(IV.maj9)) essential.add(IV.maj9);
   if (ints.has(IV.P11)) essential.add(IV.P11);
   if (ints.has(IV.s11)) essential.add(IV.s11);
   if (ints.has(IV.maj13)) essential.add(IV.maj13);
-  if (quality.intervals.length <= 3 && ints.has(IV.P1)) essential.add(IV.P1);
   return essential;
 }
 

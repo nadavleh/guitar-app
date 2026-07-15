@@ -22,36 +22,30 @@ fun essentialShellIntervals(quality: ChordQuality): Set<Interval> {
     val ints = quality.intervals.toSet()
     val essential = LinkedHashSet<Interval>()
 
+    // A shell voicing is ROOT + 3rd + 7th, with the (perfect or altered) 5th OMITTED —
+    // the root sits in the bass, the 3rd and 7th are the guide tones above it.
+    essential += Interval.P1                                   // root (in the bass)
+
     // Chord-defining third (or sus substitute)
     if (Interval.maj3 in ints) essential += Interval.maj3
     if (Interval.min3 in ints) essential += Interval.min3
     if (Interval.maj2 in ints) essential += Interval.maj2     // sus2
     if (Interval.P4   in ints) essential += Interval.P4       // sus4
 
-    // Seventh
+    // Seventh — or the 6th (for 6 / m6 chords, and dim7's bb7 = major 6th)
     if (Interval.maj7 in ints) essential += Interval.maj7
     if (Interval.min7 in ints) essential += Interval.min7
+    if (Interval.maj7 !in ints && Interval.min7 !in ints && Interval.maj6 in ints) essential += Interval.maj6
 
-    // Diminished-family essentials: the b5 (TT) defines them; dim7's bb7 (= maj6) is essential
-    val sym = quality.symbol
-    if (sym == "dim" || sym == "dim7" || sym == "m7b5") {
-        if (Interval.TT in ints) essential += Interval.TT
-    }
-    if (sym == "dim7" && Interval.maj6 in ints) essential += Interval.maj6
+    // Augmented triad: the #5 (min6 in our encoding) is the defining tone (no plain 5th to drop)
+    if (quality.symbol == "aug" && Interval.min6 in ints) essential += Interval.min6
 
-    // Augmented chord: the #5 (min6 in our encoding) is essential
-    if (sym == "aug" && Interval.min6 in ints) essential += Interval.min6
-
-    // Color / extension tones — always essential when present
+    // Color / extension tones sit on top of the shell — keep them when present
     if (Interval.b9    in ints) essential += Interval.b9
     if (Interval.maj9  in ints) essential += Interval.maj9
     if (Interval.P11   in ints) essential += Interval.P11
     if (Interval.s11   in ints) essential += Interval.s11
     if (Interval.maj13 in ints) essential += Interval.maj13
 
-    // For triads (3-interval chords), keep the root so we still have a recognizable chord
-    if (ints.size <= 3 && Interval.P1 in ints) {
-        essential += Interval.P1
-    }
     return essential
 }

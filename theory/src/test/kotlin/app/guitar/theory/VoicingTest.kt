@@ -6,25 +6,27 @@ import kotlin.test.assertTrue
 
 class VoicingTest {
 
+    // A shell voicing is ROOT + 3rd + 7th, with the 5th (perfect OR altered) omitted.
+
     @Test
-    fun `shell essentials of Cmaj7 are the 3rd and 7th`() {
+    fun `shell essentials of Cmaj7 are root, 3rd and 7th`() {
         val (_, q) = ChordLibrary.parse("Cmaj7")!!
         val essential = essentialShellIntervals(q)
-        assertEquals(setOf(Interval.maj3, Interval.maj7), essential)
+        assertEquals(setOf(Interval.P1, Interval.maj3, Interval.maj7), essential)
     }
 
     @Test
-    fun `shell essentials of C7 are the 3rd and b7`() {
+    fun `shell essentials of C7 are root, 3rd and b7`() {
         val (_, q) = ChordLibrary.parse("C7")!!
         val essential = essentialShellIntervals(q)
-        assertEquals(setOf(Interval.maj3, Interval.min7), essential)
+        assertEquals(setOf(Interval.P1, Interval.maj3, Interval.min7), essential)
     }
 
     @Test
-    fun `shell essentials of Cm7b5 are the b3, b5, and b7`() {
+    fun `shell essentials of Cm7b5 drop the b5 - just root, b3, b7`() {
         val (_, q) = ChordLibrary.parse("Cm7b5")!!
         val essential = essentialShellIntervals(q)
-        assertEquals(setOf(Interval.min3, Interval.TT, Interval.min7), essential)
+        assertEquals(setOf(Interval.P1, Interval.min3, Interval.min7), essential)
     }
 
     @Test
@@ -35,19 +37,19 @@ class VoicingTest {
     }
 
     @Test
-    fun `shell essentials of dim7 keep b3 TT bb7`() {
+    fun `shell essentials of dim7 are root, b3, bb7 (no b5)`() {
         val (_, q) = ChordLibrary.parse("Cdim7")!!
         val essential = essentialShellIntervals(q)
-        // Cdim7 = C Eb Gb Bbb (= A). bb7 is maj6 (semitones 9) in our encoding.
-        assertEquals(setOf(Interval.min3, Interval.TT, Interval.maj6), essential)
+        // Cdim7 = C Eb Gb Bbb (= A). bb7 is maj6 (semitones 9) in our encoding; b5 dropped.
+        assertEquals(setOf(Interval.P1, Interval.min3, Interval.maj6), essential)
     }
 
     @Test
     fun `shell essentials of Cmaj9 include extension`() {
         val (_, q) = ChordLibrary.parse("Cmaj9".replace("maj9", "9"))!!  // C9 = dominant 9
         val essential = essentialShellIntervals(q)
-        // C9 = C E G Bb D. Shell drops C, G. Keeps E (maj3), Bb (min7), D (maj9).
-        assertEquals(setOf(Interval.maj3, Interval.min7, Interval.maj9), essential)
+        // C9 = C E G Bb D. Shell drops the 5th (G). Keeps root, E (maj3), Bb (min7), D (maj9).
+        assertEquals(setOf(Interval.P1, Interval.maj3, Interval.min7, Interval.maj9), essential)
     }
 
     @Test
@@ -80,25 +82,23 @@ class VoicingTest {
     }
 
     @Test
-    fun `Shell mode for C7 includes the canonical drop-2 root-pos x x 5 5 5 6`() {
-        // Shell mode now serves the jazzguitar.be drop-2 dictionary. This is the
-        // root-position drop-2 voicing of C7 (5-R-3-b7 on D-G-B-e).
+    fun `Shell mode for C7 includes the true 5th-string-root shell x 3 x 3 5 x`() {
+        // Shell mode serves TRUE shell voicings (root + 3rd + b7, no 5th). This is the
+        // 5th-string-root C7 shell: A-3=C(R), G-3=Bb(b7), B-5=E(3).
         val gen = ChordShapeGenerator(style = VoicingStyle.Shell)
         val (root, q) = ChordLibrary.parse("C7")!!
         val shapes = gen.shapesFor(root, q, Tunings.standard, frets = 14)
-        val expected = listOf(null, null, 5, 5, 5, 6)
+        val expected = listOf(null, 3, null, 3, 5, null)
         assertTrue(shapes.any { it.frets == expected },
-            "expected canonical C7 drop-2 voicing $expected, got ${shapes.map { it.frets }}")
+            "expected C7 shell $expected, got ${shapes.map { it.frets }}")
     }
 
     @Test
-    fun `Shell mode for Cmaj7 spans multiple positions along the neck`() {
+    fun `Shell mode for Cmaj7 gives the two shell shapes (6th- and 5th-string root)`() {
         val gen = ChordShapeGenerator(style = VoicingStyle.Shell)
         val (root, q) = ChordLibrary.parse("Cmaj7")!!
         val shapes = gen.shapesFor(root, q, Tunings.standard, frets = 14)
-        // Each inversion sits in a different neck zone; expect distinct positions.
-        val positions = shapes.map { it.position }.toSet()
-        assertTrue(positions.size >= 4,
-            "expected Shell-mode Cmaj7 to span 4+ distinct positions, got $positions")
+        assertEquals(2, shapes.size, "expected exactly the two shell shapes, got ${shapes.map { it.frets }}")
+        assertTrue(shapes.all { it.frets.count { f -> f != null } == 3 }, "shells are 3-note voicings")
     }
 }
