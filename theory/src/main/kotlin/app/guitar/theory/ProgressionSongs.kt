@@ -253,6 +253,8 @@ object ProgressionSongs {
             s("Stray Cat Strut", "Stray Cats"),
             s("California Dreamin'", "The Mamas & the Papas"),
             s("Happy Together", "The Turtles"),
+            s("Smooth Criminal", "Michael Jackson"),
+            s("Good Vibrations", "The Beach Boys"),
         ),
         "Dark Roots" to listOf(          // i–iv–v (natural-minor v)
             s("Back to Black", "Amy Winehouse"),
@@ -402,6 +404,8 @@ object ProgressionSongs {
         "Borrowed iv" to listOf(   // I–IV–iv–I
             s("Creep", "Radiohead"),
             s("If I Fell", "The Beatles"),
+            s("Breathe Again", "Toni Braxton"),
+            s("Space Oddity", "David Bowie"),
         ),
         "Mixolydian Vamp" to listOf(   // I–V–bVII–IV
             s("Sweet Home Alabama", "Lynyrd Skynyrd"),
@@ -479,6 +483,10 @@ object ProgressionSongs {
             s("Blue Moon", "Rodgers & Hart"),
             s("Heart and Soul", "Hoagy Carmichael & Frank Loesser"),
         ),
+        // ---- folded in from the Top-96 list ----
+        "Pachelbel's Canon" to listOf(s("Canon in D", "Johann Pachelbel"), s("Basket Case", "Green Day"), s("Don't Look Back in Anger", "Oasis")),
+        "Minor ii–V–i" to listOf(s("You Never Give Me Your Money", "The Beatles"), s("Love You Like a Love Song", "Selena Gomez")),
+        "Neapolitan Cadence" to listOf(s("Frozen", "Madonna")),
         // ---- SUS category ----
         "Sus Resolution" to listOf(s("We Can Work It Out", "The Beatles")),
         "Suspended Lift" to listOf(s("We Are Never Ever Getting Back Together", "Taylor Swift")),

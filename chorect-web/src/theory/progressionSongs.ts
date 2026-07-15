@@ -239,6 +239,8 @@ const ADVANCED: Record<string, SongExample[]> = {
     s("Stray Cat Strut", "Stray Cats"),
     s("California Dreamin'", "The Mamas & the Papas"),
     s("Happy Together", "The Turtles"),
+    s("Smooth Criminal", "Michael Jackson"),
+    s("Good Vibrations", "The Beach Boys"),
   ],
   "Dark Roots": [
     s("Back to Black", "Amy Winehouse"),
@@ -387,6 +389,8 @@ const ADVANCED: Record<string, SongExample[]> = {
   "Borrowed iv": [
     s("Creep", "Radiohead"),
     s("If I Fell", "The Beatles"),
+    s("Breathe Again", "Toni Braxton"),
+    s("Space Oddity", "David Bowie"),
   ],
   "Mixolydian Vamp": [
     s("Sweet Home Alabama", "Lynyrd Skynyrd"),
@@ -464,6 +468,10 @@ const ADVANCED: Record<string, SongExample[]> = {
     s("Blue Moon", "Rodgers & Hart"),
     s("Heart and Soul", "Hoagy Carmichael & Frank Loesser"),
   ],
+  // ---- folded in from the Top-96 list ----
+  "Pachelbel's Canon": [s("Canon in D", "Johann Pachelbel"), s("Basket Case", "Green Day"), s("Don't Look Back in Anger", "Oasis")],
+  "Minor ii–V–i": [s("You Never Give Me Your Money", "The Beatles"), s("Love You Like a Love Song", "Selena Gomez")],
+  "Neapolitan Cadence": [s("Frozen", "Madonna")],
   // ---- SUS category ----
   "Sus Resolution": [s("We Can Work It Out", "The Beatles")],
   "Suspended Lift": [s("We Are Never Ever Getting Back Together", "Taylor Swift")],

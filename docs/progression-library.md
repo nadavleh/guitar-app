@@ -47,7 +47,7 @@ named against the major scale (bIII/bVI/bVII). Auto-generated from the theory en
 - I – iii – vi – V
 - I – iii – I – IV
 
-## Advanced (non-diatonic) (46)
+## Advanced (non-diatonic) (49)
 
 | Name | Progression | Example songs |
 |---|---|---|
@@ -55,7 +55,7 @@ named against the major scale (bIII/bVI/bVII). Auto-generated from the theory en
 | Bright Lift | I  –  II  –  IV  –  I | Eight Days a Week (The Beatles); Don't Think Twice, It's All Right (Bob Dylan); 9 to 5 (Dolly Parton); Tequila (The Champs) |
 | Romantic Climax | I  –  III  –  IV  –  iv | Creep (Radiohead); Get Free (Lana Del Rey); In My Life (The Beatles); No Surprises (Radiohead) |
 | Epic Backstep | I  –  bVII  –  bVI  –  bVII | Rolling in the Deep (Adele); Stairway to Heaven (Led Zeppelin); China Girl (David Bowie); All Along the Watchtower (Jimi Hendrix); Citizen Erased (Muse) |
-| Andalusian Cadence | i  –  bVII  –  bVI  –  V | Hit the Road Jack (Ray Charles); Sultans of Swing (Dire Straits); Runaway (Del Shannon); Stray Cat Strut (Stray Cats); California Dreamin' (The Mamas & the Papas); Happy Together (The Turtles) |
+| Andalusian Cadence | i  –  bVII  –  bVI  –  V | Hit the Road Jack (Ray Charles); Sultans of Swing (Dire Straits); Runaway (Del Shannon); Stray Cat Strut (Stray Cats); California Dreamin' (The Mamas & the Papas); Happy Together (The Turtles); Smooth Criminal (Michael Jackson); Good Vibrations (The Beach Boys) |
 | Dark Roots | i  –  iv  –  v | Back to Black (Amy Winehouse); Heartbreak Hotel (Elvis Presley); Ain't No Sunshine (Bill Withers); Bury a Friend (Billie Eilish) |
 | Neo-Soul Minor | i  –  v  –  bVI  –  bVII | Redbone (Childish Gambino); The Bird (Anderson .Paak); Get You (Daniel Caesar); Location (Khalid) |
 | Ragtime Circle | I  –  VI7  –  II7  –  V7 | Sweet Georgia Brown (Brother Bones & His Shadows); Five Foot Two, Eyes of Blue (The Ink Spots); Alice's Restaurant (Arlo Guthrie); Hey! Baby (Bruce Channel); Salty Dog Blues (Rev. Gary Davis) |
@@ -80,7 +80,7 @@ named against the major scale (bIII/bVI/bVII). Auto-generated from the theory en
 | Tonicized Relative | I  –  III7  –  vi  –  I | Santeria (Sublime); Georgia on My Mind (Ray Charles) |
 | Applied V of ii | I  –  VI7  –  ii  –  V  –  I | Fly Me to the Moon (Frank Sinatra); Sweet Georgia Brown (Ben Bernie & Maceo Pinkard) |
 | Long Applied Turnaround | I  –  III7  –  vi  –  II7  –  V  –  I | Charleston (James P. Johnson); Hello! Ma Baby (Howard & Emerson); Alice's Restaurant (Arlo Guthrie); Hey! Baby (Bruce Channel); They're Red Hot (Robert Johnson) |
-| Borrowed iv | I  –  IV  –  iv  –  I | Creep (Radiohead); If I Fell (The Beatles) |
+| Borrowed iv | I  –  IV  –  iv  –  I | Creep (Radiohead); If I Fell (The Beatles); Breathe Again (Toni Braxton); Space Oddity (David Bowie) |
 | Mixolydian Vamp | I  –  V  –  bVII  –  IV | Sweet Home Alabama (Lynyrd Skynyrd); Can't You See (The Marshall Tucker Band); Werewolves of London (Warren Zevon) |
 | bVI-bVII Climb | I  –  bVI  –  bVII  –  I | Lady Madonna (The Beatles); I Was Made to Love Her (Stevie Wonder) |
 | Flat-Six Color | I  –  bVI  –  IV  –  V | I Saw Her Standing There (The Beatles); What a Wonderful World (Louis Armstrong); Peggy Sue (Buddy Holly); More Than a Feeling (Boston) |
@@ -97,6 +97,9 @@ named against the major scale (bIII/bVI/bVII). Auto-generated from the theory en
 | Bossa Chromatic | Imaj7  –  #I°  –  ii7  –  V7 | The Girl from Ipanema (Antônio Carlos Jobim); Desafinado (Antônio Carlos Jobim); Só Danço Samba (Antônio Carlos Jobim) |
 | Extended vi Turnaround | I  –  vi  –  IV  –  iv  –  I | This Boy (The Beatles); Since I Don't Have You (The Skyliners) |
 | Full Turnaround | I  –  vi  –  ii  –  V  –  I | Blue Moon (Rodgers & Hart); Heart and Soul (Hoagy Carmichael & Frank Loesser) |
+| Pachelbel's Canon | I  –  V  –  vi  –  iii  –  IV  –  I  –  IV  –  V | Canon in D (Johann Pachelbel); Basket Case (Green Day); Don't Look Back in Anger (Oasis) |
+| Minor ii–V–i | iiø  –  V7  –  i | You Never Give Me Your Money (The Beatles); Love You Like a Love Song (Selena Gomez) |
+| Neapolitan Cadence | i  –  iv  –  bII  –  bIII | Frozen (Madonna) |
 
 ## Advanced II — maj7 / min9 / modal (9)
 

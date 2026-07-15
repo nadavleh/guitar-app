@@ -412,6 +412,17 @@ object EarTraining {
         adv("Full Turnaround", "The complete I–vi–ii–V–I turnaround — the most common way to loop a tune back to its beginning.",
             TrainingMode.Major,
             AdvChord(0, "", "I"), AdvChord(9, "m", "vi"), AdvChord(2, "m", "ii"), AdvChord(7, "", "V"), AdvChord(0, "", "I")),
+        // Folded in from Nadav's "Top 96" list (non-diatonic triad progressions).
+        adv("Pachelbel's Canon", "The endlessly-looping canon progression — I–V–vi–iii–IV–I–IV–V.",
+            TrainingMode.Major,
+            AdvChord(0, "", "I"), AdvChord(7, "", "V"), AdvChord(9, "m", "vi"), AdvChord(4, "m", "iii"),
+            AdvChord(5, "", "IV"), AdvChord(0, "", "I"), AdvChord(5, "", "IV"), AdvChord(7, "", "V")),
+        adv("Minor ii–V–i", "The minor-key ii–V–i: a half-diminished iiø into a dominant V7 resolving home.",
+            TrainingMode.Minor,
+            AdvChord(2, "m7b5", "iiø"), AdvChord(7, "7", "V7"), AdvChord(0, "m", "i")),
+        adv("Neapolitan Cadence", "The bII (Neapolitan) — a dark half-step-above-tonic major chord — colours a minor iv–bII–bIII move.",
+            TrainingMode.Minor,
+            AdvChord(0, "m", "i"), AdvChord(5, "m", "iv"), AdvChord(1, "", "bII"), AdvChord(3, "", "bIII")),
     )
 
     /** Pick a random advanced progression. */

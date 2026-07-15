@@ -298,6 +298,13 @@ export const ADVANCED_PROGRESSIONS: NamedProgression[] = [
     [c(0, "", "I"), c(9, "m", "vi"), c(5, "", "IV"), c(5, "m", "iv"), c(0, "", "I")]),
   adv("Full Turnaround", "The complete I–vi–ii–V–I turnaround — the most common way to loop a tune back to its beginning.", TrainingMode.Major,
     [c(0, "", "I"), c(9, "m", "vi"), c(2, "m", "ii"), c(7, "", "V"), c(0, "", "I")]),
+  // Folded in from Nadav's "Top 96" list (non-diatonic triad progressions).
+  adv("Pachelbel's Canon", "The endlessly-looping canon progression — I–V–vi–iii–IV–I–IV–V.", TrainingMode.Major,
+    [c(0, "", "I"), c(7, "", "V"), c(9, "m", "vi"), c(4, "m", "iii"), c(5, "", "IV"), c(0, "", "I"), c(5, "", "IV"), c(7, "", "V")]),
+  adv("Minor ii–V–i", "The minor-key ii–V–i: a half-diminished iiø into a dominant V7 resolving home.", TrainingMode.Minor,
+    [c(2, "m7b5", "iiø"), c(7, "7", "V7"), c(0, "m", "i")]),
+  adv("Neapolitan Cadence", "The bII (Neapolitan) — a dark half-step-above-tonic major chord — colours a minor iv–bII–bIII move.", TrainingMode.Minor,
+    [c(0, "m", "i"), c(5, "m", "iv"), c(1, "", "bII"), c(3, "", "bIII")]),
 ];
 
 export function randomAdvanced(rng: Rng = defaultRng): NamedProgression {
