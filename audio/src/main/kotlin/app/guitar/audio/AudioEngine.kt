@@ -17,8 +17,12 @@ interface AudioEngine {
      * Play a list of MIDI notes as a strummed chord. Each note is delayed by
      * [strumDelayMillis] from the previous; all notes sustain [sustainMillis].
      * The notes are pre-mixed into a single buffer so they ring polyphonically.
+     *
+     * [bassBoost] (0 = off) emphasizes the low strings: the lowest-pitched note is
+     * scaled by (1 + bassBoost), tapering linearly to no boost at the highest note,
+     * so a voicing's low end sits fuller without a separate root-emphasis pass.
      */
-    fun playChord(midiNotes: List<Int>, strumDelayMillis: Int = 40, sustainMillis: Int = 2000, timbre: Timbre = Timbre.Guitar)
+    fun playChord(midiNotes: List<Int>, strumDelayMillis: Int = 40, sustainMillis: Int = 2000, timbre: Timbre = Timbre.Guitar, bassBoost: Float = 0f)
 
     /**
      * Play a pre-synthesized one-shot mono buffer (samples in [-1, 1] at the
@@ -51,7 +55,7 @@ interface AudioEngine {
         val Silent: AudioEngine = object : AudioEngine {
             override fun playNote(midiNote: Int, durationMillis: Int, timbre: Timbre) {}
             override fun playFrequency(freqHz: Float, durationMillis: Int, timbre: Timbre) {}
-            override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre) {}
+            override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre, bassBoost: Float) {}
             override fun playSamples(samples: FloatArray, gain: Float) {}
             override fun stop() {}
             override fun close() {}

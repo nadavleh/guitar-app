@@ -155,6 +155,11 @@ class EarTrainingState(
      *  than the other voices, so the bass note stands out of the strum. */
     var earBoostTonic by mutableStateOf(false)
 
+    // Always-on subtle bass-string emphasis for ear-training chords (independent of
+    // the earBoostTonic root-emphasis toggle): the lowest note of a voicing is ~40%
+    // louder, tapering to none at the top, so chords sit on a fuller low end.
+    private val EAR_BASS_BOOST = 0.4f
+
     /** Thin a guitar voicing for EAR TRAINING playback: keep only the LOWEST occurrence
      *  of each pitch class, so a 6-string barre grip collapses to its 3–4 distinct chord
      *  tones instead of sounding all doubled strings at once (a cacophony by ear). */
@@ -186,13 +191,13 @@ class EarTrainingState(
                 val rest = midis.filter { it != tonic }
                 if (rest.isNotEmpty()) {
                     audio.playChord(rest, strumDelayMillis = strumProvider(),
-                        sustainMillis = sustainMillis, timbre = Timbre.Clarity)
+                        sustainMillis = sustainMillis, timbre = Timbre.Clarity, bassBoost = EAR_BASS_BOOST)
                 }
                 return
             }
         }
         audio.playChord(midis, strumDelayMillis = strumProvider(),
-            sustainMillis = sustainMillis, timbre = Timbre.Clarity)
+            sustainMillis = sustainMillis, timbre = Timbre.Clarity, bassBoost = EAR_BASS_BOOST)
     }
 
     /** True once the user has clicked "Generate progression" for the first time

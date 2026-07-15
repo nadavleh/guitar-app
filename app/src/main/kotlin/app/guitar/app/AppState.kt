@@ -213,14 +213,14 @@ class AppState(
 
     // ---------- Per-sound reverb amount (0..1 send) ----------
     private val reverb = java.util.EnumMap<GuitarSound, Float>(GuitarSound::class.java).apply {
-        GuitarSound.entries.forEach { put(it, 0.01f) }   // default: barely-there reverb (user: init at 1%)
+        GuitarSound.entries.forEach { put(it, 0.03f) }   // default: subtle reverb (user: 3% across all sounds/instruments)
     }
 
     /** Bumped on every reverb change so the slider composable (keyed off it) recomposes. */
     var reverbVersion by mutableStateOf(0)
         private set
 
-    fun reverbFor(s: GuitarSound): Float = reverb[s] ?: 0.18f
+    fun reverbFor(s: GuitarSound): Float = reverb[s] ?: 0.03f
 
     /** Push [s]'s reverb amount to the live engine iff [s] is the currently-selected sound. */
     private fun pushReverb(s: GuitarSound) {
@@ -415,7 +415,10 @@ class AppState(
         EarTrainingState(
             audio = audio,
             scope = scope,
-            tuningProvider = { liveTuning },
+            // Ear training is ALWAYS a guitar exercise: use the live tuning only when the
+            // guitar is selected, otherwise fall back to standard guitar tuning (so the
+            // cavaquinho's 4-string DGBD never drives ear-training voicings). Cavaco later.
+            tuningProvider = { if (instrument == Instrument.Guitar) liveTuning else Tunings.standard },
             sustainProvider = { ringSustainMs },
             strumProvider = { strumMs },
             onProgressionChallengeComplete = { score, total, durationMs ->

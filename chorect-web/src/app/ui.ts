@@ -156,7 +156,10 @@ export class App {
     this.fretboard = new FretboardCanvas(this.fretCanvasEl);
     this.ear = new EarTrainingState({
       audio: state.audio,
-      tuningProvider: () => state.liveTuning,
+      // Ear training is ALWAYS a guitar exercise: use the live tuning only on guitar,
+      // else fall back to standard guitar tuning so the cavaquinho's 4-string DGBD
+      // never drives ear-training voicings. Cavaco support may come later.
+      tuningProvider: () => (state.instrument === Instrument.Guitar ? state.liveTuning : Tunings.standard),
       sustainProvider: () => state.ringSustainMs,
       strumProvider: () => state.strumMs,
       onChange: () => this.scheduleRender(),

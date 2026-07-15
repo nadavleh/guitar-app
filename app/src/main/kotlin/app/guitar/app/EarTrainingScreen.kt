@@ -816,8 +816,11 @@ private fun ChordSlotCard(
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    // The playing bar uses the FEEDBACK (teal) hue, kept distinct from the coral
+    // ACT/primary used for user selection elsewhere (see BarSquare).
+    val playheadColor = LocalSignal.current.feedback
     val bg = when {
-        isPlaying -> MaterialTheme.colorScheme.primaryContainer
+        isPlaying -> playheadColor.copy(alpha = 0.28f)
         hidden -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         else -> MaterialTheme.colorScheme.tertiaryContainer
     }
@@ -826,9 +829,9 @@ private fun ChordSlotCard(
             .clip(RoundedCornerShape(10.dp))
             .clickable { onToggle() },
         colors = CardDefaults.cardColors(containerColor = bg),
-        // Signal restyle: the currently-sounding bar gets a solid act border so it
+        // Signal restyle: the currently-sounding bar gets a solid teal border so it
         // reads clearly even at a glance (not just the subtler container tint).
-        border = if (isPlaying) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+        border = if (isPlaying) BorderStroke(2.dp, playheadColor) else null,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp, horizontal = 4.dp),
@@ -1591,11 +1594,15 @@ private fun BarSquare(
     onPlay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The playhead uses the distinct FEEDBACK (teal) hue so it never reads the
+    // same as an ACT/primary-coloured user selection (coral). A selected bar the
+    // playhead is on shows the teal fill+ring AND its coral selection border.
+    val playheadColor = LocalSignal.current.feedback
     val border = when {
-        playhead -> MaterialTheme.colorScheme.primary
+        selected && verdict == null -> MaterialTheme.colorScheme.primary
+        playhead -> playheadColor
         verdict == true  -> MaterialTheme.colorScheme.primary
         verdict == false -> MaterialTheme.colorScheme.error
-        selected -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.outline
     }
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1609,7 +1616,7 @@ private fun BarSquare(
                 .clip(RoundedCornerShape(8.dp))
                 .background(
                     when {
-                        playhead -> MaterialTheme.colorScheme.primaryContainer
+                        playhead -> playheadColor.copy(alpha = 0.28f)
                         label == null -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                         else -> MaterialTheme.colorScheme.surfaceVariant
                     },
@@ -1951,13 +1958,19 @@ private fun AdvancedProgressionBody(ear: EarTrainingState) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         for (i in ear.progResolved.indices) {
             // The bar the loop is currently sounding gets a filled playing-"head"
-            // highlight (mirrors the diatonic slot / bar-square treatment).
+            // highlight in the FEEDBACK (teal) hue (mirrors the diatonic slot /
+            // bar-square treatment; kept distinct from the coral selection colour).
             val playhead = ear.isLooping && ear.currentBar == i
             val pad = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp)
             // #3: always a plain number — never reveal quality (major/minor/7th/♯)
             // on the play button; the reveal card below shows the answer.
             if (playhead) {
-                Button(onClick = { ear.playProgChordDirect(i) }, contentPadding = pad) { Text("▶ ${i + 1}") }
+                val teal = LocalSignal.current.feedback
+                Button(
+                    onClick = { ear.playProgChordDirect(i) },
+                    contentPadding = pad,
+                    colors = ButtonDefaults.buttonColors(containerColor = teal, contentColor = Color.White),
+                ) { Text("▶ ${i + 1}") }
             } else {
                 OutlinedButton(onClick = { ear.playProgChordDirect(i) }, contentPadding = pad) { Text("▶ ${i + 1}") }
             }

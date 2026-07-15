@@ -15,7 +15,7 @@ import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../au
 
 export const DISPLAY_FRETS = 14;
 /** App version shown beside the header wordmark. Keep in sync with package.json on release. */
-export const APP_VERSION = "2.11.2";
+export const APP_VERSION = "2.13.0";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 
@@ -69,7 +69,7 @@ function defaultEq(): Record<SoundName, EqSettings> {
 }
 
 function defaultReverb(): Record<SoundName, number> {
-  return { Synth: 0.01, Acoustic: 0.01, Nylon: 0.01, Electric: 0.01 }; // default 1% reverb
+  return { Synth: 0.03, Acoustic: 0.03, Nylon: 0.03, Electric: 0.03 }; // default 3% reverb (all sounds/instruments)
 }
 
 const LS_KEY = "chorect-web.v1";

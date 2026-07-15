@@ -41,8 +41,8 @@ class SwitchableAudioEngine(
     override fun playFrequency(freqHz: Float, durationMillis: Int, timbre: Timbre) =
         active.playFrequency(freqHz, durationMillis, timbre)
 
-    override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre) =
-        active.playChord(midiNotes, strumDelayMillis, sustainMillis, timbre)
+    override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre, bassBoost: Float) =
+        active.playChord(midiNotes, strumDelayMillis, sustainMillis, timbre, bassBoost)
 
     override fun playSamples(samples: FloatArray, gain: Float) =
         active.playSamples(samples, gain)

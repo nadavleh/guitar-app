@@ -17,7 +17,7 @@ export interface Timbre {
 }
 
 export const Timbres = {
-  Guitar: { damping: 0.997, amplitude: 0.6, pan: 0, reverbSend: 0.18, releaseMs: 20 } as Timbre,
-  Cavaquinho: { damping: 0.989, amplitude: 0.55, pan: 0, reverbSend: 0.12, releaseMs: 20 } as Timbre,
-  Clarity: { damping: 0.997, amplitude: 0.62, pan: 0, reverbSend: 0.15, releaseMs: 20 } as Timbre,
+  Guitar: { damping: 0.997, amplitude: 0.6, pan: 0, reverbSend: 0.03, releaseMs: 20 } as Timbre,
+  Cavaquinho: { damping: 0.989, amplitude: 0.55, pan: 0, reverbSend: 0.03, releaseMs: 20 } as Timbre,
+  Clarity: { damping: 0.997, amplitude: 0.62, pan: 0, reverbSend: 0.03, releaseMs: 20 } as Timbre,
 };

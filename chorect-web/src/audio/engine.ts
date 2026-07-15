@@ -60,7 +60,7 @@ export class WebAudioEngine {
   private currentBank: SampleBank | null = null;
 
   // Per-sound reverb send (0..1) for MODERN guitar voices; set per selected Sound.
-  private voiceReverbSend = 0.18;
+  private voiceReverbSend = 0.03;
 
   /** Set the per-voice reverb send amount (0..1) for subsequently-played modern voices. */
   setReverbSend(amount: number): void {
@@ -353,7 +353,10 @@ export class WebAudioEngine {
     }
   }
 
-  playChord(midiNotes: number[], strumDelayMillis = 40, sustainMillis = 2000, timbre: Timbre = Timbres.Guitar): void {
+  // bassBoost (0 = off): the lowest-pitched note is scaled by (1 + bassBoost),
+  // tapering linearly to no boost at the top note, so a voicing's low strings sit
+  // fuller. Applied in the modern path (the default engine).
+  playChord(midiNotes: number[], strumDelayMillis = 40, sustainMillis = 2000, timbre: Timbre = Timbres.Guitar, bassBoost = 0): void {
     const synth = this.ensureSynth();
     if (this._useModern) {
       const notes = midiNotes.filter((m) => m >= 0 && m <= 127);
@@ -361,11 +364,14 @@ export class WebAudioEngine {
       const ctx = this.ensure();
       const strumDelaySeconds = strumDelayMillis / 1000;
       const level = 1 / Math.sqrt(notes.length);
+      const minMidi = Math.min(...notes), maxMidi = Math.max(...notes);
+      const span = Math.max(1, maxMidi - minMidi);
       const startNow = ctx.currentTime;
       const seedBase = 1;
       const bank = this.currentBank;
       notes.forEach((midi, i) => {
         const startAt = startNow + i * strumDelaySeconds;
+        const boost = 1 + bassBoost * ((maxMidi - midi) / span);
         if (bank) {
           const root = nearestRoot(bank.roots, midi);
           this.playModernSampleVoice(
@@ -373,14 +379,14 @@ export class WebAudioEngine {
             pitchRate(midi, root),
             panForMidi(midi),
             this.voiceReverbSend,
-            level * (timbre.amplitude / 0.6), // amplitude → level (0.6 = unity); see playNote
+            level * boost * (timbre.amplitude / 0.6), // amplitude → level (0.6 = unity); see playNote
             timbre.releaseMs,
             startAt,
           );
           return;
         }
         const samples = synth.synthesize(midi, sustainMillis / 1000, seedBase + i, timbre.damping, timbre.amplitude, 0.6);
-        this.playModernVoice(samples, panForMidi(midi), this.voiceReverbSend, level, timbre.releaseMs, startAt);
+        this.playModernVoice(samples, panForMidi(midi), this.voiceReverbSend, level * boost, timbre.releaseMs, startAt);
       });
     } else {
       const strumDelaySamples = Math.round((strumDelayMillis / 1000) * synth.sampleRate);

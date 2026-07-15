@@ -23,6 +23,11 @@ import { WebAudioEngine, Timbres } from "../audio";
 const DISPLAY_FRETS = 14;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+// Always-on subtle bass-string emphasis for ear-training chords (independent of the
+// earBoostTonic root-emphasis toggle): the lowest note of a voicing is ~40% louder,
+// tapering to none at the top, so chords sit on a fuller low end.
+const EAR_BASS_BOOST = 0.4;
+
 export enum EarSubMode { Progression = "Progression", Note2Chord = "Note2Chord", Flavor = "Flavor", Inversions = "Inversions", AugDim = "AugDim", Intervals = "Intervals" }
 export enum EarMode { Practice = "Practice", Challenge = "Challenge" }
 
@@ -366,11 +371,11 @@ export class EarTrainingState {
         const tonic = Math.min(...tonics);
         this.deps.audio.playNote(tonic, sustainMs, { ...Timbres.Clarity, amplitude: 0.95 });
         const rest = midis.filter((m) => m !== tonic);
-        if (rest.length > 0) this.deps.audio.playChord(rest, this.deps.strumProvider(), sustainMs, Timbres.Clarity);
+        if (rest.length > 0) this.deps.audio.playChord(rest, this.deps.strumProvider(), sustainMs, Timbres.Clarity, EAR_BASS_BOOST);
         return;
       }
     }
-    this.deps.audio.playChord(midis, this.deps.strumProvider(), sustainMs, Timbres.Clarity);
+    this.deps.audio.playChord(midis, this.deps.strumProvider(), sustainMs, Timbres.Clarity, EAR_BASS_BOOST);
   }
 
   /** Play bar [idx] as a one-shot — same voice-led shape the loop uses for that bar. */

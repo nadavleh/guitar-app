@@ -189,7 +189,7 @@ class LegacyAudioTrackEngine(
         }
     }
 
-    override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre) {
+    override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre, bassBoost: Float) {
         if (midiNotes.isEmpty() || sustainMillis <= 0) return
         if (!running.get()) return
         synthesizer.execute {
@@ -204,8 +204,12 @@ class LegacyAudioTrackEngine(
             val totalLen = perVoiceLen + (notes.size - 1) * strumDelaySamples
             val mix = FloatArray(totalLen)
             val scale = (1.0 / kotlin.math.sqrt(notes.size.toDouble())).toFloat()
+            // Bass emphasis: lowest note ×(1+bassBoost), tapering to ×1 at the top note.
+            val minMidi = notes.min(); val maxMidi = notes.max()
+            val span = (maxMidi - minMidi).coerceAtLeast(1)
             val seedBase = System.nanoTime()
             notes.forEachIndexed { i, midi ->
+                val boost = 1f + bassBoost * ((maxMidi - midi).toFloat() / span)
                 val voice = synth.synthesize(
                     midiNote = midi,
                     durationSec = sustainMillis / 1000.0,
@@ -215,7 +219,7 @@ class LegacyAudioTrackEngine(
                 )
                 val offset = i * strumDelaySamples
                 val end = minOf(offset + voice.size, totalLen)
-                for (j in 0 until (end - offset)) mix[offset + j] += voice[j] * scale
+                for (j in 0 until (end - offset)) mix[offset + j] += voice[j] * scale * boost
             }
             if (mix.isNotEmpty()) addVoice(mix)
         }

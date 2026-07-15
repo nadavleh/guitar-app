@@ -28,6 +28,9 @@ const DISPLAY_FRETS = 14;
 const BG_HIDDEN = "var(--surface2)";
 const BG_REVEAL = "color-mix(in srgb, var(--scale-tone) 20%, transparent)";
 const BG_PRIMARY = "color-mix(in srgb, var(--act) 20%, transparent)";
+// The playing-head uses the distinct FEEDBACK (teal) hue so it never reads the
+// same as an ACT-coloured user selection (which stays coral/--act).
+const BG_PLAYHEAD = "color-mix(in srgb, var(--feedback) 30%, transparent)";
 const BG_TEACH = "color-mix(in srgb, var(--chord-tone) 15%, transparent)";
 
 function select(options: { value: string; label: string }[], value: string, onChange: (v: string) => void): HTMLSelectElement {
@@ -896,7 +899,7 @@ export class EarTrainingUI {
       const resolved = ear.progResolved[i];
       const isCurrent = ear.isLooping && ear.currentBar === i;
       const hidden = !ear.progBarRevealed.has(i);
-      const bg = isCurrent ? BG_PRIMARY : hidden ? BG_HIDDEN : BG_REVEAL;
+      const bg = isCurrent ? BG_PLAYHEAD : hidden ? BG_HIDDEN : BG_REVEAL;
       const slot = el("div", { class: "et-slot", style: `background:${bg}` }, [
         el("div", { class: "ans-label" }, [`Bar ${i + 1}`]),
         el("div", { style: `margin:6px 0;font-weight:600;${hidden ? "font-size:13px;color:var(--text-secondary)" : "font-size:24px"}` }, [hidden ? "tap" : (resolved?.romanLabel ?? "—")]),
@@ -1011,10 +1014,12 @@ export class EarTrainingUI {
     const playhead = ear.isLooping && ear.currentBar === i;   // playing "head" highlight
     const label = ear.challengeGuessLabel[i];
     const border = verdict === true ? "var(--act)" : verdict === false ? "var(--root-tone)" : selected ? "var(--act)" : "var(--line)";
-    const bg = playhead ? BG_PRIMARY : label == null ? BG_HIDDEN : "var(--surface2)";
+    // Playhead (teal bg + teal ring) is deliberately a different hue from the
+    // coral selection border, so a selected bar the playhead is on shows BOTH.
+    const bg = playhead ? BG_PLAYHEAD : label == null ? BG_HIDDEN : "var(--surface2)";
     const box = el("div", {
       class: "et-barsq",
-      style: `border-color:${border};border-width:${selected && verdict === null ? "3px" : "2px"};background:${bg}${playhead ? ";box-shadow:0 0 0 3px var(--act)" : ""}`,
+      style: `border-color:${border};border-width:${selected && verdict === null ? "3px" : "2px"};background:${bg}${playhead ? ";box-shadow:0 0 0 3px var(--feedback)" : ""}`,
     }, [label ?? "?"]);
     box.addEventListener("click", onSelect);
     const col = el("div", { class: "et-slot" }, [
@@ -1086,8 +1091,8 @@ export class EarTrainingUI {
     parent.appendChild(el("div", { class: "et-row-gap" }, ear.progResolved.map((_, i) => {
       const b = btn(`▶ ${i + 1}`, () => ear.playProgChordDirect(i));
       if (ear.isLooping && ear.currentBar === i) {
-        b.style.background = BG_PRIMARY;
-        b.style.boxShadow = "0 0 0 3px var(--act)";
+        b.style.background = BG_PLAYHEAD;
+        b.style.boxShadow = "0 0 0 3px var(--feedback)";
         b.style.fontWeight = "700";
       }
       return b;

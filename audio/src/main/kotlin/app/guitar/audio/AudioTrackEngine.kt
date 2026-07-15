@@ -189,18 +189,22 @@ class AudioTrackEngine(
         }
     }
 
-    override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre) {
+    override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre, bassBoost: Float) {
         if (midiNotes.isEmpty() || sustainMillis <= 0 || !running.get()) return
         val notes = midiNotes.filter { it in 0..127 }
         if (notes.isEmpty()) return
         val strumFrames = (sampleRate * strumDelayMillis / 1000).coerceAtLeast(0)
         val gain = (1.0 / kotlin.math.sqrt(notes.size.toDouble())).toFloat()
+        // Bass emphasis: lowest note ×(1+bassBoost), tapering to ×1 at the top note.
+        val minMidi = notes.min(); val maxMidi = notes.max()
+        val span = (maxMidi - minMidi).coerceAtLeast(1)
         synthesizer.execute {
             val inst = voiceInstrument
             // Samples ignore the synth's amplitude param, so fold it into the voice
             // gain (0.6 = the Timbre default = unity); synth buffers already bake it in.
             val voiceGain = if (inst != null) (gain * timbre.amplitude / 0.6).toFloat() else gain
             notes.forEachIndexed { i, midi ->
+                val boost = 1f + bassBoost * ((maxMidi - midi).toFloat() / span)
                 val source: VoiceSource = if (inst != null) SampleSource(inst, midi)
                     else BufferSource(synth.synthesize(
                         midi, sustainMillis / 1000.0, System.nanoTime() + i,
@@ -210,7 +214,7 @@ class AudioTrackEngine(
                 mixer.addAndCap(
                     MixVoice(
                         source,
-                        voiceGain,
+                        voiceGain * boost,
                         strumFrames * i,
                         AmpEnvelope(sampleRate, 3.0, timbre.releaseMs.toDouble()),
                         reverbSend = voiceReverbSend,
@@ -281,7 +285,7 @@ class AudioTrackEngine(
 
     /** Per-voice reverb send (0..1) for guitar note/chord voices — set per selected
      *  Sound by the app. Drums (playSamples) stay dry regardless. */
-    @Volatile var voiceReverbSend: Float = 0.18f
+    @Volatile var voiceReverbSend: Float = 0.03f
         private set
 
     fun setReverbSend(amount: Float) { voiceReverbSend = amount.coerceIn(0f, 1f) }
