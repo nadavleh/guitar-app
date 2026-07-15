@@ -105,6 +105,22 @@ const MAJOR: Record<string, SongExample[]> = {
     s("Cry Me a River", "Justin Timberlake"),
     s("Sunday Morning", "Maroon 5"),
   ],
+  "1,4,2,5": [
+    s("You're Still the One", "Shania Twain"),
+    s("Love Bites", "Def Leppard"),
+  ],
+  "1,4,6,5": [
+    s("She Drives Me Crazy", "Fine Young Cannibals"),
+    s("Where the Streets Have No Name", "U2"),
+  ],
+  "1,5,4,5": [
+    s("Wild World", "Cat Stevens"),
+    s("Waking Up in Vegas", "Katy Perry"),
+  ],
+  "6,5,4,5": [
+    s("Daniel", "Elton John"),
+    s("Come Sail Away", "Styx"),
+  ],
 };
 
 /** Minor diatonic, keyed by `degrees.join(",")`. */
@@ -175,6 +191,16 @@ const MINOR: Record<string, SongExample[]> = {
     s("Autumn Leaves", "Nat King Cole"),
     s("Still Got the Blues", "Gary Moore"),
     s("Nature Boy", "Nat King Cole"),
+  ],
+  "1,5,6,7": [
+    s("Jenny Was a Friend of Mine", "The Killers"),
+    s("Reptilia", "The Strokes"),
+    s("High Hopes", "Pink Floyd"),
+  ],
+  "1,3,7,4": [
+    s("Just Dance", "Lady Gaga"),
+    s("SOS", "ABBA"),
+    s("Personal Jesus", "Depeche Mode"),
   ],
 };
 

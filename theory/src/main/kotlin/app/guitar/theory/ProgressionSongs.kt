@@ -118,6 +118,22 @@ object ProgressionSongs {
             s("Cry Me a River", "Justin Timberlake"),
             s("Sunday Morning", "Maroon 5"),
         ),
+        listOf(1, 4, 2, 5) to listOf(   // I–IV–ii–V
+            s("You're Still the One", "Shania Twain"),
+            s("Love Bites", "Def Leppard"),
+        ),
+        listOf(1, 4, 6, 5) to listOf(   // I–IV–vi–V
+            s("She Drives Me Crazy", "Fine Young Cannibals"),
+            s("Where the Streets Have No Name", "U2"),
+        ),
+        listOf(1, 5, 4, 5) to listOf(   // I–V–IV–V
+            s("Wild World", "Cat Stevens"),
+            s("Waking Up in Vegas", "Katy Perry"),
+        ),
+        listOf(6, 5, 4, 5) to listOf(   // vi–V–IV–V
+            s("Daniel", "Elton John"),
+            s("Come Sail Away", "Styx"),
+        ),
     )
 
     /** Minor diatonic, keyed by [Progression.degrees]. */
@@ -188,6 +204,16 @@ object ProgressionSongs {
             s("Autumn Leaves", "Nat King Cole"),
             s("Still Got the Blues", "Gary Moore"),
             s("Nature Boy", "Nat King Cole"),
+        ),
+        listOf(1, 5, 6, 7) to listOf(   // i–v–bVI–bVII
+            s("Jenny Was a Friend of Mine", "The Killers"),
+            s("Reptilia", "The Strokes"),
+            s("High Hopes", "Pink Floyd"),
+        ),
+        listOf(1, 3, 7, 4) to listOf(   // i–bIII–bVII–iv
+            s("Just Dance", "Lady Gaga"),
+            s("SOS", "ABBA"),
+            s("Personal Jesus", "Depeche Mode"),
         ),
     )
 

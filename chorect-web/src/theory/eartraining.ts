@@ -140,6 +140,11 @@ export const MAJOR_PROGRESSIONS: Progression[] = [
   { mode: TrainingMode.Major, degrees: [1, 3, 6, 4] },   // I-iii-vi-IV (soft tonic family)
   { mode: TrainingMode.Major, degrees: [6, 2, 5, 1] },   // vi-ii-V-I
   { mode: TrainingMode.Major, degrees: [1, 2, 5, 1] },   // I-ii-V-I
+  // Added from Nadav's "Top 96 progressions" list (all pure-diatonic 4-chord).
+  { mode: TrainingMode.Major, degrees: [1, 4, 2, 5] },   // I-IV-ii-V
+  { mode: TrainingMode.Major, degrees: [1, 4, 6, 5] },   // I-IV-vi-V
+  { mode: TrainingMode.Major, degrees: [1, 5, 4, 5] },   // I-V-IV-V
+  { mode: TrainingMode.Major, degrees: [6, 5, 4, 5] },   // vi-V-IV-V
 ];
 
 export const MINOR_PROGRESSIONS: Progression[] = [
@@ -149,6 +154,8 @@ export const MINOR_PROGRESSIONS: Progression[] = [
   { mode: TrainingMode.Minor, degrees: [2, 5, 1, 1] },
   { mode: TrainingMode.Minor, degrees: [1, 7, 6, 5] },
   { mode: TrainingMode.Minor, degrees: [1, 4, 7, 3] },
+  { mode: TrainingMode.Minor, degrees: [1, 5, 6, 7] },   // i-v-bVI-bVII
+  { mode: TrainingMode.Minor, degrees: [1, 3, 7, 4] },   // i-bIII-bVII-iv
 ];
 
 /** Focused drill for hearing the I→iii move (the "soft" mediant that shares two

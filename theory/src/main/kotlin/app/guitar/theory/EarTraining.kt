@@ -183,6 +183,11 @@ object EarTraining {
         Progression(TrainingMode.Major, listOf(1, 3, 6, 4)),   // I-iii-vi-IV (soft tonic family)
         Progression(TrainingMode.Major, listOf(6, 2, 5, 1)),   // vi-ii-V-I
         Progression(TrainingMode.Major, listOf(1, 2, 5, 1)),   // I-ii-V-I
+        // Added from Nadav's "Top 96 progressions" list (all pure-diatonic 4-chord).
+        Progression(TrainingMode.Major, listOf(1, 4, 2, 5)),   // I-IV-ii-V
+        Progression(TrainingMode.Major, listOf(1, 4, 6, 5)),   // I-IV-vi-V
+        Progression(TrainingMode.Major, listOf(1, 5, 4, 5)),   // I-V-IV-V
+        Progression(TrainingMode.Major, listOf(6, 5, 4, 5)),   // vi-V-IV-V
     )
 
     val MINOR_PROGRESSIONS: List<Progression> = listOf(
@@ -192,6 +197,9 @@ object EarTraining {
         Progression(TrainingMode.Minor, listOf(2, 5, 1, 1)),   // ii°-V-i-i
         Progression(TrainingMode.Minor, listOf(1, 7, 6, 5)),   // i-VII-VI-V
         Progression(TrainingMode.Minor, listOf(1, 4, 7, 3)),   // i-iv-VII-III
+        // Added from Nadav's "Top 96 progressions" list (pure natural-minor 4-chord).
+        Progression(TrainingMode.Minor, listOf(1, 5, 6, 7)),   // i-v-bVI-bVII
+        Progression(TrainingMode.Minor, listOf(1, 3, 7, 4)),   // i-bIII-bVII-iv
     )
 
     /** Focused drill for hearing the I→iii move (the "soft" mediant, which shares
