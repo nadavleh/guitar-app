@@ -121,6 +121,22 @@ const MAJOR: Record<string, SongExample[]> = {
     s("Daniel", "Elton John"),
     s("Come Sail Away", "Styx"),
   ],
+  // Reclassified from Advanced — fully diatonic despite their common names.
+  "1,2,5,6": [   // "Deceptive Cadence" — V resolves to vi
+    s("Every Breath You Take", "The Police"),
+    s("I Will", "The Beatles"),
+    s("Take Me to Church", "Hozier"),
+    s("Just Give Me a Reason", "Pink ft. Nate Ruess"),
+    s("Thinking Out Loud", "Ed Sheeran"),
+  ],
+  "4,5,3,6": [   // "Royal Road" — J-pop/anime IV-V-iii-vi
+    s("Never Gonna Give You Up", "Rick Astley"),
+    s("Titanium", "David Guetta & Sia"),
+    s("Leave the Door Open", "Silk Sonic"),
+    s("Fortnight", "Taylor Swift & Post Malone"),
+    s("Heavy Rotation", "AKB48"),
+    s("Yoru ni Kakeru", "YOASOBI"),
+  ],
 };
 
 /** Minor diatonic, keyed by `degrees.join(",")`. */
@@ -339,14 +355,6 @@ const ADVANCED: Record<string, SongExample[]> = {
     s("Final Fantasy (Victory Fanfare)", "Nobuo Uematsu"),
     s("Star Wars (Main Title)", "John Williams"),
   ],
-  "Royal Road": [
-    s("Never Gonna Give You Up", "Rick Astley"),
-    s("Titanium", "David Guetta & Sia"),
-    s("Leave the Door Open", "Silk Sonic"),
-    s("Fortnight", "Taylor Swift & Post Malone"),
-    s("Heavy Rotation", "AKB48"),
-    s("Yoru ni Kakeru", "YOASOBI"),
-  ],
   "Bird Blues Turnaround": [
     s("Blues for Alice", "Charlie Parker"),
     s("Au Privave", "Charlie Parker"),
@@ -357,13 +365,6 @@ const ADVANCED: Record<string, SongExample[]> = {
     s("Lady Bird", "Tadd Dameron"),
     s("Half Nelson", "Miles Davis"),
     s("Israel", "Miles Davis"),
-  ],
-  "Deceptive Cadence": [
-    s("Every Breath You Take", "The Police"),
-    s("I Will", "The Beatles"),
-    s("Take Me to Church", "Hozier"),
-    s("Just Give Me a Reason", "Pink ft. Nate Ruess"),
-    s("Thinking Out Loud", "Ed Sheeran"),
   ],
   "Applied V of V": [
     s("9 to 5", "Dolly Parton"),

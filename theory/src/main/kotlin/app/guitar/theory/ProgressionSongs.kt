@@ -134,6 +134,22 @@ object ProgressionSongs {
             s("Daniel", "Elton John"),
             s("Come Sail Away", "Styx"),
         ),
+        // Reclassified from Advanced — fully diatonic despite their common names.
+        listOf(1, 2, 5, 6) to listOf(   // I–ii–V–vi ("Deceptive Cadence")
+            s("Every Breath You Take", "The Police"),
+            s("I Will", "The Beatles"),
+            s("Take Me to Church", "Hozier"),
+            s("Just Give Me a Reason", "Pink ft. Nate Ruess"),
+            s("Thinking Out Loud", "Ed Sheeran"),
+        ),
+        listOf(4, 5, 3, 6) to listOf(   // IV–V–iii–vi ("Royal Road" J-pop/anime)
+            s("Never Gonna Give You Up", "Rick Astley"),
+            s("Titanium", "David Guetta & Sia"),
+            s("Leave the Door Open", "Silk Sonic"),
+            s("Fortnight", "Taylor Swift & Post Malone"),
+            s("Heavy Rotation", "AKB48"),
+            s("Yoru ni Kakeru", "YOASOBI"),
+        ),
     )
 
     /** Minor diatonic, keyed by [Progression.degrees]. */
@@ -354,14 +370,6 @@ object ProgressionSongs {
             s("Final Fantasy (Victory Fanfare)", "Nobuo Uematsu"),
             s("Star Wars (Main Title)", "John Williams"),
         ),
-        "Royal Road" to listOf(          // IV–V–iii–vi
-            s("Never Gonna Give You Up", "Rick Astley"),
-            s("Titanium", "David Guetta & Sia"),
-            s("Leave the Door Open", "Silk Sonic"),
-            s("Fortnight", "Taylor Swift & Post Malone"),
-            s("Heavy Rotation", "AKB48"),
-            s("Yoru ni Kakeru", "YOASOBI"),
-        ),
         "Bird Blues Turnaround" to listOf(   // Imaj7–#IV°7–iii7–VI7–ii7–V7
             s("Blues for Alice", "Charlie Parker"),
             s("Au Privave", "Charlie Parker"),
@@ -372,13 +380,6 @@ object ProgressionSongs {
             s("Lady Bird", "Tadd Dameron"),
             s("Half Nelson", "Miles Davis"),
             s("Israel", "Miles Davis"),
-        ),
-        "Deceptive Cadence" to listOf(   // I–ii–V–vi
-            s("Every Breath You Take", "The Police"),
-            s("I Will", "The Beatles"),
-            s("Take Me to Church", "Hozier"),
-            s("Just Give Me a Reason", "Pink ft. Nate Ruess"),
-            s("Thinking Out Loud", "Ed Sheeran"),
         ),
         "Applied V of V" to listOf(   // I–II7–V–I
             s("9 to 5", "Dolly Parton"),

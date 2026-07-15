@@ -1950,13 +1950,16 @@ private fun AdvancedProgressionBody(ear: EarTrainingState) {
     Spacer(Modifier.height(4.dp))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         for (i in ear.progResolved.indices) {
-            OutlinedButton(
-                onClick = { ear.playProgChordDirect(i) },
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-            ) {
-                // #3: always a plain number — never reveal quality (major/minor/7th/♯)
-                // on the play button; the reveal card below shows the answer.
-                Text("▶ ${i + 1}")
+            // The bar the loop is currently sounding gets a filled playing-"head"
+            // highlight (mirrors the diatonic slot / bar-square treatment).
+            val playhead = ear.isLooping && ear.currentBar == i
+            val pad = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+            // #3: always a plain number — never reveal quality (major/minor/7th/♯)
+            // on the play button; the reveal card below shows the answer.
+            if (playhead) {
+                Button(onClick = { ear.playProgChordDirect(i) }, contentPadding = pad) { Text("▶ ${i + 1}") }
+            } else {
+                OutlinedButton(onClick = { ear.playProgChordDirect(i) }, contentPadding = pad) { Text("▶ ${i + 1}") }
             }
         }
     }
@@ -2617,6 +2620,24 @@ private fun ProgressionLibraryDialog(state: AppState, onDismiss: () -> Unit) {
                             expandedKey, toggle)
                     }
                 }
+                LibrarySection("Advanced II (maj7 / min9 / modal)",
+                    "Extended and modal colours — seventh chords and modal vamps.") {
+                    EarTraining.ADVANCED2_PROGRESSIONS.forEach { np ->
+                        val key = if (np.tonicMode == TrainingMode.Major) PitchClass.C else PitchClass.A
+                        LibraryRow(state, "adv2:${np.name}", "${np.name}:  ${np.romanLine}",
+                            ProgressionSongs.forAdvanced(np.name), np.resolve(key),
+                            expandedKey, toggle)
+                    }
+                }
+                LibrarySection("Suspended (sus2 / sus4)",
+                    "The tension-and-release of suspended chords.") {
+                    EarTraining.SUS_PROGRESSIONS.forEach { np ->
+                        val key = if (np.tonicMode == TrainingMode.Major) PitchClass.C else PitchClass.A
+                        LibraryRow(state, "sus:${np.name}", "${np.name}:  ${np.romanLine}",
+                            ProgressionSongs.forAdvanced(np.name), np.resolve(key),
+                            expandedKey, toggle)
+                    }
+                }
                 LibrarySection("Circle of fifths",
                     "Draws 4 adjacent chords; the 2nd may become a dominant 7th (except vii°). Characteristic examples.") {
                     EarTraining.CIRCLE_WINDOWS.forEach { w ->
@@ -2716,10 +2737,7 @@ private fun LibraryRow(
                 }
             }
             if (songs.isNotEmpty()) {
-                for (song in songs) {
-                    Text("•  ${song.title} — ${song.artist}", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface)
-                }
+                for (song in songs) SongLinkRow(song.title, song.artist)
             } else {
                 Text("No song examples for this one.", style = MaterialTheme.typography.bodySmall,
                     fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)

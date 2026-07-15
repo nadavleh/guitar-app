@@ -2,6 +2,7 @@ package app.guitar.app
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,11 +14,14 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.guitar.theory.ChordQuality
 import app.guitar.theory.ChordShape
@@ -252,29 +256,43 @@ fun SelectedPositionInfo(
 internal fun SongLinkRow(title: String, artist: String, suffix: String = "") {
     val context = LocalContext.current
     val label = "$title — $artist$suffix"
-    Text(
-        "▶  $label",
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp)
-            .combinedClickable(
-                onClick = {
-                    val q = android.net.Uri.encode("$title $artist")
-                    runCatching {
-                        context.startActivity(
-                            android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                android.net.Uri.parse("https://www.youtube.com/results?search_query=$q"),
-                            ),
-                        )
-                    }
-                },
-                onLongClick = {
-                    val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
-                        as android.content.ClipboardManager
-                    cm.setPrimaryClip(android.content.ClipData.newPlainText("song", label))
-                },
-            ),
-    )
+    val q = android.net.Uri.encode("$title $artist")
+    val open = { url: String ->
+        runCatching {
+            context.startActivity(
+                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)),
+            )
+        }
+        Unit
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // YouTube is the default target (whole label). Long-press copies "Title — Artist".
+        Text(
+            "▶  $label",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier
+                .weight(1f)
+                .combinedClickable(
+                    onClick = { open("https://www.youtube.com/results?search_query=$q") },
+                    onLongClick = {
+                        val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                            as android.content.ClipboardManager
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("song", label))
+                    },
+                ),
+        )
+        // Spotify alternative — search the same query on open.spotify.com.
+        Text(
+            "♫",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = androidx.compose.ui.graphics.Color(0xFF1DB954),
+            modifier = Modifier
+                .padding(start = 10.dp)
+                .clickable { open("https://open.spotify.com/search/$q") },
+        )
+    }
 }

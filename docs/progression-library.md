@@ -4,7 +4,7 @@ Every chord progression the ear-training trainer can generate, by category, plus
 cavaquinho functional sequences. Roman numerals are relative to the key; minor degrees are
 named against the major scale (bIII/bVI/bVII). Auto-generated from the theory engine.
 
-## Diatonic — Major (16)
+## Diatonic — Major (18)
 
 | Progression | Example songs |
 |---|---|
@@ -24,6 +24,8 @@ named against the major scale (bIII/bVI/bVII). Auto-generated from the theory en
 | I – IV – vi – V | She Drives Me Crazy (Fine Young Cannibals); Where the Streets Have No Name (U2) |
 | I – V – IV – V | Wild World (Cat Stevens); Waking Up in Vegas (Katy Perry) |
 | vi – V – IV – V | Daniel (Elton John); Come Sail Away (Styx) |
+| I – ii – V – vi | Every Breath You Take (The Police); I Will (The Beatles); Take Me to Church (Hozier); Just Give Me a Reason (Pink ft. Nate Ruess); Thinking Out Loud (Ed Sheeran) |
+| IV – V – iii – vi | Never Gonna Give You Up (Rick Astley); Titanium (David Guetta & Sia); Leave the Door Open (Silk Sonic); Fortnight (Taylor Swift & Post Malone); Heavy Rotation (AKB48); Yoru ni Kakeru (YOASOBI) |
 
 ## Diatonic — Minor (8)
 
@@ -47,7 +49,7 @@ named against the major scale (bIII/bVI/bVII). Auto-generated from the theory en
 - I – iii – vi – V
 - I – iii – I – IV
 
-## Advanced (non-diatonic) (49)
+## Advanced (non-diatonic) (47)
 
 | Name | Progression | Example songs |
 |---|---|---|
@@ -72,10 +74,8 @@ named against the major scale (bIII/bVI/bVII). Auto-generated from the theory en
 | Church Cadence | I  –  IV  –  I  –  bVII  –  IV | Hey Jude (The Beatles); Sweet Home Alabama (Lynyrd Skynyrd); Takin' Care of Business (Bachman-Turner Overdrive); Fortunate Son (Creedence Clearwater Revival) |
 | Gospel Walk-Up | I  –  I/III  –  IV  –  #IV°7  –  V | On the Sunny Side of the Street (Louis Armstrong); Embraceable You (Ella Fitzgerald); The Song Is You (Frank Sinatra) |
 | Mario Cadence | bVI  –  bVII  –  I | Super Mario Bros. (Level Complete) (Koji Kondo); The Legend of Zelda: Ocarina of Time (Koji Kondo); Final Fantasy (Victory Fanfare) (Nobuo Uematsu); Star Wars (Main Title) (John Williams) |
-| Royal Road | IV  –  V  –  iii  –  vi | Never Gonna Give You Up (Rick Astley); Titanium (David Guetta & Sia); Leave the Door Open (Silk Sonic); Fortnight (Taylor Swift & Post Malone); Heavy Rotation (AKB48); Yoru ni Kakeru (YOASOBI) |
 | Bird Blues Turnaround | Imaj7  –  #IV°7  –  iii7  –  VI7  –  ii7  –  V7 | Blues for Alice (Charlie Parker); Au Privave (Charlie Parker); Chi Chi (Charlie Parker); Bloomdido (Charlie Parker) |
 | Montgomery Turnaround | Imaj7  –  bIII7  –  bVI7  –  bII7 | Lady Bird (Tadd Dameron); Half Nelson (Miles Davis); Israel (Miles Davis) |
-| Deceptive Cadence | I  –  ii  –  V  –  vi | Every Breath You Take (The Police); I Will (The Beatles); Take Me to Church (Hozier); Just Give Me a Reason (Pink ft. Nate Ruess); Thinking Out Loud (Ed Sheeran) |
 | Applied V of V | I  –  II7  –  V  –  I | 9 to 5 (Dolly Parton); Eternal Flame (The Bangles); Fly Me to the Moon (Frank Sinatra); Oh! Darling (The Beatles) |
 | Tonicized Relative | I  –  III7  –  vi  –  I | Santeria (Sublime); Georgia on My Mind (Ray Charles) |
 | Applied V of ii | I  –  VI7  –  ii  –  V  –  I | Fly Me to the Moon (Frank Sinatra); Sweet Georgia Brown (Ben Bernie & Maceo Pinkard) |

@@ -94,8 +94,9 @@ export function labelSm(text: string): HTMLElement {
 }
 
 /** A song list row: the "Title — Artist" text is a link that opens a YouTube search
- *  (new tab), plus a copy button that puts "Title — Artist" on the clipboard so you
- *  can search yourself. `extra` is appended to the label (e.g. " (key A)"). */
+ *  (default, new tab); a Spotify glyph opens the same query on Spotify (alternative);
+ *  plus a copy button that puts "Title — Artist" on the clipboard so you can search
+ *  yourself. `extra` is appended to the label (e.g. " (key A)"). */
 export function songLinkRow(title: string, artist: string, extra = ""): HTMLElement {
   const label = `${title} — ${artist}${extra}`;
   const q = encodeURIComponent(`${title} ${artist}`);
@@ -106,6 +107,16 @@ export function songLinkRow(title: string, artist: string, extra = ""): HTMLElem
     style: "flex:1;color:inherit;text-decoration:none;cursor:pointer",
     title: "Search on YouTube",
   }, [`▶  ${label}`]);
+  // Spotify alternative — search the same query on open.spotify.com.
+  const spotify = el("a", {
+    href: `https://open.spotify.com/search/${q}`,
+    target: "_blank",
+    rel: "noopener",
+    class: "btn text",
+    style: "padding:0 6px;min-width:0;color:#1DB954;text-decoration:none;font-weight:700",
+    title: "Search on Spotify",
+  }, ["♫"]);
+  spotify.addEventListener("click", (e) => e.stopPropagation());
   const copy = el("button", { class: "btn text", style: "padding:0 6px;min-width:0", title: "Copy" }, ["⧉"]);
   copy.addEventListener("click", (e) => {
     e.preventDefault();
@@ -115,5 +126,5 @@ export function songLinkRow(title: string, artist: string, extra = ""): HTMLElem
     copy.textContent = "✓";
     setTimeout(() => { copy.textContent = prev; }, 900);
   });
-  return el("div", { style: "display:flex;align-items:center;gap:6px;font-size:14px;padding:2px 0" }, [link, copy]);
+  return el("div", { style: "display:flex;align-items:center;gap:6px;font-size:14px;padding:2px 0" }, [link, spotify, copy]);
 }

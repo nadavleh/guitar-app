@@ -188,6 +188,9 @@ object EarTraining {
         Progression(TrainingMode.Major, listOf(1, 4, 6, 5)),   // I-IV-vi-V
         Progression(TrainingMode.Major, listOf(1, 5, 4, 5)),   // I-V-IV-V
         Progression(TrainingMode.Major, listOf(6, 5, 4, 5)),   // vi-V-IV-V
+        // Reclassified from Advanced — these are fully diatonic despite their names.
+        Progression(TrainingMode.Major, listOf(1, 2, 5, 6)),   // I-ii-V-vi  ("Deceptive Cadence")
+        Progression(TrainingMode.Major, listOf(4, 5, 3, 6)),   // IV-V-iii-vi ("Royal Road" J-pop)
     )
 
     val MINOR_PROGRESSIONS: List<Progression> = listOf(
@@ -336,9 +339,6 @@ object EarTraining {
         adv("Mario Cadence", "Borrowed bVI and bVII resolve up to a triumphant major I — the classic heroic/video-game cadence.",
             TrainingMode.Major,
             AdvChord(8, "", "bVI"), AdvChord(10, "", "bVII"), AdvChord(0, "", "I")),
-        adv("Royal Road", "The backbone of modern J-pop/anime: it loops without ever landing on the home chord.",
-            TrainingMode.Major,
-            AdvChord(5, "", "IV"), AdvChord(7, "", "V"), AdvChord(4, "m", "iii"), AdvChord(9, "m", "vi")),
         adv("Bird Blues Turnaround", "Charlie Parker's rapid descending turnaround, stacking a passing #IV°7 and a secondary-dominant VI7.",
             TrainingMode.Major,
             AdvChord(0, "maj7", "Imaj7"), AdvChord(6, "dim7", "#IV°7"), AdvChord(4, "m7", "iii7"),
@@ -346,9 +346,6 @@ object EarTraining {
         adv("Montgomery Turnaround", "A highly chromatic Wes-Montgomery turnaround that slides back to the tonic in tritone steps.",
             TrainingMode.Major,
             AdvChord(0, "maj7", "Imaj7"), AdvChord(3, "7", "bIII7"), AdvChord(8, "7", "bVI7"), AdvChord(1, "7", "bII7")),
-        adv("Deceptive Cadence", "The V resolves \"wrongly\" to vi instead of I — the classic deceptive cadence that dodges the expected home chord.",
-            TrainingMode.Major,
-            AdvChord(0, "", "I"), AdvChord(2, "m", "ii"), AdvChord(7, "", "V"), AdvChord(9, "m", "vi")),
         adv("Applied V of V", "The major II is a secondary dominant (V of V): a dominant pointing at the dominant, not directly home.",
             TrainingMode.Major,
             AdvChord(0, "", "I"), AdvChord(2, "7", "II7"), AdvChord(7, "", "V"), AdvChord(0, "", "I")),

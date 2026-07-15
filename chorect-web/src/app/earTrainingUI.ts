@@ -15,7 +15,8 @@ import {
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
   parseChord, ChordShapeGenerator, CagedShape, notesFrom, midiPitchClass, fp, fpKey,
   IntervalDirection, INTERVAL_CHOICES, intervalChoiceFor,
-  MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, ADVANCED_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor,
+  MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, ADVANCED_PROGRESSIONS, ADVANCED2_PROGRESSIONS,
+  SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor,
   SongExample, songsForDiatonic, songsForAdvanced, songsForCircleWindow,
   ResolvedChord, ChordShape, resolveProgression, resolveNamed, resolveCircleWindow,
 } from "../theory";
@@ -557,8 +558,8 @@ export class EarTrainingUI {
       ];
       if (this.libShowFb) children.push(this.libFretboard(key, this.previewShapeWeb(chords[0]?.symbol)));
       if (songs.length) {
-        children.push(el("div", { style: "padding:2px 0 6px 14px" },
-          songs.map((sg) => el("div", { style: "font-size:13px" }, [`•  ${sg.title} — ${sg.artist}`]))));
+        children.push(el("div", { style: "padding:2px 0 6px 8px" },
+          songs.map((sg) => songLinkRow(sg.title, sg.artist))));
       } else {
         children.push(el("div", { class: "et-muted", style: "font-size:13px;font-style:italic;padding:2px 0 6px 14px" },
           ["No song examples for this one."]));
@@ -602,6 +603,12 @@ export class EarTrainingUI {
         resolveProgression(p, 9, ChordTypeLevel.Triads)))));
     body.appendChild(section("Advanced (non-diatonic)", "Characteristic examples — the signature harmonic move, not always note-for-note.",
       ADVANCED_PROGRESSIONS.map((p) => row(`adv:${p.name}`, `${p.name}:  ${namedRomanLine(p)}`, songsForAdvanced(p.name),
+        resolveNamed(p, p.tonicMode === TrainingMode.Major ? 0 : 9)))));
+    body.appendChild(section("Advanced II (maj7 / min9 / modal)", "Extended and modal colours — seventh chords and modal vamps.",
+      ADVANCED2_PROGRESSIONS.map((p) => row(`adv2:${p.name}`, `${p.name}:  ${namedRomanLine(p)}`, songsForAdvanced(p.name),
+        resolveNamed(p, p.tonicMode === TrainingMode.Major ? 0 : 9)))));
+    body.appendChild(section("Suspended (sus2 / sus4)", "The tension-and-release of suspended chords.",
+      SUS_PROGRESSIONS.map((p) => row(`sus:${p.name}`, `${p.name}:  ${namedRomanLine(p)}`, songsForAdvanced(p.name),
         resolveNamed(p, p.tonicMode === TrainingMode.Major ? 0 : 9)))));
     body.appendChild(section("Circle of fifths", "Draws 4 adjacent chords; the 2nd may become a dominant 7th (except vii°). Characteristic examples.",
       CIRCLE_WINDOWS.map((w) => row(`cof:${w.id}`, w.romanLine, songsForCircleWindow(w.id),
@@ -1073,9 +1080,18 @@ export class EarTrainingUI {
     if (!np) return;
     parent.appendChild(labelSm("Chords  (tap ▶ to hear each)"));
     // Always a plain positional number — never reveal quality on the play button;
-    // the reveal card below shows the full answer.
-    parent.appendChild(el("div", { class: "et-row-gap" }, ear.progResolved.map((_, i) =>
-      btn(`▶ ${i + 1}`, () => ear.playProgChordDirect(i)))));
+    // the reveal card below shows the full answer. The button for the bar the
+    // loop is currently sounding gets a playing-"head" highlight (mirrors the
+    // diatonic chordSlots / barSquare treatment).
+    parent.appendChild(el("div", { class: "et-row-gap" }, ear.progResolved.map((_, i) => {
+      const b = btn(`▶ ${i + 1}`, () => ear.playProgChordDirect(i));
+      if (ear.isLooping && ear.currentBar === i) {
+        b.style.background = BG_PRIMARY;
+        b.style.boxShadow = "0 0 0 3px var(--act)";
+        b.style.fontWeight = "700";
+      }
+      return b;
+    })));
     parent.appendChild(this.revealCardNode(ear.advRevealed, () => ear.toggleAdvReveal(), [
       el("div", { style: "font-weight:700;font-size:17px" }, [np.name]),
       el("div", { style: "font-weight:600" }, [namedRomanLine(np)]),

@@ -145,6 +145,9 @@ export const MAJOR_PROGRESSIONS: Progression[] = [
   { mode: TrainingMode.Major, degrees: [1, 4, 6, 5] },   // I-IV-vi-V
   { mode: TrainingMode.Major, degrees: [1, 5, 4, 5] },   // I-V-IV-V
   { mode: TrainingMode.Major, degrees: [6, 5, 4, 5] },   // vi-V-IV-V
+  // Reclassified from Advanced — these are fully diatonic despite their names.
+  { mode: TrainingMode.Major, degrees: [1, 2, 5, 6] },   // I-ii-V-vi  ("Deceptive Cadence")
+  { mode: TrainingMode.Major, degrees: [4, 5, 3, 6] },   // IV-V-iii-vi ("Royal Road" J-pop)
 ];
 
 export const MINOR_PROGRESSIONS: Progression[] = [
@@ -248,14 +251,10 @@ export const ADVANCED_PROGRESSIONS: NamedProgression[] = [
     [c(0, "", "I"), c(0, "", "I/III"), c(5, "", "IV"), c(6, "dim7", "#IV°7"), c(7, "", "V")]),
   adv("Mario Cadence", "Borrowed bVI and bVII resolve up to a triumphant major I — the classic heroic/video-game cadence.", TrainingMode.Major,
     [c(8, "", "bVI"), c(10, "", "bVII"), c(0, "", "I")]),
-  adv("Royal Road", "The backbone of modern J-pop/anime: it loops without ever landing on the home chord.", TrainingMode.Major,
-    [c(5, "", "IV"), c(7, "", "V"), c(4, "m", "iii"), c(9, "m", "vi")]),
   adv("Bird Blues Turnaround", "Charlie Parker's rapid descending turnaround, stacking a passing #IV°7 and a secondary-dominant VI7.", TrainingMode.Major,
     [c(0, "maj7", "Imaj7"), c(6, "dim7", "#IV°7"), c(4, "m7", "iii7"), c(9, "7", "VI7"), c(2, "m7", "ii7"), c(7, "7", "V7")]),
   adv("Montgomery Turnaround", "A highly chromatic Wes-Montgomery turnaround that slides back to the tonic in tritone steps.", TrainingMode.Major,
     [c(0, "maj7", "Imaj7"), c(3, "7", "bIII7"), c(8, "7", "bVI7"), c(1, "7", "bII7")]),
-  adv("Deceptive Cadence", "The V resolves \"wrongly\" to vi instead of I — the classic deceptive cadence that dodges the expected home chord.", TrainingMode.Major,
-    [c(0, "", "I"), c(2, "m", "ii"), c(7, "", "V"), c(9, "m", "vi")]),
   adv("Applied V of V", "The major II is a secondary dominant (V of V): a dominant pointing at the dominant, not directly home.", TrainingMode.Major,
     [c(0, "", "I"), c(2, "7", "II7"), c(7, "", "V"), c(0, "", "I")]),
   adv("Tonicized Relative", "III7 is a secondary dominant (V of vi) that pulls hard into the relative minor before returning home.", TrainingMode.Major,
