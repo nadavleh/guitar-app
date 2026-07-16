@@ -72,6 +72,10 @@ class EarTrainingState(
      *  randomize voicing (standard/shell) per chord. Overrides the single selections. */
     var earMixAll by mutableStateOf(false)
 
+    /** Include the harmonic-minor progressions (major V / V7 → i cadences) in the minor
+     *  generator pool + library. Default on. When off, minor uses only the natural-minor set. */
+    var earHarmonicMinor by mutableStateOf(true)
+
     /** Voicing style for the next chord, honoring shell / mix settings. */
     private fun earStyle(): VoicingStyle = when {
         earMixAll -> if (rng.nextBoolean()) VoicingStyle.Shell else VoicingStyle.Standard
@@ -257,7 +261,7 @@ class EarTrainingState(
         // The I→iii drill is major-only; otherwise honor the Major/Minor include flags.
         val mode = if (iiiFocusMode) TrainingMode.Major else candidates[rng.nextInt(candidates.size)]
         val key = fixedKey ?: PitchClass(rng.nextInt(12))
-        val prog = EarTraining.randomProgression(mode, rng, focusIiii = iiiFocusMode)
+        val prog = EarTraining.randomProgression(mode, rng, focusIiii = iiiFocusMode, includeHarmonicMinor = earHarmonicMinor)
         progKey = key
         progMode = mode
         progProgression = prog
@@ -374,7 +378,10 @@ class EarTrainingState(
             app.guitar.theory.EarTraining.CIRCLE_WINDOWS.firstOrNull { it.romanLine == np.romanLine }
                 ?.let { app.guitar.theory.ProgressionSongs.forCircleWindow(it.id) }
         } ?: emptyList()
-        else -> progProgression?.let { app.guitar.theory.ProgressionSongs.forDiatonic(it) } ?: emptyList()
+        else -> progProgression?.let {
+            if (it.dominantBars.isNotEmpty()) app.guitar.theory.ProgressionSongs.forHarmonicMinor(it)
+            else app.guitar.theory.ProgressionSongs.forDiatonic(it)
+        } ?: emptyList()
     }
 
     /** PDF-imported EXTRA songs for the current progression, shown behind "Show more"
@@ -825,7 +832,7 @@ class EarTrainingState(
         // The I→iii drill is major-only; otherwise honor the Major/Minor include flags.
         val mode = if (iiiFocusMode) TrainingMode.Major else candidates[rng.nextInt(candidates.size)]
         val key = fixedKey ?: PitchClass(rng.nextInt(12))
-        val prog = EarTraining.randomProgression(mode, rng, focusIiii = iiiFocusMode)
+        val prog = EarTraining.randomProgression(mode, rng, focusIiii = iiiFocusMode, includeHarmonicMinor = earHarmonicMinor)
         return QState(key, mode, prog, resolveCurrent(prog, key),
             List(4) { null }, List(4) { null }, List(4) { null })
     }
@@ -906,10 +913,13 @@ class EarTrainingState(
         }.filter { it.isNotEmpty() }.distinct().sorted()
     }
 
-    /** Correct extension label for bar [i] (suffix of its Roman label), or "" if none. */
+    /** Correct extension label for bar [i] (suffix of its Roman label), or "" if none.
+     *  A harmonic-minor dominant bar strips the "V" prefix (its suffix "" / "7" / "9"
+     *  matches the natural `v`'s, so degree-5 answers score the same either way). */
     fun correctExtLabel(i: Int): String {
         val deg = progProgression?.degrees?.getOrNull(i) ?: return ""
-        val info = degreesMap()[deg] ?: return ""
+        val dominant = progMode == TrainingMode.Minor && progProgression?.dominantBars?.contains(i) == true
+        val info = if (dominant) EarTraining.MINOR_DOMINANT else degreesMap()[deg] ?: return ""
         return progResolved.getOrNull(i)?.romanLabel?.removePrefix(info.roman) ?: ""
     }
 

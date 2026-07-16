@@ -765,6 +765,18 @@ private fun ProgressionSettings(ear: EarTrainingState) {
                 )
             }
         }
+
+        // Harmonic-minor progressions: add the major-V / V7 → i cadences to the minor
+        // generator pool + library (default on). Only affects minor keys.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Harmonic minor (V7)", style = MaterialTheme.typography.labelMedium)
+                Text("Add major-V → i cadences to the minor set",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = ear.earHarmonicMinor, onCheckedChange = { ear.earHarmonicMinor = it })
+        }
     }
 }
 
@@ -2622,6 +2634,17 @@ private fun ProgressionLibraryDialog(state: AppState, onDismiss: () -> Unit) {
                             ProgressionSongs.forDiatonic(p),
                             EarTraining.resolveProgression(p, PitchClass.A, ChordTypeLevel.Triads),
                             expandedKey, toggle)
+                    }
+                }
+                if (ear.earHarmonicMinor) {
+                    LibrarySection("Minor — harmonic (V7 → i)",
+                        "Major-V cadences (raised leading tone). Toggle off in the generator settings.") {
+                        EarTraining.MINOR_HARMONIC_PROGRESSIONS.forEach { p ->
+                            LibraryRow(state, "minH:${p.degrees}${p.dominantBars}", EarTraining.romanLineFor(p),
+                                ProgressionSongs.forHarmonicMinor(p),
+                                EarTraining.resolveProgression(p, PitchClass.A, ChordTypeLevel.Triads),
+                                expandedKey, toggle)
+                        }
                     }
                 }
                 LibrarySection("Advanced (non-diatonic)",

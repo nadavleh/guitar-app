@@ -233,6 +233,64 @@ object ProgressionSongs {
         ),
     )
 
+    /** Harmonic-minor progressions (major V / V7 → i), keyed by [Progression.degrees].
+     *  Characteristic examples of the V→i cadence, not always a note-for-note match. */
+    val harmonicMinor: Map<List<Int>, List<SongExample>> = mapOf(
+        listOf(1, 4, 5, 1) to listOf(   // i–iv–V–i (classic harmonic-minor cadence)
+            s("House of the Rising Sun", "The Animals"),
+            s("Paint It, Black", "The Rolling Stones"),
+            s("Stairway to Heaven", "Led Zeppelin"),
+            s("Hava Nagila", "Traditional"),
+            s("Für Elise", "Ludwig van Beethoven"),
+            s("Greensleeves", "Traditional"),
+            s("Minor Swing", "Django Reinhardt"),
+        ),
+        listOf(1, 2, 5, 1) to listOf(   // i–ii°–V–i (minor ii–V–i)
+            s("Autumn Leaves", "Joseph Kosma"),
+            s("Blue Bossa", "Kenny Dorham"),
+            s("Black Orpheus (Manhã de Carnaval)", "Luiz Bonfá"),
+            s("Summertime", "George Gershwin"),
+            s("Softly, as in a Morning Sunrise", "Sigmund Romberg"),
+            s("My Funny Valentine", "Rodgers & Hart"),
+        ),
+        listOf(2, 5, 1, 1) to listOf(   // ii°–V–i–i (minor ii–V–i, tonic held)
+            s("Nature Boy", "Nat King Cole"),
+            s("I Will Survive", "Gloria Gaynor"),
+            s("Fly Me to the Moon", "Frank Sinatra"),
+            s("Alone Together", "Arthur Schwartz"),
+            s("Beautiful Love", "Victor Young"),
+            s("Gloomy Sunday", "Rezső Seress"),
+        ),
+        listOf(1, 6, 2, 5) to listOf(   // i–bVI–ii°–V (minor turnaround to the dominant)
+            s("Softly, as in a Morning Sunrise", "Sigmund Romberg"),
+            s("Don't Speak", "No Doubt"),
+            s("Fly Me to the Moon", "Bart Howard"),
+            s("Beautiful Love", "Victor Young"),
+        ),
+        listOf(1, 6, 4, 5) to listOf(   // i–bVI–iv–V (minor, ending on the dominant)
+            s("Smooth", "Santana ft. Rob Thomas"),
+            s("Sleep Walk", "Santo & Johnny"),
+            s("Bésame Mucho", "Consuelo Velázquez"),
+            s("Sway (¿Quién será?)", "Pablo Beltrán Ruiz"),
+        ),
+        listOf(1, 4, 1, 5) to listOf(   // i–iv–i–V (minor half cadence)
+            s("Zorba the Greek (Sirtaki)", "Mikis Theodorakis"),
+            s("Misirlou", "Dick Dale"),
+            s("People Are Strange", "The Doors"),
+            s("God Rest Ye Merry, Gentlemen", "Traditional"),
+        ),
+        listOf(1, 6, 3, 5) to listOf(   // i–bVI–bIII–V (fact-checked: genuine major-V ending)
+            s("The Passenger", "Iggy Pop"),
+            s("Holiday", "Green Day"),
+        ),
+        listOf(1, 3, 6, 5) to listOf(   // i–bIII–bVI–V
+            s("Crazy", "Gnarls Barkley"),
+        ),
+        listOf(1, 4, 6, 5) to listOf(   // i–iv–bVI–V
+            s("Back to Black", "Amy Winehouse"),
+        ),
+    )
+
     /** Advanced (named) progressions, keyed by [EarTraining.NamedProgression.name].
      *  Characteristic examples — the signature harmonic move, not a note-for-note match. */
     val advanced: Map<String, List<SongExample>> = mapOf(
@@ -557,6 +615,10 @@ object ProgressionSongs {
     /** Songs for a diatonic [Progression] (major or minor); empty if none listed. */
     fun forDiatonic(p: Progression): List<SongExample> =
         (if (p.mode == TrainingMode.Major) major else minor)[p.degrees] ?: emptyList()
+
+    /** Songs for a harmonic-minor progression (from [EarTraining.MINOR_HARMONIC_PROGRESSIONS]),
+     *  keyed by [Progression.degrees]; empty if none. */
+    fun forHarmonicMinor(p: Progression): List<SongExample> = harmonicMinor[p.degrees] ?: emptyList()
 
     /** Songs for an advanced progression by [EarTraining.NamedProgression.name]; empty if none. */
     fun forAdvanced(name: String): List<SongExample> = advanced[name] ?: emptyList()

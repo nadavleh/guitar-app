@@ -37,6 +37,10 @@ export interface ResolvedChord {
 export interface Progression {
   mode: TrainingMode;
   degrees: number[]; // length 4, each 1..7
+  /** Bar indices (0..3) that sound as the HARMONIC-MINOR dominant — a major V / V7
+   *  instead of the natural-minor `v`. Minor-key, degree-5 bars only. Absent/empty
+   *  for every natural-minor and major progression. */
+  dominantBars?: number[];
 }
 
 export const MAJOR_DEGREES: Map<number, DegreeInfo> = new Map([
@@ -60,6 +64,12 @@ export const MINOR_DEGREES: Map<number, DegreeInfo> = new Map([
   [6, di("bVI", "", "maj7", "maj9")],
   [7, di("bVII", "", "7", "7")],
 ]);
+
+/** The HARMONIC-MINOR dominant: degree 5 played as a MAJOR V (raised leading tone),
+ *  the classic V→i cadence. Same root as the natural-minor `v`, but major / dominant 7th.
+ *  Per-level suffixes ("", "7", "9") deliberately match the natural `v`'s so the
+ *  challenge scores a degree-5 answer identically for either. */
+export const MINOR_DOMINANT: DegreeInfo = di("V", "", "7", "9");
 
 const MAJOR_SCALE_SEMITONES = [0, 2, 4, 5, 7, 9, 11];
 const NATURAL_MINOR_SEMITONES = [0, 2, 3, 5, 7, 8, 10];
@@ -105,8 +115,9 @@ export function degreeFromMajorRelative(majorRelative: number, mode: TrainingMod
 /** Alias used by the app layer. */
 export const EarTrainingDegrees = degreesMapFor;
 
-export function resolve(degree: number, key: PitchClass, mode: TrainingMode, level: ChordTypeLevel, rng: Rng = defaultRng): ResolvedChord {
-  const info = degreesMapFor(mode).get(degree)!;
+export function resolve(degree: number, key: PitchClass, mode: TrainingMode, level: ChordTypeLevel, rng: Rng = defaultRng, asDominant = false): ResolvedChord {
+  // Harmonic-minor dominant: degree 5 sounded as a major V (see MINOR_DOMINANT).
+  const info = (asDominant && mode === TrainingMode.Minor) ? MINOR_DOMINANT : degreesMapFor(mode).get(degree)!;
   const root = degreeRoot(key, degree, mode);
   const rootName = spellPc(root);
   if (level === ChordTypeLevel.Extended && info.extendedOptions.length > 0) {
@@ -124,7 +135,8 @@ export function resolve(degree: number, key: PitchClass, mode: TrainingMode, lev
 }
 
 export function resolveProgression(p: Progression, key: PitchClass, level: ChordTypeLevel, rng: Rng = defaultRng): ResolvedChord[] {
-  return p.degrees.map((d) => resolve(d, key, p.mode, level, rng));
+  const dom = p.dominantBars ?? [];
+  return p.degrees.map((d, i) => resolve(d, key, p.mode, level, rng, dom.includes(i)));
 }
 
 export const MAJOR_PROGRESSIONS: Progression[] = [
@@ -161,6 +173,23 @@ export const MINOR_PROGRESSIONS: Progression[] = [
   { mode: TrainingMode.Minor, degrees: [1, 3, 7, 4] },   // i-bIII-bVII-iv
 ];
 
+/** Harmonic-minor progressions: classic minor-key cadences using a MAJOR V / V7 (raised
+ *  leading tone) → i. Each marks its degree-5 bar(s) as dominantBars. Included in the
+ *  minor generator pool + library only when the harmonic-minor toggle is on (default on).
+ *  Kept separate from MINOR_PROGRESSIONS so the natural-minor set keeps its minor v. */
+export const MINOR_HARMONIC_PROGRESSIONS: Progression[] = [
+  { mode: TrainingMode.Minor, degrees: [1, 4, 5, 1], dominantBars: [2] },  // i-iv-V-i
+  { mode: TrainingMode.Minor, degrees: [1, 2, 5, 1], dominantBars: [2] },  // i-ii°-V-i
+  { mode: TrainingMode.Minor, degrees: [2, 5, 1, 1], dominantBars: [1] },  // ii°-V-i-i
+  { mode: TrainingMode.Minor, degrees: [1, 6, 2, 5], dominantBars: [3] },  // i-bVI-ii°-V
+  { mode: TrainingMode.Minor, degrees: [1, 6, 4, 5], dominantBars: [3] },  // i-bVI-iv-V
+  { mode: TrainingMode.Minor, degrees: [1, 4, 1, 5], dominantBars: [3] },  // i-iv-i-V (half cadence)
+  // Verified from Nadav's list (fact-checked — the mislabeled bVII "axis" ones excluded).
+  { mode: TrainingMode.Minor, degrees: [1, 6, 3, 5], dominantBars: [3] },  // i-bVI-bIII-V
+  { mode: TrainingMode.Minor, degrees: [1, 3, 6, 5], dominantBars: [3] },  // i-bIII-bVI-V
+  { mode: TrainingMode.Minor, degrees: [1, 4, 6, 5], dominantBars: [3] },  // i-iv-bVI-V
+];
+
 /** Focused drill for hearing the I→iii move (the "soft" mediant that shares two
  *  notes with the tonic). Every entry opens with I–iii. Major-only, and NOT part of
  *  MAJOR_PROGRESSIONS (it's a drill, not a library entry, so needs no song list). */
@@ -173,9 +202,11 @@ export const III_FOCUS_PROGRESSIONS: Progression[] = [
   { mode: TrainingMode.Major, degrees: [1, 3, 1, 4] },   // I–iii–I–IV
 ];
 
-export function randomProgression(mode: TrainingMode, rng: Rng = defaultRng, focusIiii = false): Progression {
+export function randomProgression(mode: TrainingMode, rng: Rng = defaultRng, focusIiii = false, includeHarmonicMinor = true): Progression {
   if (focusIiii) return III_FOCUS_PROGRESSIONS[rng.int(III_FOCUS_PROGRESSIONS.length)];
-  const pool = mode === TrainingMode.Major ? MAJOR_PROGRESSIONS : MINOR_PROGRESSIONS;
+  const pool =
+    mode === TrainingMode.Major ? MAJOR_PROGRESSIONS :
+    includeHarmonicMinor ? [...MINOR_PROGRESSIONS, ...MINOR_HARMONIC_PROGRESSIONS] : MINOR_PROGRESSIONS;
   return pool[rng.int(pool.length)];
 }
 
@@ -410,10 +441,14 @@ export function resolveCircleWindow(win: CircleWindow, key: PitchClass): Resolve
   });
 }
 
-/** Roman-numeral line for a diatonic progression, e.g. "I – V – vi – IV". */
+/** Roman-numeral line for a diatonic progression, e.g. "I – V – vi – IV". A
+ *  harmonic-minor dominant bar shows "V" instead of the natural "v". */
 export function romanLineFor(prog: Progression): string {
   const map = degreesMapFor(prog.mode);
-  return prog.degrees.map((d) => map.get(d)?.roman ?? String(d)).join("  –  ");
+  const dom = prog.dominantBars ?? [];
+  return prog.degrees.map((d, i) =>
+    (dom.includes(i) && prog.mode === TrainingMode.Minor) ? MINOR_DOMINANT.roman : (map.get(d)?.roman ?? String(d)),
+  ).join("  –  ");
 }
 
 // ---- Interval-identification trainer (#6) ----

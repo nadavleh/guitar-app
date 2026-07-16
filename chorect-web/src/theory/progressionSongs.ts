@@ -220,6 +220,64 @@ const MINOR: Record<string, SongExample[]> = {
   ],
 };
 
+/** Harmonic-minor progressions (major V / V7 → i), keyed by degrees.join(","). Mirror of
+ *  ProgressionSongs.harmonicMinor. Characteristic examples of the V→i cadence. */
+const HARMONIC_MINOR: Record<string, SongExample[]> = {
+  "1,4,5,1": [   // i–iv–V–i (classic harmonic-minor cadence)
+    s("House of the Rising Sun", "The Animals"),
+    s("Paint It, Black", "The Rolling Stones"),
+    s("Stairway to Heaven", "Led Zeppelin"),
+    s("Hava Nagila", "Traditional"),
+    s("Für Elise", "Ludwig van Beethoven"),
+    s("Greensleeves", "Traditional"),
+    s("Minor Swing", "Django Reinhardt"),
+  ],
+  "1,2,5,1": [   // i–ii°–V–i (minor ii–V–i)
+    s("Autumn Leaves", "Joseph Kosma"),
+    s("Blue Bossa", "Kenny Dorham"),
+    s("Black Orpheus (Manhã de Carnaval)", "Luiz Bonfá"),
+    s("Summertime", "George Gershwin"),
+    s("Softly, as in a Morning Sunrise", "Sigmund Romberg"),
+    s("My Funny Valentine", "Rodgers & Hart"),
+  ],
+  "2,5,1,1": [   // ii°–V–i–i (minor ii–V–i, tonic held)
+    s("Nature Boy", "Nat King Cole"),
+    s("I Will Survive", "Gloria Gaynor"),
+    s("Fly Me to the Moon", "Frank Sinatra"),
+    s("Alone Together", "Arthur Schwartz"),
+    s("Beautiful Love", "Victor Young"),
+    s("Gloomy Sunday", "Rezső Seress"),
+  ],
+  "1,6,2,5": [   // i–bVI–ii°–V (minor turnaround to the dominant)
+    s("Softly, as in a Morning Sunrise", "Sigmund Romberg"),
+    s("Don't Speak", "No Doubt"),
+    s("Fly Me to the Moon", "Bart Howard"),
+    s("Beautiful Love", "Victor Young"),
+  ],
+  "1,6,4,5": [   // i–bVI–iv–V (minor, ending on the dominant)
+    s("Smooth", "Santana ft. Rob Thomas"),
+    s("Sleep Walk", "Santo & Johnny"),
+    s("Bésame Mucho", "Consuelo Velázquez"),
+    s("Sway (¿Quién será?)", "Pablo Beltrán Ruiz"),
+  ],
+  "1,4,1,5": [   // i–iv–i–V (minor half cadence)
+    s("Zorba the Greek (Sirtaki)", "Mikis Theodorakis"),
+    s("Misirlou", "Dick Dale"),
+    s("People Are Strange", "The Doors"),
+    s("God Rest Ye Merry, Gentlemen", "Traditional"),
+  ],
+  "1,6,3,5": [   // i–bVI–bIII–V (fact-checked: genuine major-V ending)
+    s("The Passenger", "Iggy Pop"),
+    s("Holiday", "Green Day"),
+  ],
+  "1,3,6,5": [   // i–bIII–bVI–V
+    s("Crazy", "Gnarls Barkley"),
+  ],
+  "1,4,6,5": [   // i–iv–bVI–V
+    s("Back to Black", "Amy Winehouse"),
+  ],
+};
+
 /** Advanced (named) progressions, keyed by NamedProgression.name. */
 const ADVANCED: Record<string, SongExample[]> = {
   "Mixolydian Rocker": [
@@ -652,6 +710,11 @@ export function importedSongsForDiatonic(p: Progression): SongExample[] {
 export function songsForDiatonic(p: Progression): SongExample[] {
   const table = p.mode === TrainingMode.Major ? MAJOR : MINOR;
   return table[p.degrees.join(",")] ?? [];
+}
+
+/** Songs for a harmonic-minor progression (from MINOR_HARMONIC_PROGRESSIONS); [] if none. */
+export function songsForHarmonicMinor(p: Progression): SongExample[] {
+  return HARMONIC_MINOR[p.degrees.join(",")] ?? [];
 }
 
 /** Songs for an advanced progression by name; [] if none listed. */

@@ -37,14 +37,21 @@ data class DegreeInfo(
     val extendedOptions: List<Pair<String, String>> = emptyList(),
 )
 
-/** A 4-bar progression by scale degree. */
+/** A 4-bar progression by scale degree.
+ *
+ *  [dominantBars] lists bar indices (0..3) that should sound as the HARMONIC-MINOR
+ *  dominant — a major V / V7 instead of the natural-minor `v`. Only meaningful in a
+ *  minor key and only on degree-5 bars (the raised leading tone that pulls to i).
+ *  Empty for every natural-minor and major progression. */
 data class Progression(
     val mode: TrainingMode,
     val degrees: List<Int>,   // length 4, each in 1..7
+    val dominantBars: Set<Int> = emptySet(),
 ) {
     init {
         require(degrees.size == 4) { "progressions must be 4 bars, got ${degrees.size}" }
         require(degrees.all { it in 1..7 })
+        require(dominantBars.all { it in degrees.indices }) { "dominantBars out of range" }
     }
 }
 
@@ -84,6 +91,13 @@ object EarTraining {
         6 to DegreeInfo("bVI",  "",    "maj7", "maj9"),
         7 to DegreeInfo("bVII", "",    "7",    "7"),
     )
+
+    /** The HARMONIC-MINOR dominant: degree 5 played as a MAJOR V (raised leading tone),
+     *  the classic V→i cadence. Same root as the natural-minor `v` (the perfect fifth),
+     *  but a major triad / dominant 7th. Used only for a progression's [Progression.dominantBars].
+     *  No random extended set — its per-level suffixes ("", "7", "9") deliberately match the
+     *  natural `v`'s, so the challenge scores a degree-5 answer identically for either. */
+    val MINOR_DOMINANT = DegreeInfo("V", "", "7", "9")
 
     private val MAJOR_SCALE_SEMITONES = intArrayOf(0, 2, 4, 5, 7, 9, 11)
     private val NATURAL_MINOR_SEMITONES = intArrayOf(0, 2, 3, 5, 7, 8, 10)
@@ -135,9 +149,12 @@ object EarTraining {
         mode: TrainingMode,
         level: ChordTypeLevel,
         rng: kotlin.random.Random = kotlin.random.Random.Default,
+        asDominant: Boolean = false,
     ): ResolvedChord {
-        val info = (if (mode == TrainingMode.Major) MAJOR_DEGREES else MINOR_DEGREES)[degree]
-            ?: error("invalid degree $degree")
+        // Harmonic-minor dominant: degree 5 sounded as a major V (see [MINOR_DOMINANT]).
+        val info = if (asDominant && mode == TrainingMode.Minor) MINOR_DOMINANT
+            else (if (mode == TrainingMode.Major) MAJOR_DEGREES else MINOR_DEGREES)[degree]
+                ?: error("invalid degree $degree")
         val root = degreeRoot(key, degree, mode)
         val rootName = NoteSpeller.spell(root)
         // Extended level with a diatonic allowed-extension set → choose one at random.
@@ -166,7 +183,7 @@ object EarTraining {
         level: ChordTypeLevel,
         rng: kotlin.random.Random = kotlin.random.Random.Default,
     ): List<ResolvedChord> =
-        p.degrees.map { resolve(it, key, p.mode, level, rng) }
+        p.degrees.mapIndexed { i, d -> resolve(d, key, p.mode, level, rng, asDominant = i in p.dominantBars) }
 
     // ----- Common progressions ----------------------------------------------------------------
 
@@ -205,6 +222,25 @@ object EarTraining {
         Progression(TrainingMode.Minor, listOf(1, 3, 7, 4)),   // i-bIII-bVII-iv
     )
 
+    /** Harmonic-minor progressions: the classic minor-key cadences that use a MAJOR V /
+     *  V7 (raised leading tone) resolving to the minor tonic — the strong V→i pull that
+     *  natural-minor `v` lacks. Each marks its degree-5 bar(s) as [Progression.dominantBars].
+     *  Included in the minor generator pool + library only when the harmonic-minor toggle
+     *  is on (default on). Kept separate from [MINOR_PROGRESSIONS] so the natural-minor
+     *  set (e.g. i-v-bVI-bVII) still sounds its minor v. */
+    val MINOR_HARMONIC_PROGRESSIONS: List<Progression> = listOf(
+        Progression(TrainingMode.Minor, listOf(1, 4, 5, 1), dominantBars = setOf(2)),  // i-iv-V-i
+        Progression(TrainingMode.Minor, listOf(1, 2, 5, 1), dominantBars = setOf(2)),  // i-ii°-V-i
+        Progression(TrainingMode.Minor, listOf(2, 5, 1, 1), dominantBars = setOf(1)),  // ii°-V-i-i
+        Progression(TrainingMode.Minor, listOf(1, 6, 2, 5), dominantBars = setOf(3)),  // i-bVI-ii°-V
+        Progression(TrainingMode.Minor, listOf(1, 6, 4, 5), dominantBars = setOf(3)),  // i-bVI-iv-V
+        Progression(TrainingMode.Minor, listOf(1, 4, 1, 5), dominantBars = setOf(3)),  // i-iv-i-V (half cadence)
+        // Verified from Nadav's list (fact-checked — the mislabeled bVII "axis" ones excluded).
+        Progression(TrainingMode.Minor, listOf(1, 6, 3, 5), dominantBars = setOf(3)),  // i-bVI-bIII-V
+        Progression(TrainingMode.Minor, listOf(1, 3, 6, 5), dominantBars = setOf(3)),  // i-bIII-bVI-V
+        Progression(TrainingMode.Minor, listOf(1, 4, 6, 5), dominantBars = setOf(3)),  // i-iv-bVI-V
+    )
+
     /** Focused drill for hearing the I→iii move (the "soft" mediant, which shares
      *  two notes with the tonic and is easy to miss). Every entry opens with I–iii so
      *  the ear gets repeated exposure to that transition. Major-only (iii is the minor
@@ -225,9 +261,14 @@ object EarTraining {
         mode: TrainingMode,
         rng: kotlin.random.Random,
         focusIiii: Boolean = false,
+        includeHarmonicMinor: Boolean = true,
     ): Progression {
         if (focusIiii) return III_FOCUS_PROGRESSIONS[rng.nextInt(III_FOCUS_PROGRESSIONS.size)]
-        val pool = if (mode == TrainingMode.Major) MAJOR_PROGRESSIONS else MINOR_PROGRESSIONS
+        val pool = when {
+            mode == TrainingMode.Major -> MAJOR_PROGRESSIONS
+            includeHarmonicMinor -> MINOR_PROGRESSIONS + MINOR_HARMONIC_PROGRESSIONS
+            else -> MINOR_PROGRESSIONS
+        }
         return pool[rng.nextInt(pool.size)]
     }
 
@@ -551,7 +592,10 @@ object EarTraining {
      *  by the progression-library viewer. */
     fun romanLineFor(prog: Progression): String {
         val map = if (prog.mode == TrainingMode.Major) MAJOR_DEGREES else MINOR_DEGREES
-        return prog.degrees.joinToString("  –  ") { map[it]?.roman ?: it.toString() }
+        return prog.degrees.mapIndexed { i, d ->
+            if (i in prog.dominantBars && prog.mode == TrainingMode.Minor) MINOR_DOMINANT.roman
+            else map[d]?.roman ?: d.toString()
+        }.joinToString("  –  ")
     }
 }
 

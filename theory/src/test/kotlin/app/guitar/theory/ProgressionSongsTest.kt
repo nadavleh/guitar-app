@@ -33,6 +33,19 @@ class ProgressionSongsTest {
         }
     }
 
+    @Test fun `every harmonic-minor progression has songs and a dominant V that resolves`() {
+        for (p in EarTraining.MINOR_HARMONIC_PROGRESSIONS) {
+            assertClean("harmonic-minor ${EarTraining.romanLineFor(p)}", ProgressionSongs.forHarmonicMinor(p))
+            // The marked dominant bar(s) must render a MAJOR V (roman starts with "V").
+            val resolved = EarTraining.resolveProgression(p, PitchClass.A, ChordTypeLevel.Sevenths)
+            for (i in p.dominantBars) {
+                assertTrue(resolved[i].romanLabel.startsWith("V"),
+                    "harmonic-minor ${EarTraining.romanLineFor(p)}: bar $i should be a dominant V, got ${resolved[i].romanLabel}")
+                assertTrue(ChordLibrary.parse(resolved[i].symbol) != null, "unparseable ${resolved[i].symbol}")
+            }
+        }
+    }
+
     @Test fun `every advanced progression has song examples`() {
         for (p in EarTraining.ADVANCED_PROGRESSIONS) {
             assertClean("advanced ${p.name}", ProgressionSongs.forAdvanced(p.name))

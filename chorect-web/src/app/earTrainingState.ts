@@ -10,8 +10,9 @@ import {
   TrainingMode, ChordTypeLevel, Progression, ResolvedChord, NamedProgression,
   EarTrainingDegrees, degreeRoot, resolve as resolveDegree, resolveProgression,
   randomProgression, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
+  MINOR_DOMINANT,
   majorRelativeDegree, degreeFromMajorRelative,
-  SongExample, songsForDiatonic, songsForAdvanced, songsForCircleWindow, importedSongsForDiatonic, CIRCLE_WINDOWS, namedRomanLine,
+  SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow, importedSongsForDiatonic, CIRCLE_WINDOWS, namedRomanLine,
   N2cChallenge, randomN2c, n2cAnswerLabel, n2cChordSymbol, n2cTestNote, n2cLabel,
   N2C_MAJOR_TEST_OFFSETS, N2C_MINOR_TEST_OFFSETS,
   inversionCount, inversionMidis,
@@ -59,6 +60,8 @@ export class EarTrainingState {
   // voicing / variety
   earShellVoicing = true;   // shell voicings (root + 3rd + 7th) are the default for now
   earMixAll = false;
+  // Include the harmonic-minor progressions (major V / V7 → i) in the minor pool + library.
+  earHarmonicMinor = true;
 
   /** Voice-led shapes for the CURRENT progression, one per bar — built once when the
    *  progression changes so the loop AND every slot/chord button sound the identical
@@ -174,7 +177,7 @@ export class EarTrainingState {
     // The I→iii drill is major-only; otherwise honor the Major/Minor include flags.
     const mode = this.iiiFocusMode ? TrainingMode.Major : candidates[this.rng.int(candidates.length)];
     const key = this.fixedKey ?? this.rng.int(12);
-    const prog = randomProgression(mode, this.rng, this.iiiFocusMode);
+    const prog = randomProgression(mode, this.rng, this.iiiFocusMode, this.earHarmonicMinor);
     this.progKey = key;
     this.progMode = mode;
     this.progProgression = prog;
@@ -674,7 +677,7 @@ export class EarTrainingState {
     // The I→iii drill is major-only; otherwise honor the Major/Minor include flags.
     const mode = this.iiiFocusMode ? TrainingMode.Major : candidates[this.rng.int(candidates.length)];
     const key = this.fixedKey ?? this.rng.int(12);
-    const prog = randomProgression(mode, this.rng, this.iiiFocusMode);
+    const prog = randomProgression(mode, this.rng, this.iiiFocusMode, this.earHarmonicMinor);
     return {
       key, mode, prog, resolved: this.resolveCurrent(prog, key),
       guessDeg: [null, null, null, null],
@@ -771,7 +774,10 @@ export class EarTrainingState {
   correctExtLabel(i: number): string {
     const deg = this.progProgression?.degrees[i];
     if (deg == null) return "";
-    const info = EarTrainingDegrees(this.progMode).get(deg);
+    // A harmonic-minor dominant bar strips the "V" prefix (its suffix "" / "7" / "9"
+    // matches the natural v's, so degree-5 answers score the same either way).
+    const dominant = this.progMode === TrainingMode.Minor && (this.progProgression?.dominantBars ?? []).includes(i);
+    const info = dominant ? MINOR_DOMINANT : EarTrainingDegrees(this.progMode).get(deg);
     if (!info) return "";
     return this.progResolved[i]?.romanLabel.replace(info.roman, "") ?? "";
   }
@@ -1058,7 +1064,10 @@ export class EarTrainingState {
       const win = CIRCLE_WINDOWS.find((w) => w.romanLine === line);
       return win ? songsForCircleWindow(win.id) : [];
     }
-    return this.progProgression ? songsForDiatonic(this.progProgression) : [];
+    if (!this.progProgression) return [];
+    return (this.progProgression.dominantBars?.length)
+      ? songsForHarmonicMinor(this.progProgression)
+      : songsForDiatonic(this.progProgression);
   }
 
   /** PDF-imported EXTRA songs for the current progression, shown behind "Show more"

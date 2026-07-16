@@ -40,6 +40,22 @@ named against the major scale (bIII/bVI/bVII). Auto-generated from the theory en
 | i – v – bVI – bVII | Jenny Was a Friend of Mine (The Killers); Reptilia (The Strokes); High Hopes (Pink Floyd) |
 | i – bIII – bVII – iv | Just Dance (Lady Gaga); SOS (ABBA); Personal Jesus (Depeche Mode) |
 
+## Diatonic — Minor, harmonic (V7 → i) (9)
+
+Major-V / V7 cadences (raised leading tone). Included when the harmonic-minor toggle is on (default on).
+
+| Progression | Example songs |
+|---|---|
+| i – iv – V – i | House of the Rising Sun (The Animals); Paint It, Black (The Rolling Stones); Stairway to Heaven (Led Zeppelin); Hava Nagila (Traditional); Für Elise (Ludwig van Beethoven); Greensleeves (Traditional); Minor Swing (Django Reinhardt) |
+| i – ii° – V – i | Autumn Leaves (Joseph Kosma); Blue Bossa (Kenny Dorham); Black Orpheus (Manhã de Carnaval) (Luiz Bonfá); Summertime (George Gershwin); Softly, as in a Morning Sunrise (Sigmund Romberg); My Funny Valentine (Rodgers & Hart) |
+| ii° – V – i – i | Nature Boy (Nat King Cole); I Will Survive (Gloria Gaynor); Fly Me to the Moon (Frank Sinatra); Alone Together (Arthur Schwartz); Beautiful Love (Victor Young); Gloomy Sunday (Rezső Seress) |
+| i – bVI – ii° – V | Softly, as in a Morning Sunrise (Sigmund Romberg); Don't Speak (No Doubt); Fly Me to the Moon (Bart Howard); Beautiful Love (Victor Young) |
+| i – bVI – iv – V | Smooth (Santana ft. Rob Thomas); Sleep Walk (Santo & Johnny); Bésame Mucho (Consuelo Velázquez); Sway (¿Quién será?) (Pablo Beltrán Ruiz) |
+| i – iv – i – V | Zorba the Greek (Sirtaki) (Mikis Theodorakis); Misirlou (Dick Dale); People Are Strange (The Doors); God Rest Ye Merry, Gentlemen (Traditional) |
+| i – bVI – bIII – V | The Passenger (Iggy Pop); Holiday (Green Day) |
+| i – bIII – bVI – V | Crazy (Gnarls Barkley) |
+| i – iv – bVI – V | Back to Black (Amy Winehouse) |
+
 ## I → iii focus drill (6)
 
 - I – iii – IV – V

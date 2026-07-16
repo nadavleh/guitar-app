@@ -15,9 +15,9 @@ import {
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
   parseChord, ChordShapeGenerator, CagedShape, notesFrom, midiPitchClass, fp, fpKey,
   IntervalDirection, INTERVAL_CHOICES, intervalChoiceFor,
-  MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, ADVANCED_PROGRESSIONS, ADVANCED2_PROGRESSIONS,
+  MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, MINOR_HARMONIC_PROGRESSIONS, ADVANCED_PROGRESSIONS, ADVANCED2_PROGRESSIONS,
   SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor,
-  SongExample, songsForDiatonic, songsForAdvanced, songsForCircleWindow,
+  SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow,
   ResolvedChord, ChordShape, resolveProgression, resolveNamed, resolveCircleWindow,
 } from "../theory";
 
@@ -604,6 +604,11 @@ export class EarTrainingUI {
     body.appendChild(section("Minor (diatonic)", "Fixed key A minor.",
       MINOR_PROGRESSIONS.map((p) => row(`min:${p.degrees.join(",")}`, romanLineFor(p), songsForDiatonic(p),
         resolveProgression(p, 9, ChordTypeLevel.Triads)))));
+    if (ear.earHarmonicMinor) {
+      body.appendChild(section("Minor — harmonic (V7 → i)", "Major-V cadences (raised leading tone). Toggle off in the generator settings.",
+        MINOR_HARMONIC_PROGRESSIONS.map((p) => row(`minH:${p.degrees.join(",")}:${(p.dominantBars ?? []).join("")}`,
+          romanLineFor(p), songsForHarmonicMinor(p), resolveProgression(p, 9, ChordTypeLevel.Triads)))));
+    }
     body.appendChild(section("Advanced (non-diatonic)", "Characteristic examples — the signature harmonic move, not always note-for-note.",
       ADVANCED_PROGRESSIONS.map((p) => row(`adv:${p.name}`, `${p.name}:  ${namedRomanLine(p)}`, songsForAdvanced(p.name),
         resolveNamed(p, p.tonicMode === TrainingMode.Major ? 0 : 9)))));
@@ -697,6 +702,10 @@ export class EarTrainingUI {
       chip("Shell", ear.earShellVoicing && !ear.earMixAll, () => { ear.earShellVoicing = true; ear.earMixAll = false; this.rerender(); }),
       chip("Mix all", ear.earMixAll, () => { ear.earMixAll = !ear.earMixAll; ear.reresolveCurrent(); }),
     ]));
+    // Harmonic-minor progressions: add the major-V / V7 → i cadences to the minor
+    // generator pool + library (default on). Only affects minor keys.
+    parent.appendChild(switchRow("Harmonic minor (V7)", "Add major-V → i cadences to the minor set",
+      ear.earHarmonicMinor, (v) => { ear.earHarmonicMinor = v; this.rerender(); }));
   }
 
   private keySelectInline(): HTMLElement {
