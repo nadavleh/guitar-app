@@ -183,6 +183,7 @@ enum class TabDest(val sheet: Sheet, val label: String, val icon: ImageVector) {
     Loop(Sheet.Loop, "Loop", Icons.Outlined.Repeat),
     Tuner(Sheet.Tuner, "Tuner", Icons.Outlined.Speed),
     Decompose(Sheet.Decompose, "Decompose", Icons.Outlined.Extension),
+    RhythmUnits(Sheet.RhythmUnits, "Rhythm", Icons.Outlined.GraphicEq),
     // Cavaquinho-only (filtered in the tab editor + More by instrument).
     CavaqProgressions(Sheet.CavaqProgressions, "Progressions", Icons.Outlined.QueueMusic),
 }
@@ -331,6 +332,7 @@ private fun destSubtitle(dest: TabDest): String = when (dest) {
     TabDest.CavaqProgressions -> "Cavaquinho functional sequences — looper + neck"
     TabDest.Tuner -> "Chromatic tuner with cents needle"
     TabDest.Decompose -> "Chord-tone breakdown reference"
+    TabDest.RhythmUnits -> "Learn & train basic rhythmic units"
 }
 
 /**

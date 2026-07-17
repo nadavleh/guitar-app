@@ -13,3 +13,4 @@ export * from "./note2chord";
 export * from "./voiceLeading";
 export * from "./percussion";
 export * from "./chordDecomposition";
+export * from "./rhythmUnits";
