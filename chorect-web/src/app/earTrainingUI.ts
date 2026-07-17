@@ -86,6 +86,7 @@ export class EarTrainingUI {
   private padPickedDeg: number | null = null;
   private padPickedRoman: string | null = null;
   private padPickedExt: string | null = null;
+  private padPickedDominant = false;   // harmonic-minor V7 key selected
   private padExtOpen = false;
   /** Physical-keyboard handler for the fixed answer pad (1..7 pick a degree,
    *  Enter commits in extension mode, Esc cancels the pending pick) — attached
@@ -312,7 +313,7 @@ export class EarTrainingUI {
   }
 
   private resetPad(): void {
-    this.padPickedDeg = null; this.padPickedRoman = null; this.padPickedExt = null; this.padExtOpen = false;
+    this.padPickedDeg = null; this.padPickedRoman = null; this.padPickedExt = null; this.padPickedDominant = false; this.padExtOpen = false;
   }
 
   /** Physical 1..7 keys pick a degree in [challengeSelectedBar]'s pad (Enter
@@ -340,8 +341,8 @@ export class EarTrainingUI {
         if (idx >= keys.length) return;
         e.preventDefault();
         const [majDeg, roman] = keys[idx];
-        if (this.padPickedDeg !== majDeg) { this.padPickedExt = null; this.padExtOpen = false; }
-        this.padPickedDeg = majDeg; this.padPickedRoman = roman;
+        if (this.padPickedDeg !== majDeg || this.padPickedDominant) { this.padPickedExt = null; this.padExtOpen = false; }
+        this.padPickedDeg = majDeg; this.padPickedRoman = roman; this.padPickedDominant = false;
         if (!needsExt) { ear.guessChallengeKeyboard(bar, majDeg, roman, null); this.resetPad(); }
         this.rerender();
       } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
@@ -357,7 +358,7 @@ export class EarTrainingUI {
         this.rerender();
       } else if (e.key === "Enter" && needsExt && this.padPickedDeg != null) {
         e.preventDefault();
-        ear.guessChallengeKeyboard(bar, this.padPickedDeg, this.padPickedRoman ?? String(this.padPickedDeg), this.padPickedExt);
+        ear.guessChallengeKeyboard(bar, this.padPickedDeg, this.padPickedRoman ?? String(this.padPickedDeg), this.padPickedExt, this.padPickedDominant);
         this.resetPad();
         this.rerender();
       }
@@ -382,7 +383,7 @@ export class EarTrainingUI {
 
     const commit = (ext: string | null) => {
       if (this.padPickedDeg == null) return;
-      ear.guessChallengeKeyboard(bar, this.padPickedDeg, this.padPickedRoman ?? String(this.padPickedDeg), ext);
+      ear.guessChallengeKeyboard(bar, this.padPickedDeg, this.padPickedRoman ?? String(this.padPickedDeg), ext, this.padPickedDominant);
       this.resetPad();
       this.rerender();
     };
@@ -395,11 +396,22 @@ export class EarTrainingUI {
     ]);
 
     const grid = el("div", { class: "et-pad-grid" }, ear.keyboardKeys().map(([majDeg, roman]) =>
-      chip(roman, this.padPickedDeg === majDeg, () => {
-        if (this.padPickedDeg !== majDeg) { this.padPickedExt = null; this.padExtOpen = false; }
-        this.padPickedDeg = majDeg; this.padPickedRoman = roman;
+      chip(roman, this.padPickedDeg === majDeg && !this.padPickedDominant, () => {
+        if (this.padPickedDeg !== majDeg || this.padPickedDominant) { this.padPickedExt = null; this.padExtOpen = false; }
+        this.padPickedDeg = majDeg; this.padPickedRoman = roman; this.padPickedDominant = false;
         if (!needsExt) commit(null); else this.rerender();
       })));
+    // Harmonic-minor dominant: a dedicated "V7"/"V" key (minor row + harmonic toggle on)
+    // so a major V is marked distinctly from the natural `v`.
+    if (ear.harmonicDominantVisible) {
+      const domMajDeg = ear.harmonicDominantMajDeg;
+      const domLabel = ear.harmonicDominantLabel();
+      grid.appendChild(chip(domLabel, this.padPickedDeg === domMajDeg && this.padPickedDominant, () => {
+        if (this.padPickedDeg !== domMajDeg || !this.padPickedDominant) { this.padPickedExt = null; this.padExtOpen = false; }
+        this.padPickedDeg = domMajDeg; this.padPickedRoman = domLabel; this.padPickedDominant = true;
+        if (!needsExt) commit(null); else this.rerender();
+      }));
+    }
     if (needsExt) grid.appendChild(chip("7th ▾", this.padExtOpen, () => { this.padExtOpen = !this.padExtOpen; this.rerender(); }));
 
     const children: HTMLElement[] = [header, el("div", { class: "v-gap-8" }), grid];

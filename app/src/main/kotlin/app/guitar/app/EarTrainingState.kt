@@ -796,6 +796,12 @@ class EarTrainingState(
      *  in whatever Roman system they entered it; null = the bar's square is empty. */
     var challengeGuessLabel by mutableStateOf<List<String?>>(List(4) { null })
         private set
+    /** Per-bar flag: the user answered the HARMONIC-MINOR dominant (major V / V7) for
+     *  this bar, not the natural-minor `v`. Only settable from the minor keyboard's
+     *  dedicated "V7" key (shown when the harmonic-minor toggle is on). Scoring requires
+     *  it to match whether the bar actually is a [Progression.dominantBars] bar. */
+    var challengeGuessDominant by mutableStateOf<List<Boolean>>(List(4) { false })
+        private set
 
     /** #6: answer-keyboard "shift" state — false shows the MAJOR Roman row
      *  (I ii iii IV V vi vii°), true shows the MINOR row (i ii° III iv v VI VII).
@@ -807,6 +813,7 @@ class EarTrainingState(
         challengeGuessDegree = List(4) { null }
         challengeGuessExt = List(4) { null }
         challengeGuessLabel = List(4) { null }
+        challengeGuessDominant = List(4) { false }
     }
 
     // ---- #4/#5: question history so the user can step back and forward ----
@@ -820,6 +827,7 @@ class EarTrainingState(
         var guessDeg: List<Int?>,
         var guessExt: List<String?>,
         var guessLabel: List<String?>,
+        var guessDom: List<Boolean>,
     )
 
     private val challengeLog = ArrayList<QState>()
@@ -834,7 +842,7 @@ class EarTrainingState(
         val key = fixedKey ?: PitchClass(rng.nextInt(12))
         val prog = EarTraining.randomProgression(mode, rng, focusIiii = iiiFocusMode, includeHarmonicMinor = earHarmonicMinor)
         return QState(key, mode, prog, resolveCurrent(prog, key),
-            List(4) { null }, List(4) { null }, List(4) { null })
+            List(4) { null }, List(4) { null }, List(4) { null }, List(4) { false })
     }
 
     /** Make [q] the live question (prog* + guesses), resetting reveals. */
@@ -847,6 +855,7 @@ class EarTrainingState(
         challengeGuessDegree = q.guessDeg
         challengeGuessExt = q.guessExt
         challengeGuessLabel = q.guessLabel
+        challengeGuessDominant = q.guessDom
         progBarRevealed = emptySet()
         keyRevealed = false
         modeRevealed = false
@@ -861,6 +870,7 @@ class EarTrainingState(
             it.guessDeg = challengeGuessDegree
             it.guessExt = challengeGuessExt
             it.guessLabel = challengeGuessLabel
+            it.guessDom = challengeGuessDominant
         }
     }
 
@@ -928,7 +938,12 @@ class EarTrainingState(
         val deg = progProgression?.degrees?.getOrNull(i) ?: return null
         val g = challengeGuessDegree.getOrNull(i) ?: return null
         if (challengeNeedsExt && challengeGuessExt.getOrNull(i) == null) return null
-        val degOk = g == deg
+        // Degree must match AND the major-V/natural-v choice must match the bar: a
+        // harmonic-dominant bar is only correct when answered with the "V7" key, and a
+        // natural degree-5 bar only when answered with the plain "v" key.
+        val barDominant = progMode == TrainingMode.Minor && progProgression?.dominantBars?.contains(i) == true
+        val guessDominant = challengeGuessDominant.getOrNull(i) == true
+        val degOk = g == deg && guessDominant == barDominant
         val extOk = !challengeNeedsExt || challengeGuessExt.getOrNull(i) == correctExtLabel(i)
         return degOk && extOk
     }
@@ -1024,6 +1039,15 @@ class EarTrainingState(
 
     fun toggleKeyboardShift() { keyboardMinor = !keyboardMinor }
 
+    /** Show the dedicated harmonic-minor dominant ("V7") answer key: only on the minor
+     *  keyboard row, and only when the harmonic-minor option is on. Lets the user mark a
+     *  major V distinctly from the natural `v` (which the plain degree-5 key answers). */
+    val harmonicDominantVisible: Boolean get() = keyboardMinor && earHarmonicMinor
+    /** The relative-major degree the harmonic-dominant key answers as (minor degree 5). */
+    val harmonicDominantMajDeg: Int get() = EarTraining.majorRelativeDegree(5, TrainingMode.Minor)
+    /** Label for the harmonic-dominant answer key ("V7" in fixed-7ths mode, else "V"). */
+    fun harmonicDominantLabel(): String = if (challengeCombinedMode) "V7" else "V"
+
     /**
      * Commit a keyboard answer for [bar]: [majorRelativeDegree] is the relative-major
      * degree the tapped key stands for (so a major-row and the equivalent minor-row
@@ -1033,15 +1057,18 @@ class EarTrainingState(
      * the square's display). [ext] is the chosen extension suffix when the level
      * needs one (ignored for triads; forced to the diatonic 7th in fixed-7ths mode).
      */
-    fun guessChallengeKeyboard(bar: Int, majorRelativeDegree: Int, roman: String, ext: String?) {
+    fun guessChallengeKeyboard(bar: Int, majorRelativeDegree: Int, roman: String, ext: String?, dominant: Boolean = false) {
         if (!challengeActive || bar !in 0..3) return
         val deg = EarTraining.degreeFromMajorRelative(majorRelativeDegree, progMode)
         challengeGuessDegree = challengeGuessDegree.toMutableList().also { it[bar] = deg }
+        challengeGuessDominant = challengeGuessDominant.toMutableList().also { it[bar] = dominant }
+        // The harmonic dominant answers with MINOR_DOMINANT (major V) rather than the
+        // natural `v`; its per-level suffix ("", "7", "9") is otherwise identical.
+        val info = if (dominant) EarTraining.MINOR_DOMINANT else degreesMap()[deg]
         // label = what shows in the square; roman already carries the 7th in combined
         // mode (from keyboardKeys), so don't append the suffix again there.
         val label: String = when {
             challengeCombinedMode -> {
-                val info = degreesMap()[deg]
                 val e = if (info != null)
                     EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman) else ""
                 challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = e }
@@ -1063,6 +1090,7 @@ class EarTrainingState(
         challengeGuessDegree = challengeGuessDegree.toMutableList().also { it[bar] = null }
         challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = null }
         challengeGuessLabel = challengeGuessLabel.toMutableList().also { it[bar] = null }
+        challengeGuessDominant = challengeGuessDominant.toMutableList().also { it[bar] = false }
     }
 
     /** Once every bar is fully answered, auto-score the question (all bars right = a point). */

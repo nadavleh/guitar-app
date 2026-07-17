@@ -52,6 +52,7 @@ interface QState {
   guessDeg: (number | null)[];
   guessExt: (string | null)[];
   guessLabel: (string | null)[];
+  guessDom: boolean[];
 }
 
 export class EarTrainingState {
@@ -596,6 +597,10 @@ export class EarTrainingState {
   /** Per-bar display label of the user's keyboard answer (e.g. "V7", "iv");
    *  null = the bar's square is empty. */
   challengeGuessLabel: (string | null)[] = [null, null, null, null];
+  /** Per-bar flag: user answered the harmonic-minor dominant (major V/V7), not the
+   *  natural `v`. Set only by the minor keyboard's "V7" key (harmonic toggle on);
+   *  scoring requires it to match whether the bar is a dominantBars bar. */
+  challengeGuessDominant: boolean[] = [false, false, false, false];
 
   /** Answer-keyboard "shift": false shows the MAJOR Roman row, true the MINOR row.
    *  Both label the same seven shared diatonic chords. */
@@ -663,6 +668,7 @@ export class EarTrainingState {
     this.challengeGuessDegree = [null, null, null, null];
     this.challengeGuessExt = [null, null, null, null];
     this.challengeGuessLabel = [null, null, null, null];
+    this.challengeGuessDominant = [false, false, false, false];
   }
 
   // ---- question history so the user can step back and forward ----
@@ -683,6 +689,7 @@ export class EarTrainingState {
       guessDeg: [null, null, null, null],
       guessExt: [null, null, null, null],
       guessLabel: [null, null, null, null],
+      guessDom: [false, false, false, false],
     };
   }
 
@@ -696,6 +703,7 @@ export class EarTrainingState {
     this.challengeGuessDegree = q.guessDeg;
     this.challengeGuessExt = q.guessExt;
     this.challengeGuessLabel = q.guessLabel;
+    this.challengeGuessDominant = q.guessDom;
     this.progBarRevealed = new Set();
     this.keyRevealed = false;
     this.modeRevealed = false;
@@ -712,6 +720,7 @@ export class EarTrainingState {
     q.guessDeg = this.challengeGuessDegree;
     q.guessExt = this.challengeGuessExt;
     q.guessLabel = this.challengeGuessLabel;
+    q.guessDom = this.challengeGuessDominant;
   }
 
   /** True when stepping back to an earlier question is possible. */
@@ -788,7 +797,10 @@ export class EarTrainingState {
     const g = this.challengeGuessDegree[i];
     if (g == null) return null;
     if (this.challengeNeedsExt && this.challengeGuessExt[i] == null) return null;
-    const degOk = g === deg;
+    // Degree must match AND the major-V/natural-v choice must match: a harmonic-dominant
+    // bar is only correct via the "V7" key, a natural degree-5 bar only via plain "v".
+    const barDominant = this.progMode === TrainingMode.Minor && (this.progProgression?.dominantBars ?? []).includes(i);
+    const degOk = g === deg && (this.challengeGuessDominant[i] === true) === barDominant;
     const extOk = !this.challengeNeedsExt || this.challengeGuessExt[i] === this.correctExtLabel(i);
     return degOk && extOk;
   }
@@ -859,6 +871,14 @@ export class EarTrainingState {
 
   toggleKeyboardShift() { this.keyboardMinor = !this.keyboardMinor; this.notify(); }
 
+  /** Show the dedicated harmonic-minor dominant ("V7") answer key: minor keyboard row +
+   *  harmonic-minor option on. Lets the user mark a major V distinctly from natural `v`. */
+  get harmonicDominantVisible(): boolean { return this.keyboardMinor && this.earHarmonicMinor; }
+  /** The relative-major degree the harmonic-dominant key answers as (minor degree 5). */
+  get harmonicDominantMajDeg(): number { return majorRelativeDegree(5, TrainingMode.Minor); }
+  /** Label for the harmonic-dominant answer key ("V7" in fixed-7ths mode, else "V"). */
+  harmonicDominantLabel(): string { return this.challengeCombinedMode ? "V7" : "V"; }
+
   /**
    * Commit a keyboard answer for [bar]. [majorRel] is the relative-major degree the
    * tapped key stands for (so a major-row and the equivalent minor-row key produce
@@ -866,15 +886,17 @@ export class EarTrainingState {
    * is the tapped key's label; [ext] is the chosen extension suffix when the level
    * needs one (ignored for triads; forced to the diatonic 7th in fixed-7ths mode).
    */
-  guessChallengeKeyboard(bar: number, majorRel: number, roman: string, ext: string | null) {
+  guessChallengeKeyboard(bar: number, majorRel: number, roman: string, ext: string | null, dominant = false) {
     if (!this.challengeActive || bar < 0 || bar > 3) return;
     const deg = degreeFromMajorRelative(majorRel, this.progMode);
     this.challengeGuessDegree[bar] = deg;
+    this.challengeGuessDominant[bar] = dominant;
+    // The harmonic dominant answers with MINOR_DOMINANT (major V) rather than natural `v`.
+    const info = dominant ? MINOR_DOMINANT : EarTrainingDegrees(this.progMode).get(deg);
     // label = what shows in the square; roman already carries the 7th in combined
     // mode (from keyboardKeys), so don't append the suffix again there.
     let label = roman;
     if (this.challengeCombinedMode) {
-      const info = EarTrainingDegrees(this.progMode).get(deg);
       this.challengeGuessExt[bar] = info ? romanLabel(info.roman, info.seventhQuality).replace(info.roman, "") : "";
     } else if (this.challengeNeedsExt) {
       this.challengeGuessExt[bar] = ext ?? "";
@@ -891,6 +913,7 @@ export class EarTrainingState {
     this.challengeGuessDegree[bar] = null;
     this.challengeGuessExt[bar] = null;
     this.challengeGuessLabel[bar] = null;
+    this.challengeGuessDominant[bar] = false;
     this.notify();
   }
 

@@ -1683,15 +1683,16 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
     var pickedDeg by remember(bar) { mutableStateOf<Int?>(null) }     // relative-major degree
     var pickedRoman by remember(bar) { mutableStateOf<String?>(null) }
     var pickedExt by remember(bar) { mutableStateOf<String?>(null) }
+    var pickedDominant by remember(bar) { mutableStateOf(false) }     // harmonic-minor V7 key
     var extOpen by remember(bar) { mutableStateOf(false) }
     val needsExt = ear.challengeNeedsExt && !ear.challengeCombinedMode
     // Extension options depend on the picked degree (only its diatonic extensions).
     val extOptions = pickedDeg?.let { ear.challengeExtOptionsForDegree(it) } ?: emptyList()
 
-    fun reset() { pickedDeg = null; pickedRoman = null; pickedExt = null; extOpen = false }
+    fun reset() { pickedDeg = null; pickedRoman = null; pickedExt = null; pickedDominant = false; extOpen = false }
     fun commit(ext: String?) {
         val deg = pickedDeg ?: return
-        ear.guessChallengeKeyboard(bar, deg, pickedRoman ?: deg.toString(), ext)
+        ear.guessChallengeKeyboard(bar, deg, pickedRoman ?: deg.toString(), ext, pickedDominant)
         reset()
     }
 
@@ -1727,14 +1728,29 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
             ) {
                 for ((majDeg, roman) in ear.keyboardKeys()) {
                     FilterChip(
-                        selected = pickedDeg == majDeg,
+                        selected = pickedDeg == majDeg && !pickedDominant,
                         onClick = {
                             // Changing the degree invalidates the chosen extension.
-                            if (pickedDeg != majDeg) { pickedExt = null; extOpen = false }
-                            pickedDeg = majDeg; pickedRoman = roman
+                            if (pickedDeg != majDeg || pickedDominant) { pickedExt = null; extOpen = false }
+                            pickedDeg = majDeg; pickedRoman = roman; pickedDominant = false
                             if (!needsExt) commit(null)
                         },
                         label = { Text(roman) },
+                    )
+                }
+                // Harmonic-minor dominant: a dedicated "V7"/"V" key (minor row + harmonic
+                // toggle on) so a major V is marked distinctly from the natural `v`.
+                if (ear.harmonicDominantVisible) {
+                    val domMajDeg = ear.harmonicDominantMajDeg
+                    val domLabel = ear.harmonicDominantLabel()
+                    FilterChip(
+                        selected = pickedDeg == domMajDeg && pickedDominant,
+                        onClick = {
+                            if (pickedDeg != domMajDeg || !pickedDominant) { pickedExt = null; extOpen = false }
+                            pickedDeg = domMajDeg; pickedRoman = domLabel; pickedDominant = true
+                            if (!needsExt) commit(null)
+                        },
+                        label = { Text(domLabel) },
                     )
                 }
                 if (needsExt) {
