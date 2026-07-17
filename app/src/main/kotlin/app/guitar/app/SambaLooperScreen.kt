@@ -78,7 +78,10 @@ import app.guitar.theory.PercussionVoices
 @Composable
 fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     val samba = state.sambaLooper
-    DisposableEffect(Unit) { onDispose { samba.stop() } }
+    // Guard on currentSheet so a rotation (which disposes+recreates this composable
+    // when the portrait/landscape layout swaps) doesn't stop playback — only a real
+    // navigation away does.
+    DisposableEffect(Unit) { onDispose { if (state.currentSheet != Sheet.SambaLooper) samba.stop() } }
 
     // Eraser tool: when on, tapping a cell clears it instead of cycling its voice.
     var eraseMode by remember { mutableStateOf(false) }

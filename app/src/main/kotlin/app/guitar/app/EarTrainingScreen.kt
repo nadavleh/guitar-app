@@ -85,9 +85,14 @@ import app.guitar.theory.TrainingMode
 fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
     // #7: use the app-lifetime instance so leaving and returning preserves state.
     val ear = state.earTraining
-    // Stop audio/looping when leaving the screen, but keep all state (progression,
-    // reveals, counters) so returning shows exactly what you left.
-    DisposableEffect(Unit) { onDispose { ear.stopLoop(); ear.libraryStop() } }
+    // Stop audio/looping when NAVIGATING AWAY from the screen, but keep all state
+    // (progression, reveals, counters) so returning shows exactly what you left.
+    // Guard on currentSheet so a mere rotation (which disposes+recreates this
+    // composable when the portrait/landscape layout swaps, without changing the
+    // route) does NOT stop playback — only a real navigation away does.
+    DisposableEffect(Unit) {
+        onDispose { if (state.currentSheet != Sheet.EarTraining) { ear.stopLoop(); ear.libraryStop() } }
+    }
     LaunchedEffect(Unit) {
         // NB: deliberately do NOT auto-generate a progression here. The user
         // wants the first progression to honor settings they pick beforehand,

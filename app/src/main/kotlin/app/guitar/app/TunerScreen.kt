@@ -86,7 +86,9 @@ fun TunerScreen(state: AppState, onBack: () -> Unit) {
         // and the UI will show the explanation.
         tuner.start()
     }
-    DisposableEffect(Unit) { onDispose { tuner.stop() } }
+    // Guard on currentSheet so a rotation (portrait/landscape layout swap disposes+
+    // recreates this composable) doesn't stop the tuner — only navigating away does.
+    DisposableEffect(Unit) { onDispose { if (state.currentSheet != Sheet.Tuner) tuner.stop() } }
     var toneSheetOpen by remember { mutableStateOf(false) }
 
     Column(

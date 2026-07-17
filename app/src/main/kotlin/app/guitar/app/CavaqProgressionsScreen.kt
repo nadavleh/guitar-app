@@ -45,8 +45,10 @@ import app.guitar.theory.PitchClass
 @Composable
 fun CavaqProgressionsScreen(state: AppState, onBack: () -> Unit) {
     val cp = state.cavaqProg
-    // Stop the loop when leaving; keep the picked sequence/key/position.
-    DisposableEffect(Unit) { onDispose { cp.stop() } }
+    // Stop the loop when NAVIGATING AWAY; keep the picked sequence/key/position.
+    // Guard on currentSheet so a rotation (portrait/landscape layout swap disposes+
+    // recreates this composable) doesn't stop playback — only a real navigation does.
+    DisposableEffect(Unit) { onDispose { if (state.currentSheet != Sheet.CavaqProgressions) cp.stop() } }
     // Seed the idle fretboard preview (first chord's shape) on open.
     LaunchedEffect(Unit) { if (!cp.isPlaying) cp.setPosition(cp.positionIndex) }
 

@@ -1010,9 +1010,28 @@ export class EarTrainingState {
     this.playSymbolOnce(spellPc(degreeRoot(this.flavorKey, deg, this.flavorMode)) + this.flavorQuality, this.deps.sustainProvider());
   }
   auditionFlavorQuality(qual: string) { this.playSymbolOnce(spellPc(this.flavorRootPc()) + qual, this.deps.sustainProvider()); }
+  /** Play a diatonic-degree reference for the challenge palette. Conforms to the
+   *  progression's voicings: if [deg] appears in the current progression, play that
+   *  bar's EXACT cached voice-led shape; otherwise voice the degree with the SAME
+   *  ear-training style (shell/standard, earShapes/earMidis + bass boost) — so a
+   *  reference chord never sounds like a different voicing than the progression. */
   auditionProgDegree(deg: number) {
+    this.ensureProgShapes();
+    const progIdx = this.progProgression?.degrees.indexOf(deg) ?? -1;
+    const cached = progIdx >= 0 ? this.progShapes[progIdx] : null;
+    if (cached) {
+      const p = parseChord(this.progResolved[progIdx].symbol);
+      this.playEarChord(this.earMidis(cached), p ? p[0] : 0, this.deps.sustainProvider());
+      return;
+    }
     const level = this.earMixAll ? ChordTypeLevel.Sevenths : this.chordTypeLevel;
-    this.playSymbolOnce(resolveDegree(deg, this.progKey, this.progMode, level, this.rng).symbol, this.deps.sustainProvider());
+    const parsed = parseChord(resolveDegree(deg, this.progKey, this.progMode, level, this.rng).symbol);
+    if (!parsed) return;
+    const [root, q] = parsed;
+    const shapes = this.earShapes(this.gen(this.earStyle()).shapesFor(root, q, this.deps.tuningProvider(), DISPLAY_FRETS));
+    const shape = shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0] ?? null;
+    if (shape) this.playEarChord(this.earMidis(shape), root, this.deps.sustainProvider());
+    else this.playEarChord(q.intervals.map((iv) => 52 + root + iv), root, this.deps.sustainProvider());
   }
 
   // Flavor Challenge

@@ -1234,9 +1234,28 @@ class EarTrainingState(
 
     /** Audition degree [deg]'s diatonic chord in the progression key (challenge
      *  per-bar guessing) so the user can compare candidates. */
+    /** Play a diatonic-degree reference for the challenge palette. Conforms to the
+     *  progression's voicings: if [deg] appears in the current progression, play that
+     *  bar's EXACT cached voice-led shape; otherwise voice the degree with the SAME
+     *  ear-training style (shell/standard, earShapes/earMidis + bass boost) the
+     *  progression uses — so a reference chord never sounds like a different voicing
+     *  than the progression. Never mutates the fretboard (no answer reveal). */
     fun auditionProgDegree(deg: Int) {
+        ensureProgShapes()
+        val progIdx = progProgression?.degrees?.indexOf(deg) ?: -1
+        val cached = if (progIdx >= 0) progShapes.getOrNull(progIdx) else null
+        if (cached != null) {
+            val rootPc = ChordLibrary.parse(progResolved[progIdx].symbol)?.first?.value ?: 0
+            playEarChord(earMidis(cached), rootPc, sustainProvider())
+            return
+        }
         val level = if (earMixAll) ChordTypeLevel.Sevenths else chordTypeLevel
-        playSymbolOnce(EarTraining.resolve(deg, progKey, progMode, level, rng).symbol, sustainProvider())
+        val parsed = ChordLibrary.parse(EarTraining.resolve(deg, progKey, progMode, level, rng).symbol) ?: return
+        val (root, q) = parsed
+        val shapes = earShapes(ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuningProvider(), frets = DISPLAY_FRETS))
+        val shape = shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.firstOrNull()
+        if (shape != null) playEarChord(earMidis(shape), root.value, sustainProvider())
+        else playEarChord(q.intervals.map { 52 + root.value + it.semitones }, root.value, sustainProvider())
     }
 
     // ---- Flavor Challenge (scored rounds) ----
