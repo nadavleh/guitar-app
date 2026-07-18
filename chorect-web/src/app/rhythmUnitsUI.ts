@@ -1,6 +1,6 @@
 // Rhythmic Units screen UI. Mirror of app/.../RhythmUnitsScreen.kt.
-// Two sections ("Rhythmic units" + "With rests"): grids of unit cards, each with a
-// music-notation thumbnail canvas. Tapping a card loops the unit at the transport BPM.
+// Two sections ("Rhythmic units" + "With rests"): dense grids of small unit cards,
+// each with a music-notation thumbnail canvas. Tapping a card loops the unit.
 
 import { RhythmUnitState } from "./rhythmUnitState";
 import { el, btn, slider } from "./dom";
@@ -11,11 +11,9 @@ export class RhythmUnitsUI {
 
   render(parent: HTMLElement): void {
     const ru = this.ru;
-    // overflow-y:auto — .tool-screen fills its (fixed-height) content area but has no
-    // scroll of its own, so the two card sections were unreachable below the fold.
-    const screen = el("div", { class: "tool-screen", style: "overflow-y:auto;padding-bottom:28px" });
+    const screen = el("div", { class: "tool-screen" });
 
-    // Header
+    // Header (fixed)
     const topbar = el("div", { class: "tool-topbar" }, [el("h2", {}, ["Rhythm"])]);
     topbar.appendChild(el("span", { style: "flex:1" }));
     topbar.appendChild(btn("Back", () => { ru.stop(); this.onBack(); }));
@@ -23,7 +21,7 @@ export class RhythmUnitsUI {
     screen.appendChild(el("div", { class: "et-muted", style: "font-size:13px;margin-top:2px" },
       ["Tap a unit to loop it. Each is one beat; the downbeat is accented."]));
 
-    // Transport: Play/Stop + BPM
+    // Transport: Play/Stop + BPM (fixed)
     const playBtn = btn(ru.isPlaying ? "Stop ■" : "Play ▶", () => ru.toggle(), "btn primary");
     if (!ru.selectedId) playBtn.disabled = true;
     screen.appendChild(el("div", { class: "row", style: "margin-top:10px;align-items:center;gap:10px" }, [
@@ -33,15 +31,20 @@ export class RhythmUnitsUI {
     ]));
     screen.appendChild(el("div", { style: "margin-top:6px" }, [slider(10, 300, ru.bpm, (v) => ru.setBpm(v))]));
 
-    this.section(screen, "Rhythmic units", RHYTHM_UNITS);
-    this.section(screen, "With rests", RHYTHM_UNITS_RESTS);
+    // Scrollable body (the .et-scroll pattern; .tool-screen itself doesn't scroll).
+    const body = el("div", { class: "et-scroll" });
+    this.section(body, "Rhythmic units", RHYTHM_UNITS);
+    this.section(body, "With rests", RHYTHM_UNITS_RESTS);
+    screen.appendChild(body);
 
     parent.appendChild(screen);
   }
 
   private section(parent: HTMLElement, title: string, units: RhythmUnit[]): void {
-    parent.appendChild(el("div", { style: "margin-top:12px;font-weight:700;color:var(--act)" }, [title]));
-    const grid = el("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px" });
+    parent.appendChild(el("div", { style: "margin-top:10px;font-weight:700;color:var(--act)" }, [title]));
+    // Dense auto-fill grid of small cards: the whole list fits in a fraction of the
+    // old 2-column footprint.
+    const grid = el("div", { style: "display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px;margin-top:6px" });
     for (const unit of units) grid.appendChild(this.unitCard(unit));
     parent.appendChild(grid);
   }
@@ -49,24 +52,23 @@ export class RhythmUnitsUI {
   private unitCard(unit: RhythmUnit): HTMLElement {
     const ru = this.ru;
     const playing = ru.selectedId === unit.id && ru.isPlaying;
-    // height:100% + box-sizing so the card fills its whole grid cell — the entire
-    // pane is the click target, not just the painted content.
+    // Compact card; the whole pane is the click target (height:100% fills the cell).
+    // The full name is a hover tooltip so the card can stay small.
     const card = el("div", {
+      title: unit.name,
       style:
-        "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:10px;" +
-        "border-radius:10px;cursor:pointer;height:100%;box-sizing:border-box;" +
-        `background:${playing ? "color-mix(in srgb, var(--feedback) 14%, transparent)" : "var(--surface2)"};` +
+        "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:5px 4px;" +
+        "border-radius:8px;cursor:pointer;height:100%;box-sizing:border-box;" +
+        `background:${playing ? "color-mix(in srgb, var(--feedback) 16%, transparent)" : "var(--surface2)"};` +
         `border:${playing ? "2px" : "1px"} solid ${playing ? "var(--feedback)" : "var(--line)"}`,
     });
-    // Fixed-aspect canvas (3:1) scaled with width:100%;height:auto so it never
-    // stretches the notation (the earlier fixed 58px height mangled the ratio).
+    // Fixed-aspect canvas (3:1) scaled with width:100%;height:auto so it never stretches.
     const cv = el("canvas", { style: "width:100%;height:auto;display:block" }) as HTMLCanvasElement;
     cv.width = 360;
     cv.height = 120;
     drawNotation(cv, unit);
     card.appendChild(cv);
-    card.appendChild(el("div", { class: "mono", style: "font-size:13px;color:var(--text-secondary)" }, [unit.count || " "]));
-    card.appendChild(el("div", { style: "font-size:13px;font-weight:600;text-align:center" }, [unit.name]));
+    card.appendChild(el("div", { class: "mono", style: "font-size:10px;line-height:1.1;color:var(--text-secondary)" }, [unit.count || " "]));
     card.addEventListener("click", () => ru.select(unit.id));
     return card;
   }

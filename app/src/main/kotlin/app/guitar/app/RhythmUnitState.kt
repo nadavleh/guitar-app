@@ -26,7 +26,7 @@ class RhythmUnitState(
         private set
     var isPlaying by mutableStateOf(false)
         private set
-    var bpm by mutableStateOf(80)
+    var bpm by mutableStateOf(30)
         private set
 
     private var job: Job? = null

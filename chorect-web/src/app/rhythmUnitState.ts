@@ -17,7 +17,7 @@ export interface RhythmUnitDeps {
 export class RhythmUnitState {
   selectedId: string | null = null;
   isPlaying = false;
-  bpm = 80;
+  bpm = 30;
 
   private token = 0;
   private readonly click: Float32Array;
