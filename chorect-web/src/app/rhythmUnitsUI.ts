@@ -11,7 +11,9 @@ export class RhythmUnitsUI {
 
   render(parent: HTMLElement): void {
     const ru = this.ru;
-    const screen = el("div", { class: "tool-screen" });
+    // overflow-y:auto — .tool-screen fills its (fixed-height) content area but has no
+    // scroll of its own, so the two card sections were unreachable below the fold.
+    const screen = el("div", { class: "tool-screen", style: "overflow-y:auto;padding-bottom:28px" });
 
     // Header
     const topbar = el("div", { class: "tool-topbar" }, [el("h2", {}, ["Rhythm"])]);
@@ -47,9 +49,12 @@ export class RhythmUnitsUI {
   private unitCard(unit: RhythmUnit): HTMLElement {
     const ru = this.ru;
     const playing = ru.selectedId === unit.id && ru.isPlaying;
+    // height:100% + box-sizing so the card fills its whole grid cell — the entire
+    // pane is the click target, not just the painted content.
     const card = el("div", {
       style:
-        "display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px;border-radius:10px;cursor:pointer;" +
+        "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:10px;" +
+        "border-radius:10px;cursor:pointer;height:100%;box-sizing:border-box;" +
         `background:${playing ? "color-mix(in srgb, var(--feedback) 14%, transparent)" : "var(--surface2)"};` +
         `border:${playing ? "2px" : "1px"} solid ${playing ? "var(--feedback)" : "var(--line)"}`,
     });
