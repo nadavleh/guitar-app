@@ -49,6 +49,9 @@ class VoiceMixer(val sampleRate: Int) {
 
     @Synchronized fun setEq(bassDb: Float, midDb: Float, trebleDb: Float) = eq.setGainsDb(bassDb, midDb, trebleDb)
 
+    /** Flush the reverb tail so a previous chord's ambience doesn't ring over the next. */
+    @Synchronized fun clearReverb() = freeverb.clear()
+
     @Synchronized fun capVoices(max: Int) {
         while (voices.size > max) {
             // Release the quietest (lowest recent peak) rather than hard-dropping.

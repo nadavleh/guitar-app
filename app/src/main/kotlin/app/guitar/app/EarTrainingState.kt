@@ -426,6 +426,7 @@ class EarTrainingState(
                 for (i in chords.indices) {
                     if (libPlayingId != id) break
                     libBar = i
+                    audio.cutReverb()   // clear the previous chord's reverb tail first
                     libPlayChordOnce(chords[i].symbol, barMs)
                     delay(barMs)
                 }
@@ -513,6 +514,7 @@ class EarTrainingState(
                 for (i in progResolved.indices) {
                     if (!isLooping) break
                     currentBar = i
+                    audio.cutReverb()   // don't let the previous chord's reverb ring over this one
                     soundBar(i, sustain)
                     delay(barMs)
                 }

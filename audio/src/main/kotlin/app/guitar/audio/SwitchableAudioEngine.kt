@@ -56,6 +56,8 @@ class SwitchableAudioEngine(
         legacy.stop()
     }
 
+    override fun cutReverb() = active.cutReverb()
+
     override fun close() {
         modern.close()
         legacy.close()

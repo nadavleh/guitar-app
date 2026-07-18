@@ -280,6 +280,8 @@ class AudioTrackEngine(
     // release tail to finish before the output thread stops writing.
     override fun stop() { mixer.releaseAll() }
 
+    override fun cutReverb() { mixer.clearReverb() }
+
     /** Set the modern-bus tone EQ gains (dB). */
     fun setEq(bassDb: Float, midDb: Float, trebleDb: Float) = mixer.setEq(bassDb, midDb, trebleDb)
 

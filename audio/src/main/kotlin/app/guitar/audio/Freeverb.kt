@@ -32,6 +32,7 @@ class Freeverb(
             if (++idx >= buf.size) idx = 0
             return out
         }
+        fun clear() { buf.fill(0f); idx = 0; filt = 0f }
     }
     private inner class Allpass(size: Int) {
         private val buf = FloatArray(size); private var idx = 0
@@ -42,6 +43,7 @@ class Freeverb(
             if (++idx >= buf.size) idx = 0
             return out
         }
+        fun clear() { buf.fill(0f); idx = 0 }
     }
 
     private val combL = Array(8) { Comb(s(combTuning[it])) }
@@ -67,4 +69,12 @@ class Freeverb(
     }
 
     fun isRingingOut(threshold: Float = 1e-4f): Boolean = lastTail < threshold
+
+    /** Flush all comb/allpass state so the current tail stops instantly — used to
+     *  keep one chord's ambience from ringing over the next. */
+    fun clear() {
+        for (c in combL) c.clear(); for (c in combR) c.clear()
+        for (a in apL) a.clear(); for (a in apR) a.clear()
+        lastTail = 0f
+    }
 }

@@ -47,6 +47,10 @@ interface AudioEngine {
     /** Stop any currently-playing audio immediately. */
     fun stop()
 
+    /** Flush the reverb tail so a previous chord's ambience doesn't ring on top of
+     *  the next one. Default no-op for engines without a reverb bus. */
+    fun cutReverb() {}
+
     /** Release all audio resources. Must be called when the engine is no longer needed. */
     fun close()
 

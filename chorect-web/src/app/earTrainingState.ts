@@ -324,6 +324,7 @@ export class EarTrainingState {
           if (!this.isLooping || token !== this.loopToken) break;
           this.currentBar = i;
           this.notify();
+          this.deps.audio.cutReverb();   // don't let the previous chord's reverb ring over this one
           this.soundBar(i, sustain);
           await sleep(barMs);
         }
@@ -422,6 +423,7 @@ export class EarTrainingState {
         for (let i = 0; i < chords.length; i++) {
           if (this.libPlayingId !== id || token !== this.libToken) break;
           this.libBar = i;
+          this.deps.audio.cutReverb();   // clear the previous chord's reverb tail first
           this.libPlayChordOnce(chords[i].symbol, barMs);
           // Per-bar: nudge ONLY the fretboard canvas (no full rerender → no flash).
           this.libOnBar?.();

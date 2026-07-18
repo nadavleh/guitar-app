@@ -44,6 +44,7 @@ export class WebAudioEngine {
   private modernLimiter: DynamicsCompressorNode | null = null;
   private reverb: ConvolverNode | null = null;
   private reverbBus: GainNode | null = null;
+  private reverbBuffer: AudioBuffer | null = null;
 
   // Per-instrument runtime EQ, inserted modernMaster -> eqLow -> eqMid -> eqHigh
   // -> modernLimiter (reverb still feeds modernMaster, so it passes through the
@@ -65,6 +66,16 @@ export class WebAudioEngine {
   /** Set the per-voice reverb send amount (0..1) for subsequently-played modern voices. */
   setReverbSend(amount: number): void {
     this.voiceReverbSend = Math.max(0, Math.min(1, amount));
+  }
+
+  /** Flush the reverb tail (reset the convolver's state) so a previous chord's
+   *  ambience doesn't ring on top of the next one. Re-assigning the buffer resets
+   *  the convolution; null→buffer guarantees the reset even for the same buffer. */
+  cutReverb(): void {
+    if (this.reverb && this.reverbBuffer) {
+      this.reverb.buffer = null;
+      this.reverb.buffer = this.reverbBuffer;
+    }
   }
 
   /** Select (or clear, with null) the sampled bank used by MODERN note/chord voices. */
@@ -151,7 +162,8 @@ export class WebAudioEngine {
       this.eqHigh.connect(this.modernLimiter);
 
       this.reverb = this.ctx.createConvolver();
-      this.reverb.buffer = buildReverbIR(this.ctx);
+      this.reverbBuffer = buildReverbIR(this.ctx);
+      this.reverb.buffer = this.reverbBuffer;
       this.reverb.connect(this.modernMaster);
 
       this.reverbBus = this.ctx.createGain();
