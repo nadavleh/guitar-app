@@ -1,18 +1,20 @@
 <div align="center">
   <h1>🎸 Chorect</h1>
   <p>
-    <strong>The fretboard <em>is</em> the app — an interactive guitar companion for chords, scales, progressions, ear training, a samba drum machine, and a built-in chromatic tuner.</strong>
+    <strong>The fretboard <em>is</em> the app — an interactive guitar &amp; cavaquinho companion for chords, scales, progressions, ear training, cavaquinho functional sequences, rhythm training, a samba drum machine, and a built-in chromatic tuner.</strong>
   </p>
   <p>
-    Tap any spot to hear the note. Pick a chord, see every CAGED voicing across the neck. Pick a scale, see every position. Loop a progression with per-slot voicings. Identify progressions, chord flavors, and notes-over-chords by ear. Tune to within a cent.<br/>
-    Offline, no accounts, nothing leaves the device.
+    Tap any spot to hear the note. Pick a chord, see every CAGED voicing across the neck. Pick a scale, see every position. Loop a progression with voice-led voicings. Identify progressions (diatonic, harmonic-minor, and non-diatonic), chord flavors, inversions, intervals, and notes-over-chords by ear. Drill the basic units of rhythm. Tune to within a cent.<br/>
+    Native <strong>Android</strong> app + a parity <strong>web</strong> port. Offline, no accounts, nothing leaves the device.
   </p>
   <p>
     <img alt="Platform: Android" src="https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white">
+    <img alt="Platform: Web" src="https://img.shields.io/badge/platform-Web-F7DF1E?logo=javascript&logoColor=black">
     <img alt="Language: Kotlin" src="https://img.shields.io/badge/language-Kotlin-7F52FF?logo=kotlin&logoColor=white">
+    <img alt="Language: TypeScript" src="https://img.shields.io/badge/language-TypeScript-3178C6?logo=typescript&logoColor=white">
     <img alt="UI: Jetpack Compose" src="https://img.shields.io/badge/ui-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white">
     <img alt="minSdk: 26" src="https://img.shields.io/badge/minSdk-26-blue">
-    <img alt="Version: 1.6.0" src="https://img.shields.io/badge/version-1.6.0-blue">
+    <img alt="Version: 2.16.0" src="https://img.shields.io/badge/version-2.16.0-blue">
     <img alt="Tests: 700+ passing" src="https://img.shields.io/badge/tests-700%2B%20passing-brightgreen">
     <img alt="License: TBD" src="https://img.shields.io/badge/license-TBD-lightgrey">
   </p>
@@ -39,11 +41,20 @@
 
 **Chorect** is a music-theory-aware fretboard companion. It treats the neck as the primary interface and layers everything you'd want to study — chord voicings, scale positions, tunings, progressions, ear training, a percussion looper, and a chromatic tuner — on top of it.
 
-It's built **Android-first** in native Kotlin so the music-theory engine can stay pure-Kotlin (zero Android dependencies, fast JUnit tests) and the audio path can use the low-latency AAudio route directly. A Kotlin Multiplatform port for iOS is planned — the theory engine ports as-is, only the UI and audio drivers need replacing.
+It's built **Android-first** in native Kotlin so the music-theory engine can stay pure-Kotlin (zero Android dependencies, fast JUnit tests) and the audio path can use the low-latency AAudio route directly. A **web port** (`chorect-web`, TypeScript + WebAudio) mirrors the same theory engine and UI so the app runs in any browser too; the two platforms are kept in strict feature parity. A Kotlin Multiplatform port for iOS is planned — the theory engine ports as-is, only the UI and audio drivers need replacing.
 
-> Three Gradle modules: `theory` (pure JVM), `audio` (Android lib), `app` (Compose UI). The theory engine carries the bulk of the suite's 700+ tests that run in milliseconds, with zero emulator dependency.
+> Android: three Gradle modules — `theory` (pure JVM), `audio` (Android lib), `app` (Compose UI). The theory engine carries the bulk of the suite's 700+ tests that run in milliseconds, with zero emulator dependency. Web: `chorect-web/` is a Vite/TypeScript app whose `src/theory` is a hand-kept mirror of the Kotlin theory module, deployed to GitHub Pages.
 
-The current release is **version 1.6.0** (versionCode 10600) — a **minor** bump that makes the **drum machine's meter configurable** (user-selectable bars, time signature, and division, with a loop translate/shift control) and reworks **ear-training answering**: the progression challenge now uses a tappable per-bar **degree keyboard** with a Major/Minor shift (relative-major/minor answers count as equivalent), reference/audition buttons show **plain numbers** instead of Roman numerals (so auditioning a degree no longer leaks the key's quality), and the challenge gains **Prev/Next navigation** with a per-question history so an accidental "Next" is recoverable. Versioning is **major.minor.patch**: bump the **minor** (1.5 → 1.6) for new features, the **patch** (1.6.0 → 1.6.1) for bug fixes, and the **major** (2.0.0) for breaking redesigns. Each build is emitted as `Chorect_beta_V<version>.apk` (e.g. `Chorect_beta_V1.6.0.apk`), and previous releases are kept in a `releases/` folder rather than overwritten.
+The current release is **version 2.16.0** (versionCode 21600). Since the 1.x line the app has grown well beyond a fretboard tool:
+
+- **v2.0 "Signal" redesign** — a whole-app makeover: bottom **tab bar** (portrait) / **left rail** (landscape) with a user-configurable pick-4 + reorder, a persistent transport dock, a unified tone sheet, light/dark/auto theming with a 5-colour accent picker.
+- **Web port** — full parity in the browser (`chorect-web`), deployed to GitHub Pages.
+- **Cavaquinho** — a first-class 4-string instrument with a dedicated **Progressions** screen (functional samba sequences: looper + voice-led neck), a curated song library, and DGBD default tuning.
+- **Ear-training expansion** — diatonic **plus** a large curated **Advanced / Advanced II / Suspended** library, a **harmonic-minor** toggle (major V7 → i cadences, default on), a circle-of-fifths generator, a browsable progression **Library** with per-progression **song examples** (YouTube + Spotify links), and true jazz **shell voicings** by default.
+- **Better audio** — sampled acoustic/nylon/electric guitar banks (with a Karplus-Strong synth fallback), per-sound **3-band EQ** and **reverb**, a real-time voice-graph engine (envelopes, panning, soft limiter) with an A/B toggle against the legacy engine.
+- **v2.15–2.16 Rhythmic Units** — a new **Rhythm** menu entry to learn & train the basic one-beat rhythmic units (with and without rests), each shown as a music-notation thumbnail that loops at a controllable BPM.
+
+Versioning is **major.minor.patch**: bump the **minor** for new features, the **patch** for bug fixes, and the **major** for breaking redesigns. Each Android build is emitted as `Chorect_beta_V<version>.apk` (e.g. `Chorect_beta_V2.16.0.apk`), and previous releases are kept in a `releases/` folder rather than overwritten.
 
 ---
 
@@ -60,7 +71,7 @@ The current release is **version 1.6.0** (versionCode 10600) — a **minor** bum
 - **Left-handed mode.** Mirrors the whole fretboard and the tap mapping.
 - **Labels.** Switch dots between note names, interval numbers, or empty — persists across launches. The default is interval labels.
 
-The neck's three display modes are unified under a single **Fretboard** tool with a **Chord / Scale / Strum** segmented selector (not three separate menu entries).
+The neck's display modes are unified under a single **Fretboard** tool with a **None / Chord / Scale / Play** segmented selector (not separate menu entries). **Play** mode adds single-finger sweep-strumming across the strings and **8 quick-chord slots** (editable chips) that drop a chord's grip onto the neck to strum up/down.
 
 ### 🎼 Chords
 
@@ -76,7 +87,7 @@ The neck's three display modes are unified under a single **Fretboard** tool wit
 - **All-notes vs Positions view** — see the whole scale, or step through positions one at a time along the neck.
 - **Formula display** — monospace notes + intervals (e.g. `1 b3 4 5 b7` for A minor pentatonic).
 
-### ✊ Strum (pick) mode
+### ✊ Play (pick) mode
 
 - **Build an arbitrary selection.** Tap any frets across the neck to add or remove them from the selection.
 - **Per-string mutes.** Toggle whole strings off — drawn as a red ✕ at the nut, chord-diagram style. Muted strings are excluded from the Strum / Arpeggio (and picking a fret un-mutes its string).
@@ -102,16 +113,26 @@ The neck's three display modes are unified under a single **Fretboard** tool wit
 
 ### 👂 Ear training
 
-**Five** sub-modes, each with a **Practice** and a **Challenge** mode. The sub-mode picker (Progressions / Note→Chord / Flavor / Inversions / Aug-Dim) and the Practice/Challenge picker are now two compact side-by-side **dropdowns** rather than a wrapping 5-chip grid plus a full-width segmented bar, so the header no longer dominates the screen and the scrollable body gets the freed vertical space. Every **Challenge** also has a **Restart** action in its in-flight header (next to Quit) so you can restart a run mid-way without finishing it.
+**Six** sub-modes (Progressions / Note→Chord / Flavor / Inversions / Aug-Dim / Intervals), each with a **Practice** and a **Challenge** mode. Every **Challenge** has a **Restart** action in its in-flight header (next to Quit). Ear training is always a **guitar** exercise (it uses standard guitar tuning even when the cavaquinho is the selected instrument), defaults to true jazz **shell voicings**, and gives the low strings a gentle bass boost so chords sit fuller.
 
 - **Progression.** Random 4-bar progressions in any key/mode with reveal-on-tap chord labels and a "Hear I–V–I" key cadence. Practice loops a progression and lets you reveal each bar's Roman label; you can push the current chords into the Looper. The **Challenge** is 15 questions, answered with a tappable **degree keyboard**: each bar is a square you tap to open a row of scale-degree keys with a Major/Minor **shift** that relabels the same seven shared diatonic chords — so relative-major/minor answers (e.g. major I–IV–V vs minor III–VI–VII) are accepted as equivalent — plus an extensions row shown only when the level uses 7ths/extensions (triads get a simplified keyboard). The "Hear the degrees" reference palette auditions each diatonic degree in the (hidden) key labelled with **plain numbers** (1..7) rather than Roman numerals, so auditioning a degree doesn't reveal whether the key is major or minor; the answer keys themselves stay silent. **Prev / Next** are pinned at the top of the challenge with a per-question history, so "← Prev" returns to an earlier question and restores its saved answers (an accidental "Next" is recoverable). You can advance without answering every bar (unanswered bars are credited correct); a persistent **high-score table** keeps the top results with date and completion time, ranked by score then fastest time.
-  - **Advanced (non-diatonic) progressions.** A toggle in this sub-mode swaps the diatonic generator for a curated library of ~24 named special progressions — borrowed chords (modal interchange), secondary dominants, chromatic passing chords, and jazz turnarounds (e.g. Mixolydian Rocker, Andalusian Cadence, Ragtime Circle, Tritone Substitution, Bird/Montgomery turnarounds, Mario Cadence, Royal Road, line clichés). Each is transposable to any key and shown with a short teaching explanation while you quiz, plus a reveal of its name + Roman numerals + concrete chords. The per-chord play buttons show **plain numbers** (positional) rather than Roman numerals, so auditioning a chord doesn't leak the key's quality. (Exotic chords with no playable guitar voicing fall back to a struck block of their chord tones.)
+  - **Generator categories.** A dropdown swaps the diatonic generator for other pools: **Harmonic minor** (an on-by-default toggle adds the classic minor-key **major V / V7 → i** cadences — i–iv–V–i, i–ii°–V–i, i–bVI–ii°–V, etc. — answerable with a dedicated **V7** key on the minor keyboard); **I→iii focus** drill; **Circle of fifths** (adjacent windows with secondary dominants); and a large curated **Advanced / Advanced II (maj7·min9·modal) / Suspended (sus2·sus4)** library of ~60 named non-diatonic progressions — borrowed chords, secondary dominants, chromatic passing chords, jazz turnarounds, modal vamps (e.g. Mixolydian Rocker, Andalusian Cadence, Tritone Substitution, Bird/Montgomery turnarounds, Mario Cadence, line clichés). Each transposes to any key with a short teaching note and a reveal of name + Roman numerals + chords.
+  - **Progression Library + songs.** A browsable **Library** lists every progression the trainer can generate — Major / Minor (diatonic), Minor — harmonic (V7 → i), Advanced / Advanced II / Suspended, and the circle-of-fifths windows — each expandable to hear it, see it on the neck, and browse **famous-song examples** with one-tap **YouTube** (default) and **Spotify** (alternative) search links. A playing-head highlights the current bar during playback across every progression view.
 - **Note2Chord.** A random major or minor triad plays as a block, then a single diatonic non-chord-tone sounds on top ~800 ms later. Identify the test note's extension label (`9`, `11`, `13`, `maj7`, `b7`, …). Chord and test note can be auditioned independently; the Challenge scores a fixed number of rounds.
 - **Flavor.** A cadence (I–V–I / i–V–i) sets the key, then a random diatonic chord sounds; identify its scale degree and flavor. Degree and flavor chips audition for ear comparison; the Challenge scores rounds. The flavor palette now includes **6th** and **add9** alongside the previously-covered 9th and 11th extensions.
 - **Inversions.** Plays a chosen chord type — maj / min / 7th / extended / sus / dim / aug, or a mix you select from the palette — in a random inversion. Identify whether you're hearing **root position, 1st, 2nd, or 3rd inversion** (3rd only exists for 7th chords). Tap any inversion to audition and compare by ear; the Challenge scores rounds.
 - **Aug/Dim.** Drills **augmented vs diminished** by ear, with optional 7th / extended forms (`dim7`, `m7b5`, `7#5`, `maj7#5`). Audition each candidate quality at the current root to compare; the Challenge scores rounds.
+- **Intervals.** Plays a reference tone then a target note a chosen interval away (ascending / descending / mixed); identify the interval from unison to the octave.
 
-The diatonic Extended / "Mix all" pool likewise now reaches **6th** and **add9** (the 9th and 11th were already present).
+The diatonic Extended / "Mix all" pool likewise reaches **6th** and **add9** (the 9th and 11th were already present).
+
+### 🎻 Cavaquinho Progressions
+
+A cavaquinho-only screen for practising the functional chord **sequences** of samba (from a Portuguese cavaquinho course): quadradinho (I VI7 ii V7), the basic minor and extended "médio" sequences, and more. Pick a sequence, transpose to any key (starts in **G**), and loop it with a **voice-led fretboard** — a neck-position scroller steps through up to five CAGED-like voicings per chord. A **Songs ♪** button lists real samba songs (curated from the CifraClub top-30) that use the selected sequence's harmonic family, with tap-to-search links. Available only when the cavaquinho is the selected instrument.
+
+### 🥁 Rhythmic Units
+
+A **Rhythm** menu entry to learn & train the basic one-beat units of rhythm. Two sections — plain units (quarter; two eighths; four sixteenths; eighth + two sixteenths; two sixteenths + eighth; sixteenth-eighth-sixteenth; dotted-eighth + sixteenth; eighth triplet) and units **with rests** (eighth + eighth-rest, off-beat sixteenths, and more). Each unit is a card with a small **music-notation thumbnail** (rendered on a Canvas: noteheads, stems, beams, rests, flags, dots, triplet bracket); tap a card to loop that one-beat cell at a **controllable BPM**, clicked on a synthesized woodblock-like tick with the downbeat accented.
 
 ### 🥁 Drum machine
 
@@ -140,36 +161,50 @@ The page **scrolls vertically**, and each track's name + Mute/Solo (M/S) toggles
 
 ### 🎛️ Instruments, tuning + audio
 
-- **Two instruments:** Guitar (6-string) and Cavaquinho (4-string). Switching instruments resets to that instrument's default tuning and adjusts chord-shape fret-span comfort.
-- **Preset tunings** — Guitar: Standard, Drop D, DADGAD, Open G, Open D, Half-step down, Whole-step down. Cavaquinho: DGBe, DGBD.
+- **Two instruments:** Guitar (6-string) and Cavaquinho (4-string, default **DGBD**). Switching instruments resets to that instrument's default tuning and adjusts chord-shape fret-span comfort.
+- **Preset tunings** — Guitar: Standard, Drop D, DADGAD, Open G, Open D, Half-step down, Whole-step down. Cavaquinho: DGBD, DGBe.
 - **Custom tunings** — edit each string ±1 semitone or ±1 octave; save by name; persists.
+- **Selectable guitar sounds** — a Karplus-Strong **synth** plus **sampled** Acoustic (steel), Nylon (classical), and Electric banks (CC0 / GPL-with-audio-exception sources), loaded on demand with a nearest-sample pitch-shift resampler; the synth is always the fallback.
+- **Per-sound tone** — a real-time **3-band EQ** (bass/mid/treble shelves + peak) and a **reverb** amount (default a subtle 3 %), each stored per sound. An **A/B engine toggle** compares the modern voice-graph engine (envelopes, constant-power panning, soft limiter, per-voice reverb send) against the legacy engine.
 - **Strum spread** slider — the gap (0-150 ms) between consecutive chord notes, shared by single strums, the loop, and ear training.
 - **Ring sustain** slider — how long every note rings, from 0.3 s (staccato) to 4 s (drone).
-- **First-open defaults** — ear training starts on **Major triads only**, and the neck shows **interval labels**.
+- **First-open defaults** — the app opens on a **light** theme, ear training starts on **Major triads only** with shell voicings, and the neck shows **interval labels**.
 
 ---
 
 ## Tech stack
 
+**Android** (primary):
+
 | Layer | Choice | Why |
 |---|---|---|
 | Language | **Kotlin 2.1** | JVM-native, modern, no JS toolchain |
 | UI | **Jetpack Compose** (Material 3) | Declarative, theme-friendly, smooth animations |
-| Audio out | **AudioTrack** (AAudio path) + Karplus-Strong DSP | Sub-50 ms tap-to-sound on hardware |
+| Audio out | **AudioTrack** (AAudio path) + Karplus-Strong DSP + samples | Sub-50 ms tap-to-sound on hardware |
 | Audio in | **AudioRecord** + custom YIN | ~46 ms windows, ±2 ¢ accuracy |
 | Persistence | **DataStore Preferences** | Coroutine-friendly modern replacement for SharedPreferences |
 | Build | **Gradle 8.11** with the Kotlin DSL + version catalog | Standard for new Android projects |
 | Tests | **JUnit 5** + `kotlin.test` | Fast, modern, parameterizable |
-| Min Android | **API 26 (Android 8.0)** | Required for low-latency AAudio + adaptive icons |
-| Target Android | **API 34 (Android 14)** | Current stable |
+| Min / Target | **API 26 (Android 8.0)** / **API 34 (Android 14)** | Low-latency AAudio + adaptive icons; current stable |
 
-The repo is a multi-module Gradle build:
+**Web** (`chorect-web`, parity port):
+
+| Layer | Choice |
+|---|---|
+| Language | **TypeScript** (strict) |
+| UI | Hand-rolled DOM + Canvas (no framework), explicit render pass in place of Compose recomposition |
+| Audio | **Web Audio API** (buffer sources, biquad EQ, convolver reverb, dynamics compressor) |
+| Persistence | `localStorage` (mirrors the DataStore keys) |
+| Build / host | **Vite** + `tsc --noEmit`, deployed to **GitHub Pages** via Actions |
+
+The repo is a multi-module Gradle build plus the web port:
 
 ```
 Chorect/
-├── theory/   ← pure Kotlin, zero Android deps — KMP-ready for iOS later
-├── audio/    ← Android library: AudioTrack engine, Karplus-Strong synth, YIN pitch detector, MicInput
-└── app/      ← Compose UI: fretboard, sheets, tuner, loop, ear training, drum machine
+├── theory/       ← pure Kotlin, zero Android deps — KMP-ready for iOS later
+├── audio/        ← Android library: AudioTrack engine, Karplus-Strong + sample player, YIN, MicInput
+├── app/          ← Compose UI: fretboard, tuner, loop, ear training, cavaq progressions, rhythm units, drums
+└── chorect-web/  ← TypeScript/WebAudio parity port; src/theory mirrors the Kotlin theory module
 ```
 
 ---
@@ -198,6 +233,19 @@ The debug APK is named after the version, e.g. `Chorect_beta_V1.6.0.apk`, and pr
 
 **On Windows** you can also just double-click `launch-app.bat` — it starts the emulator (with audio) if needed, builds, installs, and launches in one shot.
 
+### Web version
+
+The parity web port lives in `chorect-web/`:
+
+```sh
+cd chorect-web
+npm install
+npm run dev      # Vite dev server
+npm run build    # tsc --noEmit + vite build (the CI gate)
+```
+
+It deploys to GitHub Pages from `origin/main` via the "Deploy web to GitHub Pages" Actions workflow. The theory logic under `chorect-web/src/theory` is a hand-kept mirror of the Kotlin `theory` module — changes to the music engine are applied to both.
+
 ### A note on emulator audio
 
 The Android Emulator on Windows often defaults to an audio backend that adds 100-300 ms of latency on top of the system's minimum buffer. The `launch-app.bat` script passes `-audio winaudio` to force the lower-latency Windows audio path; if you launch the emulator yourself, do the same:
@@ -218,27 +266,33 @@ For an accurate feel for the audio latency, test on a real device. On a Pixel-cl
 Chorect/
 ├── app/                                       # Android application (Compose UI)
 │   └── src/main/kotlin/app/guitar/app/
-│       ├── MainActivity.kt                    # entry point; single-Activity, nav-rail layout
-│       ├── AppShell.kt                        # persistent navigation rail (Fretboard/Loop/Ear/Drums/Tuner/Options)
+│       ├── MainActivity.kt                    # entry point; single-Activity, orientation-aware layout
+│       ├── Shell.kt                           # "Signal" bottom tab bar / landscape rail (configurable pick-4)
 │       ├── AppState.kt                        # reactive Compose state holder
-│       ├── Theme.kt                           # dark "studio" color scheme + typography
+│       ├── Theme.kt                           # light/dark/auto colour schemes + 5-accent picker
 │       ├── FretboardView.kt                   # Canvas-drawn fretboard (fixed-ratio, pinch-zoom + pan)
-│       ├── Screens.kt                         # Fretboard (Chord/Scale/Strum) + Options bottom sheets, Loop screen
+│       ├── Screens.kt                         # Fretboard (Chord/Scale/Play) + Options sheets, Loop screen
+│       ├── Transport.kt                       # persistent transport dock (play / BPM / tone chip)
 │       ├── TunerScreen.kt + TunerState.kt     # mic-driven quarter-ring tuner with on-the-fly tuning
 │       ├── LoopScreen.kt + Loop.kt            # progression looper with per-slot voicing/strum
-│       ├── EarTrainingScreen.kt + EarTrainingState.kt   # Progression (+advanced) / Note2Chord / Flavor / Inversions / Aug-Dim, Practice + Challenge
+│       ├── EarTrainingScreen.kt + EarTrainingState.kt   # 6 ear-training sub-modes, Practice + Challenge, Library
+│       ├── CavaqProgressionsScreen.kt + CavaqProgState.kt  # cavaquinho functional-sequence looper + neck
+│       ├── RhythmUnitsScreen.kt + RhythmUnitState.kt   # rhythmic-units trainer (notation cards + click loop)
+│       ├── DecomposeScreen.kt                 # chord-tone breakdown reference
 │       ├── SambaLooperScreen.kt + SambaLooperState.kt   # percussion step-sequencer (drum machine)
 │       └── TuningRepository.kt                # DataStore-backed persistence (incl. challenge high scores)
 │
 ├── audio/                                     # Android library
 │   └── src/main/kotlin/app/guitar/audio/
 │       ├── AudioEngine.kt                     # interface + no-op
-│       ├── AudioTrackEngine.kt                # MODE_STREAM continuous-output mixer
+│       ├── AudioTrackEngine.kt                # modern voice-graph engine (envelope/pan/reverb/limiter)
+│       ├── LegacyAudioTrackEngine.kt + SwitchableAudioEngine.kt  # A/B engine toggle
+│       ├── VoiceMixer.kt Freeverb.kt Panner.kt ThreeBandEq.kt    # mixer bus + effects
 │       ├── PluckedSynth.kt                    # pure-Kotlin Karplus-Strong DSP
+│       ├── SampleInstrument.kt + GuitarBankLoader.kt  # multisample player + bundled guitar banks
 │       ├── PercussionSynth.kt                 # pure-Kotlin percussion voices (synth fallback)
-│       ├── WavDecoder.kt                       # RIFF/WAVE → mono 44.1 kHz, for bundled drum samples
-│       ├── PitchDetector.kt                   # pure-Kotlin YIN
-│       ├── PitchAnalysis.kt                   # Hz ↔ MIDI ↔ cents under configurable A4
+│       ├── WavDecoder.kt                       # RIFF/WAVE → mono 44.1 kHz, for bundled samples
+│       ├── PitchDetector.kt PitchAnalysis.kt  # pure-Kotlin YIN + Hz↔MIDI↔cents (configurable A4)
 │       └── MicInput.kt                        # AudioRecord wrapper
 │
 ├── theory/                                    # Pure-Kotlin music theory (KMP-ready)
@@ -252,13 +306,22 @@ Chorect/
 │       ├── JazzShellVoicings.kt               # drop-2 dictionary
 │       ├── VoiceLeading.kt                    # min-movement voicing picker
 │       ├── ScaleLibrary.kt Scale.kt ScalePosition.kt FretboardOverlay.kt
-│       ├── EarTraining.kt                     # Roman-numeral diatonic + curated advanced progressions, resolve()
-│       ├── Inversions.kt                      # inversion voicings for the inversions trainer
-│       ├── Note2Chord.kt                      # ear-training challenge generator
+│       ├── EarTraining.kt                     # Roman-numeral diatonic + harmonic-minor + curated advanced progressions, resolve()
+│       ├── ProgressionSongs.kt                # famous-song examples per progression (library)
+│       ├── CavaqSequences.kt CavaqSongs.kt    # cavaquinho functional sequences + song families
+│       ├── RhythmUnits.kt                     # basic one-beat rhythmic units (with/without rests)
+│       ├── Inversions.kt Note2Chord.kt IntervalTrainer (in EarTraining.kt)  # more ear-training generators
 │       ├── Percussion.kt PercussionPattern.kt # drum-machine model
 │       ├── Fingering.kt NoteSpeller.kt        # display helpers
 │       └── TuningCodec.kt                     # serialization
 │
+├── chorect-web/                               # TypeScript/WebAudio parity port (Vite → GitHub Pages)
+│   └── src/
+│       ├── theory/                            # hand-kept mirror of the Kotlin theory module
+│       └── app/                               # DOM+Canvas UI, WebAudioEngine, per-screen state/UI
+│
+├── docs/superpowers/specs/                    # design specs (e.g. rhythmic-units, cavaquinho, Signal)
+├── releases/                                  # archived Chorect_beta_V<version>.apk builds
 ├── ANDROID_SETUP.md                           # Windows setup walkthrough
 ├── requirements.md                            # original product spec
 └── launch-app.bat                             # double-click launcher for Windows
@@ -280,7 +343,7 @@ Chorect/
 - **Jazz drop-2 dictionary** — every inversion of `maj7` / `m7` / `7` / `m7b5` / `dim7` / `6` / `m6` confirmed to contain only the correct chord tones.
 - **YIN pitch detector** — locks within ±2 ¢ on A4, low E2, high E4, D3; rejects pure noise and silence; picks the fundamental over a harmonic.
 - **Cents math** — A4=440 maps to MIDI 69 with 0 ¢; custom A4 references shift the grid as expected.
-- **Ear-training progression resolver** — every Roman degree in major and minor resolves to a parseable chord symbol; "ii"+"m7" displays as `ii7` (not `iim7`); harmonic-minor V is used for the cadence; every curated advanced (non-diatonic) progression resolves to playable chords in any key.
+- **Ear-training progression resolver** — every Roman degree in major and minor resolves to a parseable chord symbol; "ii"+"m7" displays as `ii7` (not `iim7`); minor is natural (`v`) with the harmonic-minor dominant available as a marked-bar option; every curated advanced (non-diatonic) and harmonic-minor progression resolves to playable chords in any key.
 - **Chord inversions** — `Inversions.midis()` voices each inversion (root / 1st / 2nd / 3rd) with the correct bass tone, low→high.
 - **Note2Chord** — labels for every diatonic non-chord-tone in both major and minor; random sampling covers all 12 roots.
 - **Percussion** — pattern cycling / voice selection for the drum machine, the synthesized percussion voices (`PercussionSynth`), the bundled-sample `WavDecoder` (PCM 8/16/24/32-bit + float, multi-channel averaging, resampling), and the save/load pattern codec round-trip.
@@ -312,9 +375,15 @@ Chorect/
 | ✅ | Adaptive launcher icon (rosewood fretboard slice) |
 | ✅ | Cavaquinho instrument — instrument toggle, DGBe/DGBD tunings, 4-string fretboard, per-instrument timbre |
 | ✅ | Samba drum machine — percussion step-sequencer (Surdo / Tamborim / Pandeiro / Agogô) with bundled one-shot WAV samples (synth fallback), save/load custom beats (+ "stock samba"), always-visible mute/solo, vertical scroll, Brazilian 16th-note swing, erase tool, per-instrument volume slider, and 2-finger aspect-ratio zoom + drag-pan |
-| ✅ | UI polish (1.5.0) — ear-training dropdown header + challenge Restart, fretboard starts empty + portrait first-fret zoom with full-area pinch/drag |
-| ✅ | Drum-machine configurable meter (1.6.0) — selectable bars / time signature / division (division-aware timing) + loop translate/shift |
-| ✅ | Ear-training answering rework (1.6.0) — per-bar degree keyboard with Major/Minor shift (relative-key answers equivalent), plain-number references, challenge Prev/Next with per-question history |
+| ✅ | Ear-training degree-keyboard answering (1.6.0) — Major/Minor shift, plain-number references, challenge Prev/Next history |
+| ✅ | Sampled guitar instruments (1.23) + per-sound 3-band EQ (1.24) + reverb (1.26) + modern voice-graph audio engine with A/B toggle (1.22) |
+| ✅ | Progression Library + famous-song examples (1.25+) with YouTube/Spotify search links |
+| ✅ | "Signal" whole-app GUI redesign (2.0) — bottom tab bar / landscape rail, configurable tabs, transport dock, unified tone sheet, light/dark/auto + accent picker |
+| ✅ | **Web port** (`chorect-web`) — TypeScript/WebAudio parity port deployed to GitHub Pages |
+| ✅ | Cavaquinho Progressions (2.5) — functional samba sequences, voice-led neck, song library; DGBD default tuning |
+| ✅ | True jazz shell voicings (2.10) + compact cavaquinho voicings |
+| ✅ | Ear-training harmonic-minor progressions (2.14) — major V7 → i cadences with a dedicated V7 answer key; Advanced II / Suspended categories |
+| ✅ | Rhythmic Units (2.15–2.16) — learn/train the basic one-beat units (with & without rests), notation thumbnails + BPM click loop |
 | 📅 | Cavaquinho curated chord library |
 | 📅 | Custom-chord favorites |
 | 📅 | iOS port via Kotlin Multiplatform |
@@ -326,6 +395,8 @@ Chorect/
 ### Module boundaries
 
 The three-module split (`theory` / `audio` / `app`) is enforced by Gradle. The `theory` module has **zero Android dependencies** — it compiles to plain JVM bytecode and is fully unit-testable without an emulator. This makes both testing and a future Kotlin Multiplatform port straightforward; only the `app` layer (Compose) and `audio` layer (AudioTrack + AudioRecord) would need iOS-specific replacements.
+
+The **web port** (`chorect-web`) re-implements the same design in TypeScript: `src/theory` is a line-by-line mirror of the Kotlin theory engine (same algorithms, same data), and `src/app` re-creates each screen's state + UI over a plain DOM/Canvas render pass in place of Compose recomposition, with a `WebAudioEngine` standing in for `AudioTrackEngine`. Keeping the two theory copies in lock-step is a deliberate constraint — every music-engine change lands in both, and the web build's `tsc --noEmit` (run in CI) is the type gate since there's no local Node toolchain.
 
 ### Audio out
 
@@ -345,7 +416,7 @@ Built around two value classes (`PitchClass` for the 12-tone scale degree, `Midi
 
 For **chord shape generation**, the `ChordShapeGenerator` short-circuits to a canonical voicing dictionary when one exists for the (style, quality, tuning) tuple — `CagedShapes` for Standard mode, `JazzShellVoicings` for Shell mode — and falls back to a brute-force constraint-filtered enumeration otherwise (with a per-instrument max fret span). CAGED templates are encoded as relative fret offsets from the root fret on the shape's primary string, so transposing to any chord root is just a single integer add.
 
-For **ear training**, `EarTraining.resolve()` maps a `(degree, key, mode, chord-type-level)` tuple to a `(chordSymbol, romanLabel)` pair. Diatonic-role tables for major and minor encode the triad / seventh / extended quality at each scale degree; minor mode uses the harmonic-minor V by default so V7→i sounds like the textbook cadence. Beyond the diatonic generator, `ADVANCED_PROGRESSIONS` is a curated list of named non-diatonic progressions — each chord is stored as a `(semitone-above-tonic, quality, Roman-label)` triple so the whole progression transposes to any key with a single add per chord, and `Inversions.midis()` lifts the bottom *k* chord tones an octave to voice the *k*-th inversion for the inversions trainer.
+For **ear training**, `EarTraining.resolve()` maps a `(degree, key, mode, chord-type-level)` tuple to a `(chordSymbol, romanLabel)` pair. Diatonic-role tables for major and minor encode the triad / seventh / extended quality at each scale degree; minor uses the natural `v` by default, and a `MINOR_DOMINANT` role supplies the harmonic-minor major V for progressions that mark a bar as a dominant (the V7→i cadence family, on by default). Beyond the diatonic generator, `ADVANCED_PROGRESSIONS` is a curated list of named non-diatonic progressions — each chord is stored as a `(semitone-above-tonic, quality, Roman-label)` triple so the whole progression transposes to any key with a single add per chord, and `Inversions.midis()` lifts the bottom *k* chord tones an octave to voice the *k*-th inversion for the inversions trainer.
 
 ---
 
