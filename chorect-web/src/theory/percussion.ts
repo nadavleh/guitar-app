@@ -389,7 +389,6 @@ export interface BuiltinPattern { name: string; pattern: PercussionPattern; bpm?
 
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */
 export const BUILTIN_PATTERNS: BuiltinPattern[] = [
-  { name: "batida do cavaco 1", pattern: BATIDA_CAVACO_1 },
   { name: "teleco-teco 1", pattern: TELECOTECO_1 },
   { name: "teleco-teco 2", pattern: TELECOTECO_2 },
   { name: "Xote", pattern: XOTE, bpm: 90 },

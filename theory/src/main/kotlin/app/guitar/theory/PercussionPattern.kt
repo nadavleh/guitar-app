@@ -322,7 +322,6 @@ object PercussionBuiltins {
 
     /** Grooves offered in the Load… menu (before the user's saved beats). */
     val ALL: List<BuiltinPattern> = listOf(
-        BuiltinPattern("batida do cavaco 1", BATIDA_CAVACO_1),
         BuiltinPattern("teleco-teco 1", TELECOTECO_1),
         BuiltinPattern("teleco-teco 2", TELECOTECO_2),
         BuiltinPattern("Xote", XOTE, bpm = 90),
