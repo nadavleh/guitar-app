@@ -27,6 +27,7 @@ export type IconName =
   | "waves"
   | "spread"
   | "timer"
+  | "rhythmNotes"
   | "note"
   | "flask"
   | "restart"
@@ -71,6 +72,9 @@ const PATH: Record<IconName, string> = {
   waves: '<path d="M2 13c2.2-4 4.4-4 6.6 0s4.4 4 6.6 0 4.4-4 6.6 0"/><path d="M2 18c2.2-4 4.4-4 6.6 0s4.4 4 6.6 0 4.4-4 6.6 0"/>',
   spread: '<line x1="4" y1="12" x2="20" y2="12"/><polyline points="8 6 4 12 8 18"/><polyline points="16 6 20 12 16 18"/>',
   timer: '<circle cx="12" cy="13" r="8"/><line x1="12" y1="13" x2="12" y2="9"/><line x1="12" y1="13" x2="15" y2="15"/><line x1="9" y1="3" x2="15" y2="3"/><line x1="12" y1="3" x2="12" y2="5"/>',
+  // Beamed sixteenth-note group ("1 e a") — the Rhythm-units tab glyph (replaces
+  // the clock/timer). Three noteheads + stems under a double beam.
+  rhythmNotes: '<line x1="7.8" y1="17" x2="7.8" y2="6"/><line x1="13" y1="17" x2="13" y2="6"/><line x1="18.2" y1="17" x2="18.2" y2="6"/><line x1="7.4" y1="6.4" x2="18.6" y2="6.4" stroke-width="2.6"/><line x1="7.4" y1="9.4" x2="18.6" y2="9.4" stroke-width="2.6"/><ellipse cx="6.1" cy="17.2" rx="2.4" ry="1.9" fill="currentColor" stroke="none"/><ellipse cx="11.3" cy="17.2" rx="2.4" ry="1.9" fill="currentColor" stroke="none"/><ellipse cx="16.5" cy="17.2" rx="2.4" ry="1.9" fill="currentColor" stroke="none"/>',
   note: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
   flask: '<path d="M9 2h6"/><path d="M10 2v6.5l-6 10.5a1.5 1.5 0 0 0 1.3 2.2h13.4a1.5 1.5 0 0 0 1.3-2.2l-6-10.5V2"/><line x1="7.5" y1="15" x2="16.5" y2="15"/>',
   // Ear Training Signal restructure (T9): pinned header Restart/Quit icons for

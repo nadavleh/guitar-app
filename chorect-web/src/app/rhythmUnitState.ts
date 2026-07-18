@@ -32,11 +32,13 @@ export class RhythmUnitState {
     return this.selectedId ? rhythmUnitById(this.selectedId) : undefined;
   }
 
-  /** Tap a card: switch to it and (re)start; tapping the playing one stops. */
+  /** Tap a card: switch to it and (re)start; tapping the playing one stops.
+   *  Switching while another unit plays swaps instantly (no stop-then-play). */
   select(id: string): void {
     if (this.selectedId === id && this.isPlaying) { this.stop(); return; }
     this.selectedId = id;
-    this.stopLoop();
+    this.stopLoop();          // cancel any running loop (bumps the token)
+    this.isPlaying = false;   // clear the guard so start() proceeds with the new unit
     this.start();
   }
 

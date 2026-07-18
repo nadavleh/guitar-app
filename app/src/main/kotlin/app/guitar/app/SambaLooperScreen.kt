@@ -478,6 +478,13 @@ private fun PatternSection(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 // Tap-tempo: tap along; BPM follows the average tap interval.
                 OutlinedButton(onClick = { samba.tapTempo() }) { Text("Tap tempo") }
+                Spacer(Modifier.width(8.dp))
+                // Metronome: overlay a wood click on the loop (higher click on beat 1).
+                if (samba.metronomeOn) {
+                    Button(onClick = { samba.toggleMetronome() }) { Text("Metronome ✓") }
+                } else {
+                    OutlinedButton(onClick = { samba.toggleMetronome() }) { Text("Metronome") }
+                }
                 Spacer(Modifier.weight(1f))
                 if (zoomed) {
                     TextButton(onClick = {

@@ -49,6 +49,20 @@ class SambaLooperState(
     var loadedName by mutableStateOf<String?>("batida do cavaco 1")
         private set
 
+    /** Overlay a wood-click metronome on the loop (higher click on each bar's "1"). */
+    var metronomeOn by mutableStateOf(false)
+        private set
+    fun toggleMetronome() { metronomeOn = !metronomeOn }
+    private val mClick: FloatArray by lazy { synthClick(2000.0, 45) }
+    private val mAccent: FloatArray by lazy { synthClick(2800.0, 45) }
+    private fun synthClick(freqHz: Double, ms: Int, sr: Int = 44100): FloatArray {
+        val n = sr * ms / 1000
+        val buf = FloatArray(n)
+        val w = 2.0 * Math.PI * freqHz / sr
+        for (i in 0 until n) buf[i] = (Math.sin(w * i) * Math.exp(-6.0 * i / n) * 0.7).toFloat()
+        return buf
+    }
+
     // Undo stack of prior patterns (Ctrl-Z / Undo button). Every pattern edit pushes
     // the previous pattern here via [commit]; [undo] pops it back.
     private val undoStack = ArrayDeque<PercussionPattern>()
@@ -316,6 +330,14 @@ class SambaLooperState(
             val sr = 44100
             fun scheduleSlot(snapshot: PercussionPattern, slot: Int, delayMs: Long) {
                 val baseFrames = (delayMs * sr / 1000).toInt()
+                // Metronome click track: one click per beat, higher click on each bar's "1".
+                if (metronomeOn) {
+                    val m = snapshot.meter
+                    if (slot % m.slotsPerBeat == 0) {
+                        val barDown = slot % m.slotsPerBar == 0
+                        audio.playSamplesAt(if (barDown) mAccent else mClick, if (barDown) 0.9f else 0.6f, baseFrames)
+                    }
+                }
                 for (inst in snapshot.instruments) {
                     if (!isAudible(inst)) continue
                     val v = snapshot.voiceAt(inst, slot) ?: continue

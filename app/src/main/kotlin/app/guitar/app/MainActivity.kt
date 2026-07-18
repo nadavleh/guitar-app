@@ -299,6 +299,8 @@ fun App(audio: AudioEngine) {
             CavaqProgressionsScreen(state, onBack = { state.closeSheet() })
         } else if (state.currentSheet == Sheet.RhythmUnits) {
             RhythmUnitsScreen(state, onBack = { state.closeSheet() })
+        } else if (state.currentSheet == Sheet.Metronome) {
+            MetronomeScreen(state, onBack = { state.closeSheet() })
         } else {
             StatusBar(state)
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -406,6 +408,7 @@ private fun sheetLabel(s: Sheet): String = when (s) {
     Sheet.SambaLooper -> "Drums"
     Sheet.Decompose -> "Decompose"
     Sheet.RhythmUnits -> "Rhythm"
+    Sheet.Metronome -> "Metronome"
 }
 
 @Composable

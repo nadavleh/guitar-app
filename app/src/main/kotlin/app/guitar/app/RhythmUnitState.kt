@@ -53,7 +53,9 @@ class RhythmUnitState(
     // Named changeBpm (not setBpm) to avoid clashing with the generated `bpm` setter.
     fun changeBpm(v: Int) { bpm = v.coerceIn(10, 300) }   // loop re-reads bpm each beat
 
-    private fun restart() { cancelJob(); start() }
+    // Clear isPlaying before restarting so start()'s `if (isPlaying) return` guard
+    // doesn't swallow an instant switch to another unit while one is playing.
+    private fun restart() { cancelJob(); isPlaying = false; start() }
 
     fun start() {
         val u = selected ?: return

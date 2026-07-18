@@ -8,6 +8,7 @@ import {
   BEAT_UNITS, DIVISIONS, BATIDA_CAVACO_1,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
+import { synthClick, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -34,6 +35,11 @@ export class SambaLooperState {
   currentSlot = -1;
   /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
   loadedName: string | null = "batida do cavaco 1";
+  /** Overlay a wood-click metronome on the loop (higher click on each bar's "1"). */
+  metronomeOn = false;
+  private readonly mClick = synthClick(BEAT_CLICK_HZ, 45);
+  private readonly mAccent = synthClick(ACCENT_CLICK_HZ, 45);
+  toggleMetronome() { this.metronomeOn = !this.metronomeOn; this.notify(); }
 
   // Undo stack of prior patterns (Ctrl-Z / Undo). Every edit pushes via commit().
   private undoStack: PercussionPattern[] = [];
@@ -297,6 +303,14 @@ export class SambaLooperState {
     const token = this.token;
     this.notify();
     const scheduleSlot = (snapshot: PercussionPattern, slot: number, when: number) => {
+      // Metronome click track: one click per beat, higher click on each bar's "1".
+      if (this.metronomeOn) {
+        const m = snapshot.meter;
+        if (slot % m.slotsPerBeat === 0) {
+          const barDownbeat = slot % m.slotsPerBar === 0;
+          this.deps.audio.playSamples(barDownbeat ? this.mAccent : this.mClick, barDownbeat ? 0.9 : 0.6, when);
+        }
+      }
       for (const inst of snapshot.instruments) {
         if (!this.isAudible(inst)) continue;
         const v = snapshot.voiceAt(inst, slot);

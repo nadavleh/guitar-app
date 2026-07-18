@@ -23,6 +23,8 @@ import { CavaqProgUI } from "./cavaqProgUI";
 import { RhythmUnitState } from "./rhythmUnitState";
 import { RhythmPhraseState } from "./rhythmPhraseState";
 import { RhythmUnitsUI } from "./rhythmUnitsUI";
+import { MetronomeState } from "./metronomeState";
+import { MetronomeUI } from "./metronomeUI";
 import { loadDrumSample } from "./drumSamples";
 import { Timbres } from "../audio";
 import { Colors, withAlpha } from "./theme";
@@ -53,12 +55,13 @@ const TAB_SHEET: Record<TabDestName, Sheet> = {
   Decompose: Sheet.Decompose,
   CavaqProgressions: Sheet.CavaqProgressions,
   RhythmUnits: Sheet.RhythmUnits,
+  Metronome: Sheet.Metronome,
 };
 const TAB_ICON: Record<TabDestName, IconName> = {
-  Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose", CavaqProgressions: "note", RhythmUnits: "timer",
+  Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose", CavaqProgressions: "note", RhythmUnits: "rhythmNotes", Metronome: "timer",
 };
 const TAB_LABEL: Record<TabDestName, string> = {
-  Neck: "Fretboard", Ear: "Ear", Rhythm: "DrumLoop", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose", CavaqProgressions: "Progressions", RhythmUnits: "Rhythm",
+  Neck: "Fretboard", Ear: "Ear", Rhythm: "DrumLoop", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose", CavaqProgressions: "Progressions", RhythmUnits: "Rhythm", Metronome: "Metronome",
 };
 /** One-line description shown under each destination's title in the More sheet. */
 const TAB_SUBTITLE: Record<TabDestName, string> = {
@@ -70,6 +73,7 @@ const TAB_SUBTITLE: Record<TabDestName, string> = {
   Decompose: "Chord-tone breakdown reference",
   CavaqProgressions: "Cavaquinho functional sequences — looper + neck",
   RhythmUnits: "Learn & train basic rhythmic units",
+  Metronome: "Click track with selectable time signatures",
 };
 
 /** Whether a tab destination is available for the current instrument. The
@@ -159,6 +163,8 @@ export class App {
   private rhythmUnits: RhythmUnitState;
   private rhythmPhrase: RhythmPhraseState;
   private rhythmUnitsUI: RhythmUnitsUI;
+  private metronome: MetronomeState;
+  private metronomeUI: MetronomeUI;
 
   constructor(private state: AppState, root: HTMLElement) {
     this.fretboard = new FretboardCanvas(this.fretCanvasEl);
@@ -212,6 +218,8 @@ export class App {
     this.rhythmUnits = new RhythmUnitState({ audio: state.audio, onChange: () => this.scheduleRender() });
     this.rhythmPhrase = new RhythmPhraseState({ audio: state.audio, onChange: () => this.scheduleRender() });
     this.rhythmUnitsUI = new RhythmUnitsUI(this.rhythmUnits, this.rhythmPhrase, () => state.closeSheet(), () => this.scheduleRender());
+    this.metronome = new MetronomeState({ audio: state.audio, onChange: () => this.scheduleRender() });
+    this.metronomeUI = new MetronomeUI(this.metronome, () => state.closeSheet(), () => this.scheduleRender());
     this.decomposeUI = new DecomposeUI(state, this.ear, () => state.closeSheet(), (symbols) => {
       this.loop.loadProgressionIntoLoop(symbols);
       state.openSheet(Sheet.Loop);
@@ -347,6 +355,7 @@ export class App {
         else if (sheet === Sheet.EarTraining && this.ear.progSubMode === EarSubMode.Progression) { e.preventDefault(); if (this.ear.isLooping) this.ear.stopLoop(); else this.ear.startLoop(); }
         else if (sheet === Sheet.CavaqProgressions) { e.preventDefault(); this.cavaq.toggle(); }
         else if (sheet === Sheet.RhythmUnits) { e.preventDefault(); this.rhythmUnits.toggle(); }
+        else if (sheet === Sheet.Metronome) { e.preventDefault(); this.metronome.toggle(); }
         return;
       }
 
@@ -461,6 +470,7 @@ export class App {
     if (route !== Sheet.CavaqProgressions && this.cavaq.isPlaying) this.cavaq.stop();
     if (route !== Sheet.RhythmUnits && this.rhythmUnits.isPlaying) this.rhythmUnits.stop();
     if (route !== Sheet.RhythmUnits && this.rhythmPhrase.isPlaying) this.rhythmPhrase.stop();
+    if (route !== Sheet.Metronome && this.metronome.isPlaying) this.metronome.stop();
 
     this.renderNav();
     // Preserve the scroll position of any long scrollable pane across full rebuilds.
@@ -474,6 +484,7 @@ export class App {
     else if (route === Sheet.Decompose) this.decomposeUI.render(this.contentEl);
     else if (route === Sheet.CavaqProgressions) this.cavaqUI.render(this.contentEl);
     else if (route === Sheet.RhythmUnits) this.rhythmUnitsUI.render(this.contentEl);
+    else if (route === Sheet.Metronome) this.metronomeUI.render(this.contentEl);
     else this.renderFretboardView();
 
     const newScroll = this.contentEl.querySelector(".et-scroll");
@@ -1309,6 +1320,7 @@ export class App {
       case Sheet.Decompose: return "Decompose";
       case Sheet.CavaqProgressions: return "Progressions";
       case Sheet.RhythmUnits: return "Rhythm";
+      case Sheet.Metronome: return "Metronome";
     }
   }
 }

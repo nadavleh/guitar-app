@@ -187,9 +187,10 @@ export class SambaLooperUI {
     const swingActive = s.meter.beatUnit === 4 && s.meter.division === 16;
     const swingSlider = slider(0, 100, s.swing, (v) => s.setSwing(v));
     swingSlider.disabled = !swingActive;
+    const metroBtn = btn(s.metronomeOn ? "Metronome ✓" : "Metronome", () => { s.toggleMetronome(); this.rerender(); }, s.metronomeOn ? "btn primary" : "btn");
     wrap.appendChild(el("div", { class: "et-card", style: `background:var(--surface2);margin-top:8px` }, [
-      el("div", { class: "row" }, [
-        btn("Tap tempo", () => s.tapTempo()),
+      el("div", { class: "row", style: "gap:8px" }, [
+        btn("Tap tempo", () => s.tapTempo()), metroBtn,
       ]),
       el("div", { class: "label-sm" }, [
         !swingActive ? "Swing: 1/16 grid only" : s.swing === 0 ? "Swing: straight" : `Swing: ${s.swing}% (16ths)`,

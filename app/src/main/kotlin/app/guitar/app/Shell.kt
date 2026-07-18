@@ -157,6 +157,63 @@ object ShellIcons {
             }
         }
     }
+
+    /** A beamed sixteenth-note group ("1 e a"): three noteheads + stems under a
+     *  double beam — the Rhythm-units tab glyph. */
+    val RhythmNotes: ImageVector by lazy {
+        outlined("ShellRhythmNotes") {
+            path(stroke = stroke, strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round) {
+                // Stems.
+                moveTo(7.8f, 17f); lineTo(7.8f, 6f)
+                moveTo(13f, 17f); lineTo(13f, 6f)
+                moveTo(18.2f, 17f); lineTo(18.2f, 6f)
+            }
+            path(stroke = stroke, strokeLineWidth = 2.6f, strokeLineCap = StrokeCap.Round) {
+                // Double beam.
+                moveTo(7.4f, 6.4f); lineTo(18.6f, 6.4f)
+                moveTo(7.4f, 9.4f); lineTo(18.6f, 9.4f)
+            }
+            path(fill = stroke) {
+                // Three noteheads (filled circles, r≈2.3).
+                moveTo(3.8f, 17.2f)
+                curveTo(3.8f, 15.93f, 4.83f, 14.9f, 6.1f, 14.9f)
+                curveTo(7.37f, 14.9f, 8.4f, 15.93f, 8.4f, 17.2f)
+                curveTo(8.4f, 18.47f, 7.37f, 19.5f, 6.1f, 19.5f)
+                curveTo(4.83f, 19.5f, 3.8f, 18.47f, 3.8f, 17.2f)
+                close()
+                moveTo(9.0f, 17.2f)
+                curveTo(9.0f, 15.93f, 10.03f, 14.9f, 11.3f, 14.9f)
+                curveTo(12.57f, 14.9f, 13.6f, 15.93f, 13.6f, 17.2f)
+                curveTo(13.6f, 18.47f, 12.57f, 19.5f, 11.3f, 19.5f)
+                curveTo(10.03f, 19.5f, 9.0f, 18.47f, 9.0f, 17.2f)
+                close()
+                moveTo(14.2f, 17.2f)
+                curveTo(14.2f, 15.93f, 15.23f, 14.9f, 16.5f, 14.9f)
+                curveTo(17.77f, 14.9f, 18.8f, 15.93f, 18.8f, 17.2f)
+                curveTo(18.8f, 18.47f, 17.77f, 19.5f, 16.5f, 19.5f)
+                curveTo(15.23f, 19.5f, 14.2f, 18.47f, 14.2f, 17.2f)
+                close()
+            }
+        }
+    }
+
+    /** A clock face + two hands — the Metronome tab glyph. */
+    val Clock: ImageVector by lazy {
+        outlined("ShellClock") {
+            path(stroke = stroke, strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                // Face.
+                moveTo(4f, 12f)
+                curveTo(4f, 7.58f, 7.58f, 4f, 12f, 4f)
+                curveTo(16.42f, 4f, 20f, 7.58f, 20f, 12f)
+                curveTo(20f, 16.42f, 16.42f, 20f, 12f, 20f)
+                curveTo(7.58f, 20f, 4f, 16.42f, 4f, 12f)
+                close()
+                // Hands.
+                moveTo(12f, 12f); lineTo(12f, 7f)
+                moveTo(12f, 12f); lineTo(15.5f, 13.5f)
+            }
+        }
+    }
 }
 
 /**
@@ -183,7 +240,8 @@ enum class TabDest(val sheet: Sheet, val label: String, val icon: ImageVector) {
     Loop(Sheet.Loop, "Loop", Icons.Outlined.Repeat),
     Tuner(Sheet.Tuner, "Tuner", Icons.Outlined.Speed),
     Decompose(Sheet.Decompose, "Decompose", Icons.Outlined.Extension),
-    RhythmUnits(Sheet.RhythmUnits, "Rhythm", Icons.Outlined.GraphicEq),
+    RhythmUnits(Sheet.RhythmUnits, "Rhythm", ShellIcons.RhythmNotes),
+    Metronome(Sheet.Metronome, "Metronome", ShellIcons.Clock),
     // Cavaquinho-only (filtered in the tab editor + More by instrument).
     CavaqProgressions(Sheet.CavaqProgressions, "Progressions", Icons.Outlined.QueueMusic),
 }
@@ -333,6 +391,7 @@ private fun destSubtitle(dest: TabDest): String = when (dest) {
     TabDest.Tuner -> "Chromatic tuner with cents needle"
     TabDest.Decompose -> "Chord-tone breakdown reference"
     TabDest.RhythmUnits -> "Learn & train basic rhythmic units"
+    TabDest.Metronome -> "Click track with selectable time signatures"
 }
 
 /**
