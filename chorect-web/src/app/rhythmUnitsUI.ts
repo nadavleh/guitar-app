@@ -1,6 +1,7 @@
 // Rhythm screen UI. Mirror of app/.../RhythmUnitsScreen.kt.
 // Two sub-modes: "Units" (loop a one-beat unit) and "Phrases" (generate a multi-bar
 // rhythmic phrase, shown as notation + a drum-machine-style grid with a playhead).
+// Notation is drawn with the Bravura SMuFL music font (real vector glyphs).
 
 import { RhythmUnitState } from "./rhythmUnitState";
 import { RhythmPhraseState } from "./rhythmPhraseState";
@@ -11,6 +12,33 @@ import {
 } from "../theory";
 
 type SubMode = "units" | "phrases";
+
+// Bravura (SMuFL) music font — professional vector glyphs that scale perfectly.
+// Loaded once via the FontFace API (base-path-safe); notation is redrawn when ready.
+let bravuraState: "idle" | "loading" | "ready" = "idle";
+function musicFontReady(): boolean {
+  if (bravuraState === "ready") return true;
+  if (typeof document !== "undefined" && document.fonts.check('64px "Bravura"')) { bravuraState = "ready"; return true; }
+  return false;
+}
+function loadMusicFont(onReady: () => void): void {
+  if (bravuraState !== "idle" || musicFontReady()) { if (musicFontReady()) onReady(); return; }
+  bravuraState = "loading";
+  const face = new FontFace("Bravura", `url(${import.meta.env.BASE_URL}fonts/Bravura.woff2)`);
+  face.load().then((f) => { document.fonts.add(f); bravuraState = "ready"; onReady(); })
+    .catch(() => { bravuraState = "idle"; });
+}
+
+// SMuFL codepoints (Bravura).
+const GLYPH = {
+  noteheadBlack: "",
+  noteQuarterUp: "",
+  note8thUp: "",
+  note16thUp: "",
+  rest8th: "",
+  rest16th: "",
+  augDot: "",
+};
 
 export class RhythmUnitsUI {
   private subMode: SubMode = "units";
@@ -24,6 +52,9 @@ export class RhythmUnitsUI {
   ) {}
 
   render(parent: HTMLElement): void {
+    // Kick off the music-font load once; redraw the notation when it's ready.
+    loadMusicFont(() => this.rerender());
+
     const screen = el("div", { class: "tool-screen" });
 
     // Header (fixed)
@@ -86,7 +117,7 @@ export class RhythmUnitsUI {
         `border:${playing ? "2px" : "1px"} solid ${playing ? "var(--feedback)" : "var(--line)"}`,
     });
     const cv = el("canvas", { style: "width:100%;height:auto;display:block" }) as HTMLCanvasElement;
-    cv.width = 360; cv.height = 120;
+    cv.width = 300; cv.height = 150;
     drawNotation(cv, unit);
     card.appendChild(cv);
     card.appendChild(el("div", { class: "mono", style: "font-size:10px;line-height:1.1;color:var(--text-secondary)" }, [unit.count || " "]));
@@ -101,7 +132,6 @@ export class RhythmUnitsUI {
     body.appendChild(el("div", { class: "et-muted", style: "font-size:13px" },
       ["Generate a phrase, then read & play it. The playhead marks the current beat."]));
 
-    // Config: Bars stepper + Time + Generate
     const stepper = el("div", { class: "row", style: "gap:4px;align-items:center" }, [
       btn("−", () => rp.changeBars(rp.bars - 1)),
       el("span", { class: "mono", style: "min-width:16px;text-align:center;font-weight:600" }, [String(rp.bars)]),
@@ -114,7 +144,6 @@ export class RhythmUnitsUI {
       el("span", { style: "font-size:13px" }, ["Time"]), timeChips,
     ]));
 
-    // Transport: Generate + Play/Stop + BPM
     body.appendChild(el("div", { class: "row", style: "margin-top:8px;align-items:center;gap:8px" }, [
       btn("Generate ↻", () => rp.generate()),
       btn(rp.isPlaying ? "Stop ■" : "Play ▶", () => rp.toggle(), "btn primary"),
@@ -123,10 +152,9 @@ export class RhythmUnitsUI {
     ]));
     body.appendChild(el("div", { style: "margin-top:6px" }, [slider(10, 300, rp.bpm, (v) => rp.setBpm(v))]));
 
-    // Resize control for the notation + grid (web).
     body.appendChild(el("div", { class: "row", style: "margin-top:6px;align-items:center;gap:8px" }, [
       el("span", { style: "font-size:13px" }, ["Size"]),
-      slider(70, 200, Math.round(this.phraseScale * 100), (v) => { this.phraseScale = v / 100; this.rerender(); }),
+      slider(70, 220, Math.round(this.phraseScale * 100), (v) => { this.phraseScale = v / 100; this.rerender(); }),
     ]));
 
     const phrase = rp.phrase;
@@ -139,9 +167,9 @@ export class RhythmUnitsUI {
 
   private phraseNotation(phrase: RhythmPhrase): HTMLElement {
     const s = this.phraseScale;
-    const boxW = Math.round(74 * s), boxH = Math.round(80 * s);
+    const boxW = Math.round(78 * s), boxH = Math.round(96 * s);
     const currentBeat = this.rp.currentSlot >= 0 ? Math.floor(this.rp.currentSlot / 4) : -1;
-    const wrap = el("div", { style: `display:flex;flex-wrap:wrap;gap:${Math.round(8 * s)}px;align-items:flex-end;margin-top:10px` });
+    const wrap = el("div", { style: `display:flex;flex-wrap:wrap;gap:${Math.round(6 * s)}px;align-items:flex-end;margin-top:10px` });
     for (let bar = 0; bar < phrase.bars; bar++) {
       const group = el("div", { style: "display:flex;align-items:flex-end" });
       for (let b = 0; b < phrase.beatsPerBar; b++) {
@@ -158,7 +186,7 @@ export class RhythmUnitsUI {
         box.appendChild(cv);
         group.appendChild(box);
       }
-      group.appendChild(el("div", { style: `width:2px;height:${Math.round(60 * s)}px;background:var(--line);margin:0 ${Math.round(8 * s)}px` }));
+      group.appendChild(el("div", { style: `width:2px;height:${Math.round(70 * s)}px;background:var(--line);margin:0 ${Math.round(8 * s)}px` }));
       wrap.appendChild(group);
     }
     return wrap;
@@ -188,90 +216,86 @@ export class RhythmUnitsUI {
   }
 }
 
-/** Draw [unit] as simple notation on [cv] — mirror of RhythmNotation (Compose). */
+/** Draw [unit] as notation on [cv] using the Bravura SMuFL font for noteheads /
+ *  rests / flagged notes, plus drawn stems + beams. Mirror of RhythmNotation (Compose). */
 function drawNotation(cv: HTMLCanvasElement, unit: RhythmUnit): void {
   const ctx = cv.getContext("2d");
   if (!ctx) return;
   const w = cv.width, h = cv.height;
   ctx.clearRect(0, 0, w, h);
+  if (!musicFontReady()) return;   // redrawn once the font loads (see render → loadMusicFont)
+
   const color = getComputedStyle(document.documentElement).getPropertyValue("--text-primary").trim() || "#111";
   ctx.fillStyle = color;
   ctx.strokeStyle = color;
 
-  const padL = w * 0.12, usable = w - padL * 2;
-  const baseline = h * 0.72, beamY = h * 0.20;
-  const headRx = Math.min(h * 0.11, w * 0.05), headRy = headRx * 0.78;
-  const stemW = Math.max(h * 0.035, 2), beamThick = h * 0.10;
   const sub = unit.subdivision;
+  const padL = w * 0.14, usable = w - padL * 2;
+  const baseline = h * 0.66;               // notehead centre / middle staff line
+  const fs = h * 0.62;                      // music-glyph size
+  const noteHalfW = fs * 0.14;
+  const stemDx = fs * 0.125;
+  const stemW = Math.max(fs * 0.035, 2);
+  const beamThick = fs * 0.13;
+  const beamY = baseline - fs * 0.78;       // stem top
+  const secGap = beamThick * 1.5;
 
-  const line = (x1: number, y1: number, x2: number, y2: number, width: number) => {
-    ctx.lineWidth = width;
-    ctx.lineCap = "butt";
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
+  const glyph = (g: string, x: number, y: number, align: CanvasTextAlign = "center") => {
+    ctx.font = `${fs}px "Bravura"`;
+    ctx.textAlign = align;
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(g, x, y);
   };
-  const circle = (x: number, y: number, r: number) => {
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  };
+  const rect = (x: number, y: number, ww: number, hh: number) => ctx.fillRect(x, y, ww, hh);
 
   const startFrac = starts(unit).map((s) => s / sub);
-  const noteCx = startFrac.map((f) => padL + f * usable + headRx);
-  const stemX = noteCx.map((x) => x + headRx * 0.9);
+  const noteCx = startFrac.map((f) => padL + f * usable + noteHalfW);
+  const stemX = noteCx.map((x) => x + stemDx);
   const is16 = unit.notes.map((n) => !n.rest && n.type === RhythmNoteType.Sixteenth);
   const beamable = unit.notes.map((_, i) => i).filter((i) => !unit.notes[i].rest && unit.notes[i].type !== RhythmNoteType.Quarter);
+  const beamed = beamable.length >= 2;
 
+  // Elements
   unit.notes.forEach((n, i) => {
     if (n.rest) {
       const cxR = padL + (startFrac[i] + (n.slots / 2) / sub) * usable;
-      const midY = (beamY + baseline) / 2;
-      const h2 = (baseline - beamY) * 0.40;
-      const dotR = headRy * 0.55;
-      const dotX = cxR - headRx * 0.25;
-      const dotTop = midY - h2 + dotR;
-      circle(dotX, dotTop, dotR);
-      line(dotX + dotR * 0.6, dotTop - dotR * 0.2, cxR + headRx * 0.5, midY + h2, stemW);
-      if (n.type === RhythmNoteType.Sixteenth) circle(dotX - dotR * 0.3, dotTop + dotR * 1.8, dotR);
+      glyph(n.type === RhythmNoteType.Sixteenth ? GLYPH.rest16th : GLYPH.rest8th, cxR, baseline);
+    } else if (n.type === RhythmNoteType.Quarter) {
+      glyph(GLYPH.noteQuarterUp, noteCx[i] - noteHalfW, baseline, "left");
+    } else if (!beamed) {
+      // Lone note → a complete flagged glyph (its own stem + flag).
+      const g = n.type === RhythmNoteType.Sixteenth ? GLYPH.note16thUp : GLYPH.note8thUp;
+      glyph(g, noteCx[i] - noteHalfW, baseline, "left");
+      if (n.type === RhythmNoteType.DottedEighth) glyph(GLYPH.augDot, noteCx[i] + noteHalfW * 1.5, baseline, "left");
     } else {
-      ctx.beginPath();
-      ctx.ellipse(noteCx[i], baseline, headRx, headRy, 0, 0, Math.PI * 2);
-      ctx.fill();
-      line(stemX[i], baseline - headRy * 0.4, stemX[i], beamY, stemW);
-      if (n.type === RhythmNoteType.DottedEighth) circle(noteCx[i] + headRx * 1.7, baseline, headRy * 0.42);
+      // Part of a beamed group → notehead only; stem + beam drawn below.
+      glyph(GLYPH.noteheadBlack, noteCx[i], baseline);
+      if (n.type === RhythmNoteType.DottedEighth) glyph(GLYPH.augDot, noteCx[i] + noteHalfW * 1.6, baseline, "left");
     }
   });
 
-  if (beamable.length >= 2) {
-    line(stemX[beamable[0]], beamY, stemX[beamable[beamable.length - 1]], beamY, beamThick);
-    const secY = beamY + beamThick * 1.5;
+  if (beamed) {
+    // Stems up to the beam.
+    for (const i of beamable) rect(stemX[i] - stemW / 2, beamY, stemW, baseline - beamY);
+    // Primary beam.
+    rect(stemX[beamable[0]] - stemW / 2, beamY, stemX[beamable[beamable.length - 1]] - stemX[beamable[0]] + stemW, beamThick);
+    // Secondary (16th) beam: full segment between adjacent sixteenths, else a stub.
     const stubLen = (usable / unit.notes.length) * 0.4;
     for (let i = 0; i < unit.notes.length; i++) {
       if (!is16[i]) continue;
       const hasNext16 = i + 1 < unit.notes.length && is16[i + 1];
       const hasPrev16 = i - 1 >= 0 && is16[i - 1];
-      if (hasNext16) line(stemX[i], secY, stemX[i + 1], secY, beamThick);
+      if (hasNext16) rect(stemX[i] - stemW / 2, beamY + secGap, stemX[i + 1] - stemX[i] + stemW, beamThick);
       else if (!hasPrev16) {
         const dir = i === beamable[0] ? 1 : -1;
-        line(stemX[i], secY, stemX[i] + dir * stubLen, secY, beamThick);
+        rect(dir > 0 ? stemX[i] - stemW / 2 : stemX[i] - stubLen, beamY + secGap, stubLen + stemW / 2, beamThick);
       }
     }
-  } else if (beamable.length === 1) {
-    const j = beamable[0];
-    const flags = unit.notes[j].type === RhythmNoteType.Sixteenth ? 2 : 1;
-    const flagLen = headRx * 1.6, flagDrop = (baseline - beamY) * 0.32;
-    for (let k = 0; k < flags; k++) {
-      const y = beamY + k * flagDrop * 0.6;
-      line(stemX[j], y, stemX[j] + flagLen, y + flagDrop, stemW * 1.1);
+    // Triplet bracket number.
+    if (unit.notes[0]?.type === RhythmNoteType.TripletEighth) {
+      ctx.font = `bold ${Math.round(h * 0.16)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("3", (stemX[beamable[0]] + stemX[beamable[beamable.length - 1]]) / 2, beamY - h * 0.03);
     }
-  }
-
-  if (unit.notes[0]?.type === RhythmNoteType.TripletEighth) {
-    ctx.font = `bold ${Math.round(h * 0.22)}px sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText("3", (stemX[0] + stemX[stemX.length - 1]) / 2, beamY - h * 0.04);
   }
 }
