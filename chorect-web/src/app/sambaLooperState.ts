@@ -5,7 +5,7 @@
 import {
   PercussionInstrument, PercussionCatalog,
   PercussionMeter, PercussionPattern, swungSlotMs, voiceCount,
-  BEAT_UNITS, DIVISIONS, TELECOTECO_1,
+  BEAT_UNITS, DIVISIONS, BATIDA_CAVACO_1,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
 
@@ -25,13 +25,37 @@ export interface SambaDeps {
 }
 
 export class SambaLooperState {
-  // Default-load "teleco-teco 1" so the machine opens with a musical starting point
-  // instead of a blank grid (#11). Clear all / Load swaps it out.
-  pattern: PercussionPattern = TELECOTECO_1;
+  // Default-load "batida do cavaco 1" (surdo + tamborim + bongo) so the machine opens
+  // with a musical starting point on the default kit. Clear all / Load swaps it out.
+  pattern: PercussionPattern = BATIDA_CAVACO_1;
   bpm = 70;
   swing = 0;
   isPlaying = false;
   currentSlot = -1;
+
+  // Undo stack of prior patterns (Ctrl-Z / Undo). Every edit pushes via commit().
+  private undoStack: PercussionPattern[] = [];
+  get canUndo(): boolean { return this.undoStack.length > 0; }
+
+  /** Apply a pattern edit, recording the previous pattern for undo. */
+  private commit(next: PercussionPattern) {
+    if (next === this.pattern) return;
+    this.undoStack.push(this.pattern);
+    while (this.undoStack.length > 50) this.undoStack.shift();
+    this.pattern = next;
+    this.notify();
+  }
+
+  /** Undo the last pattern edit. */
+  undo() {
+    const prev = this.undoStack.pop();
+    if (!prev) return;
+    this.pattern = prev;
+    this.notify();
+  }
+
+  /** Reorder the kit: move the track at `from` to index `to`. */
+  reorderInstrument(from: number, to: number) { this.commit(this.pattern.movedInstrument(from, to)); }
 
   // Tap-tempo: average the intervals of the recent taps (2 s window, last 6).
   private tapTimes: number[] = [];
@@ -164,10 +188,9 @@ export class SambaLooperState {
 
   toggleSlot(instrument: PercussionInstrument, slot: number) {
     this.ensureSamplesLoaded();
-    this.pattern = this.pattern.cycled(instrument, slot);
+    this.commit(this.pattern.cycled(instrument, slot));
     const v = this.pattern.voiceAt(instrument, slot);
     if (v !== null && !this.isPlaying) this.deps.audio.playSamples(this.buffer(instrument, v), this.effectiveGain(instrument, v));
-    this.notify();
   }
 
   preview(instrument: PercussionInstrument, voiceIndex: number) {
@@ -175,10 +198,10 @@ export class SambaLooperState {
     this.deps.audio.playSamples(this.buffer(instrument, voiceIndex), this.effectiveGain(instrument, voiceIndex));
   }
 
-  toggleAccent(instrument: PercussionInstrument, slot: number) { this.pattern = this.pattern.accentToggled(instrument, slot); this.notify(); }
-  clearCell(instrument: PercussionInstrument, slot: number) { this.pattern = this.pattern.withCell(instrument, slot, null); this.notify(); }
-  clearRow(instrument: PercussionInstrument) { this.pattern = this.pattern.clearedRow(instrument); this.notify(); }
-  clearAll() { this.pattern = PercussionPattern.empty(this.pattern.instruments, this.pattern.meter); this.notify(); }
+  toggleAccent(instrument: PercussionInstrument, slot: number) { this.commit(this.pattern.accentToggled(instrument, slot)); }
+  clearCell(instrument: PercussionInstrument, slot: number) { this.commit(this.pattern.withCell(instrument, slot, null)); }
+  clearRow(instrument: PercussionInstrument) { this.commit(this.pattern.clearedRow(instrument)); }
+  clearAll() { this.commit(PercussionPattern.empty(this.pattern.instruments, this.pattern.meter)); }
 
   // ---- kit: add / remove instruments ----
 
@@ -189,15 +212,14 @@ export class SambaLooperState {
 
   /** Add `inst` to the kit (silent row), load its samples, and audition voice 0. */
   addInstrument(inst: PercussionInstrument) {
-    this.pattern = this.pattern.addInstrument(inst);
+    this.commit(this.pattern.addInstrument(inst));
     this.loadSamplesFor(inst);
     if (!this.isPlaying) this.deps.audio.playSamples(this.buffer(inst, 0), this.effectiveGain(inst, 0));
-    this.notify();
   }
 
   /** Remove `inst` from the kit, also clearing its mute/solo state. */
   removeInstrument(inst: PercussionInstrument) {
-    this.pattern = this.pattern.removeInstrument(inst);
+    this.commit(this.pattern.removeInstrument(inst));
     this.muted.delete(inst.id);
     this.soloed.delete(inst.id);
     this.notify();
@@ -208,7 +230,7 @@ export class SambaLooperState {
   get meter(): PercussionMeter { return this.pattern.meter; }
 
   /** Re-fit the current pattern onto [newMeter] (cells preserved by slot index). */
-  setMeter(newMeter: PercussionMeter) { this.pattern = this.pattern.withMeter(newMeter); this.notify(); }
+  setMeter(newMeter: PercussionMeter) { this.commit(this.pattern.withMeter(newMeter)); }
 
   setBars(bars: number) {
     this.setMeter(this.meter.copy({ bars: Math.min(Math.max(bars, 1), 8) }));
@@ -232,7 +254,7 @@ export class SambaLooperState {
   }
 
   /** Translate (rotate) the whole loop by [n] slots with wrap-around. */
-  translate(n: number) { this.pattern = this.pattern.translated(n); this.notify(); }
+  translate(n: number) { this.commit(this.pattern.translated(n)); }
 
   // ---- save / load ----
 
@@ -246,7 +268,7 @@ export class SambaLooperState {
     return out;
   }
   saveCurrent(name: string) { this.deps.save(name, this.pattern.encode()); }
-  loadPattern(p: PercussionPattern) { this.pattern = p; this.notify(); }
+  loadPattern(p: PercussionPattern) { this.commit(p); }
   deleteSaved(name: string) { this.deps.del(name); }
 
   /**

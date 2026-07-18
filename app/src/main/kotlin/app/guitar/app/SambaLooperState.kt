@@ -39,11 +39,36 @@ class SambaLooperState(
      *  back to the built-in synth. Injected so the pure state stays Context-free. */
     private val sampleLoader: (PercussionInstrument, Int) -> FloatArray? = { _, _ -> null },
 ) {
-    // Default-load the "teleco-teco 1" groove so the machine opens with a musical
-    // starting point instead of a blank grid (#11). The user can Clear all or Load
-    // another beat from there.
-    var pattern by mutableStateOf(PercussionBuiltins.TELECOTECO_1)
+    // Default-load the "batida do cavaco 1" groove (surdo + tamborim + bongo) so the
+    // machine opens with a musical starting point on the default kit. The user can
+    // Clear all or Load another beat from there.
+    var pattern by mutableStateOf(PercussionBuiltins.BATIDA_CAVACO_1)
         private set
+
+    // Undo stack of prior patterns (Ctrl-Z / Undo button). Every pattern edit pushes
+    // the previous pattern here via [commit]; [undo] pops it back.
+    private val undoStack = ArrayDeque<PercussionPattern>()
+    var canUndo by mutableStateOf(false)
+        private set
+
+    /** Apply a pattern edit, recording the previous pattern for undo. */
+    private fun commit(next: PercussionPattern) {
+        if (next == pattern) return
+        undoStack.addLast(pattern)
+        while (undoStack.size > 50) undoStack.removeFirst()
+        pattern = next
+        canUndo = true
+    }
+
+    /** Undo the last pattern edit. */
+    fun undo() {
+        val prev = undoStack.removeLastOrNull() ?: return
+        pattern = prev
+        canUndo = undoStack.isNotEmpty()
+    }
+
+    /** Reorder the kit: move the track at [from] to index [to]. */
+    fun reorderInstrument(from: Int, to: Int) { commit(pattern.movedInstrument(from, to)) }
     var bpm by mutableStateOf(70)
     /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
     var swing by mutableStateOf(0)
@@ -148,7 +173,7 @@ class SambaLooperState(
 
     /** Cycle a cell's voice and, if it became audible, preview the new voice. */
     fun toggleSlot(instrument: PercussionInstrument, slot: Int) {
-        pattern = pattern.cycled(instrument, slot)
+        commit(pattern.cycled(instrument, slot))
         val v = pattern.voiceAt(instrument, slot)
         if (v != null && !isPlaying) audio.playSamples(buffer(instrument, v), effectiveGain(instrument, v))
     }
@@ -160,20 +185,20 @@ class SambaLooperState(
 
     /** Toggle the accent on a non-silent cell (Accent tool). */
     fun toggleAccent(instrument: PercussionInstrument, slot: Int) {
-        pattern = pattern.accentToggled(instrument, slot)
+        commit(pattern.accentToggled(instrument, slot))
     }
 
     /** Clear a single cell (long-press) without cycling through the voices. */
     fun clearCell(instrument: PercussionInstrument, slot: Int) {
-        pattern = pattern.withCell(instrument, slot, null)
+        commit(pattern.withCell(instrument, slot, null))
     }
 
     fun clearRow(instrument: PercussionInstrument) {
-        pattern = pattern.clearedRow(instrument)
+        commit(pattern.clearedRow(instrument))
     }
 
     fun clearAll() {
-        pattern = PercussionPattern.empty(pattern.instruments, pattern.meter)
+        commit(PercussionPattern.empty(pattern.instruments, pattern.meter))
     }
 
     // ---- Kit: add / remove instruments ----
@@ -184,13 +209,13 @@ class SambaLooperState(
 
     /** Add [inst] to the kit (silent row) and audition its first voice. */
     fun addInstrument(inst: PercussionInstrument) {
-        pattern = pattern.addInstrument(inst)
+        commit(pattern.addInstrument(inst))
         if (!isPlaying) audio.playSamples(buffer(inst, 0), effectiveGain(inst, 0))
     }
 
     /** Remove [inst] from the kit, also clearing its mute/solo state. */
     fun removeInstrument(inst: PercussionInstrument) {
-        pattern = pattern.removeInstrument(inst)
+        commit(pattern.removeInstrument(inst))
         muted = muted - inst
         soloed = soloed - inst
     }
@@ -201,7 +226,7 @@ class SambaLooperState(
 
     /** Re-fit the current pattern onto [newMeter] (cells preserved by slot index). */
     fun setMeter(newMeter: PercussionMeter) {
-        pattern = pattern.withMeter(newMeter)
+        commit(pattern.withMeter(newMeter))
     }
 
     fun setBars(bars: Int) =
@@ -226,7 +251,7 @@ class SambaLooperState(
 
     /** Translate (rotate) the whole loop by [n] slots with wrap-around. */
     fun translate(n: Int) {
-        pattern = pattern.translated(n)
+        commit(pattern.translated(n))
     }
 
     // ---- Save / load user beats ----
@@ -242,7 +267,7 @@ class SambaLooperState(
 
     /** Replace the editable pattern with a saved/loaded one. */
     fun loadPattern(p: PercussionPattern) {
-        pattern = p
+        commit(p)
     }
 
     fun deleteSaved(name: String) {

@@ -23,13 +23,15 @@ function inst(id: string, displayName: string, voices: [string, string][]): Perc
 // ---- The original four (default kit) — voices match the bundled WAVs. ----
 const Surdo = inst("surdo", "Surdo", [["●", "open (ring)"], ["◐", "muted bass"], ["·", "tap"]]);
 const Tamborim = inst("tamborim", "Tamborim", [["●", "clack"], ["◐", "muted clack"], ["·", "tap"]]);
+const Bongo = inst("bongo", "Bongo", [["▲", "hi"], ["▼", "lo"], ["◇", "rim"], ["✦", "slap"]]);
 const Pandeiro = inst("pandeiro", "Pandeiro", [["●", "bass (open)"], ["◐", "bass (muted)"], ["✦", "slap"], ["○", "jingle"]]);
 const Agogo = inst("agogo", "Agogô", [["▼", "low bell"], ["▲", "high bell"]]);
 
-const DEFAULT_KIT: PercussionInstrument[] = [Surdo, Tamborim, Pandeiro, Agogo];
+const DEFAULT_KIT: PercussionInstrument[] = [Surdo, Tamborim, Bongo];
 
 // ---- Brazilian + Latin additions (sourced from the Latin Percussion pack). ----
 const ADDITIONS: PercussionInstrument[] = [
+  Pandeiro, Agogo,
   inst("cuica", "Cuíca", [["▼", "low"], ["▲", "high"]]),
   inst("caxixi", "Caxixi", [["○", "open"], ["◌", "hand"], ["✺", "fx"]]),
   inst("shaker", "Shaker (Ganzá)", [["○", "shaker 1"], ["◌", "shaker 2"]]),
@@ -42,7 +44,6 @@ const ADDITIONS: PercussionInstrument[] = [
   inst("conga", "Conga", [["●", "open"], ["◐", "mute"], ["✦", "slap"], ["·", "tip"]]),
   inst("quinto", "Quinto", [["●", "open"], ["◐", "mute"], ["✦", "slap"]]),
   inst("tumba", "Tumba", [["●", "open"], ["◐", "mute"], ["✦", "slap"]]),
-  inst("bongo", "Bongo", [["▲", "hi"], ["▼", "lo"], ["◇", "rim"], ["✦", "slap"]]),
   inst("timbales", "Timbales", [["▲", "hi"], ["▼", "lo"], ["▬", "cascara"], ["◇", "rim"]]),
   inst("maracas", "Maracas", [["○", "hit"], ["✺", "fx"]]),
   inst("vibraslap", "Vibraslap", [["✹", "hit"], ["✺", "pan"]]),
@@ -57,7 +58,7 @@ const BY_ID = new Map<string, PercussionInstrument>(ALL.map((i) => [i.id, i]));
 
 /** Catalog of every available instrument plus the default kit. */
 export const PercussionCatalog = {
-  Surdo, Tamborim, Pandeiro, Agogo,
+  Surdo, Tamborim, Bongo, Pandeiro, Agogo,
   DEFAULT_KIT,
   ALL,
   byId(id: string): PercussionInstrument | undefined { return BY_ID.get(id); },
@@ -207,6 +208,15 @@ export class PercussionPattern {
     return new PercussionPattern(this.instruments.filter((i) => i.id !== instrument.id), g, this.meter);
   }
 
+  /** Reorder the kit: move the track at `from` to index `to` (grid unchanged). */
+  movedInstrument(from: number, to: number): PercussionPattern {
+    if (from < 0 || from >= this.instruments.length || to < 0 || to >= this.instruments.length || from === to) return this;
+    const list = this.instruments.slice();
+    const [item] = list.splice(from, 1);
+    list.splice(to, 0, item);
+    return new PercussionPattern(list, this.grid, this.meter);
+  }
+
   isEmpty(): boolean {
     for (const row of this.grid.values()) if (row.some((v) => v !== null)) return false;
     return true;
@@ -339,8 +349,17 @@ export const TELECOTECO_2 = builtin(
   "agogo=0,-,0,-,1,-,-,0,-,0,-,1,-,-,0,-",
 );
 
+// Batida do cavaco 1 — default groove for the new kit (surdo + tamborim + bongo).
+export const BATIDA_CAVACO_1 = builtin(
+  "M:2,2,4,16;" +
+  "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
+  "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
+  "bongo=-,0,-,1,-,0,-,1,-,0,-,1,-,0,-,1",
+);
+
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */
 export const BUILTIN_PATTERNS: { name: string; pattern: PercussionPattern }[] = [
+  { name: "batida do cavaco 1", pattern: BATIDA_CAVACO_1 },
   { name: "teleco-teco 1", pattern: TELECOTECO_1 },
   { name: "teleco-teco 2", pattern: TELECOTECO_2 },
 ];

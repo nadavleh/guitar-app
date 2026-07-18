@@ -41,21 +41,24 @@ private fun inst(id: String, name: String, vararg voices: Pair<String, String>):
  */
 object PercussionCatalog {
 
-    // ---- The original four (default kit) — voices match the bundled WAVs. ----
+    // ---- Kit instruments — voices match the bundled WAVs. ----
     val Surdo = inst("surdo", "Surdo",
         "●" to "open (ring)", "◐" to "muted bass", "·" to "tap")
     val Tamborim = inst("tamborim", "Tamborim",
         "●" to "clack", "◐" to "muted clack", "·" to "tap")
+    val Bongo = inst("bongo", "Bongo",
+        "▲" to "hi", "▼" to "lo", "◇" to "rim", "✦" to "slap")
     val Pandeiro = inst("pandeiro", "Pandeiro",
         "●" to "bass (open)", "◐" to "bass (muted)", "✦" to "slap", "○" to "jingle")
     val Agogo = inst("agogo", "Agogô",
         "▼" to "low bell", "▲" to "high bell")
 
-    /** The kit a fresh loop starts with. */
-    val DEFAULT_KIT: List<PercussionInstrument> = listOf(Surdo, Tamborim, Pandeiro, Agogo)
+    /** The kit a fresh loop starts with (surdo + tamborim + bongo). */
+    val DEFAULT_KIT: List<PercussionInstrument> = listOf(Surdo, Tamborim, Bongo)
 
     // ---- Brazilian + Latin additions (sourced from the Latin Percussion pack). ----
     private val additions: List<PercussionInstrument> = listOf(
+        Pandeiro, Agogo,
         inst("cuica", "Cuíca", "▼" to "low", "▲" to "high"),
         inst("caxixi", "Caxixi", "○" to "open", "◌" to "hand", "✺" to "fx"),
         inst("shaker", "Shaker (Ganzá)", "○" to "shaker 1", "◌" to "shaker 2"),
@@ -68,7 +71,6 @@ object PercussionCatalog {
         inst("conga", "Conga", "●" to "open", "◐" to "mute", "✦" to "slap", "·" to "tip"),
         inst("quinto", "Quinto", "●" to "open", "◐" to "mute", "✦" to "slap"),
         inst("tumba", "Tumba", "●" to "open", "◐" to "mute", "✦" to "slap"),
-        inst("bongo", "Bongo", "▲" to "hi", "▼" to "lo", "◇" to "rim", "✦" to "slap"),
         inst("timbales", "Timbales", "▲" to "hi", "▼" to "lo", "▬" to "cascara", "◇" to "rim"),
         inst("maracas", "Maracas", "○" to "hit", "✺" to "fx"),
         inst("vibraslap", "Vibraslap", "✹" to "hit", "✺" to "pan"),

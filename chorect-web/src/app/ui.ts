@@ -333,6 +333,14 @@ export class App {
       const sheet = this.state.currentSheet;
       const digit = e.key >= "1" && e.key <= "9" ? Number(e.key) - 1 : -1;
 
+      // Ctrl/Cmd-Z undoes the last drum-machine edit.
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && sheet === Sheet.SambaLooper) {
+        e.preventDefault();
+        this.samba.undo();
+        this.scheduleRender();
+        return;
+      }
+
       if (e.code === "Space") {
         if (sheet === Sheet.SambaLooper) { e.preventDefault(); if (this.samba.isPlaying) this.samba.stop(); else this.samba.start(); }
         else if (sheet === Sheet.Loop) { e.preventDefault(); if (this.loop.isLooping) this.loop.stopLoop(); else this.loop.startLoop(); }

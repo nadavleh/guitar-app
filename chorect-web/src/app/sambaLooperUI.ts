@@ -50,6 +50,8 @@ export class SambaLooperUI {
   /** The single active outside-tap popup closer (never stacked). */
   private outsideCloser: ((e: Event) => void) | null = null;
   private toneSheetOpen = false;
+  /** Track index currently being drag-reordered, or null. */
+  private dragIndex: number | null = null;
 
   constructor(
     private samba: SambaLooperState,
@@ -145,9 +147,11 @@ export class SambaLooperUI {
     const accent = this.accentMode
       ? btn("Accent ✓", () => { this.accentMode = false; this.rerender(); }, "btn primary")
       : btn("Accent", () => { this.accentMode = true; this.eraseMode = false; this.rerender(); });
+    const undoBtn = btn("↶ Undo", () => { s.undo(); this.rerender(); });
+    if (!s.canUndo) undoBtn.disabled = true;
     wrap.appendChild(el("div", { class: "et-row-gap" }, [
       erase, accent, this.saveControl(), this.loadControl(), btn("Clear all", () => s.clearAll()),
-      this.addInstrumentControl(),
+      undoBtn, this.addInstrumentControl(),
     ]));
 
     // Dismissible gesture-legend banner (module-level flag — see the
@@ -168,7 +172,7 @@ export class SambaLooperUI {
     wrap.appendChild(el("div", { class: "divider-line" }));
 
     // grid — dynamic kit
-    for (const inst of s.pattern.instruments) wrap.appendChild(this.instrumentRow(inst));
+    s.pattern.instruments.forEach((inst, i) => wrap.appendChild(this.instrumentRow(inst, i)));
     wrap.appendChild(el("div", { class: "drum-caption" }, [s.meter.describe()]));
 
     // Compact card: tap-tempo + swing.
@@ -248,12 +252,14 @@ export class SambaLooperUI {
 
   /** Instrument row: name label (tap → voice popup with overall + per-voice
    *  volume, tap-to-preview, and Remove) + Mute/Solo toggles + its step cells. */
-  private instrumentRow(inst: PercussionInstrument): HTMLElement {
+  private instrumentRow(inst: PercussionInstrument, index: number): HTMLElement {
     const s = this.samba;
     const audible = s.isAudible(inst);
 
-    const name = el("span", { class: "name" }, [inst.displayName + " ▾"]);
+    const name = el("span", { class: "name", title: "drag to reorder · right-click to remove" }, [inst.displayName + " ▾"]);
     name.addEventListener("click", () => { this.openVoiceMenu = this.openVoiceMenu === inst.id ? null : inst.id; this.rerender(); });
+    // Right-click the track name to remove it.
+    name.addEventListener("contextmenu", (e) => { e.preventDefault(); this.openVoiceMenu = null; s.removeInstrument(inst); this.rerender(); });
     const labelInner = el("div", {}, [name]);
     if (this.openVoiceMenu === inst.id) labelInner.appendChild(this.voicePopup(inst));
 
@@ -261,10 +267,13 @@ export class SambaLooperUI {
     mTag.addEventListener("click", () => s.toggleMute(inst));
     const sTag = el("button", { class: s.soloed.has(inst.id) ? "ms-tag on-s" : "ms-tag" }, ["S"]);
     sTag.addEventListener("click", () => s.toggleSolo(inst));
-    const label = el("div", { class: audible ? "drum-label" : "drum-label dim", style: "position:relative" }, [
+    const label = el("div", { class: audible ? "drum-label" : "drum-label dim", style: "position:relative;cursor:grab", draggable: "true" }, [
       labelInner,
       el("div", { class: "drum-ms" }, [mTag, sTag]),
     ]);
+    // Drag the label to reorder the track (raise/lower). The row is the drop target.
+    label.addEventListener("dragstart", (e) => { this.dragIndex = index; e.dataTransfer?.setData("text/plain", String(index)); });
+    label.addEventListener("dragend", () => { this.dragIndex = null; });
 
     // cells
     const slots = s.pattern.slots;
@@ -281,7 +290,15 @@ export class SambaLooperUI {
       }
     }
 
-    return el("div", { class: "drum-row" }, [label, cells]);
+    const row = el("div", { class: "drum-row" }, [label, cells]);
+    // Drop target: reorder the dragged track to this row's position.
+    row.addEventListener("dragover", (e) => { if (this.dragIndex !== null) e.preventDefault(); });
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      if (this.dragIndex !== null && this.dragIndex !== index) s.reorderInstrument(this.dragIndex, index);
+      this.dragIndex = null;
+    });
+    return row;
   }
 
   /** UNTOUCHED gesture logic (tap = cycle/erase/accent; long-press/right-click

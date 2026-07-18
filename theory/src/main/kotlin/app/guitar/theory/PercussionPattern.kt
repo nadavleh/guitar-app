@@ -146,6 +146,15 @@ data class PercussionPattern(
         )
     }
 
+    /** Reorder the kit: move the track at [from] to index [to]. The grid is unchanged
+     *  (rows are keyed by id); only the display order of [instruments] changes. */
+    fun movedInstrument(from: Int, to: Int): PercussionPattern {
+        if (from !in instruments.indices || to !in instruments.indices || from == to) return this
+        val list = instruments.toMutableList()
+        list.add(to, list.removeAt(from))
+        return copy(instruments = list)
+    }
+
     fun isEmpty(): Boolean = grid.values.all { row -> row.all { it == null } }
 
     /**
@@ -271,8 +280,19 @@ object PercussionBuiltins {
             "agogo=0,-,0,-,1,-,-,0,-,0,-,1,-,-,0,-",
     )
 
+    /** Batida do cavaco 1 — the default samba groove for the new default kit
+     *  (surdo + tamborim + bongo): the teleco-teco surdo/tamborim with a steady
+     *  hi/lo bongo comp on the off-beats. */
+    val BATIDA_CAVACO_1: PercussionPattern = builtin(
+        "M:2,2,4,16;" +
+            "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
+            "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
+            "bongo=-,0,-,1,-,0,-,1,-,0,-,1,-,0,-,1",
+    )
+
     /** Grooves offered in the Load… menu (before the user's saved beats). */
     val ALL: List<Pair<String, PercussionPattern>> = listOf(
+        "batida do cavaco 1" to BATIDA_CAVACO_1,
         "teleco-teco 1" to TELECOTECO_1,
         "teleco-teco 2" to TELECOTECO_2,
     )

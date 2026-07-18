@@ -2,6 +2,7 @@ package app.guitar.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -226,6 +227,7 @@ private fun PatternSection(
             }
         }
         OutlinedButton(onClick = { samba.clearAll() }) { Text("Clear all") }
+        OutlinedButton(onClick = { samba.undo() }, enabled = samba.canUndo) { Text("↶ Undo") }
 
         // Add an instrument to the kit, sourced from the catalog.
         var addMenu by remember { mutableStateOf(false) }
@@ -385,6 +387,8 @@ private fun PatternSection(
                 InstrumentRow(
                     samba = samba,
                     instrument = inst,
+                    index = i,
+                    kitSize = kit.size,
                     eraseMode = eraseMode,
                     accentMode = accentMode,
                     modifier = Modifier.height(ROW_HEIGHT_DP.dp).fillMaxWidth(),
@@ -552,6 +556,8 @@ private fun TranslateControl(samba: SambaLooperState) {
 private fun InstrumentRow(
     samba: SambaLooperState,
     instrument: PercussionInstrument,
+    index: Int,
+    kitSize: Int,
     eraseMode: Boolean,
     accentMode: Boolean,
     modifier: Modifier = Modifier,
@@ -637,11 +643,22 @@ private fun InstrumentRow(
                 }
             }
             Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 ToggleTag("M", on = instrument in samba.muted,
                     onColor = MaterialTheme.colorScheme.error) { samba.toggleMute(instrument) }
                 ToggleTag("S", on = instrument in samba.soloed,
                     onColor = MaterialTheme.colorScheme.primary) { samba.toggleSolo(instrument) }
+                // Reorder this track up / down (raise / lower to sit two tracks together).
+                Text("▲", style = MaterialTheme.typography.bodySmall,
+                    color = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                        .clickable(enabled = index > 0) { samba.reorderInstrument(index, index - 1) }
+                        .padding(horizontal = 2.dp))
+                Text("▼", style = MaterialTheme.typography.bodySmall,
+                    color = if (index < kitSize - 1) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                        .clickable(enabled = index < kitSize - 1) { samba.reorderInstrument(index, index + 1) }
+                        .padding(horizontal = 2.dp))
             }
         }
         // ---- step cells (dimmed when the track isn't audible) ----
