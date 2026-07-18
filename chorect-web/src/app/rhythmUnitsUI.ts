@@ -12,6 +12,86 @@ import {
 
 type SubMode = "units" | "phrases";
 
+// ---- Phrase notation via the Bravura SMuFL music font, rendered as inline SVG ----
+// SVG <text> with the Bravura webfont auto-reflows when the font loads (no manual
+// redraw → no render loop) and scales to any resolution. Codepoints via
+// String.fromCodePoint keep the source ASCII.
+const SM = {
+  head: String.fromCodePoint(0xE0A4),   // noteheadBlack
+  quarter: String.fromCodePoint(0xE1D5),
+  n8: String.fromCodePoint(0xE1D7),     // note8thUp (with flag)
+  n16: String.fromCodePoint(0xE1D9),    // note16thUp (with flags)
+  rest8: String.fromCodePoint(0xE4E6),
+  rest16: String.fromCodePoint(0xE4E7),
+  dot: String.fromCodePoint(0xE1E7),    // augmentationDot
+};
+
+let fontPreloaded = false;
+function preloadMusicFont(onLoaded: () => void): void {
+  if (fontPreloaded || typeof document === "undefined") return;
+  fontPreloaded = true;   // fire exactly once → no render loop
+  // Base-aware URL (the site is served under /<repo>/ on project Pages).
+  const face = new FontFace("Bravura", `url(${import.meta.env.BASE_URL}fonts/Bravura.woff2)`);
+  face.load().then((f) => { document.fonts.add(f); onLoaded(); }).catch(() => {});
+}
+
+/** One beat of [unit] as an inline-SVG string: Bravura glyphs for noteheads /
+ *  rests / flagged notes, plus <rect> stems + beams. Scales to any size. */
+function beatSvg(unit: RhythmUnit): string {
+  const W = 100, H = 130, sub = unit.subdivision;
+  const padL = 15, usable = W - padL * 2;
+  const baseline = 86, fs = 62;
+  const noteHalfW = fs * 0.14, stemDx = fs * 0.125, stemW = 2.4;
+  const beamThick = 8, beamY = baseline - fs * 0.82, secGap = beamThick * 1.5;
+
+  const startFrac = starts(unit).map((s) => s / sub);
+  const noteCx = startFrac.map((f) => padL + f * usable + noteHalfW);
+  const stemX = noteCx.map((x) => x + stemDx);
+  const is16 = unit.notes.map((n) => !n.rest && n.type === RhythmNoteType.Sixteenth);
+  const beamable = unit.notes.map((_, i) => i).filter((i) => !unit.notes[i].rest && unit.notes[i].type !== RhythmNoteType.Quarter);
+  const beamed = beamable.length >= 2;
+
+  const parts: string[] = [];
+  const text = (g: string, x: number, y: number, anchor = "middle") =>
+    parts.push(`<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="Bravura" font-size="${fs}" text-anchor="${anchor}" fill="currentColor">${g}</text>`);
+  const rect = (x: number, y: number, w: number, h: number) =>
+    parts.push(`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${Math.max(w, 0).toFixed(2)}" height="${h.toFixed(2)}" fill="currentColor"/>`);
+
+  unit.notes.forEach((n, i) => {
+    if (n.rest) {
+      const cxR = padL + (startFrac[i] + (n.slots / 2) / sub) * usable;
+      text(n.type === RhythmNoteType.Sixteenth ? SM.rest16 : SM.rest8, cxR, baseline);
+    } else if (n.type === RhythmNoteType.Quarter) {
+      text(SM.quarter, noteCx[i] - noteHalfW, baseline, "start");
+    } else if (!beamed) {
+      text(n.type === RhythmNoteType.Sixteenth ? SM.n16 : SM.n8, noteCx[i] - noteHalfW, baseline, "start");
+      if (n.type === RhythmNoteType.DottedEighth) text(SM.dot, noteCx[i] + noteHalfW * 1.6, baseline, "start");
+    } else {
+      text(SM.head, noteCx[i], baseline);
+      if (n.type === RhythmNoteType.DottedEighth) text(SM.dot, noteCx[i] + noteHalfW * 1.7, baseline, "start");
+    }
+  });
+
+  if (beamed) {
+    for (const i of beamable) rect(stemX[i] - stemW / 2, beamY, stemW, baseline - beamY);
+    rect(stemX[beamable[0]] - stemW / 2, beamY, stemX[beamable[beamable.length - 1]] - stemX[beamable[0]] + stemW, beamThick);
+    const stubLen = (usable / unit.notes.length) * 0.4;
+    for (let i = 0; i < unit.notes.length; i++) {
+      if (!is16[i]) continue;
+      const hasNext16 = i + 1 < unit.notes.length && is16[i + 1];
+      const hasPrev16 = i - 1 >= 0 && is16[i - 1];
+      const y = beamY + secGap;
+      if (hasNext16) rect(stemX[i] - stemW / 2, y, stemX[i + 1] - stemX[i] + stemW, beamThick);
+      else if (!hasPrev16) { const dir = i === beamable[0] ? 1 : -1; rect(dir > 0 ? stemX[i] - stemW / 2 : stemX[i] - stubLen, y, stubLen + stemW / 2, beamThick); }
+    }
+    if (unit.notes[0]?.type === RhythmNoteType.TripletEighth) {
+      parts.push(`<text x="${((stemX[beamable[0]] + stemX[beamable[beamable.length - 1]]) / 2).toFixed(2)}" y="${(beamY - 4).toFixed(2)}" font-family="sans-serif" font-size="16" font-weight="700" text-anchor="middle" fill="currentColor">3</text>`);
+    }
+  }
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block;color:var(--text-primary)" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+}
+
 export class RhythmUnitsUI {
   private subMode: SubMode = "units";
   private phraseScale = 1;   // user-resizable size of the phrase notation + grid
@@ -24,6 +104,7 @@ export class RhythmUnitsUI {
   ) {}
 
   render(parent: HTMLElement): void {
+    preloadMusicFont(() => this.rerender());   // once; redraws the SVG notation when Bravura loads
     const screen = el("div", { class: "tool-screen" });
 
     // Header (fixed)
@@ -139,26 +220,23 @@ export class RhythmUnitsUI {
 
   private phraseNotation(phrase: RhythmPhrase): HTMLElement {
     const s = this.phraseScale;
-    const boxW = Math.round(74 * s), boxH = Math.round(80 * s);
+    const boxW = Math.round(78 * s), boxH = Math.round(100 * s);
     const currentBeat = this.rp.currentSlot >= 0 ? Math.floor(this.rp.currentSlot / 4) : -1;
-    const wrap = el("div", { style: `display:flex;flex-wrap:wrap;gap:${Math.round(8 * s)}px;align-items:flex-end;margin-top:10px` });
+    const wrap = el("div", { style: `display:flex;flex-wrap:wrap;gap:${Math.round(6 * s)}px;align-items:flex-end;margin-top:10px` });
     for (let bar = 0; bar < phrase.bars; bar++) {
       const group = el("div", { style: "display:flex;align-items:flex-end" });
       for (let b = 0; b < phrase.beatsPerBar; b++) {
         const gi = bar * phrase.beatsPerBar + b;
         const playing = gi === currentBeat;
+        // Inline SVG (Bravura glyphs) — scales perfectly and reflows on font-load.
         const box = el("div", {
           style: `width:${boxW}px;height:${boxH}px;border-radius:8px;display:flex;align-items:center;justify-content:center;` +
             (playing ? "background:color-mix(in srgb, var(--feedback) 20%, transparent);" : ""),
         });
-        // Backing store at ~3× the display size for crisp notation on any DPR.
-        const cv = el("canvas", { style: "width:100%;height:auto;display:block" }) as HTMLCanvasElement;
-        cv.width = boxW * 3; cv.height = boxH * 3;
-        drawNotation(cv, phrase.beats[gi]);
-        box.appendChild(cv);
+        box.innerHTML = beatSvg(phrase.beats[gi]);
         group.appendChild(box);
       }
-      group.appendChild(el("div", { style: `width:2px;height:${Math.round(60 * s)}px;background:var(--line);margin:0 ${Math.round(8 * s)}px` }));
+      group.appendChild(el("div", { style: `width:2px;height:${Math.round(76 * s)}px;background:var(--line);margin:0 ${Math.round(8 * s)}px` }));
       wrap.appendChild(group);
     }
     return wrap;
