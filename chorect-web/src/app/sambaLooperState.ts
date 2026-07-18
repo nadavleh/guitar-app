@@ -32,6 +32,8 @@ export class SambaLooperState {
   swing = 0;
   isPlaying = false;
   currentSlot = -1;
+  /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
+  loadedName: string | null = "batida do cavaco 1";
 
   // Undo stack of prior patterns (Ctrl-Z / Undo). Every edit pushes via commit().
   private undoStack: PercussionPattern[] = [];
@@ -43,6 +45,7 @@ export class SambaLooperState {
     this.undoStack.push(this.pattern);
     while (this.undoStack.length > 50) this.undoStack.shift();
     this.pattern = next;
+    this.loadedName = null;   // an edit means it's no longer the named beat (load/save re-sets)
     this.notify();
   }
 
@@ -267,8 +270,15 @@ export class SambaLooperState {
     }
     return out;
   }
-  saveCurrent(name: string) { this.deps.save(name, this.pattern.encode()); }
-  loadPattern(p: PercussionPattern) { this.commit(p); }
+  saveCurrent(name: string) { this.deps.save(name, this.pattern.encode()); this.loadedName = name; this.notify(); }
+  /** Load a pattern, optionally naming it (caption) and setting its tempo/swing. */
+  loadPattern(p: PercussionPattern, name: string | null = null, bpm: number | null = null, swing: number | null = null) {
+    this.commit(p);
+    this.loadedName = name;
+    if (bpm !== null) this.bpm = Math.min(Math.max(Math.round(bpm), 10), 300);
+    if (swing !== null) this.swing = Math.min(Math.max(Math.round(swing), 0), 100);
+    this.notify();
+  }
   deleteSaved(name: string) { this.deps.del(name); }
 
   /**

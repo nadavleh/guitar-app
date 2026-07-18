@@ -17,7 +17,7 @@ import { transportDock, toneSheet } from "./transport";
 import { AppState } from "./appState";
 import {
   PercussionInstrument, voicesFor, voiceOf, PercussionPattern, BUILTIN_PATTERNS,
-  DIVISIONS,
+  DIVISIONS, encodeBeatFile, decodeBeatFile,
 } from "../theory";
 
 /** Time signatures offered in the Time dropdown (beatsPerBar / beatUnit). */
@@ -149,9 +149,17 @@ export class SambaLooperUI {
       : btn("Accent", () => { this.accentMode = true; this.eraseMode = false; this.rerender(); });
     const undoBtn = btn("↶ Undo", () => { s.undo(); this.rerender(); });
     if (!s.canUndo) undoBtn.disabled = true;
+
+    // Beat header: current beat name + tempo (set by Load / Save / Import).
+    wrap.appendChild(el("div", { class: "drum-beat-header" }, [
+      el("span", { class: "drum-beat-name" }, [s.loadedName ?? "Untitled beat"]),
+      el("span", { class: "drum-beat-bpm" }, [`${s.bpm} BPM`]),
+    ]));
+
     wrap.appendChild(el("div", { class: "et-row-gap" }, [
       erase, accent, this.saveControl(), this.loadControl(), btn("Clear all", () => s.clearAll()),
-      undoBtn, this.addInstrumentControl(),
+      undoBtn, btn("Export", () => this.exportBeat()), btn("Import", () => this.importBeat()),
+      this.addInstrumentControl(),
     ]));
 
     // Dismissible gesture-legend banner (module-level flag — see the
@@ -428,7 +436,7 @@ export class SambaLooperUI {
       const pop = el("div", { class: "drum-load-pop" });
       for (const b of BUILTIN_PATTERNS) {
         const row = el("div", { class: "lrow" }, [b.name]);
-        row.addEventListener("click", () => { s.loadPattern(b.pattern); this.loadMenuOpen = false; this.rerender(); });
+        row.addEventListener("click", () => { s.loadPattern(b.pattern, b.name, b.bpm ?? null); this.loadMenuOpen = false; this.rerender(); });
         pop.appendChild(row);
       }
       const saved = s.savedPatterns();
@@ -437,12 +445,44 @@ export class SambaLooperUI {
         const del = el("button", { class: "btn text" }, ["✕"]);
         del.addEventListener("click", (e) => { e.stopPropagation(); s.deleteSaved(name); this.rerender(); });
         const row = el("div", { class: "lrow" }, [el("span", { style: "flex:1" }, [name]), del]);
-        row.addEventListener("click", () => { s.loadPattern(pat as PercussionPattern); this.loadMenuOpen = false; this.rerender(); });
+        row.addEventListener("click", () => { s.loadPattern(pat as PercussionPattern, name); this.loadMenuOpen = false; this.rerender(); });
         pop.appendChild(row);
       }
       if (saved.size === 0) pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary)" }, ["(no saved beats yet)"]));
       wrap.appendChild(pop);
     }
     return wrap;
+  }
+
+  /** Download the current beat as a Chorect beat file (JSON: name + bpm + swing + pattern). */
+  private exportBeat(): void {
+    const s = this.samba;
+    const name = (s.loadedName ?? "beat").trim() || "beat";
+    const json = encodeBeatFile(name, s.bpm, s.swing, s.pattern);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = el("a", { href: url, download: `${name.replace(/[^\w-]+/g, "_")}.chorect.json` }) as HTMLAnchorElement;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  /** Pick a Chorect beat file and load it (pattern + name + tempo + swing). */
+  private importBeat(): void {
+    const input = el("input", { type: "file", accept: ".json,application/json", style: "display:none" }) as HTMLInputElement;
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const parsed = decodeBeatFile(String(reader.result ?? ""));
+        if (!parsed) { window.alert("Not a valid Chorect beat file."); return; }
+        this.samba.loadPattern(parsed.pattern, parsed.name, parsed.bpm, parsed.swing);
+        this.rerender();
+      };
+      reader.readAsText(file);
+    });
+    input.click();
   }
 }

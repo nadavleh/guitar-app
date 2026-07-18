@@ -123,15 +123,45 @@ class PercussionPatternTest {
     }
 
     @Test fun `built-in grooves decode, are non-empty, and round-trip`() {
-        assertEquals(3, PercussionBuiltins.ALL.size)
+        assertEquals(8, PercussionBuiltins.ALL.size)
         for ((name, pat) in PercussionBuiltins.ALL) {
             assertTrue(!pat.isEmpty(), "$name is empty")
             assertEquals(16, pat.slots, "$name should be the default 16-slot meter")
             assertEquals(pat, PercussionPattern.decode(pat.encode()), "$name doesn't round-trip")
-            // Surdo hits both bar downbeats in both phrasings.
+            // Surdo hits both bar downbeats in every groove.
             assertTrue(pat.voiceAt(PercussionCatalog.Surdo, 0) != null)
             assertTrue(pat.voiceAt(PercussionCatalog.Surdo, 8) != null)
         }
+    }
+
+    @Test fun `beat file round-trips name, tempo, swing, and pattern`() {
+        val original = BeatFile("Arrasta-pé", bpm = 100, swing = 25, pattern = PercussionBuiltins.ARRASTA_PE)
+        val parsed = BeatFile.decode(original.encode())
+        assertEquals("Arrasta-pé", parsed?.name)
+        assertEquals(100, parsed?.bpm)
+        assertEquals(25, parsed?.swing)
+        assertEquals(PercussionBuiltins.ARRASTA_PE, parsed?.pattern)
+    }
+
+    @Test fun `beat file parses web-style JSON with reordered keys and spacing`() {
+        // Mimics chorect-web's JSON.stringify output shape (2-space indent).
+        val json = """
+            {
+              "format": "chorect-beat",
+              "version": 1,
+              "name": "Xote",
+              "bpm": 90,
+              "swing": 0,
+              "pattern": "${PercussionBuiltins.XOTE.encode()}"
+            }
+        """.trimIndent()
+        val parsed = BeatFile.decode(json)
+        assertEquals("Xote", parsed?.name)
+        assertEquals(90, parsed?.bpm)
+        assertEquals(PercussionBuiltins.XOTE, parsed?.pattern)
+        // Garbage / wrong format is rejected.
+        assertNull(BeatFile.decode("""{"format":"nope","pattern":"x"}"""))
+        assertNull(BeatFile.decode("not json at all"))
     }
 
     // ---- Accents ----

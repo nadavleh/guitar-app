@@ -1,5 +1,7 @@
 package app.guitar.app
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -58,9 +60,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.guitar.theory.BeatFile
 import app.guitar.theory.PercussionInstrument
 import app.guitar.theory.PercussionMeter
 import app.guitar.theory.PercussionVoices
@@ -180,6 +184,55 @@ private fun PatternSection(
     var saveDialog by remember { mutableStateOf(false) }
     var loadMenu by remember { mutableStateOf(false) }
     var saveName by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
+    // Export the current beat to a JSON file (Storage Access Framework "create
+    // document"); Import picks one back and loads it. Same JSON shape as chorect-web.
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri != null) runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { os ->
+                os.write(BeatFile(samba.loadedName ?: "beat", samba.bpm, samba.swing, samba.pattern).encode().toByteArray())
+            }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) runCatching {
+            val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
+                ?: return@runCatching
+            BeatFile.decode(text)?.let { samba.loadPattern(it.pattern, it.name, it.bpm, it.swing) }
+        }
+    }
+
+    // ----- Beat header: current beat name + tempo (set by Load / Save / Import) -----
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Text(
+                samba.loadedName ?: "Untitled beat",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "${samba.bpm} BPM",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+    Spacer(Modifier.height(8.dp))
 
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
@@ -203,10 +256,10 @@ private fun PatternSection(
             OutlinedButton(onClick = { loadMenu = true }) { Text("Load…") }
             DropdownMenu(expanded = loadMenu, onDismissRequest = { loadMenu = false }) {
                 // Built-in grooves first (same set as the web), then saved beats.
-                for ((name, pat) in app.guitar.theory.PercussionBuiltins.ALL) {
+                for (b in app.guitar.theory.PercussionBuiltins.ALL) {
                     DropdownMenuItem(
-                        text = { Text(name) },
-                        onClick = { samba.loadPattern(pat); loadMenu = false },
+                        text = { Text(b.name) },
+                        onClick = { samba.loadPattern(b.pattern, b.name, b.bpm); loadMenu = false },
                     )
                 }
                 if (saved.isNotEmpty()) HorizontalDivider()
@@ -218,7 +271,7 @@ private fun PatternSection(
                                 TextButton(onClick = { samba.deleteSaved(name) }) { Text("✕") }
                             }
                         },
-                        onClick = { samba.loadPattern(pat); loadMenu = false },
+                        onClick = { samba.loadPattern(pat, name); loadMenu = false },
                     )
                 }
                 if (saved.isEmpty()) {
@@ -228,6 +281,10 @@ private fun PatternSection(
         }
         OutlinedButton(onClick = { samba.clearAll() }) { Text("Clear all") }
         OutlinedButton(onClick = { samba.undo() }, enabled = samba.canUndo) { Text("↶ Undo") }
+        OutlinedButton(onClick = {
+            exportLauncher.launch("${(samba.loadedName ?: "beat").replace(Regex("[^\\w-]+"), "_")}.chorect.json")
+        }) { Text("Export") }
+        OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }) { Text("Import") }
 
         // Add an instrument to the kit, sourced from the catalog.
         var addMenu by remember { mutableStateOf(false) }

@@ -290,12 +290,157 @@ object PercussionBuiltins {
             "bongo=-,0,-,1,-,0,-,1,-,0,-,1,-,0,-,1",
     )
 
-    /** Grooves offered in the Load… menu (before the user's saved beats). */
-    val ALL: List<Pair<String, PercussionPattern>> = listOf(
-        "batida do cavaco 1" to BATIDA_CAVACO_1,
-        "teleco-teco 1" to TELECOTECO_1,
-        "teleco-teco 2" to TELECOTECO_2,
+    // Northeastern-Brazilian grooves (xote / baião / forró / xaxado / arrasta-pé).
+    // Each uses the shared teleco-teco surdo (muted-bass ◐ + tap · pulse) and a
+    // tamborim tresillo (3+3+2) under a bongo comp transcribed from the user's beats.
+    private const val SURDO_TELECO = "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2"
+    private const val TAMB_TRESILLO = "tamborim=0,-,-,0,-,-,0,-,0,-,-,0,-,-,0,-"
+
+    val XOTE: PercussionPattern = builtin(
+        "M:2,2,4,16;" + SURDO_TELECO + "|" + TAMB_TRESILLO + "|" +
+            "bongo=0,-,2,1,0,-,0,-,0,-,2,1,0,-,0,-",
     )
+    val BAIAO: PercussionPattern = builtin(
+        "M:2,2,4,16;" + SURDO_TELECO + "|" + TAMB_TRESILLO + "|" +
+            "bongo=0,-,2,1,-,-,2,1,0,-,2,1,-,-,2,1",
+    )
+    val FORRO: PercussionPattern = builtin(
+        "M:2,2,4,16;" + SURDO_TELECO + "|" + TAMB_TRESILLO + "|" +
+            "bongo=0,-,3,1,2,-,3,1,0,0,-,0,2,-,3,1",
+    )
+    val XAXADO: PercussionPattern = builtin(
+        "M:2,2,4,16;" + SURDO_TELECO + "|" + TAMB_TRESILLO + "|" +
+            "bongo=0,2,3,0,-,-,1,-,0,2,3,0,-,2,1,-",
+    )
+    val ARRASTA_PE: PercussionPattern = builtin(
+        "M:2,2,4,16;" + SURDO_TELECO + "|" + TAMB_TRESILLO + "|" +
+            "bongo=0,2,3,0,1,-,1,-,0,2,3,0,1,-,1,-",
+    )
+
+    /** A loadable groove for the Load… menu; [bpm] (when non-null) is applied on load. */
+    data class BuiltinPattern(val name: String, val pattern: PercussionPattern, val bpm: Int? = null)
+
+    /** Grooves offered in the Load… menu (before the user's saved beats). */
+    val ALL: List<BuiltinPattern> = listOf(
+        BuiltinPattern("batida do cavaco 1", BATIDA_CAVACO_1),
+        BuiltinPattern("teleco-teco 1", TELECOTECO_1),
+        BuiltinPattern("teleco-teco 2", TELECOTECO_2),
+        BuiltinPattern("Xote", XOTE, bpm = 90),
+        BuiltinPattern("Baião", BAIAO, bpm = 90),
+        BuiltinPattern("Forró", FORRO, bpm = 95),
+        BuiltinPattern("Xaxado", XAXADO, bpm = 100),
+        BuiltinPattern("Arrasta-pé", ARRASTA_PE, bpm = 100),
+    )
+}
+
+/**
+ * Beat file (export / import): a self-describing JSON envelope around a pattern
+ * plus its name / tempo, so a beat can be saved to disk and loaded back (here or
+ * in chorect-web — same shape). Kept dependency-free (hand-rolled emit; the app
+ * layer parses with its platform JSON reader). Round-trips through [BeatFile].
+ */
+data class BeatFile(
+    val name: String,
+    val bpm: Int,
+    val swing: Int,
+    val pattern: PercussionPattern,
+) {
+    /** Pretty-printed JSON envelope written to disk. */
+    fun encode(): String {
+        fun esc(s: String) = buildString {
+            for (c in s) when (c) {
+                '"' -> append("\\\""); '\\' -> append("\\\\")
+                '\n' -> append("\\n"); '\r' -> append("\\r"); '\t' -> append("\\t")
+                else -> append(c)
+            }
+        }
+        return buildString {
+            append("{\n")
+            append("  \"format\": \"chorect-beat\",\n")
+            append("  \"version\": 1,\n")
+            append("  \"name\": \"").append(esc(name)).append("\",\n")
+            append("  \"bpm\": ").append(bpm).append(",\n")
+            append("  \"swing\": ").append(swing).append(",\n")
+            append("  \"pattern\": \"").append(esc(pattern.encode())).append("\"\n")
+            append("}\n")
+        }
+    }
+
+    companion object {
+        const val FORMAT = "chorect-beat"
+
+        /** Parse a beat file produced by [encode]; null on anything unrecognizable.
+         *  Uses a focused flat-JSON reader (string/number values, any key order) so
+         *  the module stays dependency-free and round-trips with web's JSON.stringify. */
+        fun decode(text: String): BeatFile? {
+            val fields = parseFlatJsonObject(text) ?: return null
+            if (fields["format"] != FORMAT) return null
+            val pattern = PercussionPattern.decode(fields["pattern"] ?: return null) ?: return null
+            val name = fields["name"]?.takeIf { it.isNotBlank() } ?: "beat"
+            val bpm = fields["bpm"]?.toIntOrNull()?.coerceIn(10, 300) ?: 90
+            val swing = fields["swing"]?.toIntOrNull()?.coerceIn(0, 100) ?: 0
+            return BeatFile(name, bpm, swing, pattern)
+        }
+    }
+}
+
+/**
+ * Minimal reader for a FLAT JSON object (values are strings or numbers only — no
+ * nesting), returning each key → its scalar value as a string (strings unescaped,
+ * numbers as their digit text). Enough for [BeatFile]; not a general JSON parser.
+ */
+private fun parseFlatJsonObject(text: String): Map<String, String>? {
+    val s = text.trim()
+    var i = s.indexOf('{')
+    val end = s.lastIndexOf('}')
+    if (i < 0 || end <= i) return null
+    i++
+    val out = HashMap<String, String>()
+
+    fun skipWs() { while (i < end && s[i].isWhitespace()) i++ }
+    fun parseString(): String? {
+        if (i >= end || s[i] != '"') return null
+        i++
+        val sb = StringBuilder()
+        while (i < end) {
+            val c = s[i++]
+            when (c) {
+                '"' -> return sb.toString()
+                '\\' -> {
+                    if (i >= end) return null
+                    when (val e = s[i++]) {
+                        '"' -> sb.append('"'); '\\' -> sb.append('\\'); '/' -> sb.append('/')
+                        'n' -> sb.append('\n'); 'r' -> sb.append('\r'); 't' -> sb.append('\t')
+                        'b' -> sb.append('\b'); 'f' -> sb.append(12.toChar())
+                        'u' -> { if (i + 4 > end) return null; sb.append(s.substring(i, i + 4).toInt(16).toChar()); i += 4 }
+                        else -> return null
+                    }
+                }
+                else -> sb.append(c)
+            }
+        }
+        return null
+    }
+
+    while (true) {
+        skipWs()
+        if (i >= end) break
+        if (s[i] == ',') { i++; continue }
+        val key = parseString() ?: return null
+        skipWs()
+        if (i >= end || s[i] != ':') return null
+        i++
+        skipWs()
+        val value = if (i < end && s[i] == '"') {
+            parseString() ?: return null
+        } else {
+            val start = i
+            while (i < end && s[i] != ',' && !s[i].isWhitespace()) i++
+            s.substring(start, i)
+        }
+        out[key] = value
+    }
+    return out
 }
 
 /** Loop timing helpers (kept pure so they're unit-testable on the JVM). */

@@ -850,6 +850,13 @@ select.et-select {
   opacity: 0.85;
 }
 .drum-caption { font-size: 11px; color: var(--text-secondary); margin: 4px 0 0 138px; }
+.drum-beat-header {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin: 2px 0 8px; padding: 6px 12px;
+  background: var(--surface2); border-radius: 10px; border: 1px solid var(--divider);
+}
+.drum-beat-name { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.drum-beat-bpm { font-size: 12px; font-weight: 600; color: var(--primary); font-variant-numeric: tabular-nums; }
 .drum-setup-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 8px 0; }
 .drum-setup-item { display: flex; align-items: center; gap: 6px; }
 .drum-setup-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }

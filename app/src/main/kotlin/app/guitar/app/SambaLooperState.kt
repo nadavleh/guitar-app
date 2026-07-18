@@ -45,6 +45,10 @@ class SambaLooperState(
     var pattern by mutableStateOf(PercussionBuiltins.BATIDA_CAVACO_1)
         private set
 
+    /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
+    var loadedName by mutableStateOf<String?>("batida do cavaco 1")
+        private set
+
     // Undo stack of prior patterns (Ctrl-Z / Undo button). Every pattern edit pushes
     // the previous pattern here via [commit]; [undo] pops it back.
     private val undoStack = ArrayDeque<PercussionPattern>()
@@ -57,6 +61,7 @@ class SambaLooperState(
         undoStack.addLast(pattern)
         while (undoStack.size > 50) undoStack.removeFirst()
         pattern = next
+        loadedName = null   // an edit means it's no longer the named beat (load/save re-sets)
         canUndo = true
     }
 
@@ -263,11 +268,16 @@ class SambaLooperState(
     fun saveCurrent(name: String) {
         val snapshot = pattern
         scope.launch { repo.saveDrumPattern(name, snapshot) }
+        loadedName = name
     }
 
-    /** Replace the editable pattern with a saved/loaded one. */
-    fun loadPattern(p: PercussionPattern) {
+    /** Replace the editable pattern with a saved/loaded one, optionally naming it
+     *  (caption) and setting its tempo / swing. */
+    fun loadPattern(p: PercussionPattern, name: String? = null, bpm: Int? = null, swing: Int? = null) {
         commit(p)
+        loadedName = name
+        if (bpm != null) this.bpm = bpm.coerceIn(10, 300)
+        if (swing != null) this.swing = swing.coerceIn(0, 100)
     }
 
     fun deleteSaved(name: String) {

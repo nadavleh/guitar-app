@@ -357,12 +357,81 @@ export const BATIDA_CAVACO_1 = builtin(
   "bongo=-,0,-,1,-,0,-,1,-,0,-,1,-,0,-,1",
 );
 
+// ---- Northeastern-Brazilian grooves (xote / baião / forró / xaxado / arrasta-pé). ----
+// Each uses the shared teleco-teco surdo (muted-bass ◐ + tap · pulse) and a tamborim
+// tresillo (3+3+2) under a bongo comp transcribed from the user's saved beats.
+const SURDO_TELECO = "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2";
+const TAMB_TRESILLO = "tamborim=0,-,-,0,-,-,0,-,0,-,-,0,-,-,0,-";
+
+export const XOTE = builtin(
+  "M:2,2,4,16;" + SURDO_TELECO + "|" + TAMB_TRESILLO + "|" +
+  "bongo=0,-,2,1,0,-,0,-,0,-,2,1,0,-,0,-",
+);
+export const BAIAO = builtin(
+  "M:2,2,4,16;" + SURDO_TELECO + "|" + TAMB_TRESILLO + "|" +
+  "bongo=0,-,2,1,-,-,2,1,0,-,2,1,-,-,2,1",
+);
+export const FORRO = builtin(
+  "M:2,2,4,16;" + SURDO_TELECO + "|" + TAMB_TRESILLO + "|" +
+  "bongo=0,-,3,1,2,-,3,1,0,0,-,0,2,-,3,1",
+);
+export const XAXADO = builtin(
+  "M:2,2,4,16;" + SURDO_TELECO + "|" + TAMB_TRESILLO + "|" +
+  "bongo=0,2,3,0,-,-,1,-,0,2,3,0,-,2,1,-",
+);
+export const ARRASTA_PE = builtin(
+  "M:2,2,4,16;" + SURDO_TELECO + "|" + TAMB_TRESILLO + "|" +
+  "bongo=0,2,3,0,1,-,1,-,0,2,3,0,1,-,1,-",
+);
+
+/** A loadable groove for the Load… menu; `bpm` (when set) is applied on load. */
+export interface BuiltinPattern { name: string; pattern: PercussionPattern; bpm?: number; }
+
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */
-export const BUILTIN_PATTERNS: { name: string; pattern: PercussionPattern }[] = [
+export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "batida do cavaco 1", pattern: BATIDA_CAVACO_1 },
   { name: "teleco-teco 1", pattern: TELECOTECO_1 },
   { name: "teleco-teco 2", pattern: TELECOTECO_2 },
+  { name: "Xote", pattern: XOTE, bpm: 90 },
+  { name: "Baião", pattern: BAIAO, bpm: 90 },
+  { name: "Forró", pattern: FORRO, bpm: 95 },
+  { name: "Xaxado", pattern: XAXADO, bpm: 100 },
+  { name: "Arrasta-pé", pattern: ARRASTA_PE, bpm: 100 },
 ];
+
+// ---- Beat file (export / import) ----
+// A self-describing JSON envelope around a pattern plus its name/tempo, so a beat
+// can be saved to disk and loaded back (here or on Android — same shape).
+
+export interface BeatFile {
+  format: "chorect-beat";
+  version: 1;
+  name: string;
+  bpm: number;
+  swing: number;
+  pattern: string;   // PercussionPattern.encode()
+}
+
+/** Serialize a beat to the pretty-printed JSON envelope written to disk. */
+export function encodeBeatFile(name: string, bpm: number, swing: number, pattern: PercussionPattern): string {
+  const obj: BeatFile = { format: "chorect-beat", version: 1, name, bpm: Math.round(bpm), swing: Math.round(swing), pattern: pattern.encode() };
+  return JSON.stringify(obj, null, 2);
+}
+
+/** Parse a beat file produced by [encodeBeatFile]; null on anything unrecognizable. */
+export function decodeBeatFile(text: string): { name: string; bpm: number; swing: number; pattern: PercussionPattern } | null {
+  let obj: unknown;
+  try { obj = JSON.parse(text); } catch { return null; }
+  if (!obj || typeof obj !== "object") return null;
+  const o = obj as Record<string, unknown>;
+  if (o.format !== "chorect-beat") return null;
+  const pattern = PercussionPattern.decode(String(o.pattern ?? ""));
+  if (!pattern) return null;
+  const name = typeof o.name === "string" && o.name.trim() ? o.name : "beat";
+  const bpm = typeof o.bpm === "number" && Number.isFinite(o.bpm) ? Math.round(o.bpm) : 90;
+  const swing = typeof o.swing === "number" && Number.isFinite(o.swing) ? Math.round(o.swing) : 0;
+  return { name, bpm: Math.min(Math.max(bpm, 10), 300), swing: Math.min(Math.max(swing, 0), 100), pattern };
+}
 
 // ---- Timing ----
 
