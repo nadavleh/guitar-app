@@ -12,84 +12,77 @@ import {
 
 type SubMode = "units" | "phrases";
 
-// ---- Phrase notation via the Bravura SMuFL music font, rendered as inline SVG ----
-// SVG <text> with the Bravura webfont auto-reflows when the font loads (no manual
-// redraw → no render loop) and scales to any resolution. Codepoints via
-// String.fromCodePoint keep the source ASCII.
-const SM = {
-  head: String.fromCodePoint(0xE0A4),   // noteheadBlack
-  quarter: String.fromCodePoint(0xE1D5),
-  n8: String.fromCodePoint(0xE1D7),     // note8thUp (with flag)
-  n16: String.fromCodePoint(0xE1D9),    // note16thUp (with flags)
-  rest8: String.fromCodePoint(0xE4E6),
-  rest16: String.fromCodePoint(0xE4E7),
-  dot: String.fromCodePoint(0xE1E7),    // augmentationDot
-};
-
-let fontPreloaded = false;
-function preloadMusicFont(onLoaded: () => void): void {
-  if (fontPreloaded || typeof document === "undefined") return;
-  fontPreloaded = true;   // fire exactly once → no render loop
-  // Base-aware URL (the site is served under /<repo>/ on project Pages).
-  const face = new FontFace("Bravura", `url(${import.meta.env.BASE_URL}fonts/Bravura.woff2)`);
-  face.load().then((f) => { document.fonts.add(f); onLoaded(); }).catch(() => {});
-}
-
-/** One beat of [unit] as an inline-SVG string: Bravura glyphs for noteheads /
- *  rests / flagged notes, plus <rect> stems + beams. Scales to any size. */
+// ---- One beat of notation as pure geometric inline SVG (no webfont) ----
+// Rendered from primitives — filled slanted noteheads (ellipse), stems + beams
+// (rect), flags + rests (path) — so it looks identical everywhere and can never
+// fall back to tofu boxes (an earlier Bravura-webfont version did). Scales freely.
 function beatSvg(unit: RhythmUnit): string {
-  const W = 100, H = 130, sub = unit.subdivision;
-  const padL = 15, usable = W - padL * 2;
-  const baseline = 86, fs = 62;
-  const noteHalfW = fs * 0.14, stemDx = fs * 0.125, stemW = 2.4;
-  const beamThick = 8, beamY = baseline - fs * 0.82, secGap = beamThick * 1.5;
+  const W = 100, H = 104, sub = unit.subdivision;   // content sits ≈ y 20–92
+  const padL = 14, usable = 72;
+  const baseline = 84;                 // notehead centre y
+  const rx = 8.5, ry = 6.3, tilt = 20; // notehead radii + slant (deg)
+  const stemW = 2.3, beamY = 28, beamThick = 7, secGap = 11, stemTopQuarter = 36;
 
   const startFrac = starts(unit).map((s) => s / sub);
-  const noteCx = startFrac.map((f) => padL + f * usable + noteHalfW);
-  const stemX = noteCx.map((x) => x + stemDx);
+  const cx = startFrac.map((f) => padL + f * usable + rx);
+  const stemX = cx.map((x) => x + rx * 0.82);           // stem rides the notehead's right edge
   const is16 = unit.notes.map((n) => !n.rest && n.type === RhythmNoteType.Sixteenth);
   const beamable = unit.notes.map((_, i) => i).filter((i) => !unit.notes[i].rest && unit.notes[i].type !== RhythmNoteType.Quarter);
   const beamed = beamable.length >= 2;
 
-  const parts: string[] = [];
-  const text = (g: string, x: number, y: number, anchor = "middle") =>
-    parts.push(`<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="Bravura" font-size="${fs}" text-anchor="${anchor}" fill="currentColor">${g}</text>`);
+  const p: string[] = [];
+  const f2 = (n: number) => n.toFixed(2);
+  const notehead = (x: number) =>
+    p.push(`<ellipse cx="${f2(x)}" cy="${baseline}" rx="${rx}" ry="${ry}" transform="rotate(-${tilt} ${f2(x)} ${baseline})" fill="currentColor"/>`);
   const rect = (x: number, y: number, w: number, h: number) =>
-    parts.push(`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${Math.max(w, 0).toFixed(2)}" height="${h.toFixed(2)}" fill="currentColor"/>`);
+    p.push(`<rect x="${f2(x)}" y="${f2(y)}" width="${f2(Math.max(w, 0))}" height="${f2(h)}" rx="0.7" fill="currentColor"/>`);
+  const stem = (x: number, top: number) => rect(x - stemW / 2, top, stemW, baseline - ry * 0.2 - top);
+  const dot = (x: number) => p.push(`<circle cx="${f2(x)}" cy="${baseline}" r="2.4" fill="currentColor"/>`);
+  const flag = (sx: number, off: number) =>
+    p.push(`<path d="M ${f2(sx)} ${f2(beamY + off)} C ${f2(sx + 13)} ${f2(beamY + off + 4)} ${f2(sx + 12)} ${f2(beamY + off + 14)} ${f2(sx + 3)} ${f2(beamY + off + 21)} C ${f2(sx + 10)} ${f2(beamY + off + 13)} ${f2(sx + 9)} ${f2(beamY + off + 7)} ${f2(sx)} ${f2(beamY + off + 8)} Z" fill="currentColor"/>`);
+  const rest = (rcx: number, sixteenth: boolean) => {
+    const top = baseline - 26;
+    p.push(`<path d="M ${f2(rcx + 7)} ${f2(top)} L ${f2(rcx + 9)} ${f2(top)} L ${f2(rcx - 6)} ${f2(baseline + 8)} L ${f2(rcx - 8)} ${f2(baseline + 8)} Z" fill="currentColor"/>`);
+    p.push(`<circle cx="${f2(rcx + 5)}" cy="${f2(top + 3)}" r="4.2" fill="currentColor"/>`);
+    if (sixteenth) p.push(`<circle cx="${f2(rcx + 1)}" cy="${f2(top + 13)}" r="4.2" fill="currentColor"/>`);
+  };
 
   unit.notes.forEach((n, i) => {
     if (n.rest) {
-      const cxR = padL + (startFrac[i] + (n.slots / 2) / sub) * usable;
-      text(n.type === RhythmNoteType.Sixteenth ? SM.rest16 : SM.rest8, cxR, baseline);
-    } else if (n.type === RhythmNoteType.Quarter) {
-      text(SM.quarter, noteCx[i] - noteHalfW, baseline, "start");
-    } else if (!beamed) {
-      text(n.type === RhythmNoteType.Sixteenth ? SM.n16 : SM.n8, noteCx[i] - noteHalfW, baseline, "start");
-      if (n.type === RhythmNoteType.DottedEighth) text(SM.dot, noteCx[i] + noteHalfW * 1.6, baseline, "start");
-    } else {
-      text(SM.head, noteCx[i], baseline);
-      if (n.type === RhythmNoteType.DottedEighth) text(SM.dot, noteCx[i] + noteHalfW * 1.7, baseline, "start");
+      rest(padL + (startFrac[i] + (n.slots / 2) / sub) * usable, n.type === RhythmNoteType.Sixteenth);
+      return;
+    }
+    notehead(cx[i]);
+    if (n.type === RhythmNoteType.Quarter) {
+      stem(stemX[i], stemTopQuarter);
+    } else if (!beamed) {                     // lone note: stem + flag(s)
+      stem(stemX[i], beamY);
+      flag(stemX[i] - stemW / 2, 0);
+      if (n.type === RhythmNoteType.Sixteenth) flag(stemX[i] - stemW / 2, 9);
+      if (n.type === RhythmNoteType.DottedEighth) dot(cx[i] + rx + 3);
+    } else {                                  // part of a beamed group
+      stem(stemX[i], beamY);
+      if (n.type === RhythmNoteType.DottedEighth) dot(cx[i] + rx + 3);
     }
   });
 
   if (beamed) {
-    for (const i of beamable) rect(stemX[i] - stemW / 2, beamY, stemW, baseline - beamY);
     rect(stemX[beamable[0]] - stemW / 2, beamY, stemX[beamable[beamable.length - 1]] - stemX[beamable[0]] + stemW, beamThick);
-    const stubLen = (usable / unit.notes.length) * 0.4;
+    const stubLen = (usable / unit.notes.length) * 0.45;
     for (let i = 0; i < unit.notes.length; i++) {
       if (!is16[i]) continue;
       const hasNext16 = i + 1 < unit.notes.length && is16[i + 1];
       const hasPrev16 = i - 1 >= 0 && is16[i - 1];
       const y = beamY + secGap;
-      if (hasNext16) rect(stemX[i] - stemW / 2, y, stemX[i + 1] - stemX[i] + stemW, beamThick);
-      else if (!hasPrev16) { const dir = i === beamable[0] ? 1 : -1; rect(dir > 0 ? stemX[i] - stemW / 2 : stemX[i] - stubLen, y, stubLen + stemW / 2, beamThick); }
+      if (hasNext16) rect(stemX[i] - stemW / 2, y, stemX[i + 1] - stemX[i] + stemW, beamThick * 0.85);
+      else if (!hasPrev16) { const dir = i === beamable[0] ? 1 : -1; rect(dir > 0 ? stemX[i] - stemW / 2 : stemX[i] - stubLen, y, stubLen + stemW / 2, beamThick * 0.85); }
     }
     if (unit.notes[0]?.type === RhythmNoteType.TripletEighth) {
-      parts.push(`<text x="${((stemX[beamable[0]] + stemX[beamable[beamable.length - 1]]) / 2).toFixed(2)}" y="${(beamY - 4).toFixed(2)}" font-family="sans-serif" font-size="16" font-weight="700" text-anchor="middle" fill="currentColor">3</text>`);
+      p.push(`<text x="${f2((stemX[beamable[0]] + stemX[beamable[beamable.length - 1]]) / 2)}" y="${f2(beamY - 5)}" font-family="sans-serif" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor">3</text>`);
     }
   }
 
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block;color:var(--text-primary)" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block;color:var(--text-primary)" xmlns="http://www.w3.org/2000/svg">${p.join("")}</svg>`;
 }
 
 export class RhythmUnitsUI {
@@ -104,7 +97,6 @@ export class RhythmUnitsUI {
   ) {}
 
   render(parent: HTMLElement): void {
-    preloadMusicFont(() => this.rerender());   // once; redraws the SVG notation when Bravura loads
     const screen = el("div", { class: "tool-screen" });
 
     // Header (fixed)
@@ -166,7 +158,7 @@ export class RhythmUnitsUI {
         `background:${playing ? "color-mix(in srgb, var(--feedback) 16%, transparent)" : "var(--surface2)"};` +
         `border:${playing ? "2px" : "1px"} solid ${playing ? "var(--feedback)" : "var(--line)"}`,
     });
-    // Bravura SMuFL notation (inline SVG) — crisp at any size, reflows on font-load.
+    // Geometric inline-SVG notation — crisp at any size, no webfont dependency.
     const svgBox = el("div", { style: "width:100%;height:92px;display:block" });
     svgBox.innerHTML = beatSvg(unit);
     card.appendChild(svgBox);
@@ -228,7 +220,7 @@ export class RhythmUnitsUI {
       for (let b = 0; b < phrase.beatsPerBar; b++) {
         const gi = bar * phrase.beatsPerBar + b;
         const playing = gi === currentBeat;
-        // Inline SVG (Bravura glyphs) — scales perfectly and reflows on font-load.
+        // Geometric inline SVG — scales perfectly at any resolution.
         const box = el("div", {
           style: `width:${boxW}px;height:${boxH}px;border-radius:8px;display:flex;align-items:center;justify-content:center;` +
             (playing ? "background:color-mix(in srgb, var(--feedback) 20%, transparent);" : ""),
