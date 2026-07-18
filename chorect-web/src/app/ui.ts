@@ -211,7 +211,7 @@ export class App {
     this.cavaqUI = new CavaqProgUI(state, this.cavaq);
     this.rhythmUnits = new RhythmUnitState({ audio: state.audio, onChange: () => this.scheduleRender() });
     this.rhythmPhrase = new RhythmPhraseState({ audio: state.audio, onChange: () => this.scheduleRender() });
-    this.rhythmUnitsUI = new RhythmUnitsUI(this.rhythmUnits, this.rhythmPhrase, () => state.closeSheet());
+    this.rhythmUnitsUI = new RhythmUnitsUI(this.rhythmUnits, this.rhythmPhrase, () => state.closeSheet(), () => this.scheduleRender());
     this.decomposeUI = new DecomposeUI(state, this.ear, () => state.closeSheet(), (symbols) => {
       this.loop.loadProgressionIntoLoop(symbols);
       state.openSheet(Sheet.Loop);
