@@ -21,6 +21,7 @@ import { LoopUI } from "./loopUI";
 import { CavaqProgState } from "./cavaqProgState";
 import { CavaqProgUI } from "./cavaqProgUI";
 import { RhythmUnitState } from "./rhythmUnitState";
+import { RhythmPhraseState } from "./rhythmPhraseState";
 import { RhythmUnitsUI } from "./rhythmUnitsUI";
 import { loadDrumSample } from "./drumSamples";
 import { Timbres } from "../audio";
@@ -156,6 +157,7 @@ export class App {
   private cavaq: CavaqProgState;
   private cavaqUI: CavaqProgUI;
   private rhythmUnits: RhythmUnitState;
+  private rhythmPhrase: RhythmPhraseState;
   private rhythmUnitsUI: RhythmUnitsUI;
 
   constructor(private state: AppState, root: HTMLElement) {
@@ -208,7 +210,8 @@ export class App {
     });
     this.cavaqUI = new CavaqProgUI(state, this.cavaq);
     this.rhythmUnits = new RhythmUnitState({ audio: state.audio, onChange: () => this.scheduleRender() });
-    this.rhythmUnitsUI = new RhythmUnitsUI(this.rhythmUnits, () => state.closeSheet());
+    this.rhythmPhrase = new RhythmPhraseState({ audio: state.audio, onChange: () => this.scheduleRender() });
+    this.rhythmUnitsUI = new RhythmUnitsUI(this.rhythmUnits, this.rhythmPhrase, () => state.closeSheet());
     this.decomposeUI = new DecomposeUI(state, this.ear, () => state.closeSheet(), (symbols) => {
       this.loop.loadProgressionIntoLoop(symbols);
       state.openSheet(Sheet.Loop);
@@ -449,6 +452,7 @@ export class App {
     if (route !== Sheet.SambaLooper && this.samba.isPlaying) this.samba.stop();
     if (route !== Sheet.CavaqProgressions && this.cavaq.isPlaying) this.cavaq.stop();
     if (route !== Sheet.RhythmUnits && this.rhythmUnits.isPlaying) this.rhythmUnits.stop();
+    if (route !== Sheet.RhythmUnits && this.rhythmPhrase.isPlaying) this.rhythmPhrase.stop();
 
     this.renderNav();
     // Preserve the scroll position of any long scrollable pane across full rebuilds.

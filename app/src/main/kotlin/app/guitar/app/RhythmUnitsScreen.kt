@@ -4,19 +4,26 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -24,6 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,22 +46,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.guitar.theory.RhythmNoteType
+import app.guitar.theory.RhythmPhrase
+import app.guitar.theory.RhythmPhrases
 import app.guitar.theory.RhythmUnit
 import app.guitar.theory.RhythmUnits
 
+private enum class RhythmSubMode { Units, Phrases }
+
 /**
- * Rhythmic Units — a single-section screen to learn & train the 8 basic one-beat
- * rhythmic units. Each unit is a card with a music-notation thumbnail; tapping it
- * loops the unit's click pattern at the transport BPM (the playing card lights up).
+ * Rhythm screen — two sub-modes. UNITS: learn/loop the basic one-beat units.
+ * PHRASES: generate a multi-bar rhythmic phrase and practice it (notation + a
+ * drum-machine-style grid with a sweeping playhead).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RhythmUnitsScreen(state: AppState, onBack: () -> Unit) {
     val ru = state.rhythmUnits
-    // Stop the loop when NAVIGATING AWAY, but survive a rotation (which disposes+
-    // recreates this composable without changing the route) — same guard as the other
-    // looping screens (see v2.14.1).
-    DisposableEffect(Unit) { onDispose { if (state.currentSheet != Sheet.RhythmUnits) ru.stop() } }
+    val rp = state.rhythmPhrase
+    var subMode by remember { mutableStateOf(RhythmSubMode.Units) }
+    // Stop looping when NAVIGATING AWAY, but survive a rotation (route unchanged) —
+    // same guard as the other looping screens (see v2.14.1).
+    DisposableEffect(Unit) { onDispose { if (state.currentSheet != Sheet.RhythmUnits) { ru.stop(); rp.stop() } } }
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(12.dp).verticalScroll(rememberScrollState()),
@@ -60,33 +75,42 @@ fun RhythmUnitsScreen(state: AppState, onBack: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("RHYTHM", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = { ru.stop(); onBack() }) { Text("Back") }
+            OutlinedButton(onClick = { ru.stop(); rp.stop(); onBack() }) { Text("Back") }
         }
-        Text("Tap a unit to loop it. Each is one beat; the downbeat is accented.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
+        Spacer(Modifier.height(8.dp))
+        // Sub-mode toggle
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = subMode == RhythmSubMode.Units,
+                onClick = { rp.stop(); subMode = RhythmSubMode.Units }, label = { Text("Units") })
+            FilterChip(selected = subMode == RhythmSubMode.Phrases,
+                onClick = { ru.stop(); if (rp.phrase == null) rp.generate(); subMode = RhythmSubMode.Phrases },
+                label = { Text("Phrases") })
+        }
         Spacer(Modifier.height(10.dp))
 
-        // Transport: Play/Stop + BPM.
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = { ru.toggle() }, enabled = ru.selectedId != null) {
-                Text(if (ru.isPlaying) "Stop ■" else "Play ▶")
-            }
-            Spacer(Modifier.weight(1f))
-            Text("${ru.bpm} BPM", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-        }
-        Slider(
-            value = ru.bpm.toFloat(),
-            onValueChange = { ru.changeBpm(it.toInt()) },
-            valueRange = 10f..300f,
-        )
-
-        Spacer(Modifier.height(6.dp))
-        RhythmSection("Rhythmic units", RhythmUnits.ALL, ru)
-        Spacer(Modifier.height(14.dp))
-        RhythmSection("With rests", RhythmUnits.RESTS, ru)
-        Spacer(Modifier.height(12.dp))
+        if (subMode == RhythmSubMode.Units) RhythmUnitsBody(ru) else RhythmPhrasesBody(rp)
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RhythmUnitsBody(ru: RhythmUnitState) {
+    Text("Tap a unit to loop it. Each is one beat; the downbeat is accented.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(10.dp))
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = { ru.toggle() }, enabled = ru.selectedId != null) {
+            Text(if (ru.isPlaying) "Stop ■" else "Play ▶")
+        }
+        Spacer(Modifier.weight(1f))
+        Text("${ru.bpm} BPM", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+    }
+    Slider(value = ru.bpm.toFloat(), onValueChange = { ru.changeBpm(it.toInt()) }, valueRange = 10f..300f)
+    Spacer(Modifier.height(6.dp))
+    RhythmSection("Rhythmic units", RhythmUnits.ALL, ru)
+    Spacer(Modifier.height(14.dp))
+    RhythmSection("With rests", RhythmUnits.RESTS, ru)
+    Spacer(Modifier.height(12.dp))
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -128,6 +152,126 @@ private fun RhythmUnitCard(unit: RhythmUnit, playing: Boolean, onTap: () -> Unit
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(unit.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+// ---------- Phrases sub-mode ----------
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RhythmPhrasesBody(rp: RhythmPhraseState) {
+    Text("Generate a phrase, then read & play it. The playhead marks the current beat.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(10.dp))
+
+    // Config: Bars stepper + Time signature + Generate.
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text("Bars", style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.width(6.dp))
+        Stepper(rp.bars, RhythmPhrases.MIN_BARS, RhythmPhrases.MAX_BARS) { rp.changeBars(it) }
+        Spacer(Modifier.width(16.dp))
+        Text("Time", style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.width(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (n in RhythmPhrases.TIME_SIGNATURES) {
+                FilterChip(selected = rp.beatsPerBar == n, onClick = { rp.changeBeatsPerBar(n) }, label = { Text("$n/4") })
+            }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { rp.generate() }) { Text("Generate ↻") }
+        Spacer(Modifier.width(8.dp))
+        Button(onClick = { rp.toggle() }, enabled = rp.phrase != null) {
+            Text(if (rp.isPlaying) "Stop ■" else "Play ▶")
+        }
+        Spacer(Modifier.weight(1f))
+        Text("${rp.bpm} BPM", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+    }
+    Slider(value = rp.bpm.toFloat(), onValueChange = { rp.changeBpm(it.toInt()) }, valueRange = 10f..300f)
+
+    val phrase = rp.phrase
+    if (phrase != null) {
+        Spacer(Modifier.height(10.dp))
+        PhraseNotation(phrase, rp.currentSlot)
+        Spacer(Modifier.height(14.dp))
+        Text("Grid", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.height(6.dp))
+        PhraseGrid(phrase, rp.currentSlot)
+    }
+    Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun Stepper(value: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
+    val pad = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedButton(onClick = { onChange(value - 1) }, enabled = value > min, contentPadding = pad) { Text("−") }
+        Text("$value", modifier = Modifier.padding(horizontal = 10.dp), fontWeight = FontWeight.SemiBold)
+        OutlinedButton(onClick = { onChange(value + 1) }, enabled = value < max, contentPadding = pad) { Text("+") }
+    }
+}
+
+/** The phrase as notation: per-beat boxes grouped into bars with bar-lines; the
+ *  currently-playing beat's box is highlighted (teal), like the reference image. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PhraseNotation(phrase: RhythmPhrase, currentSlot: Int) {
+    val teal = LocalSignal.current.feedback
+    val noteColor = MaterialTheme.colorScheme.onSurface
+    val currentBeat = if (currentSlot >= 0) currentSlot / phrase.slotsPerBeat else -1
+    FlowRow(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (bar in 0 until phrase.bars) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                for (beatInBar in 0 until phrase.beatsPerBar) {
+                    val gi = bar * phrase.beatsPerBar + beatInBar
+                    val playing = gi == currentBeat
+                    Box(
+                        modifier = Modifier.size(46.dp, 52.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (playing) teal.copy(alpha = 0.20f) else Color.Transparent),
+                    ) { RhythmNotation(phrase.beats[gi], noteColor, Modifier.fillMaxSize()) }
+                }
+                Box(Modifier.width(2.dp).height(40.dp).background(MaterialTheme.colorScheme.outline))
+                Spacer(Modifier.width(6.dp))
+            }
+        }
+    }
+}
+
+/** The phrase as a drum-machine-style grid: one row of 16th-slot cells with onsets
+ *  marked (bar downbeats brighter), beat/bar dividers, and a sweeping playhead. */
+@Composable
+private fun PhraseGrid(phrase: RhythmPhrase, currentSlot: Int) {
+    val teal = LocalSignal.current.feedback
+    val primary = MaterialTheme.colorScheme.primary
+    val outline = MaterialTheme.colorScheme.outline
+    val emptyBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    val onsetAccent = remember(phrase) { phrase.onsets().associate { it.slot to it.accent } }
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        for (slot in 0 until phrase.totalSlots) {
+            if (slot > 0 && slot % phrase.slotsPerBar == 0) Box(Modifier.width(3.dp).height(30.dp).background(outline))
+            else if (slot > 0 && slot % phrase.slotsPerBeat == 0) Spacer(Modifier.width(4.dp))
+            else if (slot > 0) Spacer(Modifier.width(1.dp))
+            val accent = onsetAccent[slot]
+            val isPlayhead = slot == currentSlot
+            val color = when {
+                isPlayhead -> teal
+                accent == true -> primary
+                accent == false -> primary.copy(alpha = 0.55f)
+                else -> emptyBg
+            }
+            Box(
+                modifier = Modifier.size(16.dp, 28.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(color)
+                    .border(1.dp, if (isPlayhead) teal else outline.copy(alpha = 0.4f), RoundedCornerShape(3.dp)),
+            )
+        }
     }
 }
 

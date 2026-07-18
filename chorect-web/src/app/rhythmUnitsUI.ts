@@ -1,49 +1,69 @@
-// Rhythmic Units screen UI. Mirror of app/.../RhythmUnitsScreen.kt.
-// Two sections ("Rhythmic units" + "With rests"): dense grids of small unit cards,
-// each with a music-notation thumbnail canvas. Tapping a card loops the unit.
+// Rhythm screen UI. Mirror of app/.../RhythmUnitsScreen.kt.
+// Two sub-modes: "Units" (loop a one-beat unit) and "Phrases" (generate a multi-bar
+// rhythmic phrase, shown as notation + a drum-machine-style grid with a playhead).
 
 import { RhythmUnitState } from "./rhythmUnitState";
-import { el, btn, slider } from "./dom";
-import { RHYTHM_UNITS, RHYTHM_UNITS_RESTS, RhythmUnit, RhythmNoteType, starts } from "../theory";
+import { RhythmPhraseState } from "./rhythmPhraseState";
+import { el, btn, slider, segmented } from "./dom";
+import {
+  RHYTHM_UNITS, RHYTHM_UNITS_RESTS, RhythmUnit, RhythmNoteType, starts,
+  RhythmPhrase, phraseOnsets, phraseTotalSlots, PHRASE_TIME_SIGNATURES,
+} from "../theory";
+
+type SubMode = "units" | "phrases";
 
 export class RhythmUnitsUI {
-  constructor(private ru: RhythmUnitState, private onBack: () => void) {}
+  private subMode: SubMode = "units";
+
+  constructor(private ru: RhythmUnitState, private rp: RhythmPhraseState, private onBack: () => void) {}
 
   render(parent: HTMLElement): void {
-    const ru = this.ru;
     const screen = el("div", { class: "tool-screen" });
 
     // Header (fixed)
     const topbar = el("div", { class: "tool-topbar" }, [el("h2", {}, ["Rhythm"])]);
     topbar.appendChild(el("span", { style: "flex:1" }));
-    topbar.appendChild(btn("Back", () => { ru.stop(); this.onBack(); }));
+    topbar.appendChild(btn("Back", () => { this.ru.stop(); this.rp.stop(); this.onBack(); }));
     screen.appendChild(topbar);
-    screen.appendChild(el("div", { class: "et-muted", style: "font-size:13px;margin-top:2px" },
-      ["Tap a unit to loop it. Each is one beat; the downbeat is accented."]));
 
-    // Transport: Play/Stop + BPM (fixed)
-    const playBtn = btn(ru.isPlaying ? "Stop ■" : "Play ▶", () => ru.toggle(), "btn primary");
-    if (!ru.selectedId) playBtn.disabled = true;
-    screen.appendChild(el("div", { class: "row", style: "margin-top:10px;align-items:center;gap:10px" }, [
-      playBtn,
-      el("span", { style: "flex:1" }),
-      el("span", { class: "mono", style: "font-weight:600" }, [`${ru.bpm} BPM`]),
+    // Sub-mode toggle (fixed)
+    screen.appendChild(el("div", { style: "margin-top:8px" }, [
+      segmented<SubMode>([{ value: "units", label: "Units" }, { value: "phrases", label: "Phrases" }], this.subMode, (v) => {
+        this.subMode = v;
+        // Both branches call a state stop()/generate(), which fires onChange →
+        // scheduleRender, so the screen re-renders in the new sub-mode.
+        if (v === "units") this.rp.stop();
+        else { this.ru.stop(); if (!this.rp.phrase) this.rp.generate(); }
+      }),
     ]));
-    screen.appendChild(el("div", { style: "margin-top:6px" }, [slider(10, 300, ru.bpm, (v) => ru.setBpm(v))]));
 
-    // Scrollable body (the .et-scroll pattern; .tool-screen itself doesn't scroll).
+    // Scrollable body
     const body = el("div", { class: "et-scroll" });
-    this.section(body, "Rhythmic units", RHYTHM_UNITS);
-    this.section(body, "With rests", RHYTHM_UNITS_RESTS);
+    if (this.subMode === "units") this.unitsBody(body);
+    else this.phrasesBody(body);
     screen.appendChild(body);
 
     parent.appendChild(screen);
   }
 
-  private section(parent: HTMLElement, title: string, units: RhythmUnit[]): void {
+  // ---------- Units ----------
+
+  private unitsBody(body: HTMLElement): void {
+    const ru = this.ru;
+    body.appendChild(el("div", { class: "et-muted", style: "font-size:13px" },
+      ["Tap a unit to loop it. Each is one beat; the downbeat is accented."]));
+    const playBtn = btn(ru.isPlaying ? "Stop ■" : "Play ▶", () => ru.toggle(), "btn primary");
+    if (!ru.selectedId) playBtn.disabled = true;
+    body.appendChild(el("div", { class: "row", style: "margin-top:8px;align-items:center;gap:10px" }, [
+      playBtn, el("span", { style: "flex:1" }), el("span", { class: "mono", style: "font-weight:600" }, [`${ru.bpm} BPM`]),
+    ]));
+    body.appendChild(el("div", { style: "margin-top:6px" }, [slider(10, 300, ru.bpm, (v) => ru.setBpm(v))]));
+    this.unitSection(body, "Rhythmic units", RHYTHM_UNITS);
+    this.unitSection(body, "With rests", RHYTHM_UNITS_RESTS);
+  }
+
+  private unitSection(parent: HTMLElement, title: string, units: RhythmUnit[]): void {
     parent.appendChild(el("div", { style: "margin-top:10px;font-weight:700;color:var(--act)" }, [title]));
-    // Dense auto-fill grid of small cards: the whole list fits in a fraction of the
-    // old 2-column footprint.
     const grid = el("div", { style: "display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px;margin-top:6px" });
     for (const unit of units) grid.appendChild(this.unitCard(unit));
     parent.appendChild(grid);
@@ -52,8 +72,6 @@ export class RhythmUnitsUI {
   private unitCard(unit: RhythmUnit): HTMLElement {
     const ru = this.ru;
     const playing = ru.selectedId === unit.id && ru.isPlaying;
-    // Compact card; the whole pane is the click target (height:100% fills the cell).
-    // The full name is a hover tooltip so the card can stay small.
     const card = el("div", {
       title: unit.name,
       style:
@@ -62,15 +80,95 @@ export class RhythmUnitsUI {
         `background:${playing ? "color-mix(in srgb, var(--feedback) 16%, transparent)" : "var(--surface2)"};` +
         `border:${playing ? "2px" : "1px"} solid ${playing ? "var(--feedback)" : "var(--line)"}`,
     });
-    // Fixed-aspect canvas (3:1) scaled with width:100%;height:auto so it never stretches.
     const cv = el("canvas", { style: "width:100%;height:auto;display:block" }) as HTMLCanvasElement;
-    cv.width = 360;
-    cv.height = 120;
+    cv.width = 360; cv.height = 120;
     drawNotation(cv, unit);
     card.appendChild(cv);
     card.appendChild(el("div", { class: "mono", style: "font-size:10px;line-height:1.1;color:var(--text-secondary)" }, [unit.count || " "]));
     card.addEventListener("click", () => ru.select(unit.id));
     return card;
+  }
+
+  // ---------- Phrases ----------
+
+  private phrasesBody(body: HTMLElement): void {
+    const rp = this.rp;
+    body.appendChild(el("div", { class: "et-muted", style: "font-size:13px" },
+      ["Generate a phrase, then read & play it. The playhead marks the current beat."]));
+
+    // Config: Bars stepper + Time + Generate
+    const stepper = el("div", { class: "row", style: "gap:4px;align-items:center" }, [
+      btn("−", () => rp.changeBars(rp.bars - 1)),
+      el("span", { class: "mono", style: "min-width:16px;text-align:center;font-weight:600" }, [String(rp.bars)]),
+      btn("+", () => rp.changeBars(rp.bars + 1)),
+    ]);
+    const timeChips = el("div", { class: "row", style: "gap:4px" },
+      PHRASE_TIME_SIGNATURES.map((n) => btn(`${n}/4`, () => rp.changeBeatsPerBar(n), rp.beatsPerBar === n ? "btn primary" : "btn")));
+    body.appendChild(el("div", { class: "row", style: "margin-top:8px;align-items:center;gap:12px;flex-wrap:wrap" }, [
+      el("span", { style: "font-size:13px" }, ["Bars"]), stepper,
+      el("span", { style: "font-size:13px" }, ["Time"]), timeChips,
+    ]));
+
+    // Transport: Generate + Play/Stop + BPM
+    body.appendChild(el("div", { class: "row", style: "margin-top:8px;align-items:center;gap:8px" }, [
+      btn("Generate ↻", () => rp.generate()),
+      btn(rp.isPlaying ? "Stop ■" : "Play ▶", () => rp.toggle(), "btn primary"),
+      el("span", { style: "flex:1" }),
+      el("span", { class: "mono", style: "font-weight:600" }, [`${rp.bpm} BPM`]),
+    ]));
+    body.appendChild(el("div", { style: "margin-top:6px" }, [slider(10, 300, rp.bpm, (v) => rp.setBpm(v))]));
+
+    const phrase = rp.phrase;
+    if (phrase) {
+      body.appendChild(this.phraseNotation(phrase));
+      body.appendChild(el("div", { style: "margin-top:12px;font-weight:700;color:var(--act)" }, ["Grid"]));
+      body.appendChild(this.phraseGrid(phrase));
+    }
+  }
+
+  private phraseNotation(phrase: RhythmPhrase): HTMLElement {
+    const currentBeat = this.rp.currentSlot >= 0 ? Math.floor(this.rp.currentSlot / 4) : -1;
+    const wrap = el("div", { style: "display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-top:10px" });
+    for (let bar = 0; bar < phrase.bars; bar++) {
+      const group = el("div", { style: "display:flex;align-items:flex-end" });
+      for (let b = 0; b < phrase.beatsPerBar; b++) {
+        const gi = bar * phrase.beatsPerBar + b;
+        const playing = gi === currentBeat;
+        const box = el("div", {
+          style: "width:48px;height:52px;border-radius:6px;display:flex;align-items:center;justify-content:center;" +
+            (playing ? "background:color-mix(in srgb, var(--feedback) 20%, transparent);" : ""),
+        });
+        const cv = el("canvas", { style: "width:100%;height:auto;display:block" }) as HTMLCanvasElement;
+        cv.width = 120; cv.height = 120;
+        drawNotation(cv, phrase.beats[gi]);
+        box.appendChild(cv);
+        group.appendChild(box);
+      }
+      group.appendChild(el("div", { style: "width:2px;height:40px;background:var(--line);margin:0 6px" }));
+      wrap.appendChild(group);
+    }
+    return wrap;
+  }
+
+  private phraseGrid(phrase: RhythmPhrase): HTMLElement {
+    const onsetAccent = new Map(phraseOnsets(phrase).map((o) => [o.slot, o.accent] as [number, boolean]));
+    const total = phraseTotalSlots(phrase);
+    const slotsPerBar = phrase.beatsPerBar * 4;
+    const row = el("div", { style: "display:flex;align-items:center;overflow-x:auto;margin-top:6px;padding-bottom:4px" });
+    for (let slot = 0; slot < total; slot++) {
+      if (slot > 0 && slot % slotsPerBar === 0) row.appendChild(el("div", { style: "width:3px;height:30px;background:var(--line);margin:0 2px;flex:0 0 auto" }));
+      else if (slot > 0 && slot % 4 === 0) row.appendChild(el("div", { style: "width:4px;flex:0 0 auto" }));
+      else if (slot > 0) row.appendChild(el("div", { style: "width:1px;flex:0 0 auto" }));
+      const accent = onsetAccent.get(slot);
+      const playhead = slot === this.rp.currentSlot;
+      const bg = playhead ? "var(--feedback)"
+        : accent === true ? "var(--act)"
+        : accent === false ? "color-mix(in srgb, var(--act) 55%, transparent)"
+        : "var(--surface2)";
+      const border = playhead ? "var(--feedback)" : "color-mix(in srgb, var(--line) 40%, transparent)";
+      row.appendChild(el("div", { style: `width:16px;height:28px;border-radius:3px;flex:0 0 auto;background:${bg};border:1px solid ${border}` }));
+    }
+    return row;
   }
 }
 
@@ -110,7 +208,6 @@ function drawNotation(cv: HTMLCanvasElement, unit: RhythmUnit): void {
   const is16 = unit.notes.map((n) => !n.rest && n.type === RhythmNoteType.Sixteenth);
   const beamable = unit.notes.map((_, i) => i).filter((i) => !unit.notes[i].rest && unit.notes[i].type !== RhythmNoteType.Quarter);
 
-  // Elements
   unit.notes.forEach((n, i) => {
     if (n.rest) {
       const cxR = padL + (startFrac[i] + (n.slots / 2) / sub) * usable;

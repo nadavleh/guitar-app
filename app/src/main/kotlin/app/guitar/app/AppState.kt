@@ -463,6 +463,9 @@ class AppState(
     /** App-lifetime Rhythmic Units state (one-beat rhythm trainer looper). */
     val rhythmUnits: RhythmUnitState by lazy { RhythmUnitState(audio = audio, scope = scope) }
 
+    /** App-lifetime Rhythmic Phrases state (multi-bar phrase generator + looper). */
+    val rhythmPhrase: RhythmPhraseState by lazy { RhythmPhraseState(audio = audio, scope = scope) }
+
     @JvmName("applyA4Hz")
     fun setA4Hz(value: Float) {
         val clamped = value.coerceIn(435f, 445f)
