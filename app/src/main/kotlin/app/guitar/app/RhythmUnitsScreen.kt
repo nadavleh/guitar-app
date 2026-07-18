@@ -228,13 +228,13 @@ private fun PhraseNotation(phrase: RhythmPhrase, currentSlot: Int) {
                     val gi = bar * phrase.beatsPerBar + beatInBar
                     val playing = gi == currentBeat
                     Box(
-                        modifier = Modifier.size(46.dp, 52.dp)
-                            .clip(RoundedCornerShape(6.dp))
+                        modifier = Modifier.size(70.dp, 78.dp)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(if (playing) teal.copy(alpha = 0.20f) else Color.Transparent),
                     ) { RhythmNotation(phrase.beats[gi], noteColor, Modifier.fillMaxSize()) }
                 }
-                Box(Modifier.width(2.dp).height(40.dp).background(MaterialTheme.colorScheme.outline))
-                Spacer(Modifier.width(6.dp))
+                Box(Modifier.width(2.dp).height(58.dp).background(MaterialTheme.colorScheme.outline))
+                Spacer(Modifier.width(8.dp))
             }
         }
     }
@@ -254,9 +254,9 @@ private fun PhraseGrid(phrase: RhythmPhrase, currentSlot: Int) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         for (slot in 0 until phrase.totalSlots) {
-            if (slot > 0 && slot % phrase.slotsPerBar == 0) Box(Modifier.width(3.dp).height(30.dp).background(outline))
-            else if (slot > 0 && slot % phrase.slotsPerBeat == 0) Spacer(Modifier.width(4.dp))
-            else if (slot > 0) Spacer(Modifier.width(1.dp))
+            if (slot > 0 && slot % phrase.slotsPerBar == 0) Box(Modifier.width(3.dp).height(46.dp).background(outline))
+            else if (slot > 0 && slot % phrase.slotsPerBeat == 0) Spacer(Modifier.width(6.dp))
+            else if (slot > 0) Spacer(Modifier.width(2.dp))
             val accent = onsetAccent[slot]
             val isPlayhead = slot == currentSlot
             val color = when {
@@ -266,10 +266,10 @@ private fun PhraseGrid(phrase: RhythmPhrase, currentSlot: Int) {
                 else -> emptyBg
             }
             Box(
-                modifier = Modifier.size(16.dp, 28.dp)
-                    .clip(RoundedCornerShape(3.dp))
+                modifier = Modifier.size(26.dp, 42.dp)
+                    .clip(RoundedCornerShape(4.dp))
                     .background(color)
-                    .border(1.dp, if (isPlayhead) teal else outline.copy(alpha = 0.4f), RoundedCornerShape(3.dp)),
+                    .border(1.dp, if (isPlayhead) teal else outline.copy(alpha = 0.4f), RoundedCornerShape(4.dp)),
             )
         }
     }

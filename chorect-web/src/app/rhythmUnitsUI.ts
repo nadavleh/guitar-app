@@ -135,7 +135,7 @@ export class RhythmUnitsUI {
         const gi = bar * phrase.beatsPerBar + b;
         const playing = gi === currentBeat;
         const box = el("div", {
-          style: "width:48px;height:52px;border-radius:6px;display:flex;align-items:center;justify-content:center;" +
+          style: "width:74px;height:80px;border-radius:8px;display:flex;align-items:center;justify-content:center;" +
             (playing ? "background:color-mix(in srgb, var(--feedback) 20%, transparent);" : ""),
         });
         const cv = el("canvas", { style: "width:100%;height:auto;display:block" }) as HTMLCanvasElement;
@@ -144,7 +144,7 @@ export class RhythmUnitsUI {
         box.appendChild(cv);
         group.appendChild(box);
       }
-      group.appendChild(el("div", { style: "width:2px;height:40px;background:var(--line);margin:0 6px" }));
+      group.appendChild(el("div", { style: "width:2px;height:60px;background:var(--line);margin:0 8px" }));
       wrap.appendChild(group);
     }
     return wrap;
@@ -156,9 +156,9 @@ export class RhythmUnitsUI {
     const slotsPerBar = phrase.beatsPerBar * 4;
     const row = el("div", { style: "display:flex;align-items:center;overflow-x:auto;margin-top:6px;padding-bottom:4px" });
     for (let slot = 0; slot < total; slot++) {
-      if (slot > 0 && slot % slotsPerBar === 0) row.appendChild(el("div", { style: "width:3px;height:30px;background:var(--line);margin:0 2px;flex:0 0 auto" }));
-      else if (slot > 0 && slot % 4 === 0) row.appendChild(el("div", { style: "width:4px;flex:0 0 auto" }));
-      else if (slot > 0) row.appendChild(el("div", { style: "width:1px;flex:0 0 auto" }));
+      if (slot > 0 && slot % slotsPerBar === 0) row.appendChild(el("div", { style: "width:3px;height:46px;background:var(--line);margin:0 3px;flex:0 0 auto" }));
+      else if (slot > 0 && slot % 4 === 0) row.appendChild(el("div", { style: "width:6px;flex:0 0 auto" }));
+      else if (slot > 0) row.appendChild(el("div", { style: "width:2px;flex:0 0 auto" }));
       const accent = onsetAccent.get(slot);
       const playhead = slot === this.rp.currentSlot;
       const bg = playhead ? "var(--feedback)"
@@ -166,7 +166,7 @@ export class RhythmUnitsUI {
         : accent === false ? "color-mix(in srgb, var(--act) 55%, transparent)"
         : "var(--surface2)";
       const border = playhead ? "var(--feedback)" : "color-mix(in srgb, var(--line) 40%, transparent)";
-      row.appendChild(el("div", { style: `width:16px;height:28px;border-radius:3px;flex:0 0 auto;background:${bg};border:1px solid ${border}` }));
+      row.appendChild(el("div", { style: `width:26px;height:42px;border-radius:4px;flex:0 0 auto;background:${bg};border:1px solid ${border}` }));
     }
     return row;
   }
