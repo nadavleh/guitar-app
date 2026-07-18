@@ -1,10 +1,10 @@
 // Rhythmic Units screen UI. Mirror of app/.../RhythmUnitsScreen.kt.
-// One section: a grid of unit cards, each with a music-notation thumbnail canvas.
-// Tapping a card loops the unit at the transport BPM (playing card highlights).
+// Two sections ("Rhythmic units" + "With rests"): grids of unit cards, each with a
+// music-notation thumbnail canvas. Tapping a card loops the unit at the transport BPM.
 
 import { RhythmUnitState } from "./rhythmUnitState";
 import { el, btn, slider } from "./dom";
-import { RHYTHM_UNITS, RhythmUnit, RhythmNoteType, onsetFractions } from "../theory";
+import { RHYTHM_UNITS, RHYTHM_UNITS_RESTS, RhythmUnit, RhythmNoteType, starts } from "../theory";
 
 export class RhythmUnitsUI {
   constructor(private ru: RhythmUnitState, private onBack: () => void) {}
@@ -31,16 +31,17 @@ export class RhythmUnitsUI {
     ]));
     screen.appendChild(el("div", { style: "margin-top:6px" }, [slider(10, 300, ru.bpm, (v) => ru.setBpm(v))]));
 
-    // Section
-    screen.appendChild(el("div", { style: "margin-top:10px;font-weight:700;color:var(--act)" }, ["Rhythmic units"]));
-
-    const grid = el("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px" });
-    for (const unit of RHYTHM_UNITS) {
-      grid.appendChild(this.unitCard(unit));
-    }
-    screen.appendChild(grid);
+    this.section(screen, "Rhythmic units", RHYTHM_UNITS);
+    this.section(screen, "With rests", RHYTHM_UNITS_RESTS);
 
     parent.appendChild(screen);
+  }
+
+  private section(parent: HTMLElement, title: string, units: RhythmUnit[]): void {
+    parent.appendChild(el("div", { style: "margin-top:12px;font-weight:700;color:var(--act)" }, [title]));
+    const grid = el("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px" });
+    for (const unit of units) grid.appendChild(this.unitCard(unit));
+    parent.appendChild(grid);
   }
 
   private unitCard(unit: RhythmUnit): HTMLElement {
@@ -52,21 +53,21 @@ export class RhythmUnitsUI {
         `background:${playing ? "color-mix(in srgb, var(--feedback) 14%, transparent)" : "var(--surface2)"};` +
         `border:${playing ? "2px" : "1px"} solid ${playing ? "var(--feedback)" : "var(--line)"}`,
     });
-    const cv = el("canvas", { style: "width:100%;height:58px" }) as HTMLCanvasElement;
-    cv.width = 300;
-    cv.height = 116;
+    // Fixed-aspect canvas (3:1) scaled with width:100%;height:auto so it never
+    // stretches the notation (the earlier fixed 58px height mangled the ratio).
+    const cv = el("canvas", { style: "width:100%;height:auto;display:block" }) as HTMLCanvasElement;
+    cv.width = 360;
+    cv.height = 120;
     drawNotation(cv, unit);
     card.appendChild(cv);
-    card.appendChild(el("div", { class: "mono", style: "font-size:13px;color:var(--text-secondary)" }, [unit.count]));
-    card.appendChild(el("div", { style: "font-size:13px;font-weight:600" }, [unit.name]));
+    card.appendChild(el("div", { class: "mono", style: "font-size:13px;color:var(--text-secondary)" }, [unit.count || " "]));
+    card.appendChild(el("div", { style: "font-size:13px;font-weight:600;text-align:center" }, [unit.name]));
     card.addEventListener("click", () => ru.select(unit.id));
     return card;
   }
 }
 
-/** Draw [unit] as simple notation on [cv]: noteheads at their beat positions, stems,
- *  a primary beam across sub-quarter notes, secondary (16th) beams/stubs, a dot for
- *  the dotted eighth, a "3" for the triplet. Placement follows onset fractions. */
+/** Draw [unit] as simple notation on [cv] — mirror of RhythmNotation (Compose). */
 function drawNotation(cv: HTMLCanvasElement, unit: RhythmUnit): void {
   const ctx = cv.getContext("2d");
   if (!ctx) return;
@@ -76,16 +77,11 @@ function drawNotation(cv: HTMLCanvasElement, unit: RhythmUnit): void {
   ctx.fillStyle = color;
   ctx.strokeStyle = color;
 
-  const padL = w * 0.12, padR = w * 0.12, usable = w - padL - padR;
+  const padL = w * 0.12, usable = w - padL * 2;
   const baseline = h * 0.72, beamY = h * 0.20;
   const headRx = Math.min(h * 0.11, w * 0.05), headRy = headRx * 0.78;
   const stemW = Math.max(h * 0.035, 2), beamThick = h * 0.10;
-
-  const fr = onsetFractions(unit);
-  const beamable = unit.notes.map((n) => n.type !== RhythmNoteType.Quarter);
-  const is16 = unit.notes.map((n) => n.type === RhythmNoteType.Sixteenth);
-  const cx = fr.map((f) => padL + f * usable + headRx);
-  const stemX = cx.map((x) => x + headRx * 0.9);
+  const sub = unit.subdivision;
 
   const line = (x1: number, y1: number, x2: number, y2: number, width: number) => {
     ctx.lineWidth = width;
@@ -95,48 +91,63 @@ function drawNotation(cv: HTMLCanvasElement, unit: RhythmUnit): void {
     ctx.lineTo(x2, y2);
     ctx.stroke();
   };
-
-  // Noteheads + stems
-  for (let i = 0; i < unit.notes.length; i++) {
+  const circle = (x: number, y: number, r: number) => {
     ctx.beginPath();
-    ctx.ellipse(cx[i], baseline, headRx, headRy, 0, 0, Math.PI * 2);
+    ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
-    if (beamable[i] || unit.notes.length === 1) {
-      line(stemX[i], baseline - headRy * 0.4, stemX[i], beamY, stemW);
-    }
-  }
+  };
 
-  // Dotted-eighth augmentation dot
+  const startFrac = starts(unit).map((s) => s / sub);
+  const noteCx = startFrac.map((f) => padL + f * usable + headRx);
+  const stemX = noteCx.map((x) => x + headRx * 0.9);
+  const is16 = unit.notes.map((n) => !n.rest && n.type === RhythmNoteType.Sixteenth);
+  const beamable = unit.notes.map((_, i) => i).filter((i) => !unit.notes[i].rest && unit.notes[i].type !== RhythmNoteType.Quarter);
+
+  // Elements
   unit.notes.forEach((n, i) => {
-    if (n.type === RhythmNoteType.DottedEighth) {
+    if (n.rest) {
+      const cxR = padL + (startFrac[i] + (n.slots / 2) / sub) * usable;
+      const midY = (beamY + baseline) / 2;
+      const h2 = (baseline - beamY) * 0.40;
+      const dotR = headRy * 0.55;
+      const dotX = cxR - headRx * 0.25;
+      const dotTop = midY - h2 + dotR;
+      circle(dotX, dotTop, dotR);
+      line(dotX + dotR * 0.6, dotTop - dotR * 0.2, cxR + headRx * 0.5, midY + h2, stemW);
+      if (n.type === RhythmNoteType.Sixteenth) circle(dotX - dotR * 0.3, dotTop + dotR * 1.8, dotR);
+    } else {
       ctx.beginPath();
-      ctx.arc(cx[i] + headRx * 1.7, baseline, headRy * 0.42, 0, Math.PI * 2);
+      ctx.ellipse(noteCx[i], baseline, headRx, headRy, 0, 0, Math.PI * 2);
       ctx.fill();
+      line(stemX[i], baseline - headRy * 0.4, stemX[i], beamY, stemW);
+      if (n.type === RhythmNoteType.DottedEighth) circle(noteCx[i] + headRx * 1.7, baseline, headRy * 0.42);
     }
   });
 
-  // Primary beam across all beamable notes
-  const beamIdx = unit.notes.map((_, i) => i).filter((i) => beamable[i]);
-  if (beamIdx.length >= 2) {
-    line(stemX[beamIdx[0]], beamY, stemX[beamIdx[beamIdx.length - 1]], beamY, beamThick);
+  if (beamable.length >= 2) {
+    line(stemX[beamable[0]], beamY, stemX[beamable[beamable.length - 1]], beamY, beamThick);
     const secY = beamY + beamThick * 1.5;
     const stubLen = (usable / unit.notes.length) * 0.4;
-    let i = 0;
-    while (i < unit.notes.length) {
-      if (is16[i]) {
-        if (i + 1 < unit.notes.length && is16[i + 1]) {
-          line(stemX[i], secY, stemX[i + 1], secY, beamThick);
-          i += 2;
-          continue;
-        }
-        const dir = i === 0 ? 1 : -1;
+    for (let i = 0; i < unit.notes.length; i++) {
+      if (!is16[i]) continue;
+      const hasNext16 = i + 1 < unit.notes.length && is16[i + 1];
+      const hasPrev16 = i - 1 >= 0 && is16[i - 1];
+      if (hasNext16) line(stemX[i], secY, stemX[i + 1], secY, beamThick);
+      else if (!hasPrev16) {
+        const dir = i === beamable[0] ? 1 : -1;
         line(stemX[i], secY, stemX[i] + dir * stubLen, secY, beamThick);
       }
-      i++;
+    }
+  } else if (beamable.length === 1) {
+    const j = beamable[0];
+    const flags = unit.notes[j].type === RhythmNoteType.Sixteenth ? 2 : 1;
+    const flagLen = headRx * 1.6, flagDrop = (baseline - beamY) * 0.32;
+    for (let k = 0; k < flags; k++) {
+      const y = beamY + k * flagDrop * 0.6;
+      line(stemX[j], y, stemX[j] + flagLen, y + flagDrop, stemW * 1.1);
     }
   }
 
-  // Triplet "3"
   if (unit.notes[0]?.type === RhythmNoteType.TripletEighth) {
     ctx.font = `bold ${Math.round(h * 0.22)}px sans-serif`;
     ctx.textAlign = "center";

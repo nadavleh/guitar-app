@@ -82,21 +82,28 @@ fun RhythmUnitsScreen(state: AppState, onBack: () -> Unit) {
         )
 
         Spacer(Modifier.height(6.dp))
-        Text("Rhythmic units", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(8.dp))
-
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            maxItemsInEachRow = 2,
-        ) {
-            for (unit in RhythmUnits.ALL) {
-                val playing = ru.selectedId == unit.id && ru.isPlaying
-                RhythmUnitCard(unit, playing, onTap = { ru.select(unit.id) }, modifier = Modifier.weight(1f))
-            }
-        }
+        RhythmSection("Rhythmic units", RhythmUnits.ALL, ru)
+        Spacer(Modifier.height(14.dp))
+        RhythmSection("With rests", RhythmUnits.RESTS, ru)
         Spacer(Modifier.height(12.dp))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RhythmSection(title: String, units: List<RhythmUnit>, ru: RhythmUnitState) {
+    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary)
+    Spacer(Modifier.height(8.dp))
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        maxItemsInEachRow = 2,
+    ) {
+        for (unit in units) {
+            val playing = ru.selectedId == unit.id && ru.isPlaying
+            RhythmUnitCard(unit, playing, onTap = { ru.select(unit.id) }, modifier = Modifier.weight(1f))
+        }
     }
 }
 
@@ -124,73 +131,82 @@ private fun RhythmUnitCard(unit: RhythmUnit, playing: Boolean, onTap: () -> Unit
     }
 }
 
-/** Draws [unit] as simple music notation: noteheads at their beat positions, stems,
- *  a primary beam across sub-quarter notes, secondary (16th) beams/stubs, a dot for
- *  the dotted eighth, and a "3" for the triplet. Placement follows onset fractions. */
+/** Draws [unit] as simple music notation: noteheads at their beat positions with stems,
+ *  rest glyphs for rests, a primary beam across sub-quarter notes (spanning over any
+ *  rests), secondary (16th) beams/stubs, a flag for a lone beamed note, a dot for the
+ *  dotted eighth, and a "3" for the triplet. Placement follows the element start slots. */
 @Composable
 private fun RhythmNotation(unit: RhythmUnit, color: Color, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
         val padL = w * 0.12f
-        val padR = w * 0.12f
-        val usable = w - padL - padR
+        val usable = w - padL * 2
         val baseline = h * 0.72f
         val beamY = h * 0.20f
         val headRx = (h * 0.11f).coerceAtMost(w * 0.05f)
         val headRy = headRx * 0.78f
         val stemW = (h * 0.035f).coerceAtLeast(1.5f)
         val beamThick = h * 0.10f
+        val sub = unit.subdivision
 
-        val fractions = unit.onsetFractions()
-        // A note is beamable if it is shorter than a quarter (everything except a lone quarter).
-        val beamable = unit.notes.map { it.type != RhythmNoteType.Quarter }
-        // Note x-centers and stem x (stem on the right edge of the notehead).
-        val cx = fractions.map { padL + (it.toFloat()) * usable + headRx }
-        val stemX = cx.map { it + headRx * 0.9f }
+        fun line(x1: Float, y1: Float, x2: Float, y2: Float, wd: Float) =
+            drawLine(color, Offset(x1, y1), Offset(x2, y2), wd, cap = StrokeCap.Butt)
 
-        // Noteheads + stems.
-        for (i in unit.notes.indices) {
-            drawOval(
-                color = color,
-                topLeft = Offset(cx[i] - headRx, baseline - headRy),
-                size = androidx.compose.ui.geometry.Size(headRx * 2, headRy * 2),
-            )
-            if (beamable[i] || unit.notes.size == 1) {
-                drawLine(color, Offset(stemX[i], baseline - headRy * 0.4f), Offset(stemX[i], beamY), stemW)
-            }
-        }
+        val startFrac = unit.starts.map { it.toFloat() / sub }
+        val noteCx = startFrac.map { padL + it * usable + headRx }
+        val stemX = noteCx.map { it + headRx * 0.9f }
+        val is16 = unit.notes.map { !it.rest && it.type == RhythmNoteType.Sixteenth }
+        val beamable = unit.notes.indices.filter { !unit.notes[it].rest && unit.notes[it].type != RhythmNoteType.Quarter }
 
-        // Dotted-eighth augmentation dot (after its notehead).
+        // Elements: noteheads + stems (notes) or rest glyphs (rests).
         unit.notes.forEachIndexed { i, n ->
-            if (n.type == RhythmNoteType.DottedEighth) {
-                drawCircle(color, radius = headRy * 0.42f, center = Offset(cx[i] + headRx * 1.7f, baseline))
+            if (n.rest) {
+                val cxR = padL + (startFrac[i] + (n.slots.toFloat() / 2f) / sub) * usable
+                val midY = (beamY + baseline) / 2f
+                val h2 = (baseline - beamY) * 0.40f
+                val dotR = headRy * 0.55f
+                val dotX = cxR - headRx * 0.25f
+                val dotTop = midY - h2 + dotR
+                drawCircle(color, dotR, Offset(dotX, dotTop))
+                line(dotX + dotR * 0.6f, dotTop - dotR * 0.2f, cxR + headRx * 0.5f, midY + h2, stemW)
+                if (n.type == RhythmNoteType.Sixteenth) {
+                    drawCircle(color, dotR, Offset(dotX - dotR * 0.3f, dotTop + dotR * 1.8f))
+                }
+            } else {
+                drawOval(color, Offset(noteCx[i] - headRx, baseline - headRy),
+                    androidx.compose.ui.geometry.Size(headRx * 2, headRy * 2))
+                line(stemX[i], baseline - headRy * 0.4f, stemX[i], beamY, stemW)
+                if (n.type == RhythmNoteType.DottedEighth) {
+                    drawCircle(color, headRy * 0.42f, Offset(noteCx[i] + headRx * 1.7f, baseline))
+                }
             }
         }
 
-        // Primary beam across all beamable notes (they all sit in one beat).
-        val beamIdx = unit.notes.indices.filter { beamable[it] }
-        if (beamIdx.size >= 2) {
-            drawLine(color, Offset(stemX[beamIdx.first()], beamY), Offset(stemX[beamIdx.last()], beamY),
-                beamThick, cap = StrokeCap.Butt)
-            // Secondary (16th) beam: full segment between adjacent sixteenths, else a stub.
+        if (beamable.size >= 2) {
+            // Primary beam spans the first→last beamed note (over any rests between).
+            line(stemX[beamable.first()], beamY, stemX[beamable.last()], beamY, beamThick)
             val secY = beamY + beamThick * 1.5f
-            val is16 = unit.notes.map { it.type == RhythmNoteType.Sixteenth }
             val stubLen = (usable / unit.notes.size) * 0.4f
-            var i = 0
-            while (i < unit.notes.size) {
-                if (is16[i]) {
-                    if (i + 1 < unit.notes.size && is16[i + 1]) {
-                        drawLine(color, Offset(stemX[i], secY), Offset(stemX[i + 1], secY), beamThick, cap = StrokeCap.Butt)
-                        i += 2
-                        continue
-                    } else {
-                        // isolated sixteenth → stub toward the beat interior
-                        val dir = if (i == 0) 1f else -1f
-                        drawLine(color, Offset(stemX[i], secY), Offset(stemX[i] + dir * stubLen, secY), beamThick, cap = StrokeCap.Butt)
-                    }
+            for (i in unit.notes.indices) {
+                if (!is16[i]) continue
+                val hasNext16 = i + 1 < unit.notes.size && is16[i + 1]
+                val hasPrev16 = i - 1 >= 0 && is16[i - 1]
+                if (hasNext16) line(stemX[i], secY, stemX[i + 1], secY, beamThick)
+                else if (!hasPrev16) {
+                    val dir = if (i == beamable.first()) 1f else -1f
+                    line(stemX[i], secY, stemX[i] + dir * stubLen, secY, beamThick)
                 }
-                i++
+            }
+        } else if (beamable.size == 1) {
+            // Lone beamed note → a flag (eighth = 1, sixteenth = 2) instead of a beam.
+            val j = beamable.first()
+            val flags = if (unit.notes[j].type == RhythmNoteType.Sixteenth) 2 else 1
+            val flagLen = headRx * 1.6f
+            val flagDrop = (baseline - beamY) * 0.32f
+            for (k in 0 until flags) {
+                val y = beamY + k * flagDrop * 0.6f
+                line(stemX[j], y, stemX[j] + flagLen, y + flagDrop, stemW * 1.1f)
             }
         }
 

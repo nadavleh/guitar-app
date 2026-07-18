@@ -5,7 +5,7 @@
 // counter replaces Kotlin's Job cancellation.
 
 import { WebAudioEngine } from "../audio";
-import { RhythmUnit, rhythmUnitById, onsetFractions } from "../theory";
+import { RhythmUnit, rhythmUnitById, clickFractions } from "../theory";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -67,14 +67,15 @@ export class RhythmUnitState {
   private stopLoop(): void { this.token++; }
 
   private async loop(u: RhythmUnit, token: number): Promise<void> {
-    const fractions = onsetFractions(u);
+    const fractions = clickFractions(u);   // rests produce no click
     let nextBeat = this.deps.audio.now();
     while (this.isPlaying && token === this.token) {
       const beatSec = 60 / this.bpm;
       const base = Math.max(nextBeat - this.deps.audio.now(), 0);
-      fractions.forEach((f, idx) => {
+      fractions.forEach((f) => {
         const whenSec = this.deps.audio.now() + base + f * beatSec;
-        if (idx === 0) this.deps.audio.playSamples(this.accentClick, 1.0, whenSec);
+        // Accent the downbeat click (a note on the beat), not merely the first click.
+        if (f === 0) this.deps.audio.playSamples(this.accentClick, 1.0, whenSec);
         else this.deps.audio.playSamples(this.click, 0.72, whenSec);
       });
       nextBeat += beatSec;

@@ -71,15 +71,17 @@ class RhythmUnitState(
 
     private suspend fun loop(u: RhythmUnit) {
         val sr = 44100
-        val fractions = u.onsetFractions()
+        val fractions = u.clickFractions()   // rests produce no click
         var nextBeatNanos = System.nanoTime()
         while (isPlaying) {
             val beatMs = 60_000.0 / bpm
             val baseDelayMs = ((nextBeatNanos - System.nanoTime()) / 1_000_000.0).coerceAtLeast(0.0)
-            for ((idx, f) in fractions.withIndex()) {
+            for (f in fractions) {
                 val onsetDelayMs = baseDelayMs + f * beatMs
                 val delayFrames = (onsetDelayMs * sr / 1000.0).toInt().coerceAtLeast(0)
-                if (idx == 0) audio.playSamplesAt(accentClick, 1.0f, delayFrames)
+                // Accent the downbeat click (a note landing on the beat), not merely the
+                // first click — so a unit that rests on beat 1 isn't falsely accented.
+                if (f == 0.0) audio.playSamplesAt(accentClick, 1.0f, delayFrames)
                 else audio.playSamplesAt(click, 0.72f, delayFrames)
             }
             nextBeatNanos += (beatMs * 1_000_000).toLong()
