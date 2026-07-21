@@ -41,6 +41,36 @@ export class SambaLooperState {
   private readonly mAccent = synthClick(ACCENT_CLICK_HZ, 45);
   toggleMetronome() { this.metronomeOn = !this.metronomeOn; this.notify(); }
 
+  // ---- track selection + voice brush (the bottom palette) ----
+
+  /** Id of the selected track (tap its name), or null. Selecting shows the voice
+   *  palette; cells of the selected track follow [brush] instead of cycling. */
+  selectedTrackId: string | null = null;
+  /** What a tap paints on the selected track: "cycle" (default, classic behavior),
+   *  "erase", or a voice index to place directly (tap a same-voice cell to clear). */
+  brush: number | "cycle" | "erase" = "cycle";
+
+  /** Toggle track selection; a fresh selection resets the brush to Cycle. */
+  selectTrack(id: string) {
+    if (this.selectedTrackId === id) { this.selectedTrackId = null; }
+    else { this.selectedTrackId = id; this.brush = "cycle"; }
+    this.notify();
+  }
+  setBrush(b: number | "cycle" | "erase") { this.brush = b; this.notify(); }
+
+  /** Apply the current brush to a cell of the selected track. Voice brush paints
+   *  that voice (tapping a cell already holding it clears — quick-clear). */
+  applyBrush(instrument: PercussionInstrument, slot: number) {
+    if (this.brush === "cycle") { this.toggleSlot(instrument, slot); return; }
+    if (this.brush === "erase") { this.clearCell(instrument, slot); return; }
+    const v = this.brush;
+    const cur = this.pattern.voiceAt(instrument, slot);
+    if (cur === v) { this.clearCell(instrument, slot); return; }
+    this.ensureSamplesLoaded();
+    this.commit(this.pattern.withCell(instrument, slot, v));
+    if (!this.isPlaying) this.deps.audio.playSamples(this.buffer(instrument, v), this.effectiveGain(instrument, v));
+  }
+
   // Undo stack of prior patterns (Ctrl-Z / Undo). Every edit pushes via commit().
   private undoStack: PercussionPattern[] = [];
   get canUndo(): boolean { return this.undoStack.length > 0; }
@@ -226,11 +256,12 @@ export class SambaLooperState {
     if (!this.isPlaying) this.deps.audio.playSamples(this.buffer(inst, 0), this.effectiveGain(inst, 0));
   }
 
-  /** Remove `inst` from the kit, also clearing its mute/solo state. */
+  /** Remove `inst` from the kit, also clearing its mute/solo/selection state. */
   removeInstrument(inst: PercussionInstrument) {
     this.commit(this.pattern.removeInstrument(inst));
     this.muted.delete(inst.id);
     this.soloed.delete(inst.id);
+    if (this.selectedTrackId === inst.id) { this.selectedTrackId = null; this.brush = "cycle"; }
     this.notify();
   }
 

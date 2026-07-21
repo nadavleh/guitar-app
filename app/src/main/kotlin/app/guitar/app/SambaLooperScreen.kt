@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -109,6 +110,9 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     val offsetY = remember { mutableFloatStateOf(0f) }
 
     var toneSheetOpen by remember { mutableStateOf(false) }
+    // Which track's mixer popup (volumes/remove) is open — triggered from the
+    // palette's Mixer chip, anchored at that track's row label.
+    var mixerFor by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -146,7 +150,17 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 accentMode = accentMode,
                 onAccentMode = { accentMode = it },
                 scaleX = scaleX, scaleY = scaleY, offsetX = offsetX, offsetY = offsetY,
+                mixerFor = mixerFor,
+                onMixerDismiss = { mixerFor = null },
             )
+        }
+
+        // Voice palette for the selected track — pinned above the transport dock so
+        // it stays visible while the grid scrolls (mirrors chorect-web).
+        val selInst = samba.pattern.instruments.firstOrNull { it.id == samba.selectedTrackId }
+        if (selInst != null) {
+            Spacer(Modifier.height(6.dp))
+            PaletteBar(samba, selInst, onMixer = { mixerFor = selInst.id })
         }
 
         Spacer(Modifier.height(8.dp))
@@ -179,6 +193,8 @@ private fun PatternSection(
     scaleY: androidx.compose.runtime.MutableFloatState,
     offsetX: androidx.compose.runtime.MutableFloatState,
     offsetY: androidx.compose.runtime.MutableFloatState,
+    mixerFor: String? = null,
+    onMixerDismiss: () -> Unit = {},
 ) {
     // ----- Section header: Save / Load / Clear / Erase / Accent -----
     val saved by samba.savedPatterns.collectAsState(initial = emptyMap())
@@ -449,6 +465,8 @@ private fun PatternSection(
                     kitSize = kit.size,
                     eraseMode = eraseMode,
                     accentMode = accentMode,
+                    mixerOpen = mixerFor == inst.id,
+                    onMixerDismiss = onMixerDismiss,
                     modifier = Modifier.height(ROW_HEIGHT_DP.dp).fillMaxWidth(),
                 )
                 if (i != kit.lastIndex) {
@@ -625,40 +643,45 @@ private fun InstrumentRow(
     kitSize: Int,
     eraseMode: Boolean,
     accentMode: Boolean,
+    mixerOpen: Boolean = false,
+    onMixerDismiss: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val voices = PercussionVoices.voicesFor(instrument)
     val audible = samba.isAudible(instrument)
+    val selected = samba.selectedTrackId == instrument.id
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        // ---- Row label: instrument name (tap → voice popup) + Mute / Solo ----
+        // ---- Row label: instrument name (tap → select track / voice palette) + Mute / Solo ----
         Column(
             modifier = Modifier.width(ROW_LABEL_DP.dp).fillMaxHeight().padding(end = 6.dp),
             verticalArrangement = Arrangement.Center,
         ) {
-            var voiceMenu by remember { mutableStateOf(false) }
             Box {
-                // Name + ▾ hints the voice popup; the whole row is the tap target.
+                // Tap the name to select the track — opens the voice palette at the
+                // bottom (the mixer popup now opens from the palette's Mixer chip).
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .pointerInput(instrument) { detectTapGestures(onTap = { voiceMenu = true }) }
+                        .pointerInput(instrument) { detectTapGestures(onTap = { samba.selectTrack(instrument.id) }) }
                         .padding(vertical = 2.dp),
                 ) {
                     Text(
-                        instrument.displayName,
+                        instrument.displayName + if (selected) " ✓" else "",
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                         maxLines = 1,
-                        color = if (audible) MaterialTheme.colorScheme.onBackground
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = when {
+                            selected -> MaterialTheme.colorScheme.primary
+                            audible -> MaterialTheme.colorScheme.onBackground
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     )
-                    Text(" ▾", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                // Voice menu: overall + per-voice volume, plus Remove. Tap outside to
-                // dismiss; stays open across slider drags so levels can be compared.
-                DropdownMenu(expanded = voiceMenu, onDismissRequest = { voiceMenu = false }) {
+                // Mixer menu: overall + per-voice volume, plus Remove. Opened from the
+                // palette's Mixer chip; tap outside to dismiss; stays open across
+                // slider drags so levels can be compared.
+                DropdownMenu(expanded = mixerOpen, onDismissRequest = onMixerDismiss) {
                     // Overall instrument volume. Lives in the voice popup so the dense
                     // step-grid stays uncluttered.
                     Column(modifier = Modifier.width(260.dp).padding(horizontal = 12.dp, vertical = 4.dp)) {
@@ -703,7 +726,7 @@ private fun InstrumentRow(
                     HorizontalDivider()
                     DropdownMenuItem(
                         text = { Text("Remove ${instrument.displayName}") },
-                        onClick = { voiceMenu = false; samba.removeInstrument(instrument) },
+                        onClick = { onMixerDismiss(); samba.removeInstrument(instrument) },
                     )
                 }
             }
@@ -773,6 +796,83 @@ private fun InstrumentRow(
                 }
             }
         }
+    }
+}
+
+/** Bottom voice palette for the selected track (mirrors chorect-web): pick the
+ *  "brush" a cell tap paints — Cycle (default, classic behavior), one chip per
+ *  voice (tapping also previews the sound), or Erase. Mixer opens the volume
+ *  popup at the track's row; ✕ deselects. */
+@Composable
+private fun PaletteBar(samba: SambaLooperState, inst: PercussionInstrument, onMixer: () -> Unit) {
+    val brush = samba.brush
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            inst.displayName,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+        )
+        Spacer(Modifier.width(8.dp))
+        Row(
+            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PalChip("↻ Cycle", brush is SambaLooperState.Brush.Cycle) { samba.changeBrush(SambaLooperState.Brush.Cycle) }
+            PercussionVoices.voicesFor(inst).forEachIndexed { idx, v ->
+                PalChip("${v.glyph} ${v.displayName}", brush == SambaLooperState.Brush.Voice(idx)) {
+                    samba.changeBrush(SambaLooperState.Brush.Voice(idx))
+                    samba.preview(inst, idx)   // hear what you're about to paint
+                }
+            }
+            PalChip("⌫ Erase", brush is SambaLooperState.Brush.Erase) { samba.changeBrush(SambaLooperState.Brush.Erase) }
+        }
+        Spacer(Modifier.width(8.dp))
+        PalChip("Mixer", selected = false, tool = true, onTap = onMixer)
+        Spacer(Modifier.width(6.dp))
+        PalChip("✕", selected = false, tool = true) { samba.selectTrack(inst.id) }
+    }
+}
+
+/** One palette chip: pill outline; filled with the act color when selected;
+ *  teal (feedback) outline for the tool chips (Mixer / ✕). */
+@Composable
+private fun PalChip(label: String, selected: Boolean, tool: Boolean = false, onTap: () -> Unit) {
+    val palette = LocalSignal.current
+    val borderColor = when {
+        selected -> MaterialTheme.colorScheme.primary
+        tool -> palette.feedback
+        else -> MaterialTheme.colorScheme.outline
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .border(1.dp, borderColor, RoundedCornerShape(999.dp))
+            .clickable(onClick = onTap)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            color = when {
+                selected -> MaterialTheme.colorScheme.onPrimary
+                tool -> palette.feedback
+                else -> MaterialTheme.colorScheme.onSurface
+            },
+        )
     }
 }
 
@@ -867,6 +967,8 @@ private fun Cell(
                         when {
                             eraseMode -> samba.clearCell(instrument, slot)
                             accentMode -> samba.toggleAccent(instrument, slot)
+                            // Selected track follows the palette brush; others keep cycling.
+                            samba.selectedTrackId == instrument.id -> samba.applyBrush(instrument, slot)
                             else -> samba.toggleSlot(instrument, slot)
                         }
                     }

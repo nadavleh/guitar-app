@@ -76,6 +76,11 @@ export class SambaLooperUI {
     screen.appendChild(body);
     body.appendChild(this.patternSection());
 
+    // Voice palette for the selected track — pinned above the transport dock so
+    // it stays visible while the grid scrolls.
+    const selInst = s.pattern.instruments.find((i) => i.id === s.selectedTrackId);
+    if (selInst) screen.appendChild(this.paletteBar(selInst));
+
     // Transport dock (Signal move #2): BPM lives here now — samba reads `bpm`
     // live every slot (see SambaLooperState.start()), so no restart is needed
     // when it changes, unlike the Ear progression loop.
@@ -266,8 +271,11 @@ export class SambaLooperUI {
     const s = this.samba;
     const audible = s.isAudible(inst);
 
-    const name = el("span", { class: "name", title: "drag to reorder · right-click to remove" }, [inst.displayName + " ▾"]);
-    name.addEventListener("click", () => { this.openVoiceMenu = this.openVoiceMenu === inst.id ? null : inst.id; this.rerender(); });
+    const selected = s.selectedTrackId === inst.id;
+    const name = el("span", { class: selected ? "name track-sel" : "name", title: "tap to select · drag to reorder · right-click to remove" },
+      [inst.displayName + (selected ? " ✓" : "")]);
+    // Tap the name to select the track — opens the voice palette at the bottom.
+    name.addEventListener("click", () => { this.openVoiceMenu = null; s.selectTrack(inst.id); });
     // Right-click the track name to remove it.
     name.addEventListener("contextmenu", (e) => { e.preventDefault(); this.openVoiceMenu = null; s.removeInstrument(inst); this.rerender(); });
     const labelInner = el("div", {}, [name]);
@@ -346,6 +354,8 @@ export class SambaLooperUI {
       if (longPressed) return;
       if (this.eraseMode) s.clearCell(inst, slot);
       else if (this.accentMode) s.toggleAccent(inst, slot);
+      // Selected track follows the palette brush; other tracks keep cycling.
+      else if (s.selectedTrackId === inst.id) s.applyBrush(inst, slot);
       else s.toggleSlot(inst, slot);
     });
     c.addEventListener("pointerleave", cancel);
@@ -359,8 +369,39 @@ export class SambaLooperUI {
     return c;
   }
 
+  /** Bottom voice palette for the selected track: pick the "brush" a cell tap
+   *  paints — Cycle (default, classic behavior), one chip per voice (tap also
+   *  previews the sound), or Erase. Mixer opens the volume popup; ✕ deselects. */
+  private paletteBar(inst: PercussionInstrument): HTMLElement {
+    const s = this.samba;
+    const chip = (label: string, active: boolean, onTap: () => void, title = ""): HTMLElement => {
+      const b = el("button", { class: active ? "pal-chip on" : "pal-chip", title }, [label]);
+      b.addEventListener("click", onTap);
+      return b;
+    };
+    const chips = el("div", { class: "pal-chips" });
+    chips.appendChild(chip("↻ Cycle", s.brush === "cycle", () => s.setBrush("cycle"), "tap steps through the voices (classic)"));
+    voicesFor(inst).forEach((v, idx) => {
+      chips.appendChild(chip(`${v.glyph} ${v.displayName}`, s.brush === idx, () => {
+        s.setBrush(idx);
+        s.preview(inst, idx);   // hear what you're about to paint
+      }, "tap a cell to place this voice · tap a same-voice cell to clear"));
+    });
+    chips.appendChild(chip("⌫ Erase", s.brush === "erase", () => s.setBrush("erase"), "tap cells to clear them"));
+
+    const mixer = el("button", { class: "pal-chip pal-tool" }, ["Mixer"]);
+    mixer.addEventListener("click", () => { this.openVoiceMenu = this.openVoiceMenu === inst.id ? null : inst.id; this.rerender(); });
+    const close = el("button", { class: "pal-chip pal-tool", "aria-label": "Deselect track" }, ["✕"]);
+    close.addEventListener("click", () => s.selectTrack(inst.id));
+
+    return el("div", { class: "drum-palette" }, [
+      el("span", { class: "pal-name" }, [inst.displayName]),
+      chips, mixer, close,
+    ]);
+  }
+
   /** Voice popup: overall instrument volume, per-voice volume (tap the label
-   *  to audition), and a Remove action — opened by tapping the row's name. */
+   *  to audition), and a Remove action — opened from the palette's Mixer chip. */
   private voicePopup(inst: PercussionInstrument): HTMLElement {
     const s = this.samba;
     const vol = s.volumeOf(inst);

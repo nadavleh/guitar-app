@@ -53,6 +53,48 @@ class SambaLooperState(
     var metronomeOn by mutableStateOf(false)
         private set
     fun toggleMetronome() { metronomeOn = !metronomeOn }
+
+    // ---- track selection + voice brush (the bottom palette) ----
+
+    /** Id of the selected track (tap its name), or null. Selecting shows the voice
+     *  palette; cells of the selected track follow [brush] instead of cycling. */
+    var selectedTrackId by mutableStateOf<String?>(null)
+        private set
+
+    /** What a tap paints on the selected track (mirrors chorect-web's brush). */
+    sealed interface Brush {
+        /** Classic behavior: tap steps through the voices. The default. */
+        object Cycle : Brush
+        /** Tap clears the cell. */
+        object Erase : Brush
+        /** Tap places this voice; tapping a same-voice cell clears it (quick-clear). */
+        data class Voice(val index: Int) : Brush
+    }
+
+    var brush by mutableStateOf<Brush>(Brush.Cycle)
+        private set
+
+    /** Toggle track selection; a fresh selection resets the brush to Cycle. */
+    fun selectTrack(id: String) {
+        if (selectedTrackId == id) selectedTrackId = null
+        else { selectedTrackId = id; brush = Brush.Cycle }
+    }
+
+    // Named changeBrush (not setBrush) to avoid clashing with the generated `brush` setter.
+    fun changeBrush(b: Brush) { brush = b }
+
+    /** Apply the current brush to a cell of the selected track. */
+    fun applyBrush(instrument: PercussionInstrument, slot: Int) {
+        when (val b = brush) {
+            is Brush.Cycle -> toggleSlot(instrument, slot)
+            is Brush.Erase -> clearCell(instrument, slot)
+            is Brush.Voice -> {
+                if (pattern.voiceAt(instrument, slot) == b.index) { clearCell(instrument, slot); return }
+                commit(pattern.withCell(instrument, slot, b.index))
+                if (!isPlaying) audio.playSamples(buffer(instrument, b.index), effectiveGain(instrument, b.index))
+            }
+        }
+    }
     private val mClick: FloatArray by lazy { synthClick(2000.0, 45) }
     private val mAccent: FloatArray by lazy { synthClick(2800.0, 45) }
     private fun synthClick(freqHz: Double, ms: Int, sr: Int = 44100): FloatArray {
@@ -232,11 +274,12 @@ class SambaLooperState(
         if (!isPlaying) audio.playSamples(buffer(inst, 0), effectiveGain(inst, 0))
     }
 
-    /** Remove [inst] from the kit, also clearing its mute/solo state. */
+    /** Remove [inst] from the kit, also clearing its mute/solo/selection state. */
     fun removeInstrument(inst: PercussionInstrument) {
         commit(pattern.removeInstrument(inst))
         muted = muted - inst
         soloed = soloed - inst
+        if (selectedTrackId == inst.id) { selectedTrackId = null; brush = Brush.Cycle }
     }
 
     // ---- Meter (bars / time signature / division) ----

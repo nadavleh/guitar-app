@@ -857,6 +857,23 @@ select.et-select {
 }
 .drum-beat-name { font-size: 16px; font-weight: 700; color: var(--text-primary); }
 .drum-beat-bpm { font-size: 12px; font-weight: 600; color: var(--primary); font-variant-numeric: tabular-nums; }
+
+/* Voice palette (selected track): pinned above the transport dock. */
+.drum-palette {
+  display: flex; align-items: center; gap: 8px;
+  margin: 6px 0 8px; padding: 6px 8px;
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 12px;
+}
+.pal-name { font-size: 12px; font-weight: 700; color: var(--primary); flex: 0 0 auto; }
+.pal-chips { display: flex; gap: 6px; overflow-x: auto; flex: 1 1 auto; padding: 2px 0; }
+.pal-chip {
+  flex: 0 0 auto; padding: 6px 10px; border-radius: 999px;
+  background: transparent; border: 1px solid var(--line);
+  color: var(--text-primary); font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.pal-chip.on { background: var(--primary); border-color: var(--primary); color: var(--on-act); font-weight: 700; }
+.pal-chip.pal-tool { border-color: var(--feedback); color: var(--feedback); }
+.name.track-sel { color: var(--primary); font-weight: 700; }
 .drum-setup-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 8px 0; }
 .drum-setup-item { display: flex; align-items: center; gap: 6px; }
 .drum-setup-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
