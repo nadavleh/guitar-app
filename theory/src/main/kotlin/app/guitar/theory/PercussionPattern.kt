@@ -155,6 +155,20 @@ data class PercussionPattern(
         return copy(instruments = list)
     }
 
+    /** Add a preset TRACK in one press: [base]'s row filled by tiling [template]
+     *  (defined on the default 16-slot meter) across this pattern's slots. If the
+     *  instrument is already in the kit, the preset lands on a fresh clone track
+     *  ("Surdo 2") so the existing line is untouched. */
+    fun withPresetTrack(base: PercussionInstrument, template: List<Int?>): PercussionPattern {
+        val inst = if (!hasInstrument(base)) base else {
+            var n = 2
+            while (instruments.any { it.id == "${base.id}#$n" }) n++
+            base.copy(id = "${base.id}#$n", displayName = "${base.displayName} $n")
+        }
+        val row = List(meter.totalSlots) { i -> template[i % template.size] }
+        return copy(instruments = instruments + inst, grid = grid + (inst.id to row))
+    }
+
     /** Duplicate [instrument]'s track: a CLONE instrument (same voices and sound,
      *  id "<base>#<n>", display name "Surdo 2") is inserted right below it with a
      *  copy of its row. No-op if [instrument] isn't in the kit. */
@@ -343,10 +357,114 @@ object PercussionBuiltins {
         val opening: PercussionPattern? = null,
     )
 
+    /** A one-press preset TRACK ("+ Add ▾" → presets): a 16-slot row template
+     *  tiled across the current loop on [instrument] (cloned if already present). */
+    data class PresetTrack(val label: String, val instrument: PercussionInstrument, val template: List<Int?>)
+
+    /** A single-line tamborim rhythm from onset slots (voice 0 = open clack;
+     *  [accented] slots get the accent flag). Used by the study patterns, which
+     *  are transcribed from notation sheets as pure rhythms. */
+    private fun tamborimLine(onsets: Set<Int>, accented: Set<Int> = emptySet(), bars: Int = 2): PercussionPattern {
+        val cells = (0 until bars * 8).joinToString(",") { i ->
+            when {
+                i in accented -> "${PERCUSSION_ACCENT}"
+                i in onsets -> "0"
+                else -> "-"
+            }
+        }
+        return builtin("M:$bars,2,4,16;tamborim=$cells")
+    }
+
+    // ---- Study rhythms, transcribed from Adam Osmianski's "Brasilian Comping
+    // Rhythms" + "Telecoteco Entradas" sheets (thatdrumblog). 2 bars of 2/4 on a
+    // 16th grid unless noted; single tamborim line. "Up/down side" are the two
+    // phase-shifted phrasings; an entrada is an OPENING played once before its loop.
+    private val PA_UP = tamborimLine(setOf(1, 4, 6, 8, 10, 13, 15))
+    private val PA_DOWN = tamborimLine(setOf(0, 2, 5, 7, 9, 12, 14))
+    private val TT1_UP = tamborimLine(setOf(1, 3, 5, 6, 8, 10, 12, 13, 15))
+    private val TT1_DOWN = tamborimLine(setOf(0, 2, 4, 5, 7, 9, 11, 13, 14))
+    private val TT2_UP = tamborimLine(setOf(1, 3, 5, 6, 8, 10, 12, 14, 15))
+    private val TT2_DOWN = tamborimLine(setOf(0, 2, 4, 6, 7, 9, 11, 13, 14))
+    private val TT3_UP = tamborimLine(setOf(1, 3, 6, 8, 10, 12, 15))
+    private val TT3_DOWN = tamborimLine(setOf(0, 2, 4, 7, 9, 11, 14))   // (= teleco-teco 4's down side too)
+    private val TT4_UP = tamborimLine(setOf(1, 3, 6, 8, 10, 13, 15))
+    private val BOSSA_UP = tamborimLine(setOf(0, 3, 6, 10, 13))
+    private val BOSSA_DOWN = tamborimLine(setOf(2, 5, 8, 11, 14))
+    private val SAMBA_CLAP = tamborimLine(setOf(0, 3, 6), bars = 1)
+
+    /** Study grooves (Load… menu, "Study" section): the comping rhythms plus the
+     *  eight entradas — each entrada is the beat's opening, played once into its
+     *  telecoteco (or partido-alto) loop. */
+    val STUDY: List<BuiltinPattern> = listOf(
+        BuiltinPattern("Partido alto — up side", PA_UP, bpm = 70),
+        BuiltinPattern("Partido alto — down side", PA_DOWN, bpm = 70),
+        BuiltinPattern("Teleco-teco 1 — up", TT1_UP, bpm = 70),
+        BuiltinPattern("Teleco-teco 1 — down", TT1_DOWN, bpm = 70),
+        BuiltinPattern("Teleco-teco 2 — up", TT2_UP, bpm = 70),
+        BuiltinPattern("Teleco-teco 2 — down", TT2_DOWN, bpm = 70),
+        BuiltinPattern("Teleco-teco 3 — up", TT3_UP, bpm = 70),
+        BuiltinPattern("Teleco-teco 3 — down", TT3_DOWN, bpm = 70),
+        BuiltinPattern("Teleco-teco 4 — up", TT4_UP, bpm = 70),
+        BuiltinPattern("Bossa nova — up", BOSSA_UP, bpm = 70),
+        BuiltinPattern("Bossa nova — down", BOSSA_DOWN, bpm = 70),
+        BuiltinPattern("Samba clap (palma)", SAMBA_CLAP, bpm = 70),
+        BuiltinPattern("Entrada 1 → teleco-teco", TT1_UP, bpm = 70,
+            opening = tamborimLine(setOf(0, 1, 3, 5, 6, 8, 10, 12, 13, 15))),
+        BuiltinPattern("Entrada 2 → teleco-teco", TT1_UP, bpm = 70,
+            opening = tamborimLine(setOf(0, 2, 4, 6, 8, 10, 12, 13, 14))),
+        BuiltinPattern("Entrada 3 → teleco-teco", TT1_UP, bpm = 70,
+            opening = tamborimLine(setOf(0, 2, 4, 6, 8, 10, 12, 14, 15))),
+        BuiltinPattern("Entrada 4 → teleco-teco", TT1_UP, bpm = 70,
+            opening = tamborimLine(setOf(0, 2, 4, 6, 8, 10, 12, 15))),
+        BuiltinPattern("Entrada 5 → teleco-teco", TT1_UP, bpm = 70,
+            opening = tamborimLine(setOf(0, 3, 6, 8, 10, 13, 15))),
+        BuiltinPattern("Entrada 6 → teleco-teco", TT1_UP, bpm = 70,
+            opening = tamborimLine(setOf(0, 3, 6, 8, 10, 12, 15))),
+        BuiltinPattern("Entrada 7 → teleco-teco", TT1_UP, bpm = 70,
+            opening = tamborimLine(setOf(4, 6, 8, 10, 12, 13, 15), accented = setOf(1))),
+        BuiltinPattern("Entrada 8 → partido alto", PA_UP, bpm = 70,
+            opening = tamborimLine(setOf(4, 6, 8, 10, 13, 15), accented = setOf(1))),
+    )
+
+    /** Track presets: the marcação surdo (◐··●, the classic samba marking) and the
+     *  teleco-teco tamborim (muted/open clack weave) — added to the CURRENT beat
+     *  in one press, matching the rows used across the teleco-teco built-ins. */
+    val PRESET_TRACKS: List<PresetTrack> = listOf(
+        PresetTrack(
+            "Surdo — marcação", PercussionCatalog.Surdo,
+            listOf(1, null, null, 2, 0, null, null, 2, 1, null, null, 2, 0, null, null, 2),
+        ),
+        PresetTrack(
+            "Tamborim — teleco-teco", PercussionCatalog.Tamborim,
+            listOf(1, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 0, 1, 2, 0),
+        ),
+    )
+
+    // Partido-alto grooves (from Nadav's exported beats): the teleco-teco
+    // surdo/tamborim under three bongo comps.
+    val PARTIDO_ALTO_OFFICIAL: PercussionPattern = builtin(
+        "M:2,2,4,16;" + SURDO_TELECO + "|" +
+            "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
+            "bongo=-,0,-,-,1,-,1,-,1,-,0,-,-,1,-,1",
+    )
+    val PARTIDO_ALTO_DEC: PercussionPattern = builtin(
+        "M:2,2,4,16;" + SURDO_TELECO + "|" +
+            "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
+            "bongo=-,0,-,0,1,-,1,-,1,-,0,-,3,1,-,1",
+    )
+    val PARTIDO_ALTO_PLATINELAS: PercussionPattern = builtin(
+        "M:2,2,4,16;" + SURDO_TELECO + "|" +
+            "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
+            "bongo=0,0,-,0,1,-,0,-,1,-,0,-,3,1,2,0",
+    )
+
     /** Grooves offered in the Load… menu (before the user's saved beats). */
     val ALL: List<BuiltinPattern> = listOf(
         BuiltinPattern("teleco-teco 1", TELECOTECO_1),
         BuiltinPattern("teleco-teco 2", TELECOTECO_2),
+        BuiltinPattern("Partido alto (official)", PARTIDO_ALTO_OFFICIAL, bpm = 70),
+        BuiltinPattern("Partido alto (dec)", PARTIDO_ALTO_DEC, bpm = 70),
+        BuiltinPattern("Platinelas pandeiro — partido alto", PARTIDO_ALTO_PLATINELAS, bpm = 70),
         BuiltinPattern("Xote", XOTE, bpm = 90),
         BuiltinPattern("Baião", BAIAO, bpm = 90),
         BuiltinPattern("Forró", FORRO, bpm = 95),

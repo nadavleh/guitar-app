@@ -237,6 +237,23 @@ export class PercussionPattern {
     return new PercussionPattern(list, this.grid, this.meter);
   }
 
+  /** Add a preset TRACK in one press: `base`'s row filled by tiling `template`
+   *  (defined on the default 16-slot meter) across this pattern's slots. If the
+   *  instrument is already in the kit, the preset lands on a fresh clone track
+   *  ("Surdo 2") so the existing line is untouched. */
+  withPresetTrack(base: PercussionInstrument, template: (number | null)[]): PercussionPattern {
+    let inst = base;
+    if (this.hasInstrument(base)) {
+      let n = 2;
+      while (this.instruments.some((i) => i.id === `${base.id}#${n}`)) n++;
+      inst = { id: `${base.id}#${n}`, displayName: `${base.displayName} ${n}`, voices: base.voices };
+    }
+    const row: (number | null)[] = Array.from({ length: this.meter.totalSlots }, (_, i) => template[i % template.length]);
+    const g = new Map(this.grid);
+    g.set(inst.id, row);
+    return new PercussionPattern([...this.instruments, inst], g, this.meter);
+  }
+
   /** Duplicate `instrument`'s track: a CLONE instrument (same voices and sound,
    *  id "<base>#<n>", display name "Surdo 2") is inserted right below it with a
    *  copy of its row. No-op if `instrument` isn't in the kit. */
@@ -428,15 +445,103 @@ export const ARRASTA_PE = builtin(
  *  `opening` (when set) is a one-shot entrada played once before the loop. */
 export interface BuiltinPattern { name: string; pattern: PercussionPattern; bpm?: number; opening?: PercussionPattern; }
 
+// Partido-alto grooves (from Nadav's exported beats): the teleco-teco
+// surdo/tamborim under three bongo comps.
+export const PARTIDO_ALTO_OFFICIAL = builtin(
+  "M:2,2,4,16;" + SURDO_TELECO + "|" +
+  "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
+  "bongo=-,0,-,-,1,-,1,-,1,-,0,-,-,1,-,1",
+);
+export const PARTIDO_ALTO_DEC = builtin(
+  "M:2,2,4,16;" + SURDO_TELECO + "|" +
+  "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
+  "bongo=-,0,-,0,1,-,1,-,1,-,0,-,3,1,-,1",
+);
+export const PARTIDO_ALTO_PLATINELAS = builtin(
+  "M:2,2,4,16;" + SURDO_TELECO + "|" +
+  "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
+  "bongo=0,0,-,0,1,-,0,-,1,-,0,-,3,1,2,0",
+);
+
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */
 export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "teleco-teco 1", pattern: TELECOTECO_1 },
   { name: "teleco-teco 2", pattern: TELECOTECO_2 },
+  { name: "Partido alto (official)", pattern: PARTIDO_ALTO_OFFICIAL, bpm: 70 },
+  { name: "Partido alto (dec)", pattern: PARTIDO_ALTO_DEC, bpm: 70 },
+  { name: "Platinelas pandeiro — partido alto", pattern: PARTIDO_ALTO_PLATINELAS, bpm: 70 },
   { name: "Xote", pattern: XOTE, bpm: 90 },
   { name: "Baião", pattern: BAIAO, bpm: 90 },
   { name: "Forró", pattern: FORRO, bpm: 95 },
   { name: "Xaxado", pattern: XAXADO, bpm: 100 },
   { name: "Arrasta-pé", pattern: ARRASTA_PE, bpm: 100 },
+];
+
+/** A one-press preset TRACK ("+ Add ▾" → presets): a 16-slot row template tiled
+ *  across the current loop on `instrument` (cloned if already present). */
+export interface PresetTrack { label: string; instrument: PercussionInstrument; template: (number | null)[]; }
+
+/** Track presets: the marcação surdo (◐··●, the classic samba marking) and the
+ *  teleco-teco tamborim (muted/open clack weave) — added to the CURRENT beat in
+ *  one press, matching the rows used across the teleco-teco built-ins. */
+export const PRESET_TRACKS: PresetTrack[] = [
+  { label: "Surdo — marcação", instrument: Surdo,
+    template: [1, null, null, 2, 0, null, null, 2, 1, null, null, 2, 0, null, null, 2] },
+  { label: "Tamborim — teleco-teco", instrument: Tamborim,
+    template: [1, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 0, 1, 2, 0] },
+];
+
+/** A single-line tamborim rhythm from onset slots (voice 0 = open clack;
+ *  `accented` slots get the accent flag). Used by the study patterns, which are
+ *  transcribed from notation sheets as pure rhythms. */
+function tamborimLine(onsets: number[], accented: number[] = [], bars = 2): PercussionPattern {
+  const on = new Set(onsets), acc = new Set(accented);
+  const cells = Array.from({ length: bars * 8 }, (_, i) =>
+    acc.has(i) ? String(PERCUSSION_ACCENT) : on.has(i) ? "0" : "-").join(",");
+  return builtin(`M:${bars},2,4,16;tamborim=${cells}`);
+}
+
+// ---- Study rhythms, transcribed from Adam Osmianski's "Brasilian Comping
+// Rhythms" + "Telecoteco Entradas" sheets (thatdrumblog). 2 bars of 2/4 on a
+// 16th grid unless noted; single tamborim line. "Up/down side" are the two
+// phase-shifted phrasings; an entrada is an OPENING played once before its loop.
+const PA_UP = tamborimLine([1, 4, 6, 8, 10, 13, 15]);
+const PA_DOWN = tamborimLine([0, 2, 5, 7, 9, 12, 14]);
+const TT1_UP = tamborimLine([1, 3, 5, 6, 8, 10, 12, 13, 15]);
+const TT1_DOWN = tamborimLine([0, 2, 4, 5, 7, 9, 11, 13, 14]);
+const TT2_UP = tamborimLine([1, 3, 5, 6, 8, 10, 12, 14, 15]);
+const TT2_DOWN = tamborimLine([0, 2, 4, 6, 7, 9, 11, 13, 14]);
+const TT3_UP = tamborimLine([1, 3, 6, 8, 10, 12, 15]);
+const TT3_DOWN = tamborimLine([0, 2, 4, 7, 9, 11, 14]);   // (= teleco-teco 4's down side too)
+const TT4_UP = tamborimLine([1, 3, 6, 8, 10, 13, 15]);
+const BOSSA_UP = tamborimLine([0, 3, 6, 10, 13]);
+const BOSSA_DOWN = tamborimLine([2, 5, 8, 11, 14]);
+const SAMBA_CLAP = tamborimLine([0, 3, 6], [], 1);
+
+/** Study grooves (Load… menu, "Study" section): the comping rhythms plus the
+ *  eight entradas — each entrada is the beat's opening, played once into its
+ *  telecoteco (or partido-alto) loop. */
+export const STUDY_PATTERNS: BuiltinPattern[] = [
+  { name: "Partido alto — up side", pattern: PA_UP, bpm: 70 },
+  { name: "Partido alto — down side", pattern: PA_DOWN, bpm: 70 },
+  { name: "Teleco-teco 1 — up", pattern: TT1_UP, bpm: 70 },
+  { name: "Teleco-teco 1 — down", pattern: TT1_DOWN, bpm: 70 },
+  { name: "Teleco-teco 2 — up", pattern: TT2_UP, bpm: 70 },
+  { name: "Teleco-teco 2 — down", pattern: TT2_DOWN, bpm: 70 },
+  { name: "Teleco-teco 3 — up", pattern: TT3_UP, bpm: 70 },
+  { name: "Teleco-teco 3 — down", pattern: TT3_DOWN, bpm: 70 },
+  { name: "Teleco-teco 4 — up", pattern: TT4_UP, bpm: 70 },
+  { name: "Bossa nova — up", pattern: BOSSA_UP, bpm: 70 },
+  { name: "Bossa nova — down", pattern: BOSSA_DOWN, bpm: 70 },
+  { name: "Samba clap (palma)", pattern: SAMBA_CLAP, bpm: 70 },
+  { name: "Entrada 1 → teleco-teco", pattern: TT1_UP, bpm: 70, opening: tamborimLine([0, 1, 3, 5, 6, 8, 10, 12, 13, 15]) },
+  { name: "Entrada 2 → teleco-teco", pattern: TT1_UP, bpm: 70, opening: tamborimLine([0, 2, 4, 6, 8, 10, 12, 13, 14]) },
+  { name: "Entrada 3 → teleco-teco", pattern: TT1_UP, bpm: 70, opening: tamborimLine([0, 2, 4, 6, 8, 10, 12, 14, 15]) },
+  { name: "Entrada 4 → teleco-teco", pattern: TT1_UP, bpm: 70, opening: tamborimLine([0, 2, 4, 6, 8, 10, 12, 15]) },
+  { name: "Entrada 5 → teleco-teco", pattern: TT1_UP, bpm: 70, opening: tamborimLine([0, 3, 6, 8, 10, 13, 15]) },
+  { name: "Entrada 6 → teleco-teco", pattern: TT1_UP, bpm: 70, opening: tamborimLine([0, 3, 6, 8, 10, 12, 15]) },
+  { name: "Entrada 7 → teleco-teco", pattern: TT1_UP, bpm: 70, opening: tamborimLine([4, 6, 8, 10, 12, 13, 15], [1]) },
+  { name: "Entrada 8 → partido alto", pattern: PA_UP, bpm: 70, opening: tamborimLine([4, 6, 8, 10, 13, 15], [1]) },
 ];
 
 // ---- Beat file (export / import) ----

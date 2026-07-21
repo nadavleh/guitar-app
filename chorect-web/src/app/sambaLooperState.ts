@@ -3,7 +3,7 @@
 // async loop; voices are synthesized once and cached, then replayed each tick.
 
 import {
-  PercussionInstrument, PercussionCatalog, basePercussionId,
+  PercussionInstrument, PercussionCatalog, basePercussionId, PresetTrack,
   PercussionMeter, PercussionPattern, swungSlotMs, voiceCount,
   BEAT_UNITS, DIVISIONS, BATIDA_CAVACO_1,
 } from "../theory";
@@ -329,6 +329,14 @@ export class SambaLooperState {
    *  instrument or re-painting (the new track is a clone, e.g. "Surdo 2"). */
   duplicateTrack(inst: PercussionInstrument) {
     this.commit(this.editPattern.duplicatedTrack(inst));
+  }
+
+  /** One-press preset track (marcação surdo / teleco-teco tamborim): adds the
+   *  instrument (cloned if present) with its row pre-filled, and auditions it. */
+  addPresetTrack(p: PresetTrack) {
+    this.commit(this.editPattern.withPresetTrack(p.instrument, p.template));
+    this.loadSamplesFor(p.instrument);
+    if (!this.isPlaying) this.deps.audio.playSamples(this.buffer(p.instrument, 0), this.effectiveGain(p.instrument, 0));
   }
 
   /** Remove `inst` from the kit, also clearing its mute/solo/selection state. */

@@ -16,8 +16,8 @@ import { icon } from "./icons";
 import { transportDock, toneSheet } from "./transport";
 import { AppState } from "./appState";
 import {
-  PercussionInstrument, voicesFor, voiceOf, BUILTIN_PATTERNS,
-  DIVISIONS, encodeBeatFile, decodeBeatFile,
+  PercussionInstrument, voicesFor, voiceOf, BUILTIN_PATTERNS, STUDY_PATTERNS,
+  PRESET_TRACKS, DIVISIONS, encodeBeatFile, decodeBeatFile, BuiltinPattern,
 } from "../theory";
 
 /** Time signatures offered in the Time dropdown (beatsPerBar / beatUnit). */
@@ -463,6 +463,14 @@ export class SambaLooperUI {
     }, "btn primary"));
     if (this.addMenuOpen) {
       const pop = el("div", { class: "drum-load-pop" });
+      // One-press preset tracks first (instrument + a filled row in one go).
+      pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary);cursor:default;font-size:11px" }, ["Track presets"]));
+      for (const p of PRESET_TRACKS) {
+        const row = el("div", { class: "lrow" }, [`★ ${p.label}`]);
+        row.addEventListener("click", () => { s.addPresetTrack(p); this.addMenuOpen = false; this.rerender(); });
+        pop.appendChild(row);
+      }
+      pop.appendChild(el("div", { class: "divider-line", style: "margin:4px 0" }));
       const toAdd = s.instrumentsToAdd();
       if (toAdd.length === 0) {
         pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary)" }, ["(all instruments added)"]));
@@ -500,11 +508,16 @@ export class SambaLooperUI {
     wrap.appendChild(btn(this.loadMenuOpen ? "Load ✕" : "Load…", () => { this.loadMenuOpen = !this.loadMenuOpen; this.saveOpen = false; this.addMenuOpen = false; this.rerender(); }));
     if (this.loadMenuOpen) {
       const pop = el("div", { class: "drum-load-pop" });
-      for (const b of BUILTIN_PATTERNS) {
-        const row = el("div", { class: "lrow" }, [b.name]);
+      const builtinRow = (b: BuiltinPattern): HTMLElement => {
+        const row = el("div", { class: "lrow" }, [b.name + (b.opening ? " ▶¹" : "")]);
         row.addEventListener("click", () => { s.loadPattern(b.pattern, b.name, b.bpm ?? null, null, b.opening ?? null); this.loadMenuOpen = false; this.rerender(); });
-        pop.appendChild(row);
-      }
+        return row;
+      };
+      for (const b of BUILTIN_PATTERNS) pop.appendChild(builtinRow(b));
+      // Study section: comping rhythms + entradas (transcribed from the sheets).
+      pop.appendChild(el("div", { class: "divider-line", style: "margin:4px 0" }));
+      pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary);cursor:default;font-size:11px" }, ["Study — entradas & comping"]));
+      for (const b of STUDY_PATTERNS) pop.appendChild(builtinRow(b));
       const saved = s.savedPatterns();
       if (saved.size) pop.appendChild(el("div", { class: "divider-line", style: "margin:4px 0" }));
       for (const [name, beat] of saved) {

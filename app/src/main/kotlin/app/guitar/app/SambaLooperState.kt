@@ -326,6 +326,13 @@ class SambaLooperState(
         commit(editPattern.duplicatedTrack(inst))
     }
 
+    /** One-press preset track (marcação surdo / teleco-teco tamborim): adds the
+     *  instrument (cloned if present) with its row pre-filled, and auditions it. */
+    fun addPresetTrack(p: PercussionBuiltins.PresetTrack) {
+        commit(editPattern.withPresetTrack(p.instrument, p.template))
+        if (!isPlaying) audio.playSamples(buffer(p.instrument, 0), effectiveGain(p.instrument, 0))
+    }
+
     /** Remove [inst] from the kit, also clearing its mute/solo/selection state. */
     fun removeInstrument(inst: PercussionInstrument) {
         commit(editPattern.removeInstrument(inst))

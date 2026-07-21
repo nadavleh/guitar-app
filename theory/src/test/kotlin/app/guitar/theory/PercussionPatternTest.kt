@@ -123,7 +123,7 @@ class PercussionPatternTest {
     }
 
     @Test fun `built-in grooves decode, are non-empty, and round-trip`() {
-        assertEquals(7, PercussionBuiltins.ALL.size)
+        assertEquals(10, PercussionBuiltins.ALL.size)
         for ((name, pat) in PercussionBuiltins.ALL) {
             assertTrue(!pat.isEmpty(), "$name is empty")
             assertEquals(16, pat.slots, "$name should be the default 16-slot meter")
@@ -141,6 +141,29 @@ class PercussionPatternTest {
         assertEquals(100, parsed?.bpm)
         assertEquals(25, parsed?.swing)
         assertEquals(PercussionBuiltins.ARRASTA_PE, parsed?.pattern)
+    }
+
+    @Test fun `preset track fills a new or cloned row and study patterns are valid`() {
+        // Preset onto a kit that lacks the instrument: lands on the base id.
+        val marcacao = PercussionBuiltins.PRESET_TRACKS.first { it.instrument.id == "surdo" }
+        val empty = PercussionPattern.empty(listOf(PercussionCatalog.Tamborim))
+        val p1 = empty.withPresetTrack(marcacao.instrument, marcacao.template)
+        assertEquals(listOf("tamborim", "surdo"), p1.instruments.map { it.id })
+        assertEquals(marcacao.template, p1.grid.getValue("surdo"))
+        // Preset onto a kit that has it: lands on a clone with the same row.
+        val p2 = p1.withPresetTrack(marcacao.instrument, marcacao.template)
+        assertEquals(listOf("tamborim", "surdo", "surdo#2"), p2.instruments.map { it.id })
+        assertEquals(marcacao.template, p2.grid.getValue("surdo#2"))
+        assertEquals(p2, PercussionPattern.decode(p2.encode()))
+
+        // Every study groove decodes, is non-empty, and round-trips (incl. openings).
+        for (b in PercussionBuiltins.STUDY) {
+            assertTrue(!b.pattern.isEmpty(), "${b.name} is empty")
+            assertEquals(b.pattern, PercussionPattern.decode(b.pattern.encode()), "${b.name} doesn't round-trip")
+            b.opening?.let { assertEquals(it, PercussionPattern.decode(it.encode()), "${b.name} opening doesn't round-trip") }
+        }
+        // The entradas carry openings.
+        assertEquals(8, PercussionBuiltins.STUDY.count { it.opening != null })
     }
 
     @Test fun `duplicated track clones the instrument and round-trips`() {

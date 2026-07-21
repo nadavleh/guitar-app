@@ -292,7 +292,18 @@ private fun PatternSection(
                 // Built-in grooves first (same set as the web), then saved beats.
                 for (b in app.guitar.theory.PercussionBuiltins.ALL) {
                     DropdownMenuItem(
-                        text = { Text(b.name) },
+                        text = { Text(b.name + if (b.opening != null) " ▶¹" else "") },
+                        onClick = { samba.loadPattern(b.pattern, b.name, b.bpm, opening = b.opening); loadMenu = false },
+                    )
+                }
+                // Study section: comping rhythms + entradas (transcribed from the sheets).
+                HorizontalDivider()
+                DropdownMenuItem(text = { Text("Study — entradas & comping",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant) }, enabled = false, onClick = {})
+                for (b in app.guitar.theory.PercussionBuiltins.STUDY) {
+                    DropdownMenuItem(
+                        text = { Text(b.name + if (b.opening != null) " ▶¹" else "") },
                         onClick = { samba.loadPattern(b.pattern, b.name, b.bpm, opening = b.opening); loadMenu = false },
                     )
                 }
@@ -325,6 +336,17 @@ private fun PatternSection(
         Box {
             Button(onClick = { addMenu = true }) { Text("+ Add ▾") }
             DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
+                // One-press preset tracks first (instrument + a filled row in one go).
+                DropdownMenuItem(text = { Text("Track presets",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant) }, enabled = false, onClick = {})
+                for (p in app.guitar.theory.PercussionBuiltins.PRESET_TRACKS) {
+                    DropdownMenuItem(
+                        text = { Text("★ ${p.label}") },
+                        onClick = { samba.addPresetTrack(p); addMenu = false },
+                    )
+                }
+                HorizontalDivider()
                 val toAdd = samba.instrumentsToAdd()
                 if (toAdd.isEmpty()) {
                     DropdownMenuItem(
