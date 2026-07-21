@@ -838,16 +838,17 @@ select.et-select {
 .drum-cell.playhead { border-color: var(--text-primary); }
 .drum-cell.accent { border-color: var(--feedback); font-weight: 700; font-size: 18px; }
 .drum-cells.dim { opacity: 0.4; }
-/* Quarter-note division rule between each group of four 16th cells; heavier at bar lines. */
+/* Quarter-note division rule between each group of four 16th cells; heavier at
+   bar lines. Strengthened so the 1-2-3-4 quarter grouping reads at a glance. */
 .drum-div {
-  flex: 0 0 5px; align-self: stretch;
-  background: linear-gradient(to right, transparent calc(50% - 0.75px), var(--text-secondary) calc(50% - 0.75px), var(--text-secondary) calc(50% + 0.75px), transparent calc(50% + 0.75px));
-  opacity: 0.55;
+  flex: 0 0 6px; align-self: stretch;
+  background: linear-gradient(to right, transparent calc(50% - 1px), var(--text-primary) calc(50% - 1px), var(--text-primary) calc(50% + 1px), transparent calc(50% + 1px));
+  opacity: 0.65;
 }
 .drum-div.bar {
-  flex: 0 0 8px;
-  background: linear-gradient(to right, transparent calc(50% - 1.25px), var(--text-secondary) calc(50% - 1.25px), var(--text-secondary) calc(50% + 1.25px), transparent calc(50% + 1.25px));
-  opacity: 0.85;
+  flex: 0 0 9px;
+  background: linear-gradient(to right, transparent calc(50% - 1.75px), var(--text-primary) calc(50% - 1.75px), var(--text-primary) calc(50% + 1.75px), transparent calc(50% + 1.75px));
+  opacity: 0.95;
 }
 .drum-caption { font-size: 11px; color: var(--text-secondary); margin: 4px 0 0 138px; }
 .drum-beat-header {
@@ -859,6 +860,44 @@ select.et-select {
 .drum-beat-bpm { font-size: 12px; font-weight: 600; color: var(--primary); font-variant-numeric: tabular-nums; }
 .drum-edit-toggle { display: flex; gap: 4px; align-items: center; }
 .drum-edit-toggle .btn { padding: 4px 10px; font-size: 12px; }
+
+/* Main row: pattern editor + the constantly-open beats side panel. */
+.drum-main { display: flex; gap: 10px; flex: 1 1 auto; min-height: 0; }
+.drum-main > .et-scroll { flex: 1 1 auto; min-width: 0; }
+.drum-side {
+  flex: 0 0 200px; overflow-y: auto; scrollbar-width: thin;
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 6px;
+}
+.drum-side-head {
+  font-size: 11px; font-weight: 700; color: var(--primary);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 8px 8px 4px; border-bottom: 1px solid var(--line); margin-bottom: 4px;
+}
+.drum-side .lrow { display: flex; align-items: center; gap: 6px; padding: 6px 8px; cursor: pointer; border-radius: 6px; font-size: 13px; }
+.drum-side .lrow:hover { background: rgba(128,128,128,0.12); }
+.drum-side .lrow.sel { background: var(--primary-container); color: var(--primary); font-weight: 700; }
+
+/* Opening/Loop section headers + the bold divider between them. */
+.drum-section-head { display: flex; align-items: center; gap: 6px; margin: 8px 0 2px; }
+.drum-section-title { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; color: var(--primary); }
+.drum-section-head.opening .drum-section-title { color: var(--feedback); }
+.drum-opening-divider { height: 4px; border-radius: 2px; background: var(--text-primary); opacity: 0.8; margin: 10px 0 4px; }
+
+/* Count row ("1 e & a 2 e & a…") above each grid. */
+.count-row { margin-bottom: -2px; }
+.drum-cell.count {
+  height: 15px; font-size: 10px; color: var(--text-secondary);
+  background: transparent; border: none; cursor: default; user-select: none;
+}
+.drum-cell.count.beat { color: var(--text-primary); font-weight: 800; font-size: 11px; }
+
+/* Per-beat notes editor. */
+.drum-notes {
+  width: 100%; box-sizing: border-box; margin: 6px 0; padding: 8px 10px;
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 10px;
+  color: var(--text-primary); font-size: 13px; font-family: inherit; resize: vertical;
+}
 
 /* Voice palette (selected track): pinned above the transport dock. */
 .drum-palette {

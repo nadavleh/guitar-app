@@ -78,15 +78,25 @@ class SambaLooperState(
         editingOpening = false
     }
 
-    /** Switch the grid between editing the loop and the opening. */
+    /** Switch which section (loop or opening) edits target. Both grids are always
+     *  visible; interacting with a section's rows calls this first, so header
+     *  tools (meter, palette, add) follow the section you touched last. Clears
+     *  the track selection on a switch so the brush can't leak across sections. */
     fun editOpening(on: Boolean) {
         if (on && opening == null) { addOpening(); return }
-        editingOpening = on && opening != null
+        val target = on && opening != null
+        if (editingOpening == target) return
+        editingOpening = target
+        selectedTrackId = null
+        brush = Brush.Cycle
     }
 
     /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
     var loadedName by mutableStateOf<String?>("batida do cavaco 1")
         private set
+
+    /** Free-text notes attached to the current beat (saved + exported with it). */
+    var beatNotes by mutableStateOf("")
 
     /** Overlay a wood-click metronome on the loop (higher click on each bar's "1"). */
     var metronomeOn by mutableStateOf(false)
@@ -176,7 +186,7 @@ class SambaLooperState(
 
     /** Reorder the kit: move the track at [from] to index [to]. */
     fun reorderInstrument(from: Int, to: Int) { commit(editPattern.movedInstrument(from, to)) }
-    var bpm by mutableStateOf(70)
+    var bpm by mutableStateOf(80)
     /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
     var swing by mutableStateOf(0)
     var isPlaying by mutableStateOf(false)
@@ -381,26 +391,28 @@ class SambaLooperState(
     /** User-saved beats (loop + optional opening), by name (observe in the UI). */
     val savedPatterns get() = repo.drumPatterns
 
-    /** Save the current beat (loop + opening) under [name]. */
+    /** Save the current beat (loop + opening + notes) under [name]. */
     fun saveCurrent(name: String) {
-        val snapshot = SavedBeat(pattern, opening)
+        val snapshot = SavedBeat(pattern, opening, beatNotes)
         scope.launch { repo.saveDrumPattern(name, snapshot) }
         loadedName = name
     }
 
-    /** Replace the editable beat with a saved/loaded one (loop + optional opening),
-     *  optionally naming it (caption) and setting its tempo / swing. Editing
-     *  returns to the loop grid. */
+    /** Replace the editable beat with a saved/loaded one (loop + optional opening
+     *  + notes), optionally naming it (caption) and setting its tempo / swing.
+     *  Editing returns to the loop grid. */
     fun loadPattern(
         p: PercussionPattern, name: String? = null,
         bpm: Int? = null, swing: Int? = null,
         opening: PercussionPattern? = null,
+        notes: String = "",
     ) {
         pushUndo()
         pattern = p
         this.opening = opening
         editingOpening = false
         loadedName = name
+        beatNotes = notes
         if (bpm != null) this.bpm = bpm.coerceIn(10, 300)
         if (swing != null) this.swing = swing.coerceIn(0, 100)
     }

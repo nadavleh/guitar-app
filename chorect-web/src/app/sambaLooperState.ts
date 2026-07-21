@@ -25,26 +25,42 @@ export interface SambaDeps {
   saveVolume: (key: string, value: number) => void;
 }
 
-/** Separator between the main and opening patterns in a saved beat's encoded
- *  value ("main~opening"). '~' never appears in PercussionPattern.encode(), and
- *  older app versions fail to decode the combined string and simply skip the
- *  beat rather than mis-reading it. */
+/** Separator between the main pattern, opening pattern, and notes in a saved
+ *  beat's encoded value ("main~opening~notes"; empty middle part when the beat
+ *  has notes but no opening). '~' never appears in PercussionPattern.encode()
+ *  and is escaped out of the notes; older app versions fail to decode the
+ *  combined string and simply skip the beat rather than mis-reading it. */
 export const OPENING_SEP = "~";
 
-/** Encode a beat's pattern(s) for persistence: main, or "main~opening". */
-export function encodeBeatPatterns(main: PercussionPattern, opening: PercussionPattern | null): string {
-  return opening ? main.encode() + OPENING_SEP + opening.encode() : main.encode();
+/** Escape free-text notes for the '~'-separated beat value (newline-safe too,
+ *  since Android's saved-beats store is newline-delimited). */
+function escapeNotes(s: string): string {
+  return s.replace(/%/g, "%25").replace(/~/g, "%7E").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+}
+function unescapeNotes(s: string): string {
+  return s.replace(/%0A/g, "\n").replace(/%0D/g, "\r").replace(/%7E/g, "~").replace(/%25/g, "%");
 }
 
-/** Decode a persisted beat value (either plain or "main~opening"); null if the
- *  main pattern is unreadable. A bad opening part is dropped, not fatal. */
-export function decodeBeatPatterns(s: string): { main: PercussionPattern; opening: PercussionPattern | null } | null {
-  const sep = s.indexOf(OPENING_SEP);
-  const mainStr = sep < 0 ? s : s.substring(0, sep);
-  const main = PercussionPattern.decode(mainStr);
+/** A saved beat: the loop, an optional one-shot opening, and free-text notes. */
+export interface SavedBeatValue { main: PercussionPattern; opening: PercussionPattern | null; notes: string; }
+
+/** Encode a beat for persistence: "main", "main~opening", or "main~opening~notes". */
+export function encodeBeatPatterns(main: PercussionPattern, opening: PercussionPattern | null, notes = ""): string {
+  let out = main.encode();
+  if (opening || notes) out += OPENING_SEP + (opening ? opening.encode() : "");
+  if (notes) out += OPENING_SEP + escapeNotes(notes);
+  return out;
+}
+
+/** Decode a persisted beat value; null if the main pattern is unreadable. A bad
+ *  opening part is dropped, not fatal. */
+export function decodeBeatPatterns(s: string): SavedBeatValue | null {
+  const parts = s.split(OPENING_SEP);
+  const main = PercussionPattern.decode(parts[0]);
   if (!main) return null;
-  const opening = sep < 0 ? null : PercussionPattern.decode(s.substring(sep + 1));
-  return { main, opening };
+  const opening = parts.length > 1 && parts[1] ? PercussionPattern.decode(parts[1]) : null;
+  const notes = parts.length > 2 ? unescapeNotes(parts.slice(2).join(OPENING_SEP)) : "";
+  return { main, opening, notes };
 }
 
 export class SambaLooperState {
@@ -57,12 +73,14 @@ export class SambaLooperState {
   editingOpening = false;
   /** True while the scheduler is sounding the opening pass (drives the playhead). */
   playingOpening = false;
-  bpm = 70;
+  bpm = 80;
   swing = 0;
   isPlaying = false;
   currentSlot = -1;
   /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
   loadedName: string | null = "batida do cavaco 1";
+  /** Free-text notes attached to the current beat (saved + exported with it). */
+  beatNotes = "";
 
   /** The pattern the grid is currently editing (loop or opening). */
   get editPattern(): PercussionPattern {
@@ -87,10 +105,17 @@ export class SambaLooperState {
     this.notify();
   }
 
-  /** Switch the grid between editing the loop and the opening. */
+  /** Switch which section (loop or opening) edits target. Both grids are always
+   *  visible; interacting with a section's rows calls this first, so header
+   *  tools (meter, palette, add) follow the section you touched last. Clears the
+   *  track selection on a switch so the brush can't leak across sections. */
   editOpening(on: boolean) {
     if (on && !this.opening) { this.addOpening(); return; }
-    this.editingOpening = on && this.opening !== null;
+    const target = on && this.opening !== null;
+    if (this.editingOpening === target) return;
+    this.editingOpening = target;
+    this.selectedTrackId = null;
+    this.brush = "cycle";
     this.notify();
   }
   /** Overlay a wood-click metronome on the loop (higher click on each bar's "1"). */
@@ -382,9 +407,9 @@ export class SambaLooperState {
 
   // ---- save / load ----
 
-  /** Decoded saved beats, name → { main, opening } (opening null when absent). */
-  savedPatterns(): Map<string, { main: PercussionPattern; opening: PercussionPattern | null }> {
-    const out = new Map<string, { main: PercussionPattern; opening: PercussionPattern | null }>();
+  /** Decoded saved beats, name → { main, opening, notes }. */
+  savedPatterns(): Map<string, SavedBeatValue> {
+    const out = new Map<string, SavedBeatValue>();
     for (const [name, enc] of this.deps.getSaved()) {
       const p = decodeBeatPatterns(enc);
       if (p) out.set(name, p);
@@ -392,22 +417,23 @@ export class SambaLooperState {
     return out;
   }
   saveCurrent(name: string) {
-    this.deps.save(name, encodeBeatPatterns(this.pattern, this.opening));
+    this.deps.save(name, encodeBeatPatterns(this.pattern, this.opening, this.beatNotes));
     this.loadedName = name;
     this.notify();
   }
-  /** Load a beat (loop + optional opening), optionally naming it (caption) and
-   *  setting its tempo/swing. Editing returns to the loop grid. */
+  /** Load a beat (loop + optional opening + notes), optionally naming it
+   *  (caption) and setting its tempo/swing. Editing returns to the loop grid. */
   loadPattern(
     p: PercussionPattern, name: string | null = null,
     bpm: number | null = null, swing: number | null = null,
-    opening: PercussionPattern | null = null,
+    opening: PercussionPattern | null = null, notes = "",
   ) {
     this.pushUndo();
     this.pattern = p;
     this.opening = opening;
     this.editingOpening = false;
     this.loadedName = name;
+    this.beatNotes = notes;
     if (bpm !== null) this.bpm = Math.min(Math.max(Math.round(bpm), 10), 300);
     if (swing !== null) this.swing = Math.min(Math.max(Math.round(swing), 0), 100);
     this.notify();

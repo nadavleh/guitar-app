@@ -491,48 +491,44 @@ export const PRESET_TRACKS: PresetTrack[] = [
     template: [1, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 0, 1, 2, 0] },
 ];
 
-/** A single-line tamborim rhythm from onset slots (voice 0 = open clack;
- *  `accented` slots get the accent flag). Used by the study patterns, which are
- *  transcribed from notation sheets as pure rhythms. */
+/** A single-line tamborim rhythm from onset slots (`accented` slots get the
+ *  accent flag). Tamborim articulation: an onset directly followed by another
+ *  onset is played as a MUTED clack (voice 1) leading into the open clack
+ *  (voice 0) — i.e. the first stroke of every consecutive-16ths pair is muted.
+ *  Used by the study patterns, transcribed from notation sheets. */
 function tamborimLine(onsets: number[], accented: number[] = [], bars = 2): PercussionPattern {
   const on = new Set(onsets), acc = new Set(accented);
   const cells = Array.from({ length: bars * 8 }, (_, i) =>
-    acc.has(i) ? String(PERCUSSION_ACCENT) : on.has(i) ? "0" : "-").join(",");
+    !on.has(i) ? "-"
+    : acc.has(i) ? String(PERCUSSION_ACCENT)
+    : on.has(i + 1) ? "1"    // muted pickup into the next stroke
+    : "0").join(",");
   return builtin(`M:${bars},2,4,16;tamborim=${cells}`);
 }
 
 // ---- Study rhythms, transcribed from Adam Osmianski's "Brasilian Comping
 // Rhythms" + "Telecoteco Entradas" sheets (thatdrumblog). 2 bars of 2/4 on a
-// 16th grid unless noted; single tamborim line. "Up/down side" are the two
-// phase-shifted phrasings; an entrada is an OPENING played once before its loop.
+// 16th grid unless noted; single tamborim line ("up side" phrasings only — the
+// down sides are rarely played). An entrada is an OPENING played once before
+// its loop.
 const PA_UP = tamborimLine([1, 4, 6, 8, 10, 13, 15]);
-const PA_DOWN = tamborimLine([0, 2, 5, 7, 9, 12, 14]);
 const TT1_UP = tamborimLine([1, 3, 5, 6, 8, 10, 12, 13, 15]);
-const TT1_DOWN = tamborimLine([0, 2, 4, 5, 7, 9, 11, 13, 14]);
 const TT2_UP = tamborimLine([1, 3, 5, 6, 8, 10, 12, 14, 15]);
-const TT2_DOWN = tamborimLine([0, 2, 4, 6, 7, 9, 11, 13, 14]);
 const TT3_UP = tamborimLine([1, 3, 6, 8, 10, 12, 15]);
-const TT3_DOWN = tamborimLine([0, 2, 4, 7, 9, 11, 14]);   // (= teleco-teco 4's down side too)
 const TT4_UP = tamborimLine([1, 3, 6, 8, 10, 13, 15]);
 const BOSSA_UP = tamborimLine([0, 3, 6, 10, 13]);
-const BOSSA_DOWN = tamborimLine([2, 5, 8, 11, 14]);
 const SAMBA_CLAP = tamborimLine([0, 3, 6], [], 1);
 
-/** Study grooves (Load… menu, "Study" section): the comping rhythms plus the
- *  eight entradas — each entrada is the beat's opening, played once into its
+/** Study grooves (the "Study" section): the comping rhythms plus the eight
+ *  entradas — each entrada is the beat's opening, played once into its
  *  telecoteco (or partido-alto) loop. */
 export const STUDY_PATTERNS: BuiltinPattern[] = [
-  { name: "Partido alto — up side", pattern: PA_UP, bpm: 70 },
-  { name: "Partido alto — down side", pattern: PA_DOWN, bpm: 70 },
-  { name: "Teleco-teco 1 — up", pattern: TT1_UP, bpm: 70 },
-  { name: "Teleco-teco 1 — down", pattern: TT1_DOWN, bpm: 70 },
-  { name: "Teleco-teco 2 — up", pattern: TT2_UP, bpm: 70 },
-  { name: "Teleco-teco 2 — down", pattern: TT2_DOWN, bpm: 70 },
-  { name: "Teleco-teco 3 — up", pattern: TT3_UP, bpm: 70 },
-  { name: "Teleco-teco 3 — down", pattern: TT3_DOWN, bpm: 70 },
-  { name: "Teleco-teco 4 — up", pattern: TT4_UP, bpm: 70 },
-  { name: "Bossa nova — up", pattern: BOSSA_UP, bpm: 70 },
-  { name: "Bossa nova — down", pattern: BOSSA_DOWN, bpm: 70 },
+  { name: "Partido alto", pattern: PA_UP, bpm: 70 },
+  { name: "Teleco-teco 1", pattern: TT1_UP, bpm: 70 },
+  { name: "Teleco-teco 2", pattern: TT2_UP, bpm: 70 },
+  { name: "Teleco-teco 3", pattern: TT3_UP, bpm: 70 },
+  { name: "Teleco-teco 4", pattern: TT4_UP, bpm: 70 },
+  { name: "Bossa nova", pattern: BOSSA_UP, bpm: 70 },
   { name: "Samba clap (palma)", pattern: SAMBA_CLAP, bpm: 70 },
   { name: "Entrada 1 → teleco-teco", pattern: TT1_UP, bpm: 70, opening: tamborimLine([0, 1, 3, 5, 6, 8, 10, 12, 13, 15]) },
   { name: "Entrada 2 → teleco-teco", pattern: TT1_UP, bpm: 70, opening: tamborimLine([0, 2, 4, 6, 8, 10, 12, 13, 14]) },
@@ -556,17 +552,19 @@ export interface BeatFile {
   swing: number;
   pattern: string;    // PercussionPattern.encode()
   opening?: string;   // optional one-shot entrada, PercussionPattern.encode()
+  notes?: string;     // optional free-text notes attached to the beat
 }
 
 /** Serialize a beat to the pretty-printed JSON envelope written to disk. */
-export function encodeBeatFile(name: string, bpm: number, swing: number, pattern: PercussionPattern, opening: PercussionPattern | null = null): string {
+export function encodeBeatFile(name: string, bpm: number, swing: number, pattern: PercussionPattern, opening: PercussionPattern | null = null, notes = ""): string {
   const obj: BeatFile = { format: "chorect-beat", version: 1, name, bpm: Math.round(bpm), swing: Math.round(swing), pattern: pattern.encode() };
   if (opening) obj.opening = opening.encode();
+  if (notes) obj.notes = notes;
   return JSON.stringify(obj, null, 2);
 }
 
 /** Parse a beat file produced by [encodeBeatFile]; null on anything unrecognizable. */
-export function decodeBeatFile(text: string): { name: string; bpm: number; swing: number; pattern: PercussionPattern; opening: PercussionPattern | null } | null {
+export function decodeBeatFile(text: string): { name: string; bpm: number; swing: number; pattern: PercussionPattern; opening: PercussionPattern | null; notes: string } | null {
   let obj: unknown;
   try { obj = JSON.parse(text); } catch { return null; }
   if (!obj || typeof obj !== "object") return null;
@@ -575,10 +573,11 @@ export function decodeBeatFile(text: string): { name: string; bpm: number; swing
   const pattern = PercussionPattern.decode(String(o.pattern ?? ""));
   if (!pattern) return null;
   const opening = typeof o.opening === "string" ? PercussionPattern.decode(o.opening) : null;
+  const notes = typeof o.notes === "string" ? o.notes : "";
   const name = typeof o.name === "string" && o.name.trim() ? o.name : "beat";
   const bpm = typeof o.bpm === "number" && Number.isFinite(o.bpm) ? Math.round(o.bpm) : 90;
   const swing = typeof o.swing === "number" && Number.isFinite(o.swing) ? Math.round(o.swing) : 0;
-  return { name, bpm: Math.min(Math.max(bpm, 10), 300), swing: Math.min(Math.max(swing, 0), 100), pattern, opening };
+  return { name, bpm: Math.min(Math.max(bpm, 10), 300), swing: Math.min(Math.max(swing, 0), 100), pattern, opening, notes };
 }
 
 // ---- Timing ----

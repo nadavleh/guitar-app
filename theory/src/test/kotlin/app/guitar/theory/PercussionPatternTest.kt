@@ -192,6 +192,21 @@ class PercussionPatternTest {
         assertEquals(plain, SavedBeat.decode(PercussionBuiltins.XOTE.encode()))
     }
 
+    @Test fun `saved beat round-trips notes, with escaping, with and without an opening`() {
+        val notes = "Xote feel:\nlean on beat 2 ~ 80 BPM works, 100% swing doesn't"
+        val notesOnly = SavedBeat(PercussionBuiltins.XOTE, notes = notes)
+        assertEquals(notesOnly, SavedBeat.decode(notesOnly.encode()))
+        // Newlines must not survive into the encoded value (the store is newline-delimited).
+        assertTrue(!notesOnly.encode().contains("\n"))
+
+        val full = SavedBeat(PercussionBuiltins.XOTE, PercussionBuiltins.BATIDA_CAVACO_1, notes)
+        assertEquals(full, SavedBeat.decode(full.encode()))
+
+        // BeatFile carries notes through its JSON too.
+        val bf = BeatFile("x", 80, 0, PercussionBuiltins.XOTE, notes = notes)
+        assertEquals(notes, BeatFile.decode(bf.encode())?.notes)
+    }
+
     @Test fun `beat file round-trips an opening`() {
         val original = BeatFile("Entrada study", 80, 0, PercussionBuiltins.XOTE, PercussionBuiltins.BATIDA_CAVACO_1)
         val parsed = BeatFile.decode(original.encode())

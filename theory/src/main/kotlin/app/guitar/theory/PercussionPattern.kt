@@ -361,15 +361,18 @@ object PercussionBuiltins {
      *  tiled across the current loop on [instrument] (cloned if already present). */
     data class PresetTrack(val label: String, val instrument: PercussionInstrument, val template: List<Int?>)
 
-    /** A single-line tamborim rhythm from onset slots (voice 0 = open clack;
-     *  [accented] slots get the accent flag). Used by the study patterns, which
-     *  are transcribed from notation sheets as pure rhythms. */
+    /** A single-line tamborim rhythm from onset slots ([accented] slots get the
+     *  accent flag). Tamborim articulation: an onset directly followed by another
+     *  onset is played as a MUTED clack (voice 1) leading into the open clack
+     *  (voice 0) — i.e. the first stroke of every consecutive-16ths pair is muted.
+     *  Used by the study patterns, transcribed from notation sheets. */
     private fun tamborimLine(onsets: Set<Int>, accented: Set<Int> = emptySet(), bars: Int = 2): PercussionPattern {
         val cells = (0 until bars * 8).joinToString(",") { i ->
             when {
+                i !in onsets -> "-"
                 i in accented -> "${PERCUSSION_ACCENT}"
-                i in onsets -> "0"
-                else -> "-"
+                (i + 1) in onsets -> "1"    // muted pickup into the next stroke
+                else -> "0"
             }
         }
         return builtin("M:$bars,2,4,16;tamborim=$cells")
@@ -377,36 +380,27 @@ object PercussionBuiltins {
 
     // ---- Study rhythms, transcribed from Adam Osmianski's "Brasilian Comping
     // Rhythms" + "Telecoteco Entradas" sheets (thatdrumblog). 2 bars of 2/4 on a
-    // 16th grid unless noted; single tamborim line. "Up/down side" are the two
-    // phase-shifted phrasings; an entrada is an OPENING played once before its loop.
+    // 16th grid unless noted; single tamborim line ("up side" phrasings only —
+    // the down sides are rarely played). An entrada is an OPENING played once
+    // before its loop.
     private val PA_UP = tamborimLine(setOf(1, 4, 6, 8, 10, 13, 15))
-    private val PA_DOWN = tamborimLine(setOf(0, 2, 5, 7, 9, 12, 14))
     private val TT1_UP = tamborimLine(setOf(1, 3, 5, 6, 8, 10, 12, 13, 15))
-    private val TT1_DOWN = tamborimLine(setOf(0, 2, 4, 5, 7, 9, 11, 13, 14))
     private val TT2_UP = tamborimLine(setOf(1, 3, 5, 6, 8, 10, 12, 14, 15))
-    private val TT2_DOWN = tamborimLine(setOf(0, 2, 4, 6, 7, 9, 11, 13, 14))
     private val TT3_UP = tamborimLine(setOf(1, 3, 6, 8, 10, 12, 15))
-    private val TT3_DOWN = tamborimLine(setOf(0, 2, 4, 7, 9, 11, 14))   // (= teleco-teco 4's down side too)
     private val TT4_UP = tamborimLine(setOf(1, 3, 6, 8, 10, 13, 15))
     private val BOSSA_UP = tamborimLine(setOf(0, 3, 6, 10, 13))
-    private val BOSSA_DOWN = tamborimLine(setOf(2, 5, 8, 11, 14))
     private val SAMBA_CLAP = tamborimLine(setOf(0, 3, 6), bars = 1)
 
-    /** Study grooves (Load… menu, "Study" section): the comping rhythms plus the
-     *  eight entradas — each entrada is the beat's opening, played once into its
+    /** Study grooves (the "Study" section): the comping rhythms plus the eight
+     *  entradas — each entrada is the beat's opening, played once into its
      *  telecoteco (or partido-alto) loop. */
     val STUDY: List<BuiltinPattern> = listOf(
-        BuiltinPattern("Partido alto — up side", PA_UP, bpm = 70),
-        BuiltinPattern("Partido alto — down side", PA_DOWN, bpm = 70),
-        BuiltinPattern("Teleco-teco 1 — up", TT1_UP, bpm = 70),
-        BuiltinPattern("Teleco-teco 1 — down", TT1_DOWN, bpm = 70),
-        BuiltinPattern("Teleco-teco 2 — up", TT2_UP, bpm = 70),
-        BuiltinPattern("Teleco-teco 2 — down", TT2_DOWN, bpm = 70),
-        BuiltinPattern("Teleco-teco 3 — up", TT3_UP, bpm = 70),
-        BuiltinPattern("Teleco-teco 3 — down", TT3_DOWN, bpm = 70),
-        BuiltinPattern("Teleco-teco 4 — up", TT4_UP, bpm = 70),
-        BuiltinPattern("Bossa nova — up", BOSSA_UP, bpm = 70),
-        BuiltinPattern("Bossa nova — down", BOSSA_DOWN, bpm = 70),
+        BuiltinPattern("Partido alto", PA_UP, bpm = 70),
+        BuiltinPattern("Teleco-teco 1", TT1_UP, bpm = 70),
+        BuiltinPattern("Teleco-teco 2", TT2_UP, bpm = 70),
+        BuiltinPattern("Teleco-teco 3", TT3_UP, bpm = 70),
+        BuiltinPattern("Teleco-teco 4", TT4_UP, bpm = 70),
+        BuiltinPattern("Bossa nova", BOSSA_UP, bpm = 70),
         BuiltinPattern("Samba clap (palma)", SAMBA_CLAP, bpm = 70),
         BuiltinPattern("Entrada 1 → teleco-teco", TT1_UP, bpm = 70,
             opening = tamborimLine(setOf(0, 1, 3, 5, 6, 8, 10, 12, 13, 15))),
@@ -486,6 +480,8 @@ data class BeatFile(
     val pattern: PercussionPattern,
     /** Optional one-shot opening (entrada) played once before the loop. */
     val opening: PercussionPattern? = null,
+    /** Optional free-text notes attached to the beat. */
+    val notes: String = "",
 ) {
     /** Pretty-printed JSON envelope written to disk. */
     fun encode(): String {
@@ -507,6 +503,9 @@ data class BeatFile(
             if (opening != null) {
                 append(",\n  \"opening\": \"").append(esc(opening.encode())).append("\"")
             }
+            if (notes.isNotEmpty()) {
+                append(",\n  \"notes\": \"").append(esc(notes)).append("\"")
+            }
             append("\n}\n")
         }
     }
@@ -522,36 +521,56 @@ data class BeatFile(
             if (fields["format"] != FORMAT) return null
             val pattern = PercussionPattern.decode(fields["pattern"] ?: return null) ?: return null
             val opening = fields["opening"]?.let { PercussionPattern.decode(it) }
+            val notes = fields["notes"] ?: ""
             val name = fields["name"]?.takeIf { it.isNotBlank() } ?: "beat"
             val bpm = fields["bpm"]?.toIntOrNull()?.coerceIn(10, 300) ?: 90
             val swing = fields["swing"]?.toIntOrNull()?.coerceIn(0, 100) ?: 0
-            return BeatFile(name, bpm, swing, pattern, opening)
+            return BeatFile(name, bpm, swing, pattern, opening, notes)
         }
     }
 }
 
 /**
- * A saved beat: the loop plus an optional one-shot opening (entrada) played once
- * before it. Persisted as "main" or "main~opening" — '~' never appears in
- * [PercussionPattern.encode] output, and older app versions fail to decode the
- * combined string and simply skip the beat rather than mis-reading it. Mirrors
- * chorect-web's encodeBeatPatterns/decodeBeatPatterns.
+ * A saved beat: the loop, an optional one-shot opening (entrada) played once
+ * before it, and free-text [notes]. Persisted as "main", "main~opening", or
+ * "main~opening~notes" (empty middle part when there's no opening) — '~' never
+ * appears in [PercussionPattern.encode] output and is escaped out of the notes
+ * (newlines too: the Android store is newline-delimited). Older app versions
+ * fail to decode combined values and simply skip the beat rather than
+ * mis-reading it. Mirrors chorect-web's encodeBeatPatterns/decodeBeatPatterns.
  */
-data class SavedBeat(val main: PercussionPattern, val opening: PercussionPattern? = null) {
-    fun encode(): String =
-        if (opening != null) main.encode() + SEP + opening.encode() else main.encode()
+data class SavedBeat(
+    val main: PercussionPattern,
+    val opening: PercussionPattern? = null,
+    val notes: String = "",
+) {
+    fun encode(): String = buildString {
+        append(main.encode())
+        if (opening != null || notes.isNotEmpty()) {
+            append(SEP).append(opening?.encode() ?: "")
+        }
+        if (notes.isNotEmpty()) append(SEP).append(escapeNotes(notes))
+    }
 
     companion object {
         const val SEP = "~"
 
-        /** Decode a persisted beat value (plain or "main~opening"); null if the
-         *  main pattern is unreadable. A bad opening part is dropped, not fatal. */
+        private fun escapeNotes(s: String): String = s
+            .replace("%", "%25").replace(SEP, "%7E")
+            .replace("\r", "%0D").replace("\n", "%0A")
+
+        private fun unescapeNotes(s: String): String = s
+            .replace("%0A", "\n").replace("%0D", "\r")
+            .replace("%7E", SEP).replace("%25", "%")
+
+        /** Decode a persisted beat value; null if the main pattern is unreadable.
+         *  A bad opening part is dropped, not fatal. */
         fun decode(s: String): SavedBeat? {
-            val sep = s.indexOf(SEP)
-            val mainStr = if (sep < 0) s else s.substring(0, sep)
-            val main = PercussionPattern.decode(mainStr) ?: return null
-            val opening = if (sep < 0) null else PercussionPattern.decode(s.substring(sep + 1))
-            return SavedBeat(main, opening)
+            val parts = s.split(SEP)
+            val main = PercussionPattern.decode(parts[0]) ?: return null
+            val opening = parts.getOrNull(1)?.takeIf { it.isNotEmpty() }?.let { PercussionPattern.decode(it) }
+            val notes = if (parts.size > 2) unescapeNotes(parts.drop(2).joinToString(SEP)) else ""
+            return SavedBeat(main, opening, notes)
         }
     }
 }
