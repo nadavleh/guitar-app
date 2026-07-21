@@ -21,7 +21,8 @@ export class PercussionSynth {
   constructor(public readonly sampleRate = 44100) {}
 
   synthesize(instrument: PercussionInstrument, voiceIndex: number): Float32Array {
-    switch (instrument.id) {
+    // Duplicated tracks ("surdo#2") synthesize like their base instrument.
+    switch (instrument.id.split("#")[0]) {
       case "surdo":
         if (voiceIndex === 0) return this.surdo(true);
         if (voiceIndex === 1) return this.surdo(false);

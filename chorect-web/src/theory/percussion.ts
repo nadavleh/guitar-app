@@ -56,12 +56,32 @@ const ADDITIONS: PercussionInstrument[] = [
 const ALL: PercussionInstrument[] = [...DEFAULT_KIT, ...ADDITIONS];
 const BY_ID = new Map<string, PercussionInstrument>(ALL.map((i) => [i.id, i]));
 
+/** Base catalog id of `id`: duplicated tracks are clones with ids "<base>#<n>"
+ *  (e.g. "surdo#2"); samples/synthesis always key off the base id. */
+export function basePercussionId(id: string): string {
+  const h = id.indexOf("#");
+  return h < 0 ? id : id.substring(0, h);
+}
+
 /** Catalog of every available instrument plus the default kit. */
 export const PercussionCatalog = {
   Surdo, Tamborim, Bongo, Pandeiro, Agogo,
   DEFAULT_KIT,
   ALL,
   byId(id: string): PercussionInstrument | undefined { return BY_ID.get(id); },
+  /** Resolve `id` to an instrument: a catalog instrument, or — for a duplicated
+   *  track's clone id like "surdo#2" — a copy of its base instrument with the
+   *  clone id and a numbered display name ("Surdo 2"). Undefined if unknown. */
+  resolve(id: string): PercussionInstrument | undefined {
+    const direct = BY_ID.get(id);
+    if (direct) return direct;
+    const base = BY_ID.get(basePercussionId(id));
+    if (!base) return undefined;
+    const h = id.indexOf("#");
+    const n = h < 0 ? NaN : parseInt(id.substring(h + 1), 10);
+    if (Number.isNaN(n)) return undefined;
+    return { id, displayName: `${base.displayName} ${n}`, voices: base.voices };
+  },
 };
 
 export function voicesFor(instrument: PercussionInstrument): PercussionVoice[] { return instrument.voices; }
@@ -217,6 +237,24 @@ export class PercussionPattern {
     return new PercussionPattern(list, this.grid, this.meter);
   }
 
+  /** Duplicate `instrument`'s track: a CLONE instrument (same voices and sound,
+   *  id "<base>#<n>", display name "Surdo 2") is inserted right below it with a
+   *  copy of its row. No-op if `instrument` isn't in the kit. */
+  duplicatedTrack(instrument: PercussionInstrument): PercussionPattern {
+    const idx = this.instruments.findIndex((i) => i.id === instrument.id);
+    if (idx < 0) return this;
+    const base = basePercussionId(instrument.id);
+    let n = 2;
+    while (this.instruments.some((i) => i.id === `${base}#${n}`)) n++;
+    const baseInst = PercussionCatalog.byId(base) ?? instrument;
+    const clone: PercussionInstrument = { id: `${base}#${n}`, displayName: `${baseInst.displayName} ${n}`, voices: baseInst.voices };
+    const list = this.instruments.slice();
+    list.splice(idx + 1, 0, clone);
+    const g = new Map(this.grid);
+    g.set(clone.id, this.grid.get(instrument.id)!.slice());
+    return new PercussionPattern(list, g, this.meter);
+  }
+
   isEmpty(): boolean {
     for (const row of this.grid.values()) if (row.some((v) => v !== null)) return false;
     return true;
@@ -299,8 +337,10 @@ export class PercussionPattern {
       const eq = rowStr.indexOf("=");
       if (eq < 0) return null;
       const id = rowStr.substring(0, eq);
-      const instrument = PercussionCatalog.byId(id);
-      if (!instrument) continue;          // skip unknown instruments
+      // resolve() also reconstructs duplicated-track clones ("surdo#2"); truly
+      // unknown instruments are skipped (forward compatibility).
+      const instrument = PercussionCatalog.resolve(id);
+      if (!instrument) continue;
       if (g.has(id)) continue;            // ignore duplicate rows
       const cells = rowStr.substring(eq + 1).split(",");
       if (cells.length !== meter.totalSlots) return null;

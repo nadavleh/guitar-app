@@ -16,7 +16,8 @@ import kotlin.random.Random
  */
 class PercussionSynth(val sampleRate: Int = 44100) {
 
-    fun synthesize(instrument: PercussionInstrument, voiceIndex: Int): FloatArray = when (instrument.id) {
+    // Duplicated tracks ("surdo#2") synthesize like their base instrument.
+    fun synthesize(instrument: PercussionInstrument, voiceIndex: Int): FloatArray = when (instrument.id.substringBefore('#')) {
         // Surdo: 0 ringing bass, 1 muted bass, 2 light muted tap.
         "surdo" -> when (voiceIndex) {
             0 -> surdo(open = true)

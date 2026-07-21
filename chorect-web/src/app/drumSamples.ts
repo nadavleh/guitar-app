@@ -5,11 +5,12 @@
 // Drop your own recorded or properly-licensed royalty-free WAVs into `public/drums/`
 // — e.g. `pandeiro_3.wav` / `pandeiro_4.wav` for the platinela jingles.
 
-import { PercussionInstrument } from "../theory";
+import { PercussionInstrument, basePercussionId } from "../theory";
 import { WebAudioEngine } from "../audio";
 
 export async function loadDrumSample(engine: WebAudioEngine, inst: PercussionInstrument, voice: number): Promise<Float32Array | null> {
-  const name = `${inst.id}_${voice}.wav`;
+  // Duplicated tracks ("surdo#2") share their base instrument's samples.
+  const name = `${basePercussionId(inst.id)}_${voice}.wav`;
   const url = `${import.meta.env.BASE_URL}drums/${name}`;
   try {
     const res = await fetch(url);

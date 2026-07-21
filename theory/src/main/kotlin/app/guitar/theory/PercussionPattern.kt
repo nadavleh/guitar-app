@@ -155,6 +155,21 @@ data class PercussionPattern(
         return copy(instruments = list)
     }
 
+    /** Duplicate [instrument]'s track: a CLONE instrument (same voices and sound,
+     *  id "<base>#<n>", display name "Surdo 2") is inserted right below it with a
+     *  copy of its row. No-op if [instrument] isn't in the kit. */
+    fun duplicatedTrack(instrument: PercussionInstrument): PercussionPattern {
+        val idx = instruments.indexOfFirst { it.id == instrument.id }
+        if (idx < 0) return this
+        val base = PercussionCatalog.baseId(instrument.id)
+        var n = 2
+        while (instruments.any { it.id == "$base#$n" }) n++
+        val baseInst = PercussionCatalog.byId(base) ?: instrument
+        val clone = baseInst.copy(id = "$base#$n", displayName = "${baseInst.displayName} $n")
+        val list = instruments.toMutableList().apply { add(idx + 1, clone) }
+        return PercussionPattern(list, grid + (clone.id to grid.getValue(instrument.id)), meter)
+    }
+
     fun isEmpty(): Boolean = grid.values.all { row -> row.all { it == null } }
 
     /**
@@ -235,7 +250,9 @@ data class PercussionPattern(
                 val eq = rowStr.indexOf('=')
                 if (eq < 0) return null
                 val id = rowStr.substring(0, eq)
-                val inst = PercussionCatalog.byId(id) ?: continue   // skip unknown instruments
+                // resolve() also reconstructs duplicated-track clones ("surdo#2");
+                // truly unknown instruments are skipped (forward compatibility).
+                val inst = PercussionCatalog.resolve(id) ?: continue
                 if (grid.containsKey(id)) continue                  // ignore duplicate rows
                 val cells = rowStr.substring(eq + 1).split(",")
                 if (cells.size != meter.totalSlots) return null

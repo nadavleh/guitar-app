@@ -230,13 +230,13 @@ class SambaLooperState(
 
     private fun voiceKey(inst: PercussionInstrument, voiceIndex: Int) = "${inst.id}:$voiceIndex"
 
-    /** Global level of an instrument (default full). */
+    /** Global level of an instrument (default full; clones default like their base). */
     fun volumeOf(inst: PercussionInstrument): Float =
-        volumes[inst.id] ?: if (inst.id == "agogo") 0.1f else 1f   // agogô defaults quiet (user: 10%)
+        volumes[inst.id] ?: if (PercussionCatalog.baseId(inst.id) == "agogo") 0.1f else 1f   // agogô defaults quiet (user: 10%)
 
     /** Level of one voice (default full, or 50% for the soft tamborim voices). */
     fun voiceVolumeOf(inst: PercussionInstrument, voiceIndex: Int): Float =
-        volumes[voiceKey(inst, voiceIndex)] ?: defaultVoiceVolume(inst.id, voiceIndex)
+        volumes[voiceKey(inst, voiceIndex)] ?: defaultVoiceVolume(PercussionCatalog.baseId(inst.id), voiceIndex)
 
     /** Combined gain a hit of [voiceIndex] actually plays at: global × per-voice. */
     fun effectiveGain(inst: PercussionInstrument, voiceIndex: Int): Float =
@@ -318,6 +318,12 @@ class SambaLooperState(
     fun addInstrument(inst: PercussionInstrument) {
         commit(editPattern.addInstrument(inst))
         if (!isPlaying) audio.playSamples(buffer(inst, 0), effectiveGain(inst, 0))
+    }
+
+    /** Duplicate [inst]'s track — same sound + a copy of its row, no re-picking the
+     *  instrument or re-painting (the new track is a clone, e.g. "Surdo 2"). */
+    fun duplicateTrack(inst: PercussionInstrument) {
+        commit(editPattern.duplicatedTrack(inst))
     }
 
     /** Remove [inst] from the kit, also clearing its mute/solo/selection state. */

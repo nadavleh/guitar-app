@@ -86,6 +86,20 @@ object PercussionCatalog {
     private val byId: Map<String, PercussionInstrument> = ALL.associateBy { it.id }
 
     fun byId(id: String): PercussionInstrument? = byId[id]
+
+    /** Base catalog id of [id]: duplicated tracks are clones with ids "<base>#<n>"
+     *  (e.g. "surdo#2"); samples/synthesis always key off the base id. */
+    fun baseId(id: String): String = id.substringBefore('#')
+
+    /** Resolve [id] to an instrument: a catalog instrument, or — for a duplicated
+     *  track's clone id like "surdo#2" — a copy of its base instrument with the
+     *  clone id and a numbered display name ("Surdo 2"). Null if unknown. */
+    fun resolve(id: String): PercussionInstrument? {
+        byId[id]?.let { return it }
+        val base = byId[baseId(id)] ?: return null
+        val n = id.substringAfter('#', "").toIntOrNull() ?: return null
+        return base.copy(id = id, displayName = "${base.displayName} $n")
+    }
 }
 
 /**

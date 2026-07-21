@@ -742,6 +742,10 @@ private fun InstrumentRow(
                     }
                     HorizontalDivider()
                     DropdownMenuItem(
+                        text = { Text("⧉ Duplicate ${instrument.displayName}") },
+                        onClick = { onMixerDismiss(); samba.duplicateTrack(instrument) },
+                    )
+                    DropdownMenuItem(
                         text = { Text("Remove ${instrument.displayName}") },
                         onClick = { onMixerDismiss(); samba.removeInstrument(instrument) },
                     )
@@ -856,6 +860,8 @@ private fun PaletteBar(samba: SambaLooperState, inst: PercussionInstrument, onMi
         }
         Spacer(Modifier.width(8.dp))
         PalChip("Mixer", selected = false, tool = true, onTap = onMixer)
+        Spacer(Modifier.width(6.dp))
+        PalChip("⧉ Dup", selected = false, tool = true) { samba.duplicateTrack(inst) }
         Spacer(Modifier.width(6.dp))
         PalChip("✕", selected = false, tool = true) { samba.selectTrack(inst.id) }
     }

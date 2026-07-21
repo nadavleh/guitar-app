@@ -409,12 +409,14 @@ export class SambaLooperUI {
 
     const mixer = el("button", { class: "pal-chip pal-tool" }, ["Mixer"]);
     mixer.addEventListener("click", () => { this.openVoiceMenu = this.openVoiceMenu === inst.id ? null : inst.id; this.rerender(); });
+    const dup = el("button", { class: "pal-chip pal-tool", title: "Duplicate this track (same sound + pattern)" }, ["⧉ Dup"]);
+    dup.addEventListener("click", () => s.duplicateTrack(inst));
     const close = el("button", { class: "pal-chip pal-tool", "aria-label": "Deselect track" }, ["✕"]);
     close.addEventListener("click", () => s.selectTrack(inst.id));
 
     return el("div", { class: "drum-palette" }, [
       el("span", { class: "pal-name" }, [inst.displayName]),
-      chips, mixer, close,
+      chips, mixer, dup, close,
     ]);
   }
 
@@ -441,8 +443,11 @@ export class SambaLooperUI {
       pop.appendChild(row);
       pop.appendChild(slider(0, 1, vvol, (val) => s.setVoiceVolume(inst, idx, val), 0.01));
     });
-    // Remove this instrument from the kit.
+    // Duplicate / Remove this track.
     pop.appendChild(el("div", { class: "divider-line" }));
+    const dup = el("div", { class: "vrow" }, [`⧉ Duplicate ${inst.displayName}`]);
+    dup.addEventListener("click", (e) => { e.stopPropagation(); this.openVoiceMenu = null; s.duplicateTrack(inst); this.rerender(); });
+    pop.appendChild(dup);
     const remove = el("div", { class: "vrow", style: `color:${Colors.textSecondary}` }, [`Remove ${inst.displayName}`]);
     remove.addEventListener("click", (e) => { e.stopPropagation(); this.openVoiceMenu = null; s.removeInstrument(inst); this.rerender(); });
     pop.appendChild(remove);

@@ -135,7 +135,8 @@ fun App(audio: AudioEngine) {
     // decoded to mono 44.1 kHz; null → SambaLooperState falls back to the synth.
     val drumSampleLoader = remember(context) {
         loader@{ inst: app.guitar.theory.PercussionInstrument, voice: Int ->
-            val name = "drums/${inst.id}_$voice.wav"
+            // Duplicated tracks ("surdo#2") share their base instrument's samples.
+            val name = "drums/${inst.id.substringBefore('#')}_$voice.wav"
             runCatching {
                 context.applicationContext.assets.open(name).use { it.readBytes() }
             }.getOrNull()?.let { app.guitar.audio.WavDecoder.decode(it) }

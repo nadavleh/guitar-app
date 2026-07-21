@@ -143,6 +143,21 @@ class PercussionPatternTest {
         assertEquals(PercussionBuiltins.ARRASTA_PE, parsed?.pattern)
     }
 
+    @Test fun `duplicated track clones the instrument and round-trips`() {
+        val p = PercussionBuiltins.BATIDA_CAVACO_1.duplicatedTrack(PercussionCatalog.Surdo)
+        assertEquals(listOf("surdo", "surdo#2", "tamborim", "bongo"), p.instruments.map { it.id })
+        val clone = p.instruments[1]
+        assertEquals("Surdo 2", clone.displayName)
+        assertEquals(PercussionCatalog.Surdo.voices, clone.voices)
+        // The row is copied.
+        assertEquals(p.grid.getValue("surdo"), p.grid.getValue("surdo#2"))
+        // Encode/decode reconstructs the clone (resolve() on "surdo#2").
+        assertEquals(p, PercussionPattern.decode(p.encode()))
+        // Duplicating again numbers the next clone #3.
+        val p2 = p.duplicatedTrack(clone)
+        assertEquals(listOf("surdo", "surdo#2", "surdo#3", "tamborim", "bongo"), p2.instruments.map { it.id })
+    }
+
     @Test fun `saved beat round-trips with and without an opening`() {
         val plain = SavedBeat(PercussionBuiltins.XOTE)
         assertEquals(plain, SavedBeat.decode(plain.encode()))

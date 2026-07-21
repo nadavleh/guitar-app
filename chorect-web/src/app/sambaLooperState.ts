@@ -3,7 +3,7 @@
 // async loop; voices are synthesized once and cached, then replayed each tick.
 
 import {
-  PercussionInstrument, PercussionCatalog,
+  PercussionInstrument, PercussionCatalog, basePercussionId,
   PercussionMeter, PercussionPattern, swungSlotMs, voiceCount,
   BEAT_UNITS, DIVISIONS, BATIDA_CAVACO_1,
 } from "../theory";
@@ -270,11 +270,11 @@ export class SambaLooperState {
     return !this.muted.has(inst.id) && (this.soloed.size === 0 || this.soloed.has(inst.id));
   }
 
-  /** Global level of an instrument (default full). */
-  volumeOf(inst: PercussionInstrument): number { return this.volumes.get(inst.id) ?? (inst.id === "agogo" ? 0.1 : 1); } // agogô defaults quiet
+  /** Global level of an instrument (default full; clones default like their base). */
+  volumeOf(inst: PercussionInstrument): number { return this.volumes.get(inst.id) ?? (basePercussionId(inst.id) === "agogo" ? 0.1 : 1); } // agogô defaults quiet
   /** Level of one voice (default full, or 50% for the soft tamborim voices). */
   voiceVolumeOf(inst: PercussionInstrument, voiceIndex: number): number {
-    return this.volumes.get(this.voiceKey(inst, voiceIndex)) ?? SambaLooperState.defaultVoiceVolume(inst.id, voiceIndex);
+    return this.volumes.get(this.voiceKey(inst, voiceIndex)) ?? SambaLooperState.defaultVoiceVolume(basePercussionId(inst.id), voiceIndex);
   }
   /** Combined gain a hit actually plays at: global × per-voice. */
   effectiveGain(inst: PercussionInstrument, voiceIndex: number): number {
@@ -323,6 +323,12 @@ export class SambaLooperState {
     this.commit(this.editPattern.addInstrument(inst));
     this.loadSamplesFor(inst);
     if (!this.isPlaying) this.deps.audio.playSamples(this.buffer(inst, 0), this.effectiveGain(inst, 0));
+  }
+
+  /** Duplicate `inst`'s track — same sound + a copy of its row, no re-picking the
+   *  instrument or re-painting (the new track is a clone, e.g. "Surdo 2"). */
+  duplicateTrack(inst: PercussionInstrument) {
+    this.commit(this.editPattern.duplicatedTrack(inst));
   }
 
   /** Remove `inst` from the kit, also clearing its mute/solo/selection state. */
