@@ -1,0 +1,93 @@
+{
+  "tuning": "DGBD",
+  "pages": [
+    {
+      "header": "G major",
+      "symbol": "",
+      "shapes": [
+        {"frets": [0,0,0,0], "intervals": [7,0,4,7], "bass": 7, "position": 0},
+        {"frets": [5,4,3,5], "intervals": [0,4,7,0], "bass": 0, "position": 3},
+        {"frets": [9,7,8,9], "intervals": [4,7,0,4], "bass": 4, "position": 7},
+        {"frets": [9,12,12,12], "intervals": [4,0,4,7], "bass": 4, "position": 9},
+        {"frets": [5,7,8,9], "intervals": [0,7,0,4], "bass": 0, "position": 5}
+      ]
+    },
+    {
+      "header": "G minor",
+      "symbol": "m",
+      "shapes": [
+        {"frets": [8,7,8,8], "intervals": [3,7,0,3], "bass": 3, "position": 7},
+        {"frets": [12,12,11,12], "intervals": [7,0,3,7], "bass": 7, "position": 11},
+        {"frets": [5,3,3,5], "intervals": [0,3,7,0], "bass": 0, "position": 3},
+        {"frets": [5,7,8,8], "intervals": [0,7,0,3], "bass": 0, "position": 5},
+        {"frets": [8,12,11,12], "intervals": [3,0,3,7], "bass": 3, "position": 8}
+      ]
+    },
+    {
+      "header": "G7",
+      "symbol": "7",
+      "shapes": [
+        {"frets": [0,0,0,3], "intervals": [7,0,4,10], "bass": 7, "position": 3},
+        {"frets": [3,0,0,0], "intervals": [10,0,4,7], "bass": 10, "position": 3},
+        {"frets": [3,0,0,3], "intervals": [10,0,4,10], "bass": 10, "position": 3},
+        {"frets": [5,4,3,3], "intervals": [0,4,7,10], "bass": 0, "position": 3},
+        {"frets": [3,4,3,5], "intervals": [10,4,7,0], "bass": 10, "position": 3}
+      ]
+    },
+    {
+      "header": "Gm7",
+      "symbol": "m7",
+      "shapes": [
+        {"frets": [5,3,3,3], "intervals": [0,3,7,10], "bass": 0, "position": 3},
+        {"frets": [3,3,3,5], "intervals": [10,3,7,0], "bass": 10, "position": 3},
+        {"frets": [8,10,8,8], "intervals": [3,10,0,3], "bass": 3, "position": 8},
+        {"frets": [5,3,6,5], "intervals": [0,3,10,0], "bass": 0, "position": 3},
+        {"frets": [3,3,6,5], "intervals": [10,3,10,0], "bass": 10, "position": 3}
+      ]
+    },
+    {
+      "header": "Gmaj7",
+      "symbol": "maj7",
+      "shapes": [
+        {"frets": [5,4,3,4], "intervals": [0,4,7,11], "bass": 0, "position": 3},
+        {"frets": [4,4,3,5], "intervals": [11,4,7,0], "bass": 11, "position": 3},
+        {"frets": [5,4,7,5], "intervals": [0,4,11,0], "bass": 0, "position": 4},
+        {"frets": [4,4,7,5], "intervals": [11,4,11,0], "bass": 11, "position": 4},
+        {"frets": [9,11,8,9], "intervals": [4,11,0,4], "bass": 4, "position": 8}
+      ]
+    },
+    {
+      "header": "G dim",
+      "symbol": "dim",
+      "shapes": [
+        {"frets": [11,12,11,11], "intervals": [6,0,3,6], "bass": 6, "position": 11},
+        {"frets": [8,6,8,8], "intervals": [3,6,0,3], "bass": 3, "position": 6},
+        {"frets": [5,3,2,5], "intervals": [0,3,6,0], "bass": 0, "position": 2},
+        {"frets": [5,6,8,8], "intervals": [0,6,0,3], "bass": 0, "position": 5},
+        {"frets": [8,12,11,11], "intervals": [3,0,3,6], "bass": 3, "position": 8}
+      ]
+    },
+    {
+      "header": "G b5bb7 (full dim7)",
+      "symbol": "dim7",
+      "shapes": [
+        {"frets": [5,3,2,2], "intervals": [0,3,6,9], "bass": 0, "position": 2},
+        {"frets": [2,3,2,5], "intervals": [9,3,6,0], "bass": 9, "position": 2},
+        {"frets": [5,6,5,8], "intervals": [0,6,9,3], "bass": 0, "position": 5},
+        {"frets": [8,6,5,5], "intervals": [3,6,9,0], "bass": 3, "position": 5},
+        {"frets": [8,9,8,11], "intervals": [3,9,0,6], "bass": 3, "position": 8}
+      ]
+    },
+    {
+      "header": "G half-dim7 (m7b5)",
+      "symbol": "m7b5",
+      "shapes": [
+        {"frets": [5,3,2,3], "intervals": [0,3,6,10], "bass": 0, "position": 2},
+        {"frets": [3,3,2,5], "intervals": [10,3,6,0], "bass": 10, "position": 2},
+        {"frets": [5,6,6,8], "intervals": [0,6,10,3], "bass": 0, "position": 5},
+        {"frets": [8,6,6,5], "intervals": [3,6,10,0], "bass": 3, "position": 5},
+        {"frets": [8,10,8,11], "intervals": [3,10,0,6], "bass": 3, "position": 8}
+      ]
+    }
+  ]
+}
