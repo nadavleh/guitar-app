@@ -19,6 +19,9 @@ export interface TransportDockOpts {
    *  BPM block (readout + slider popover) is left out. */
   bpm?: number;
   onBpm?: (v: number) => void;
+  /** Show the BPM as an always-visible inline readout + slider (no popover) —
+   *  used by the drum machine so tempo needs no extra tap. */
+  inlineBpm?: boolean;
   toneLabel: string;
   onTone: () => void;
 }
@@ -42,18 +45,29 @@ export function transportDock(opts: TransportDockOpts): HTMLElement {
 
   if (opts.bpm !== undefined && opts.onBpm) {
     const bpm = opts.bpm, onBpm = opts.onBpm;
-    const summary = el("summary", { class: "transport-bpm" }, [
-      el("span", { class: "transport-bpm-val" }, [String(bpm)]),
-      el("span", { class: "transport-bpm-unit" }, ["BPM"]),
-    ]);
-    const pop = el("div", { class: "transport-bpm-pop" }, [
-      el("div", { class: "label-sm", style: "margin-top:0" }, [`Tempo: ${bpm} BPM`]),
-      slider(10, 300, bpm, (v) => onBpm(Math.round(v))),
-    ]);
-    const details = el("details", { class: "transport-bpm-wrap" }, [summary, pop]);
-    details.open = bpmExpanded;
-    details.addEventListener("toggle", () => { bpmExpanded = details.open; });
-    children.push(details);
+    if (opts.inlineBpm) {
+      // Always-visible readout + slider, no popover (drum machine).
+      const readout = el("div", { class: "transport-bpm transport-bpm-inline" }, [
+        el("span", { class: "transport-bpm-val" }, [String(bpm)]),
+        el("span", { class: "transport-bpm-unit" }, ["BPM"]),
+      ]);
+      const s = slider(10, 300, bpm, (v) => onBpm(Math.round(v)));
+      s.classList.add("transport-bpm-slider");
+      children.push(readout, s);
+    } else {
+      const summary = el("summary", { class: "transport-bpm" }, [
+        el("span", { class: "transport-bpm-val" }, [String(bpm)]),
+        el("span", { class: "transport-bpm-unit" }, ["BPM"]),
+      ]);
+      const pop = el("div", { class: "transport-bpm-pop" }, [
+        el("div", { class: "label-sm", style: "margin-top:0" }, [`Tempo: ${bpm} BPM`]),
+        slider(10, 300, bpm, (v) => onBpm(Math.round(v))),
+      ]);
+      const details = el("details", { class: "transport-bpm-wrap" }, [summary, pop]);
+      details.open = bpmExpanded;
+      details.addEventListener("toggle", () => { bpmExpanded = details.open; });
+      children.push(details);
+    }
   }
 
   children.push(el("div", { class: "spacer" }));

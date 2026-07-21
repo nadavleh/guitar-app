@@ -84,6 +84,7 @@ export class SambaLooperUI {
       onPlayStop: () => { if (s.isPlaying) s.stop(); else s.start(); },
       bpm: s.bpm,
       onBpm: (v) => s.setBpm(v),
+      inlineBpm: true,
       toneLabel: this.state.sound,
       onTone: () => { this.toneSheetOpen = true; this.rerender(); },
     }));

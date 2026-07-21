@@ -159,6 +159,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             onBpm = { samba.bpm = it },
             toneLabel = state.sound.name,
             onTone = { toneSheetOpen = true },
+            inlineBpm = true,
         )
         if (toneSheetOpen) ToneSheet(state, onDismiss = { toneSheetOpen = false })
     }

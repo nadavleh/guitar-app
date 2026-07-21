@@ -312,7 +312,14 @@ export class App {
 
   private setupPressGuard(): void {
     // Capture phase so these run before any element's own handler.
-    window.addEventListener("pointerdown", () => { this.pressActive = true; }, true);
+    window.addEventListener("pointerdown", (e) => {
+      this.pressActive = true;
+      // Any open <details> popover (transport BPM / EQ) closes when you tap
+      // outside it — the general "click elsewhere dismisses the popup" rule.
+      const t = e.target as Node;
+      document.querySelectorAll<HTMLDetailsElement>("details.transport-bpm-wrap[open], details.tone-eq-wrap[open]")
+        .forEach((d) => { if (!d.contains(t)) d.open = false; });   // toggle event syncs the persisted flag
+    }, true);
     const release = () => {
       if (!this.pressActive) return;
       this.pressActive = false;

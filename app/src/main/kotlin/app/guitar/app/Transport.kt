@@ -81,6 +81,8 @@ fun TransportDock(
     toneLabel: String,
     onTone: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Show BPM as an always-visible readout + inline slider (no popover) — drum machine. */
+    inlineBpm: Boolean = false,
 ) {
     val palette = LocalSignal.current
     Row(
@@ -110,41 +112,57 @@ fun TransportDock(
 
         if (bpm != null && onBpm != null) {
             Spacer(Modifier.width(14.dp))
-            var open by remember { mutableStateOf(false) }
-            Box {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { open = true }
-                        .padding(horizontal = 6.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        "$bpm",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        "BPM",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                    Column(modifier = Modifier.width(260.dp).padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        Text("Tempo: $bpm BPM", style = MaterialTheme.typography.bodyMedium)
-                        Slider(
-                            value = bpm.toFloat(),
-                            onValueChange = { onBpm(it.toInt()) },
-                            valueRange = 10f..300f,
+            if (inlineBpm) {
+                // Always-visible readout + inline slider (no popover).
+                Text("$bpm", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(3.dp))
+                Text("BPM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(10.dp))
+                Slider(
+                    value = bpm.toFloat(),
+                    onValueChange = { onBpm(it.toInt()) },
+                    valueRange = 10f..300f,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(10.dp))
+            } else {
+                var open by remember { mutableStateOf(false) }
+                Box {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { open = true }
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            "$bpm",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "BPM",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                        Column(modifier = Modifier.width(260.dp).padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Text("Tempo: $bpm BPM", style = MaterialTheme.typography.bodyMedium)
+                            Slider(
+                                value = bpm.toFloat(),
+                                onValueChange = { onBpm(it.toInt()) },
+                                valueRange = 10f..300f,
+                            )
+                        }
+                    }
                 }
+                Spacer(Modifier.weight(1f))
             }
+        } else {
+            Spacer(Modifier.weight(1f))
         }
-
-        Spacer(Modifier.weight(1f))
 
         // Tone chip: teal (feedback) outline + text, per the "current tone" role.
         Row(
