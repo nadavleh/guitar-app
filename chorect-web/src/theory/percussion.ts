@@ -384,8 +384,9 @@ export const ARRASTA_PE = builtin(
   "bongo=0,2,3,0,1,-,1,-,0,2,3,0,1,-,1,-",
 );
 
-/** A loadable groove for the Load… menu; `bpm` (when set) is applied on load. */
-export interface BuiltinPattern { name: string; pattern: PercussionPattern; bpm?: number; }
+/** A loadable groove for the Load… menu; `bpm` (when set) is applied on load;
+ *  `opening` (when set) is a one-shot entrada played once before the loop. */
+export interface BuiltinPattern { name: string; pattern: PercussionPattern; bpm?: number; opening?: PercussionPattern; }
 
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */
 export const BUILTIN_PATTERNS: BuiltinPattern[] = [
@@ -408,17 +409,19 @@ export interface BeatFile {
   name: string;
   bpm: number;
   swing: number;
-  pattern: string;   // PercussionPattern.encode()
+  pattern: string;    // PercussionPattern.encode()
+  opening?: string;   // optional one-shot entrada, PercussionPattern.encode()
 }
 
 /** Serialize a beat to the pretty-printed JSON envelope written to disk. */
-export function encodeBeatFile(name: string, bpm: number, swing: number, pattern: PercussionPattern): string {
+export function encodeBeatFile(name: string, bpm: number, swing: number, pattern: PercussionPattern, opening: PercussionPattern | null = null): string {
   const obj: BeatFile = { format: "chorect-beat", version: 1, name, bpm: Math.round(bpm), swing: Math.round(swing), pattern: pattern.encode() };
+  if (opening) obj.opening = opening.encode();
   return JSON.stringify(obj, null, 2);
 }
 
 /** Parse a beat file produced by [encodeBeatFile]; null on anything unrecognizable. */
-export function decodeBeatFile(text: string): { name: string; bpm: number; swing: number; pattern: PercussionPattern } | null {
+export function decodeBeatFile(text: string): { name: string; bpm: number; swing: number; pattern: PercussionPattern; opening: PercussionPattern | null } | null {
   let obj: unknown;
   try { obj = JSON.parse(text); } catch { return null; }
   if (!obj || typeof obj !== "object") return null;
@@ -426,10 +429,11 @@ export function decodeBeatFile(text: string): { name: string; bpm: number; swing
   if (o.format !== "chorect-beat") return null;
   const pattern = PercussionPattern.decode(String(o.pattern ?? ""));
   if (!pattern) return null;
+  const opening = typeof o.opening === "string" ? PercussionPattern.decode(o.opening) : null;
   const name = typeof o.name === "string" && o.name.trim() ? o.name : "beat";
   const bpm = typeof o.bpm === "number" && Number.isFinite(o.bpm) ? Math.round(o.bpm) : 90;
   const swing = typeof o.swing === "number" && Number.isFinite(o.swing) ? Math.round(o.swing) : 0;
-  return { name, bpm: Math.min(Math.max(bpm, 10), 300), swing: Math.min(Math.max(swing, 0), 100), pattern };
+  return { name, bpm: Math.min(Math.max(bpm, 10), 300), swing: Math.min(Math.max(swing, 0), 100), pattern, opening };
 }
 
 // ---- Timing ----

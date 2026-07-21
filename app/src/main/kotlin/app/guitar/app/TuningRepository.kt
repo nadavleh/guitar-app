@@ -333,17 +333,18 @@ class TuningRepository(private val context: Context) {
 
     private val keyDrumPatterns = stringPreferencesKey("drum_patterns")
 
-    /** User-saved drum patterns, by name (insertion order preserved). */
-    val drumPatterns: Flow<Map<String, app.guitar.theory.PercussionPattern>> =
+    /** User-saved drum beats (loop + optional opening), by name (insertion order
+     *  preserved). */
+    val drumPatterns: Flow<Map<String, app.guitar.theory.SavedBeat>> =
         context.tuningDataStore.data.map { prefs -> decodeDrumMap(prefs[keyDrumPatterns] ?: "") }
 
     /** Save/overwrite a beat under [name]. Names with reserved chars are rejected. */
-    suspend fun saveDrumPattern(name: String, pattern: app.guitar.theory.PercussionPattern) {
+    suspend fun saveDrumPattern(name: String, beat: app.guitar.theory.SavedBeat) {
         val clean = name.trim()
-        if (clean.isEmpty() || clean.any { it in "=;|," }) return
+        if (clean.isEmpty() || clean.any { it in "=;|,~" }) return
         context.tuningDataStore.edit { prefs ->
             val current = decodeDrumMap(prefs[keyDrumPatterns] ?: "")
-            val updated = LinkedHashMap(current).apply { put(clean, pattern) }
+            val updated = LinkedHashMap(current).apply { put(clean, beat) }
             prefs[keyDrumPatterns] = encodeDrumMap(updated)
         }
     }
@@ -355,21 +356,22 @@ class TuningRepository(private val context: Context) {
         }
     }
 
-    /** Entries "name=<encodedPattern>" joined by newline. A newline is used (not
+    /** Entries "name=<encodedBeat>" joined by newline. A newline is used (not
      *  ';') because an encoded pattern itself contains ';' and '|'/'=' — only a
      *  newline is guaranteed absent from both encode() output and (single-line)
-     *  beat names. */
-    private fun encodeDrumMap(map: Map<String, app.guitar.theory.PercussionPattern>): String =
-        map.entries.joinToString("\n") { (n, p) -> "$n=${p.encode()}" }
+     *  beat names. The value is [app.guitar.theory.SavedBeat.encode] — the plain
+     *  pattern string, or "main~opening" when the beat has an opening. */
+    private fun encodeDrumMap(map: Map<String, app.guitar.theory.SavedBeat>): String =
+        map.entries.joinToString("\n") { (n, b) -> "$n=${b.encode()}" }
 
-    private fun decodeDrumMap(raw: String): Map<String, app.guitar.theory.PercussionPattern> {
-        val out = LinkedHashMap<String, app.guitar.theory.PercussionPattern>()
+    private fun decodeDrumMap(raw: String): Map<String, app.guitar.theory.SavedBeat> {
+        val out = LinkedHashMap<String, app.guitar.theory.SavedBeat>()
         for (entry in raw.split("\n")) {
             val eq = entry.indexOf('=')
             if (eq <= 0) continue
             val name = entry.substring(0, eq)
-            val pattern = app.guitar.theory.PercussionPattern.decode(entry.substring(eq + 1)) ?: continue
-            out[name] = pattern
+            val beat = app.guitar.theory.SavedBeat.decode(entry.substring(eq + 1)) ?: continue
+            out[name] = beat
         }
         return out
     }

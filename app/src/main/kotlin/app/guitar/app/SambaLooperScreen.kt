@@ -157,7 +157,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
 
         // Voice palette for the selected track — pinned above the transport dock so
         // it stays visible while the grid scrolls (mirrors chorect-web).
-        val selInst = samba.pattern.instruments.firstOrNull { it.id == samba.selectedTrackId }
+        val selInst = samba.editPattern.instruments.firstOrNull { it.id == samba.selectedTrackId }
         if (selInst != null) {
             Spacer(Modifier.height(6.dp))
             PaletteBar(samba, selInst, onMixer = { mixerFor = selInst.id })
@@ -210,7 +210,7 @@ private fun PatternSection(
     ) { uri ->
         if (uri != null) runCatching {
             context.contentResolver.openOutputStream(uri)?.use { os ->
-                os.write(BeatFile(samba.loadedName ?: "beat", samba.bpm, samba.swing, samba.pattern).encode().toByteArray())
+                os.write(BeatFile(samba.loadedName ?: "beat", samba.bpm, samba.swing, samba.pattern, samba.opening).encode().toByteArray())
             }
         }
     }
@@ -220,7 +220,7 @@ private fun PatternSection(
         if (uri != null) runCatching {
             val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
                 ?: return@runCatching
-            BeatFile.decode(text)?.let { samba.loadPattern(it.pattern, it.name, it.bpm, it.swing) }
+            BeatFile.decode(text)?.let { samba.loadPattern(it.pattern, it.name, it.bpm, it.swing, it.opening) }
         }
     }
 
@@ -234,7 +234,7 @@ private fun PatternSection(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
             Text(
-                samba.loadedName ?: "Untitled beat",
+                (samba.loadedName ?: "Untitled beat") + if (samba.editingOpening) " — opening" else "",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -247,6 +247,23 @@ private fun PatternSection(
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
             )
+            Spacer(Modifier.width(10.dp))
+            // Loop/Opening edit toggle (the opening plays once before the loop).
+            if (samba.opening != null) {
+                if (samba.editingOpening) {
+                    OutlinedButton(onClick = { samba.editOpening(false) }, contentPadding = STEP_PAD) { Text("Loop") }
+                    Spacer(Modifier.width(4.dp))
+                    Button(onClick = { samba.editOpening(true) }, contentPadding = STEP_PAD) { Text("Opening ▶¹") }
+                    Spacer(Modifier.width(4.dp))
+                    TextButton(onClick = { samba.removeOpening() }, contentPadding = STEP_PAD) { Text("✕") }
+                } else {
+                    Button(onClick = { samba.editOpening(false) }, contentPadding = STEP_PAD) { Text("Loop") }
+                    Spacer(Modifier.width(4.dp))
+                    OutlinedButton(onClick = { samba.editOpening(true) }, contentPadding = STEP_PAD) { Text("Opening ▶¹") }
+                }
+            } else {
+                OutlinedButton(onClick = { samba.addOpening() }, contentPadding = STEP_PAD) { Text("＋ Opening") }
+            }
         }
     }
     Spacer(Modifier.height(8.dp))
@@ -276,19 +293,19 @@ private fun PatternSection(
                 for (b in app.guitar.theory.PercussionBuiltins.ALL) {
                     DropdownMenuItem(
                         text = { Text(b.name) },
-                        onClick = { samba.loadPattern(b.pattern, b.name, b.bpm); loadMenu = false },
+                        onClick = { samba.loadPattern(b.pattern, b.name, b.bpm, opening = b.opening); loadMenu = false },
                     )
                 }
                 if (saved.isNotEmpty()) HorizontalDivider()
-                for ((name, pat) in saved) {
+                for ((name, beat) in saved) {
                     DropdownMenuItem(
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(name, modifier = Modifier.weight(1f))
+                                Text(name + if (beat.opening != null) " ▶¹" else "", modifier = Modifier.weight(1f))
                                 TextButton(onClick = { samba.deleteSaved(name) }) { Text("✕") }
                             }
                         },
-                        onClick = { samba.loadPattern(pat, name); loadMenu = false },
+                        onClick = { samba.loadPattern(beat.main, name, opening = beat.opening); loadMenu = false },
                     )
                 }
                 if (saved.isEmpty()) {
@@ -386,7 +403,7 @@ private fun PatternSection(
     // scroll) so the whole cycle is visible at a glance in landscape. Pinch to
     // zoom in (independent X/Y) and pan for a closer look; a subtle beat-group
     // tint + wider bar gaps make the quarter-note grouping easy to read (#6/#7).
-    val kit = samba.pattern.instruments
+    val kit = samba.editPattern.instruments
     val rowCount = kit.size.coerceAtLeast(1)
     val gridHeight = (rowCount * ROW_HEIGHT_DP + (rowCount - 1) * 6 + CAPTION_DP).dp
     Box(
@@ -753,7 +770,7 @@ private fun InstrumentRow(
         // Fill-width (weight per cell) so the whole cycle fits at 1×; pinch-zoom the
         // container to enlarge. Beat-group index drives an alternating tint so the
         // quarter-note groups (4 sixteenths each) are easy to count.
-        val slots = samba.pattern.slots
+        val slots = samba.editPattern.slots
         val slotsPerBeat = samba.meter.slotsPerBeat.coerceAtLeast(1)
         val slotsPerBar = samba.meter.slotsPerBar.coerceAtLeast(1)
         Row(
@@ -914,9 +931,11 @@ private fun Cell(
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalSignal.current
-    val voice = samba.pattern.voiceAt(instrument, slot)
-    val accented = samba.pattern.isAccented(instrument, slot)
-    val isPlayhead = samba.currentSlot == slot
+    val voice = samba.editPattern.voiceAt(instrument, slot)
+    val accented = samba.editPattern.isAccented(instrument, slot)
+    // Playhead shows only when the displayed grid is what's sounding (the loop
+    // grid during the loop, the opening grid during the opening pass).
+    val isPlayhead = samba.currentSlot == slot && samba.playingOpening == samba.editingOpening
     val base = MaterialTheme.colorScheme.surfaceVariant
     // Empty cells are brightened (were near-invisible on the black background) and
     // tinted per beat-group so the quarter-note grouping reads at a glance: the first

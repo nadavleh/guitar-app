@@ -16,7 +16,7 @@ import { icon } from "./icons";
 import { transportDock, toneSheet } from "./transport";
 import { AppState } from "./appState";
 import {
-  PercussionInstrument, voicesFor, voiceOf, PercussionPattern, BUILTIN_PATTERNS,
+  PercussionInstrument, voicesFor, voiceOf, BUILTIN_PATTERNS,
   DIVISIONS, encodeBeatFile, decodeBeatFile,
 } from "../theory";
 
@@ -78,7 +78,7 @@ export class SambaLooperUI {
 
     // Voice palette for the selected track — pinned above the transport dock so
     // it stays visible while the grid scrolls.
-    const selInst = s.pattern.instruments.find((i) => i.id === s.selectedTrackId);
+    const selInst = s.editPattern.instruments.find((i) => i.id === s.selectedTrackId);
     if (selInst) screen.appendChild(this.paletteBar(selInst));
 
     // Transport dock (Signal move #2): BPM lives here now — samba reads `bpm`
@@ -156,10 +156,26 @@ export class SambaLooperUI {
     const undoBtn = btn("↶ Undo", () => { s.undo(); this.rerender(); });
     if (!s.canUndo) undoBtn.disabled = true;
 
-    // Beat header: current beat name + tempo (set by Load / Save / Import).
+    // Beat header: current beat name + tempo (set by Load / Save / Import), plus
+    // the Loop/Opening edit toggle (the opening plays once before the loop).
+    const editToggle = el("span", { class: "drum-edit-toggle" });
+    if (s.opening) {
+      const loopBtn = btn("Loop", () => s.editOpening(false), s.editingOpening ? "btn" : "btn primary");
+      const openBtn = btn("Opening ▶¹", () => s.editOpening(true), s.editingOpening ? "btn primary" : "btn");
+      editToggle.appendChild(loopBtn);
+      editToggle.appendChild(openBtn);
+      if (s.editingOpening) {
+        const rm = btn("✕ Remove opening", () => s.removeOpening(), "btn text");
+        editToggle.appendChild(rm);
+      }
+    } else {
+      editToggle.appendChild(btn("＋ Opening", () => s.addOpening(), "btn"));
+    }
     wrap.appendChild(el("div", { class: "drum-beat-header" }, [
-      el("span", { class: "drum-beat-name" }, [s.loadedName ?? "Untitled beat"]),
+      el("span", { class: "drum-beat-name" }, [(s.loadedName ?? "Untitled beat") + (s.editingOpening ? " — opening" : "")]),
       el("span", { class: "drum-beat-bpm" }, [`${s.bpm} BPM`]),
+      el("span", { style: "flex:1" }),
+      editToggle,
     ]));
 
     wrap.appendChild(el("div", { class: "et-row-gap" }, [
@@ -186,7 +202,7 @@ export class SambaLooperUI {
     wrap.appendChild(el("div", { class: "divider-line" }));
 
     // grid — dynamic kit
-    s.pattern.instruments.forEach((inst, i) => wrap.appendChild(this.instrumentRow(inst, i)));
+    s.editPattern.instruments.forEach((inst, i) => wrap.appendChild(this.instrumentRow(inst, i)));
     wrap.appendChild(el("div", { class: "drum-caption" }, [s.meter.describe()]));
 
     // Compact card: tap-tempo + swing.
@@ -294,7 +310,7 @@ export class SambaLooperUI {
     label.addEventListener("dragend", () => { this.dragIndex = null; });
 
     // cells
-    const slots = s.pattern.slots;
+    const slots = s.editPattern.slots;
     const { slotsPerBeat, slotsPerBar } = s.meter;
     const cells = el("div", { class: audible ? "drum-cells" : "drum-cells dim" });
     const perBeat = Math.max(slotsPerBeat, 1);
@@ -324,9 +340,11 @@ export class SambaLooperUI {
    *  primary/scaleTone/chordTone), the pre-Signal mapping. */
   private cell(inst: PercussionInstrument, slot: number, beatIndex: number, isBeatStart: boolean): HTMLElement {
     const s = this.samba;
-    const voice = s.pattern.voiceAt(inst, slot);
-    const accented = s.pattern.isAccented(inst, slot);
-    const isPlayhead = s.currentSlot === slot;
+    const voice = s.editPattern.voiceAt(inst, slot);
+    const accented = s.editPattern.isAccented(inst, slot);
+    // Playhead shows only when the displayed grid is what's sounding (the loop
+    // grid during the loop, the opening grid during the opening pass).
+    const isPlayhead = s.currentSlot === slot && s.playingOpening === s.editingOpening;
     // Empty cells brightened (were near-invisible on black) and tinted per beat-group
     // so the quarter-note grouping reads at a glance: first 16th of each beat is
     // brightest; alternating beats step between two shades.
@@ -479,16 +497,16 @@ export class SambaLooperUI {
       const pop = el("div", { class: "drum-load-pop" });
       for (const b of BUILTIN_PATTERNS) {
         const row = el("div", { class: "lrow" }, [b.name]);
-        row.addEventListener("click", () => { s.loadPattern(b.pattern, b.name, b.bpm ?? null); this.loadMenuOpen = false; this.rerender(); });
+        row.addEventListener("click", () => { s.loadPattern(b.pattern, b.name, b.bpm ?? null, null, b.opening ?? null); this.loadMenuOpen = false; this.rerender(); });
         pop.appendChild(row);
       }
       const saved = s.savedPatterns();
       if (saved.size) pop.appendChild(el("div", { class: "divider-line", style: "margin:4px 0" }));
-      for (const [name, pat] of saved) {
+      for (const [name, beat] of saved) {
         const del = el("button", { class: "btn text" }, ["✕"]);
         del.addEventListener("click", (e) => { e.stopPropagation(); s.deleteSaved(name); this.rerender(); });
-        const row = el("div", { class: "lrow" }, [el("span", { style: "flex:1" }, [name]), del]);
-        row.addEventListener("click", () => { s.loadPattern(pat as PercussionPattern, name); this.loadMenuOpen = false; this.rerender(); });
+        const row = el("div", { class: "lrow" }, [el("span", { style: "flex:1" }, [name + (beat.opening ? " ▶¹" : "")]), del]);
+        row.addEventListener("click", () => { s.loadPattern(beat.main, name, null, null, beat.opening); this.loadMenuOpen = false; this.rerender(); });
         pop.appendChild(row);
       }
       if (saved.size === 0) pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary)" }, ["(no saved beats yet)"]));
@@ -501,7 +519,7 @@ export class SambaLooperUI {
   private exportBeat(): void {
     const s = this.samba;
     const name = (s.loadedName ?? "beat").trim() || "beat";
-    const json = encodeBeatFile(name, s.bpm, s.swing, s.pattern);
+    const json = encodeBeatFile(name, s.bpm, s.swing, s.pattern, s.opening);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = el("a", { href: url, download: `${name.replace(/[^\w-]+/g, "_")}.chorect.json` }) as HTMLAnchorElement;
@@ -521,7 +539,7 @@ export class SambaLooperUI {
       reader.onload = () => {
         const parsed = decodeBeatFile(String(reader.result ?? ""));
         if (!parsed) { window.alert("Not a valid Chorect beat file."); return; }
-        this.samba.loadPattern(parsed.pattern, parsed.name, parsed.bpm, parsed.swing);
+        this.samba.loadPattern(parsed.pattern, parsed.name, parsed.bpm, parsed.swing, parsed.opening);
         this.rerender();
       };
       reader.readAsText(file);

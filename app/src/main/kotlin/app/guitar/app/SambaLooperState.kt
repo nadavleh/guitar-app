@@ -13,6 +13,7 @@ import app.guitar.theory.PercussionBuiltins
 import app.guitar.theory.PercussionPattern
 import app.guitar.theory.PercussionTiming
 import app.guitar.theory.PercussionVoices
+import app.guitar.theory.SavedBeat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -44,6 +45,44 @@ class SambaLooperState(
     // Clear all or Load another beat from there.
     var pattern by mutableStateOf(PercussionBuiltins.BATIDA_CAVACO_1)
         private set
+
+    /** Optional one-shot "opening" (entrada) played once before the loop starts. */
+    var opening by mutableStateOf<PercussionPattern?>(null)
+        private set
+
+    /** Which pattern the grid is editing: the loop (false) or the opening (true). */
+    var editingOpening by mutableStateOf(false)
+        private set
+
+    /** True while the scheduler is sounding the opening pass (drives the playhead). */
+    var playingOpening by mutableStateOf(false)
+        private set
+
+    /** The pattern the grid is currently editing (loop or opening). */
+    val editPattern: PercussionPattern
+        get() = if (editingOpening) opening ?: pattern else pattern
+
+    /** Create an empty opening (same kit + meter as the loop) and start editing it. */
+    fun addOpening() {
+        if (opening == null) {
+            opening = PercussionPattern.empty(pattern.instruments, pattern.meter)
+        }
+        editingOpening = true
+    }
+
+    /** Delete the opening and return to editing the loop. */
+    fun removeOpening() {
+        if (opening == null) return
+        pushUndo()
+        opening = null
+        editingOpening = false
+    }
+
+    /** Switch the grid between editing the loop and the opening. */
+    fun editOpening(on: Boolean) {
+        if (on && opening == null) { addOpening(); return }
+        editingOpening = on && opening != null
+    }
 
     /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
     var loadedName by mutableStateOf<String?>("batida do cavaco 1")
@@ -89,8 +128,8 @@ class SambaLooperState(
             is Brush.Cycle -> toggleSlot(instrument, slot)
             is Brush.Erase -> clearCell(instrument, slot)
             is Brush.Voice -> {
-                if (pattern.voiceAt(instrument, slot) == b.index) { clearCell(instrument, slot); return }
-                commit(pattern.withCell(instrument, slot, b.index))
+                if (editPattern.voiceAt(instrument, slot) == b.index) { clearCell(instrument, slot); return }
+                commit(editPattern.withCell(instrument, slot, b.index))
                 if (!isPlaying) audio.playSamples(buffer(instrument, b.index), effectiveGain(instrument, b.index))
             }
         }
@@ -105,31 +144,38 @@ class SambaLooperState(
         return buf
     }
 
-    // Undo stack of prior patterns (Ctrl-Z / Undo button). Every pattern edit pushes
-    // the previous pattern here via [commit]; [undo] pops it back.
-    private val undoStack = ArrayDeque<PercussionPattern>()
+    // Undo stack (Ctrl-Z / Undo button). Every edit pushes a snapshot of BOTH
+    // patterns via [commit], so undo restores loop + opening together.
+    private val undoStack = ArrayDeque<Pair<PercussionPattern, PercussionPattern?>>()
     var canUndo by mutableStateOf(false)
         private set
 
-    /** Apply a pattern edit, recording the previous pattern for undo. */
-    private fun commit(next: PercussionPattern) {
-        if (next == pattern) return
-        undoStack.addLast(pattern)
+    private fun pushUndo() {
+        undoStack.addLast(pattern to opening)
         while (undoStack.size > 50) undoStack.removeFirst()
-        pattern = next
-        loadedName = null   // an edit means it's no longer the named beat (load/save re-sets)
         canUndo = true
     }
 
-    /** Undo the last pattern edit. */
+    /** Apply an edit to whichever pattern the grid is editing (loop or opening),
+     *  recording the previous state for undo. */
+    private fun commit(next: PercussionPattern) {
+        if (next == editPattern) return
+        pushUndo()
+        if (editingOpening && opening != null) opening = next else pattern = next
+        loadedName = null   // an edit means it's no longer the named beat (load/save re-sets)
+    }
+
+    /** Undo the last edit (restores both loop and opening). */
     fun undo() {
         val prev = undoStack.removeLastOrNull() ?: return
-        pattern = prev
+        pattern = prev.first
+        opening = prev.second
+        if (opening == null) editingOpening = false
         canUndo = undoStack.isNotEmpty()
     }
 
     /** Reorder the kit: move the track at [from] to index [to]. */
-    fun reorderInstrument(from: Int, to: Int) { commit(pattern.movedInstrument(from, to)) }
+    fun reorderInstrument(from: Int, to: Int) { commit(editPattern.movedInstrument(from, to)) }
     var bpm by mutableStateOf(70)
     /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
     var swing by mutableStateOf(0)
@@ -234,8 +280,8 @@ class SambaLooperState(
 
     /** Cycle a cell's voice and, if it became audible, preview the new voice. */
     fun toggleSlot(instrument: PercussionInstrument, slot: Int) {
-        commit(pattern.cycled(instrument, slot))
-        val v = pattern.voiceAt(instrument, slot)
+        commit(editPattern.cycled(instrument, slot))
+        val v = editPattern.voiceAt(instrument, slot)
         if (v != null && !isPlaying) audio.playSamples(buffer(instrument, v), effectiveGain(instrument, v))
     }
 
@@ -246,37 +292,37 @@ class SambaLooperState(
 
     /** Toggle the accent on a non-silent cell (Accent tool). */
     fun toggleAccent(instrument: PercussionInstrument, slot: Int) {
-        commit(pattern.accentToggled(instrument, slot))
+        commit(editPattern.accentToggled(instrument, slot))
     }
 
     /** Clear a single cell (long-press) without cycling through the voices. */
     fun clearCell(instrument: PercussionInstrument, slot: Int) {
-        commit(pattern.withCell(instrument, slot, null))
+        commit(editPattern.withCell(instrument, slot, null))
     }
 
     fun clearRow(instrument: PercussionInstrument) {
-        commit(pattern.clearedRow(instrument))
+        commit(editPattern.clearedRow(instrument))
     }
 
     fun clearAll() {
-        commit(PercussionPattern.empty(pattern.instruments, pattern.meter))
+        commit(PercussionPattern.empty(editPattern.instruments, editPattern.meter))
     }
 
     // ---- Kit: add / remove instruments ----
 
     /** Catalog instruments not yet in the kit, in catalog order (for the picker). */
     fun instrumentsToAdd(): List<PercussionInstrument> =
-        PercussionCatalog.ALL.filter { !pattern.hasInstrument(it) }
+        PercussionCatalog.ALL.filter { !editPattern.hasInstrument(it) }
 
     /** Add [inst] to the kit (silent row) and audition its first voice. */
     fun addInstrument(inst: PercussionInstrument) {
-        commit(pattern.addInstrument(inst))
+        commit(editPattern.addInstrument(inst))
         if (!isPlaying) audio.playSamples(buffer(inst, 0), effectiveGain(inst, 0))
     }
 
     /** Remove [inst] from the kit, also clearing its mute/solo/selection state. */
     fun removeInstrument(inst: PercussionInstrument) {
-        commit(pattern.removeInstrument(inst))
+        commit(editPattern.removeInstrument(inst))
         muted = muted - inst
         soloed = soloed - inst
         if (selectedTrackId == inst.id) { selectedTrackId = null; brush = Brush.Cycle }
@@ -284,11 +330,12 @@ class SambaLooperState(
 
     // ---- Meter (bars / time signature / division) ----
 
-    val meter get() = pattern.meter
+    /** Meter of the pattern the grid is editing (opening can differ from the loop). */
+    val meter get() = editPattern.meter
 
-    /** Re-fit the current pattern onto [newMeter] (cells preserved by slot index). */
+    /** Re-fit the edited pattern onto [newMeter] (cells preserved by slot index). */
     fun setMeter(newMeter: PercussionMeter) {
-        commit(pattern.withMeter(newMeter))
+        commit(editPattern.withMeter(newMeter))
     }
 
     fun setBars(bars: Int) =
@@ -311,27 +358,35 @@ class SambaLooperState(
         setMeter(meter.copy(division = division))
     }
 
-    /** Translate (rotate) the whole loop by [n] slots with wrap-around. */
+    /** Translate (rotate) the edited pattern by [n] slots with wrap-around. */
     fun translate(n: Int) {
-        commit(pattern.translated(n))
+        commit(editPattern.translated(n))
     }
 
     // ---- Save / load user beats ----
 
-    /** User-saved beats, by name (observe in the UI). */
+    /** User-saved beats (loop + optional opening), by name (observe in the UI). */
     val savedPatterns get() = repo.drumPatterns
 
-    /** Save the current pattern under [name]. */
+    /** Save the current beat (loop + opening) under [name]. */
     fun saveCurrent(name: String) {
-        val snapshot = pattern
+        val snapshot = SavedBeat(pattern, opening)
         scope.launch { repo.saveDrumPattern(name, snapshot) }
         loadedName = name
     }
 
-    /** Replace the editable pattern with a saved/loaded one, optionally naming it
-     *  (caption) and setting its tempo / swing. */
-    fun loadPattern(p: PercussionPattern, name: String? = null, bpm: Int? = null, swing: Int? = null) {
-        commit(p)
+    /** Replace the editable beat with a saved/loaded one (loop + optional opening),
+     *  optionally naming it (caption) and setting its tempo / swing. Editing
+     *  returns to the loop grid. */
+    fun loadPattern(
+        p: PercussionPattern, name: String? = null,
+        bpm: Int? = null, swing: Int? = null,
+        opening: PercussionPattern? = null,
+    ) {
+        pushUndo()
+        pattern = p
+        this.opening = opening
+        editingOpening = false
         loadedName = name
         if (bpm != null) this.bpm = bpm.coerceIn(10, 300)
         if (swing != null) this.swing = swing.coerceIn(0, 100)
@@ -394,6 +449,26 @@ class SambaLooperState(
             }
             var nextOnsetNanos = System.nanoTime()
             var first = true
+
+            // ---- Opening: one pass of the (non-empty) opening pattern, then the loop.
+            val op = opening
+            if (op != null && !op.isEmpty()) {
+                playingOpening = true
+                for (slot in 0 until op.slots) {
+                    if (!isPlaying) break
+                    currentSlot = slot
+                    if (first) { scheduleSlot(op, slot, 0); first = false }
+                    val slotMs = PercussionTiming.swungSlotMs(slot, bpm, swing, op.meter)
+                    nextOnsetNanos += slotMs * 1_000_000
+                    val delayMs = ((nextOnsetNanos - System.nanoTime()) / 1_000_000).coerceAtLeast(0)
+                    // Next up: the opening's next slot, or the loop's downbeat when it ends.
+                    if (slot + 1 < op.slots) scheduleSlot(op, slot + 1, delayMs)
+                    else scheduleSlot(pattern, 0, delayMs)
+                    delay(delayMs)
+                }
+                playingOpening = false
+            }
+
             while (isPlaying) {
                 val snapshot = pattern        // re-read each pass so meter edits take effect
                 for (slot in 0 until snapshot.slots) {
@@ -417,6 +492,7 @@ class SambaLooperState(
         job?.cancel()
         job = null
         currentSlot = -1
+        playingOpening = false
         audio.stop()
     }
 

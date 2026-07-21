@@ -317,8 +317,14 @@ object PercussionBuiltins {
             "bongo=0,2,3,0,1,-,1,-,0,2,3,0,1,-,1,-",
     )
 
-    /** A loadable groove for the Load… menu; [bpm] (when non-null) is applied on load. */
-    data class BuiltinPattern(val name: String, val pattern: PercussionPattern, val bpm: Int? = null)
+    /** A loadable groove for the Load… menu; [bpm] (when non-null) is applied on
+     *  load; [opening] (when non-null) is a one-shot entrada played before the loop. */
+    data class BuiltinPattern(
+        val name: String,
+        val pattern: PercussionPattern,
+        val bpm: Int? = null,
+        val opening: PercussionPattern? = null,
+    )
 
     /** Grooves offered in the Load… menu (before the user's saved beats). */
     val ALL: List<BuiltinPattern> = listOf(
@@ -343,6 +349,8 @@ data class BeatFile(
     val bpm: Int,
     val swing: Int,
     val pattern: PercussionPattern,
+    /** Optional one-shot opening (entrada) played once before the loop. */
+    val opening: PercussionPattern? = null,
 ) {
     /** Pretty-printed JSON envelope written to disk. */
     fun encode(): String {
@@ -360,8 +368,11 @@ data class BeatFile(
             append("  \"name\": \"").append(esc(name)).append("\",\n")
             append("  \"bpm\": ").append(bpm).append(",\n")
             append("  \"swing\": ").append(swing).append(",\n")
-            append("  \"pattern\": \"").append(esc(pattern.encode())).append("\"\n")
-            append("}\n")
+            append("  \"pattern\": \"").append(esc(pattern.encode())).append("\"")
+            if (opening != null) {
+                append(",\n  \"opening\": \"").append(esc(opening.encode())).append("\"")
+            }
+            append("\n}\n")
         }
     }
 
@@ -375,10 +386,37 @@ data class BeatFile(
             val fields = parseFlatJsonObject(text) ?: return null
             if (fields["format"] != FORMAT) return null
             val pattern = PercussionPattern.decode(fields["pattern"] ?: return null) ?: return null
+            val opening = fields["opening"]?.let { PercussionPattern.decode(it) }
             val name = fields["name"]?.takeIf { it.isNotBlank() } ?: "beat"
             val bpm = fields["bpm"]?.toIntOrNull()?.coerceIn(10, 300) ?: 90
             val swing = fields["swing"]?.toIntOrNull()?.coerceIn(0, 100) ?: 0
-            return BeatFile(name, bpm, swing, pattern)
+            return BeatFile(name, bpm, swing, pattern, opening)
+        }
+    }
+}
+
+/**
+ * A saved beat: the loop plus an optional one-shot opening (entrada) played once
+ * before it. Persisted as "main" or "main~opening" — '~' never appears in
+ * [PercussionPattern.encode] output, and older app versions fail to decode the
+ * combined string and simply skip the beat rather than mis-reading it. Mirrors
+ * chorect-web's encodeBeatPatterns/decodeBeatPatterns.
+ */
+data class SavedBeat(val main: PercussionPattern, val opening: PercussionPattern? = null) {
+    fun encode(): String =
+        if (opening != null) main.encode() + SEP + opening.encode() else main.encode()
+
+    companion object {
+        const val SEP = "~"
+
+        /** Decode a persisted beat value (plain or "main~opening"); null if the
+         *  main pattern is unreadable. A bad opening part is dropped, not fatal. */
+        fun decode(s: String): SavedBeat? {
+            val sep = s.indexOf(SEP)
+            val mainStr = if (sep < 0) s else s.substring(0, sep)
+            val main = PercussionPattern.decode(mainStr) ?: return null
+            val opening = if (sep < 0) null else PercussionPattern.decode(s.substring(sep + 1))
+            return SavedBeat(main, opening)
         }
     }
 }

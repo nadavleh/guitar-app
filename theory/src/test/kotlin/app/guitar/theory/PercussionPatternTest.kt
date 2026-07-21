@@ -143,6 +143,27 @@ class PercussionPatternTest {
         assertEquals(PercussionBuiltins.ARRASTA_PE, parsed?.pattern)
     }
 
+    @Test fun `saved beat round-trips with and without an opening`() {
+        val plain = SavedBeat(PercussionBuiltins.XOTE)
+        assertEquals(plain, SavedBeat.decode(plain.encode()))
+        assertTrue(!plain.encode().contains(SavedBeat.SEP))
+
+        val withOpening = SavedBeat(PercussionBuiltins.XOTE, PercussionBuiltins.BATIDA_CAVACO_1)
+        assertEquals(withOpening, SavedBeat.decode(withOpening.encode()))
+        // A plain (pre-opening) encoded value still decodes — back-compat.
+        assertEquals(plain, SavedBeat.decode(PercussionBuiltins.XOTE.encode()))
+    }
+
+    @Test fun `beat file round-trips an opening`() {
+        val original = BeatFile("Entrada study", 80, 0, PercussionBuiltins.XOTE, PercussionBuiltins.BATIDA_CAVACO_1)
+        val parsed = BeatFile.decode(original.encode())
+        assertEquals(PercussionBuiltins.XOTE, parsed?.pattern)
+        assertEquals(PercussionBuiltins.BATIDA_CAVACO_1, parsed?.opening)
+        // A file without the optional key parses with a null opening.
+        val noOpening = BeatFile.decode(BeatFile("x", 80, 0, PercussionBuiltins.XOTE).encode())
+        assertEquals(null, noOpening?.opening)
+    }
+
     @Test fun `beat file parses web-style JSON with reordered keys and spacing`() {
         // Mimics chorect-web's JSON.stringify output shape (2-space indent).
         val json = """
