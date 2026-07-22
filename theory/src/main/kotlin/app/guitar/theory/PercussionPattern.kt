@@ -425,18 +425,18 @@ object PercussionBuiltins {
     private val SAMBA_CLAP = tamborimLine(setOf(0, 3, 6), bars = 1)
 
     /** The teleco-teco tamborim loop the entradas fall into — the same line as
-     *  the "Tamborim — teleco-teco" track preset. */
+     *  the "Tamborim — Teleco-teco" track preset. */
     private val TELECO_LOOP: PercussionPattern =
         builtin("M:2,2,4,16;tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0")
 
     /** Study grooves (the "Study" section): comping rhythms plus Oded's two
      *  entradas — each entrada plays once, then falls into the teleco-teco loop. */
     val STUDY: List<BuiltinPattern> = listOf(
-        BuiltinPattern("Bossa nova clave", BOSSA_UP, bpm = 70),
-        BuiltinPattern("Samba clap (palma)", SAMBA_CLAP, bpm = 70),
-        BuiltinPattern("Entrada 1 → teleco-teco", TELECO_LOOP, bpm = 80,
+        BuiltinPattern("Bossa Nova Clave", BOSSA_UP, bpm = 70),
+        BuiltinPattern("Samba Clap (Palma)", SAMBA_CLAP, bpm = 70),
+        BuiltinPattern("Entrada 1 → Teleco-teco", TELECO_LOOP, bpm = 80,
             opening = builtin("M:2,2,4,16;tamborim=0,2,1,0,1,2,0,2,0,2,0,2,0,2,1,0")),
-        BuiltinPattern("Entrada 2 → teleco-teco", TELECO_LOOP, bpm = 70,
+        BuiltinPattern("Entrada 2 → Teleco-teco", TELECO_LOOP, bpm = 70,
             opening = builtin("M:2,2,4,16;tamborim=0,2,0,2,0,2,0,2,0,2,0,2,0,2,1,0")),
     )
 
@@ -446,50 +446,50 @@ object PercussionBuiltins {
      *  Oded's entradas, and Nadav's variation exports. */
     val PRESET_TRACKS: List<PresetTrack> = listOf(
         PresetTrack(
-            "Surdo — marcação", PercussionCatalog.Surdo,
+            "Surdo — Marcação", PercussionCatalog.Surdo,
             listOf(1, null, null, 2, 0, null, null, 2, 1, null, null, 2, 0, null, null, 2),
         ),
         PresetTrack(
-            "Tamborim — teleco-teco", PercussionCatalog.Tamborim,
+            "Tamborim — Teleco-teco", PercussionCatalog.Tamborim,
             listOf(1, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 0, 1, 2, 0),
         ),
         PresetTrack(
-            "Tamborim — telecoteco var 1", PercussionCatalog.Tamborim,
+            "Tamborim — Telecoteco Var 1", PercussionCatalog.Tamborim,
             listOf(1, 0, 1, 0, 1, 2, 0, 1, 0, 0, 0, 0, 0, 1, 2, 0),
         ),
         PresetTrack(
-            "Tamborim — telecoteco var 2", PercussionCatalog.Tamborim,
+            "Tamborim — Telecoteco Var 2", PercussionCatalog.Tamborim,
             listOf(1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 0, 0, 0, 1, 2, 0),
         ),
         PresetTrack(
-            "Tamborim — telecoteco var 3", PercussionCatalog.Tamborim,
+            "Tamborim — Telecoteco Var 3", PercussionCatalog.Tamborim,
             listOf(1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0),
         ),
         PresetTrack(
-            "Tamborim — levada reta", PercussionCatalog.Tamborim,
+            "Tamborim — Levada Reta", PercussionCatalog.Tamborim,
             listOf(0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0),
             note = "Dynamics vary along the bar even where the stroke is the same.",
         ),
         PresetTrack(
-            "Tamborim — chamada", PercussionCatalog.Tamborim,
+            "Tamborim — Chamada", PercussionCatalog.Tamborim,
             listOf(1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0),
             swing = 61,
             note = "Played with ~60% swing.",
         ),
         PresetTrack(
-            "Tamborim — entrada 1", PercussionCatalog.Tamborim,
+            "Tamborim — Entrada 1", PercussionCatalog.Tamborim,
             listOf(0, 2, 1, 0, 1, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0),
         ),
         PresetTrack(
-            "Tamborim — entrada 2", PercussionCatalog.Tamborim,
+            "Tamborim — Entrada 2", PercussionCatalog.Tamborim,
             listOf(0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0),
         ),
         PresetTrack(
-            "Bongo — partido alto", PercussionCatalog.Bongo,
+            "Bongo — Partido Alto", PercussionCatalog.Bongo,
             listOf(null, 0, null, null, 1, null, 1, null, 1, null, 0, null, null, 1, null, 1),
         ),
         PresetTrack(
-            "Bongo — partido alto var 1", PercussionCatalog.Bongo,
+            "Bongo — Partido Alto Var 1", PercussionCatalog.Bongo,
             listOf(null, 0, null, 0, 1, null, 1, 1, 1, null, 1, 1, 1, null, 1, 1),
             note = "RULE: when returning to the regular partido alto after this variation, " +
                 "the partido alto gets a strong beat on beat 1 of measure 1 — the same stroke " +
@@ -497,7 +497,7 @@ object PercussionBuiltins {
             addsReturnDownbeat = true,
         ),
         PresetTrack(
-            "Bongo — partido alto var 2", PercussionCatalog.Bongo,
+            "Bongo — Partido Alto Var 2", PercussionCatalog.Bongo,
             listOf(null, 0, null, 0, 1, null, 0, null, 2, 1, null, 1, null, 1, null, 1),
         ),
     )
@@ -522,10 +522,10 @@ object PercussionBuiltins {
 
     /** Grooves offered in the Load… menu (before the user's saved beats). */
     val ALL: List<BuiltinPattern> = listOf(
-        BuiltinPattern("teleco-teco 1", TELECOTECO_1),
-        BuiltinPattern("Partido alto (official)", PARTIDO_ALTO_OFFICIAL, bpm = 70),
-        BuiltinPattern("Partido alto (dec)", PARTIDO_ALTO_DEC, bpm = 70),
-        BuiltinPattern("Platinelas pandeiro — partido alto", PARTIDO_ALTO_PLATINELAS, bpm = 70),
+        BuiltinPattern("Samba 1", TELECOTECO_1),
+        BuiltinPattern("Partido Alto Groove (Official)", PARTIDO_ALTO_OFFICIAL, bpm = 70),
+        BuiltinPattern("Partido Alto Groove (Dec)", PARTIDO_ALTO_DEC, bpm = 70),
+        BuiltinPattern("Platinelas Pandeiro — Partido Alto Groove", PARTIDO_ALTO_PLATINELAS, bpm = 70),
         BuiltinPattern("Xote", XOTE, bpm = 90),
         BuiltinPattern("Baião", BAIAO, bpm = 90),
         BuiltinPattern("Forró", FORRO, bpm = 95),

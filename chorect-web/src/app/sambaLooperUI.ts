@@ -286,7 +286,11 @@ export class SambaLooperUI {
       closeBtn.addEventListener("click", () => { legendDismissed = true; this.rerender(); });
       wrap.appendChild(el("div", { class: "et-card drum-legend", style: `background:var(--surface2)` }, [
         el("div", { class: "row" }, [
-          el("div", { class: "et-muted", style: "flex:1" }, ["Tap = toggle · hold = accent · long-press = erase"]),
+          el("div", { class: "et-muted", style: "flex:1" }, [
+            "Tap a cell = cycle its voice · long-press / right-click = clear. Tools: " +
+            "Accent ✓ + tap a hit = louder hit (teal ring) · Dyn ✓ + tap a hit = cycle its " +
+            "volume 100→75→50→25 % (shown faded) · Erase ✓ + tap = clear.",
+          ]),
           closeBtn,
         ]),
       ]));
@@ -649,23 +653,34 @@ export class SambaLooperUI {
       wrap.appendChild(el("div", { class: "block-row" }, [el("div", { class: "block-label-wrap" }, [label, rm]), cells]));
     });
 
-    // Phrase palette for the picked cell.
+    // Phrase palette for the picked cell (stays open so the swing can be tuned).
     const pick = this.blockPick;
     if (pick && pick.track < blk.tracks.length) {
       const track = blk.tracks[pick.track];
+      const current = track.cells[pick.col];
       const chips = el("div", { class: "pal-chips" });
-      const noneChip = el("button", { class: "pal-chip" }, ["(empty)"]);
-      noneChip.addEventListener("click", () => { b.setCell(pick.track, pick.col, null); this.blockPick = null; this.rerender(); });
+      const noneChip = el("button", { class: current ? "pal-chip" : "pal-chip on" }, ["(empty)"]);
+      noneChip.addEventListener("click", () => { b.setCell(pick.track, pick.col, null); this.rerender(); });
       chips.appendChild(noneChip);
       for (const p of b.phrasesFor(track.instrument)) {
-        const chip = el("button", { class: "pal-chip", title: p.note ?? "" }, [this.phraseShort(p) + (p.swing ? ` ~${p.swing}%` : "")]);
-        chip.addEventListener("click", () => { b.setCell(pick.track, pick.col, p); this.blockPick = null; this.rerender(); });
+        const sel = current?.label === p.label;
+        const chip = el("button", { class: sel ? "pal-chip on" : "pal-chip", title: p.note ?? "" }, [this.phraseShort(p) + (p.swing ? ` ~${p.swing}%` : "")]);
+        chip.addEventListener("click", () => { b.setCell(pick.track, pick.col, p); this.rerender(); });
         chips.appendChild(chip);
       }
+      const close = el("button", { class: "pal-chip pal-tool", "aria-label": "Close" }, ["✕"]);
+      close.addEventListener("click", () => { this.blockPick = null; this.rerender(); });
       wrap.appendChild(el("div", { class: "drum-palette", style: "margin-top:10px" }, [
         el("span", { class: "pal-name" }, [`${track.instrument.displayName} · phrase ${pick.col + 1}`]),
-        chips,
+        chips, close,
       ]));
+      // Per-cell swing override: THIS phrase's own clock (0 = straight).
+      if (current) {
+        wrap.appendChild(el("div", { class: "row", style: "margin-top:6px;gap:10px;align-items:center" }, [
+          el("span", { class: "drum-setup-label", style: "flex:0 0 auto" }, [`Swing of this phrase: ${current.swing ?? 0}%`]),
+          slider(0, 100, current.swing ?? 0, (v) => b.setCellSwing(pick.track, pick.col, v)),
+        ]));
+      }
     }
 
     // Rule/notes of the phrases in use, shown under the grid.
@@ -809,6 +824,14 @@ export class SambaLooperUI {
     };
     header("Grooves");
     for (const b of [...BUILTIN_PATTERNS, ...STUDY_PATTERNS]) beatRow(b);
+    // Track presets: tap to ADD the chunk as a track to the current beat.
+    header("Track presets");
+    for (const p of PRESET_TRACKS) {
+      const row = el("div", { class: "lrow", title: p.note ?? "tap to add this track to the current beat" },
+        [`★ ${p.label}` + (p.swing ? ` ~${p.swing}%` : "")]);
+      row.addEventListener("click", () => { s.addPresetTrack(p); this.rerender(); });
+      side.appendChild(row);
+    }
     header("Saved");
     const saved = s.savedPatterns();
     for (const [name, beat] of saved) {

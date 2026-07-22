@@ -7,9 +7,9 @@ import kotlin.test.assertTrue
 
 class DrumBlocksTest {
 
-    private val teleco = PercussionBuiltins.presetByLabel("Tamborim — teleco-teco")!!
-    private val paVar1 = PercussionBuiltins.presetByLabel("Bongo — partido alto var 1")!!
-    private val pa = PercussionBuiltins.presetByLabel("Bongo — partido alto")!!
+    private val teleco = PercussionBuiltins.presetByLabel("Tamborim — Teleco-teco")!!
+    private val paVar1 = PercussionBuiltins.presetByLabel("Bongo — Partido Alto Var 1")!!
+    private val pa = PercussionBuiltins.presetByLabel("Bongo — Partido Alto")!!
 
     @Test fun `block edits, encode and decode round-trip`() {
         var b = DrumBlock.empty("My block", 4)
@@ -23,6 +23,18 @@ class DrumBlocksTest {
         // Resizing keeps cells; growing adds empty columns.
         assertEquals(pa, b.withPhraseCount(6).tracks[1].cells[2])
         assertNull(b.withPhraseCount(2).tracks[1].cells.getOrNull(2))
+    }
+
+    @Test fun `per-cell swing override round-trips and default swing stays plain`() {
+        var b = DrumBlock.empty("Swing", 2).withTrack(PercussionCatalog.Tamborim)
+        b = b.withCell(0, 0, teleco.copy(swing = 55)).withCell(0, 1, teleco)
+        val decoded = DrumBlock.decode(b.encode())!!
+        assertEquals(55, decoded.tracks[0].cells[0]?.swing)
+        assertEquals(teleco, decoded.tracks[0].cells[1])   // untouched cell = library phrase
+        assertEquals(b, decoded)
+        // The encoding only annotates the overridden cell.
+        assertTrue(b.encode().contains("@55"))
+        assertEquals(1, Regex("@\\d+").findAll(b.encode()).count())
     }
 
     @Test fun `blocks merge only when phrase counts match`() {

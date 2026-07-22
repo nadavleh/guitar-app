@@ -73,10 +73,16 @@ export class DrumBlock {
   isEmpty(): boolean { return this.tracks.every((t) => t.cells.every((c) => c === null)); }
 
   /** Serialize: "name=instId:lbl,lbl,…|instId:…" — phrases referenced by label
-   *  (empty cell = empty label). Labels contain none of '=', '|', ':', ','. */
+   *  (empty cell = empty label). A cell whose swing was overridden away from its
+   *  library default is written "label@swing". Labels contain none of '=', '|',
+   *  ':', ',' (or a trailing "@<digits>"). */
   encode(): string {
     return this.name + "=" + this.tracks.map((t) =>
-      t.instrument.id + ":" + t.cells.map((c) => c?.label ?? "").join(",")).join("|");
+      t.instrument.id + ":" + t.cells.map((c) => {
+        if (!c) return "";
+        const libSwing = presetByLabel(c.label)?.swing ?? 0;
+        return (c.swing ?? 0) !== libSwing ? `${c.label}@${c.swing ?? 0}` : c.label;
+      }).join(",")).join("|");
   }
 
   /** Parse a value produced by `encode`; null on structural garbage. Unknown
@@ -94,7 +100,17 @@ export class DrumBlock {
       if (colon <= 0) return null;
       const inst = PercussionCatalog.resolve(trackStr.substring(0, colon));
       if (!inst) continue;
-      const cells = trackStr.substring(colon + 1).split(",").map((lbl) => (lbl ? presetByLabel(lbl) ?? null : null));
+      const cells = trackStr.substring(colon + 1).split(",").map((lbl): PresetTrack | null => {
+        if (!lbl) return null;
+        // "label@swing" = a per-cell swing override on the library phrase.
+        const at = lbl.lastIndexOf("@");
+        const overridden = at > 0 ? parseInt(lbl.substring(at + 1), 10) : NaN;
+        if (!Number.isNaN(overridden)) {
+          const base = presetByLabel(lbl.substring(0, at));
+          return base ? { ...base, swing: Math.min(Math.max(overridden, 0), 100) } : null;
+        }
+        return presetByLabel(lbl) ?? null;
+      });
       if (phraseCount === -1) phraseCount = cells.length;
       if (cells.length !== phraseCount) return null;
       tracks.push({ instrument: inst, cells });

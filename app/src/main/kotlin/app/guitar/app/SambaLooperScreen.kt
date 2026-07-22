@@ -422,7 +422,9 @@ private fun PatternSection(
                 modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             ) {
                 Text(
-                    "Tap = toggle · hold = accent · long-press = erase",
+                    "Tap a cell = cycle its voice · long-press = clear. Tools: Accent ✓ + tap " +
+                        "a hit = louder hit (teal ring) · Dyn ✓ + tap a hit = cycle its volume " +
+                        "100→75→50→25 % (shown faded) · Erase ✓ + tap = clear.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
@@ -905,29 +907,48 @@ private fun BlocksSection(blocks: BlocksState) {
         }
     }
 
-    // Phrase palette for the picked cell.
+    // Phrase palette for the picked cell (stays open so the swing can be tuned).
     pick?.let { (ti, c) ->
         if (ti < blk.tracks.size) {
             val track = blk.tracks[ti]
+            val current = track.cells[c]
             Spacer(Modifier.height(8.dp))
-            Text(
-                "${track.instrument.displayName} · phrase ${c + 1}",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "${track.instrument.displayName} · phrase ${c + 1}",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { pick = null }, contentPadding = STEP_PAD) { Text("✕") }
+            }
             Spacer(Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                PalChip("(empty)", selected = false) { blocks.setCell(ti, c, null); pick = null }
+                PalChip("(empty)", selected = current == null) { blocks.setCell(ti, c, null) }
                 for (p in blocks.phrasesFor(track.instrument)) {
                     val i = p.label.indexOf("— ")
                     val short = (if (i < 0) p.label else p.label.substring(i + 2)) +
                         (if (p.swing > 0) " ~${p.swing}%" else "")
-                    PalChip(short, selected = false) { blocks.setCell(ti, c, p); pick = null }
+                    PalChip(short, selected = current?.label == p.label) { blocks.setCell(ti, c, p) }
                 }
+            }
+            // Per-cell swing override: THIS phrase's own clock (0 = straight).
+            if (current != null) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Swing of this phrase: ${current.swing}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Slider(
+                    value = current.swing.toFloat(),
+                    onValueChange = { blocks.setCellSwing(ti, c, it.toInt()) },
+                    valueRange = 0f..100f,
+                )
             }
         }
     }
@@ -1015,6 +1036,13 @@ private fun BeatList(
             beatRow(b.name + if (b.opening != null) " ▶¹" else "", samba.loadedName == b.name) {
                 samba.loadPattern(b.pattern, b.name, b.bpm, opening = b.opening)
                 onLoaded()
+            }
+        }
+        // Track presets: tap to ADD the chunk as a track to the current beat.
+        header("Track presets")
+        for (p in app.guitar.theory.PercussionBuiltins.PRESET_TRACKS) {
+            beatRow("★ ${p.label}" + if (p.swing > 0) " ~${p.swing}%" else "", selected = false) {
+                samba.addPresetTrack(p)
             }
         }
         header("Saved")

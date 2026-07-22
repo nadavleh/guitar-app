@@ -55,6 +55,14 @@ export class BlocksState {
   addTrack(inst: PercussionInstrument) { this.block = this.block.withTrack(inst); this.ensureSamplesFor(inst); this.notify(); }
   removeTrack(index: number) { this.block = this.block.withoutTrack(index); this.notify(); }
   setCell(track: number, col: number, phrase: PresetTrack | null) { this.block = this.block.withCell(track, col, phrase); this.notify(); }
+
+  /** Override one cell's swing (0–100): the phrase keeps its own clock, so a
+   *  swung cell over straight tracks stays bar-aligned. Saved with the block. */
+  setCellSwing(track: number, col: number, swing: number) {
+    const phrase = this.block.tracks[track]?.cells[col];
+    if (!phrase) return;
+    this.setCell(track, col, { ...phrase, swing: Math.min(Math.max(Math.round(swing), 0), 100) });
+  }
   setPhraseCount(n: number) { this.block = this.block.withPhraseCount(n); this.notify(); }
   clear() { this.block = DrumBlock.empty(this.block.name, this.block.phraseCount); this.notify(); }
 

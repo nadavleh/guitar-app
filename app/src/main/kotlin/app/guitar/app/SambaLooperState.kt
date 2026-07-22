@@ -40,7 +40,7 @@ class SambaLooperState(
      *  back to the built-in synth. Injected so the pure state stays Context-free. */
     private val sampleLoader: (PercussionInstrument, Int) -> FloatArray? = { _, _ -> null },
 ) {
-    // Default-load the "batida do cavaco 1" groove (surdo + tamborim + bongo) so the
+    // Default-load the "Batida do Cavaco 1" groove (surdo + tamborim + bongo) so the
     // machine opens with a musical starting point on the default kit. The user can
     // Clear all or Load another beat from there.
     var pattern by mutableStateOf(PercussionBuiltins.BATIDA_CAVACO_1)
@@ -100,7 +100,7 @@ class SambaLooperState(
     }
 
     /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
-    var loadedName by mutableStateOf<String?>("batida do cavaco 1")
+    var loadedName by mutableStateOf<String?>("Batida do Cavaco 1")
         private set
 
     /** Free-text notes attached to the current beat (saved + exported with it). */

@@ -64,7 +64,7 @@ export function decodeBeatPatterns(s: string): SavedBeatValue | null {
 }
 
 export class SambaLooperState {
-  // Default-load "batida do cavaco 1" (surdo + tamborim + bongo) so the machine opens
+  // Default-load "Batida do Cavaco 1" (surdo + tamborim + bongo) so the machine opens
   // with a musical starting point on the default kit. Clear all / Load swaps it out.
   pattern: PercussionPattern = BATIDA_CAVACO_1;
   /** Optional one-shot "opening" (entrada) played once before the loop starts. */
@@ -78,7 +78,7 @@ export class SambaLooperState {
   isPlaying = false;
   currentSlot = -1;
   /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
-  loadedName: string | null = "batida do cavaco 1";
+  loadedName: string | null = "Batida do Cavaco 1";
   /** Free-text notes attached to the current beat (saved + exported with it). */
   beatNotes = "";
 

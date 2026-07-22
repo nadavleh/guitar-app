@@ -59,10 +59,18 @@ data class DrumBlock(
     fun isEmpty(): Boolean = tracks.all { t -> t.cells.all { it == null } }
 
     /** Serialize: "name=instId:lbl,lbl,…|instId:…" — phrases referenced by label
-     *  (empty cell = empty label). Labels contain none of '=', '|', ':', ','. */
+     *  (empty cell = empty label). A cell whose swing was overridden away from
+     *  its library default is written "label@swing". Labels contain none of
+     *  '=', '|', ':', ',' (or a trailing "@<digits>"). */
     fun encode(): String =
         name + "=" + tracks.joinToString("|") { t ->
-            t.instrument.id + ":" + t.cells.joinToString(",") { it?.label ?: "" }
+            t.instrument.id + ":" + t.cells.joinToString(",") { c ->
+                if (c == null) ""
+                else {
+                    val libSwing = PercussionBuiltins.presetByLabel(c.label)?.swing ?: 0
+                    if (c.swing != libSwing) "${c.label}@${c.swing}" else c.label
+                }
+            }
         }
 
     companion object {
@@ -86,7 +94,18 @@ data class DrumBlock(
                 if (colon <= 0) return null
                 val inst = PercussionCatalog.resolve(trackStr.substring(0, colon)) ?: continue
                 val cells = trackStr.substring(colon + 1).split(",").map { lbl ->
-                    if (lbl.isEmpty()) null else PercussionBuiltins.presetByLabel(lbl)
+                    if (lbl.isEmpty()) null
+                    else {
+                        // "label@swing" = a per-cell swing override on the library phrase.
+                        val at = lbl.lastIndexOf('@')
+                        val overridden = if (at > 0) lbl.substring(at + 1).toIntOrNull() else null
+                        if (overridden != null) {
+                            PercussionBuiltins.presetByLabel(lbl.substring(0, at))
+                                ?.copy(swing = overridden.coerceIn(0, 100))
+                        } else {
+                            PercussionBuiltins.presetByLabel(lbl)
+                        }
+                    }
                 }
                 if (phraseCount == -1) phraseCount = cells.size
                 if (cells.size != phraseCount) return null

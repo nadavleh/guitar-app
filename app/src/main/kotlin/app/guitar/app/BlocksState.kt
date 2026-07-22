@@ -64,6 +64,13 @@ class BlocksState(
     fun addTrack(inst: PercussionInstrument) { block = block.withTrack(inst) }
     fun removeTrack(index: Int) { block = block.withoutTrack(index) }
     fun setCell(track: Int, col: Int, phrase: PresetTrack?) { block = block.withCell(track, col, phrase) }
+
+    /** Override one cell's swing (0–100): the phrase keeps its own clock, so a
+     *  swung cell over straight tracks stays bar-aligned. Saved with the block. */
+    fun setCellSwing(track: Int, col: Int, swing: Int) {
+        val phrase = block.tracks.getOrNull(track)?.cells?.getOrNull(col) ?: return
+        setCell(track, col, phrase.copy(swing = swing.coerceIn(0, 100)))
+    }
     fun setPhraseCount(n: Int) { block = block.withPhraseCount(n) }
     fun clear() { block = DrumBlock.empty(block.name, block.phraseCount) }
 
