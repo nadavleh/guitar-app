@@ -534,9 +534,11 @@ export const PRESET_TRACKS: PresetTrack[] = [
     template: [1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 0, 0, 0, 1, 2, 0] },
   { label: "Tamborim — Telecoteco Var 3", instrument: Tamborim,
     template: [1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0] },
+  // Corrected per Nadav's export: each beat = ACCENTED clack, muted clack at
+  // 75 % (dyn level 1), tap, clack — with a light 10 % swing.
   { label: "Tamborim — Levada Reta", instrument: Tamborim,
-    template: [0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0],
-    note: "Dynamics vary along the bar even where the stroke is the same." },
+    template: [100, 1001, 2, 0, 100, 1001, 2, 0, 100, 1001, 2, 0, 100, 1001, 2, 0],
+    swing: 10 },
   { label: "Tamborim — Chamada", instrument: Tamborim,
     template: [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
     swing: 61, note: "Played with ~60% swing." },
