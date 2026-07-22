@@ -285,6 +285,7 @@ export class App {
     root.appendChild(this.tabbarEl);
     root.appendChild(this.sheetLayer);
     this.setupPressGuard();
+    this.setupMarquee();
     this.setupSpacebarShortcut();
     state.subscribe(() => this.scheduleRender());
     // Theme mode "Auto" tracks the system live (see isLightFor/render()).
@@ -342,6 +343,66 @@ export class App {
     };
     window.addEventListener("pointerup", release, true);
     window.addEventListener("pointercancel", release, true);
+  }
+
+  /** App-wide rectangle selection (Windows-desktop style): RIGHT-drag anywhere
+   *  on the screen draws a translucent rubber band; elements that tag themselves
+   *  as selectable (currently the drum grid's cells, via data-sect/track/slot)
+   *  get marked as it passes over them. A plain right-click (no drag) keeps its
+   *  usual meaning — clearing a grid cell, or the browser's own menu elsewhere;
+   *  text fields are exempt entirely so their native menus keep working. More
+   *  selectable element kinds can join later by tagging themselves the same way. */
+  private setupMarquee(): void {
+    let startX = 0, startY = 0;
+    let active = false, dragging = false;
+    let startedOnCell: HTMLElement | null = null;
+    let marquee: HTMLElement | null = null;
+    let suppressMenu = false;
+
+    document.addEventListener("pointerdown", (e) => {
+      if (e.button !== 2) return;
+      const t = e.target as HTMLElement;
+      if (t.closest("input, textarea, [contenteditable]")) return;
+      active = true;
+      dragging = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      startedOnCell = t.closest<HTMLElement>(".drum-cell[data-slot]");
+    }, true);
+
+    document.addEventListener("pointermove", (e) => {
+      if (!active) return;
+      if (!dragging && Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) < 5) return;
+      dragging = true;
+      if (!marquee) {
+        marquee = document.createElement("div");
+        marquee.className = "drum-marquee";
+        document.body.appendChild(marquee);
+      }
+      const left = Math.min(startX, e.clientX), top = Math.min(startY, e.clientY);
+      const width = Math.abs(e.clientX - startX), height = Math.abs(e.clientY - startY);
+      marquee.style.left = `${left}px`;
+      marquee.style.top = `${top}px`;
+      marquee.style.width = `${width}px`;
+      marquee.style.height = `${height}px`;
+      this.sambaUI.marqueeSelect({ left, top, right: left + width, bottom: top + height });
+    }, true);
+
+    document.addEventListener("pointerup", (e) => {
+      if (e.button !== 2 || !active) return;
+      active = false;
+      marquee?.remove();
+      marquee = null;
+      if (dragging) suppressMenu = true;
+      else if (startedOnCell && this.sambaUI.rightClickCell(startedOnCell)) suppressMenu = true;
+      startedOnCell = null;
+    }, true);
+
+    // Only swallow the browser context menu when the right button actually did
+    // something (a drag-select, or a cell clear).
+    document.addEventListener("contextmenu", (e) => {
+      if (suppressMenu) { e.preventDefault(); suppressMenu = false; }
+    }, true);
   }
 
   /** Physical-keyboard shortcuts (web). Space toggles play/stop; arrows/number keys

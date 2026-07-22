@@ -77,44 +77,57 @@ export class SambaLooperUI {
   private dynMode = false;
 
   // ---- rectangle select + copy/paste of strikes (web only) ----
-  /** Anchor cell of an in-progress right-drag selection. */
-  private selStart: { track: number; slot: number; inOpening: boolean } | null = null;
+  // The rubber-band itself is app-level (ui.ts setupMarquee): it draws anywhere
+  // on the screen and reports its rect here; only grid cells (elements tagged
+  // with data-sect/data-track/data-slot) are actually selected. More selectable
+  // element kinds can join later by tagging themselves the same way.
   /** The selected rectangle (inclusive), or null. */
   private selRect: { inOpening: boolean; t0: number; t1: number; s0: number; s1: number } | null = null;
   /** Cell the mouse is currently over — the Ctrl+V paste anchor. */
   private hoverCell: { track: number; slot: number; inOpening: boolean } | null = null;
   /** Copied region (rows × slots of raw cell values). */
   private cellClipboard: (number | null)[][] | null = null;
-  /** The visual rubber-band rectangle that follows the cursor during a right-drag
-   *  (Windows-desktop style). Lives on <body>, so grid rebuilds don't kill it. */
-  private marqueeEl: HTMLElement | null = null;
 
-  /** Start the marquee at the press point and track the pointer until release. */
-  private startMarquee(x0: number, y0: number): void {
-    this.killMarquee();
-    const m = el("div", { class: "drum-marquee" });
-    m.style.left = `${x0}px`;
-    m.style.top = `${y0}px`;
-    document.body.appendChild(m);
-    this.marqueeEl = m;
-    const onMove = (e: PointerEvent) => {
-      m.style.left = `${Math.min(x0, e.clientX)}px`;
-      m.style.top = `${Math.min(y0, e.clientY)}px`;
-      m.style.width = `${Math.abs(e.clientX - x0)}px`;
-      m.style.height = `${Math.abs(e.clientY - y0)}px`;
+  /** Live marquee update from ui.ts: select the grid cells intersecting the
+   *  viewport rect. If the rect spans both grids, the section holding most of
+   *  the hits wins (a selection is rectangular within ONE section). */
+  marqueeSelect(rect: { left: number; top: number; right: number; bottom: number }): void {
+    const hits = Array.from(document.querySelectorAll<HTMLElement>(".drum-cell[data-slot]"))
+      .map((elm) => ({ elm, r: elm.getBoundingClientRect() }))
+      .filter(({ r }) => r.right > rect.left && r.left < rect.right && r.bottom > rect.top && r.top < rect.bottom)
+      .map(({ elm }) => ({ sect: elm.dataset.sect!, track: Number(elm.dataset.track), slot: Number(elm.dataset.slot) }));
+    if (hits.length === 0) {
+      if (this.selRect) { this.selRect = null; this.rerender(); }
+      return;
+    }
+    const openingHits = hits.filter((h) => h.sect === "o").length;
+    const inOpening = openingHits > hits.length / 2;
+    const sel = hits.filter((h) => (h.sect === "o") === inOpening);
+    const next = {
+      inOpening,
+      t0: Math.min(...sel.map((h) => h.track)), t1: Math.max(...sel.map((h) => h.track)),
+      s0: Math.min(...sel.map((h) => h.slot)), s1: Math.max(...sel.map((h) => h.slot)),
     };
-    const onUp = () => {
-      document.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerup", onUp);
-      this.killMarquee();
-    };
-    document.addEventListener("pointermove", onMove);
-    document.addEventListener("pointerup", onUp);
+    const cur = this.selRect;
+    if (!cur || cur.inOpening !== next.inOpening || cur.t0 !== next.t0 || cur.t1 !== next.t1 || cur.s0 !== next.s0 || cur.s1 !== next.s1) {
+      this.selRect = next;
+      this.rerender();
+    }
   }
 
-  private killMarquee(): void {
-    this.marqueeEl?.remove();
-    this.marqueeEl = null;
+  /** A plain right-click (no drag) on a grid cell clears it (classic behavior).
+   *  Returns false when the element isn't a grid cell (native menu proceeds). */
+  rightClickCell(elm: HTMLElement): boolean {
+    const { sect, track, slot } = elm.dataset;
+    if (sect === undefined || track === undefined || slot === undefined) return false;
+    const inOpening = sect === "o";
+    const pat = inOpening ? this.samba.opening : this.samba.pattern;
+    const inst = pat?.instruments[Number(track)];
+    if (!pat || !inst) return false;
+    this.selRect = null;
+    this.samba.editOpening(inOpening);
+    this.samba.clearCell(inst, Number(slot));
+    return true;
   }
 
   /** Ctrl+C: copy the selected rectangle. False = no selection (let native copy run). */
@@ -590,22 +603,19 @@ export class SambaLooperUI {
       class: cls,
       style: `background:${fill}${dynStyle}`,
       title: dynLevel > 0 ? `${100 - dynLevel * 25}%` : "",
+      // Marquee-selectable element tags (see ui.ts setupMarquee).
+      "data-sect": inOpening ? "o" : "l",
+      "data-track": String(trackIndex),
+      "data-slot": String(slot),
     }, [voice !== null ? voiceOf(inst, voice).glyph : ""]);
 
-    // tap = cycle/erase/accent; long-press = clear; RIGHT-drag = rectangle
-    // selection (Ctrl+C copies it, hover a cell + Ctrl+V pastes). A plain
-    // right-click (no drag) still clears the single cell. Any edit first
-    // targets this cell's section (loop or opening).
+    // tap = cycle/erase/accent; long-press = clear. The RIGHT button is handled
+    // app-wide (ui.ts setupMarquee): drag = rectangle selection, plain click on
+    // a cell = clear. Any edit first targets this cell's section.
     let longPressed = false;
     let timer: number | undefined;
     c.addEventListener("pointerdown", (e) => {
-      if ((e as PointerEvent).button === 2) {
-        this.selStart = { track: trackIndex, slot, inOpening };
-        this.selRect = { inOpening, t0: trackIndex, t1: trackIndex, s0: slot, s1: slot };
-        this.startMarquee((e as PointerEvent).clientX, (e as PointerEvent).clientY);
-        this.rerender();
-        return;
-      }
+      if ((e as PointerEvent).button !== 0) return;
       // A left-click anywhere dismisses an existing selection.
       if (this.selRect) { this.selRect = null; this.rerender(); }
       longPressed = false;
@@ -614,29 +624,9 @@ export class SambaLooperUI {
     const cancel = () => { if (timer) { clearTimeout(timer); timer = undefined; } };
     c.addEventListener("pointerenter", () => {
       this.hoverCell = { track: trackIndex, slot, inOpening };
-      const a = this.selStart;
-      if (a && a.inOpening === inOpening) {
-        this.selRect = {
-          inOpening,
-          t0: Math.min(a.track, trackIndex), t1: Math.max(a.track, trackIndex),
-          s0: Math.min(a.slot, slot), s1: Math.max(a.slot, slot),
-        };
-        this.rerender();
-      }
     });
     c.addEventListener("pointerup", (e) => {
-      if ((e as PointerEvent).button === 2) {
-        const r = this.selRect;
-        this.selStart = null;
-        // No drag → the classic right-click single-cell clear.
-        if (r && r.t0 === r.t1 && r.s0 === r.s1) {
-          this.selRect = null;
-          s.editOpening(inOpening);
-          s.clearCell(inst, slot);
-        }
-        this.rerender();
-        return;
-      }
+      if ((e as PointerEvent).button !== 0) return;
       cancel();
       if (longPressed) return;
       s.editOpening(inOpening);
@@ -649,8 +639,6 @@ export class SambaLooperUI {
     });
     c.addEventListener("pointerleave", cancel);
     c.addEventListener("pointercancel", cancel);
-    // Suppress the native context menu over cells (right button is selection/clear).
-    c.addEventListener("contextmenu", (e) => { e.preventDefault(); cancel(); });
     return c;
   }
 
