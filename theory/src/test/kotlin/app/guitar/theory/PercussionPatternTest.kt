@@ -162,8 +162,8 @@ class PercussionPatternTest {
             assertEquals(b.pattern, PercussionPattern.decode(b.pattern.encode()), "${b.name} doesn't round-trip")
             b.opening?.let { assertEquals(it, PercussionPattern.decode(it.encode()), "${b.name} opening doesn't round-trip") }
         }
-        // The entradas carry openings.
-        assertEquals(8, PercussionBuiltins.STUDY.count { it.opening != null })
+        // Oded's two entradas carry openings.
+        assertEquals(2, PercussionBuiltins.STUDY.count { it.opening != null })
     }
 
     @Test fun `duplicated track clones the instrument and round-trips`() {

@@ -46,6 +46,9 @@ export class SambaLooperUI {
   private saveName = "";
   /** Shared lane scroll position, preserved across the full re-renders. */
   private laneScrollLeft = 0;
+  /** Beats side-panel scroll position, preserved across the full re-renders
+   *  (playback rebuilds the DOM every slot — without this the panel snaps to top). */
+  private sideScrollTop = 0;
   /** The single active outside-tap popup closer (never stacked). */
   private outsideCloser: ((e: Event) => void) | null = null;
   private toneSheetOpen = false;
@@ -104,6 +107,10 @@ export class SambaLooperUI {
 
     container.appendChild(screen);
     if (this.toneSheetOpen) container.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.rerender(); }));
+
+    // Restore the side panel's scroll position (rebuilt fresh on every rerender).
+    const side = screen.querySelector<HTMLElement>(".drum-side");
+    if (side) side.scrollTop = this.sideScrollTop;
 
     // Keep all step lanes scrolled together (fixed-size cells scroll horizontally
     // so they stay a consistent size regardless of viewport width).
@@ -583,6 +590,7 @@ export class SambaLooperUI {
   private beatSidebar(): HTMLElement {
     const s = this.samba;
     const side = el("div", { class: "drum-side" });
+    side.addEventListener("scroll", () => { this.sideScrollTop = side.scrollTop; });
     const header = (t: string) => side.appendChild(el("div", { class: "drum-side-head" }, [t]));
     const beatRow = (b: BuiltinPattern): void => {
       const cls = s.loadedName === b.name ? "lrow sel" : "lrow";

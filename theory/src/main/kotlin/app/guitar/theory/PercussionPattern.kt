@@ -378,46 +378,25 @@ object PercussionBuiltins {
         return builtin("M:$bars,2,4,16;tamborim=$cells")
     }
 
-    // ---- Study rhythms, transcribed from Adam Osmianski's "Brasilian Comping
-    // Rhythms" + "Telecoteco Entradas" sheets (thatdrumblog). 2 bars of 2/4 on a
-    // 16th grid unless noted; single tamborim line ("up side" phrasings only —
-    // the down sides are rarely played). An entrada is an OPENING played once
-    // before its loop.
-    private val PA_UP = tamborimLine(setOf(1, 4, 6, 8, 10, 13, 15))
-    private val TT1_UP = tamborimLine(setOf(1, 3, 5, 6, 8, 10, 12, 13, 15))
-    private val TT2_UP = tamborimLine(setOf(1, 3, 5, 6, 8, 10, 12, 14, 15))
-    private val TT3_UP = tamborimLine(setOf(1, 3, 6, 8, 10, 12, 15))
-    private val TT4_UP = tamborimLine(setOf(1, 3, 6, 8, 10, 13, 15))
+    // ---- Study rhythms. 2 bars of 2/4 on a 16th grid unless noted; single
+    // tamborim line. An entrada is an OPENING played once before its loop.
     private val BOSSA_UP = tamborimLine(setOf(0, 3, 6, 10, 13))
     private val SAMBA_CLAP = tamborimLine(setOf(0, 3, 6), bars = 1)
 
-    /** Study grooves (the "Study" section): the comping rhythms plus the eight
-     *  entradas — each entrada is the beat's opening, played once into its
-     *  telecoteco (or partido-alto) loop. */
+    /** The teleco-teco tamborim loop the entradas fall into — the same line as
+     *  the "Tamborim — teleco-teco" track preset. */
+    private val TELECO_LOOP: PercussionPattern =
+        builtin("M:2,2,4,16;tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0")
+
+    /** Study grooves (the "Study" section): comping rhythms plus Oded's two
+     *  entradas — each entrada plays once, then falls into the teleco-teco loop. */
     val STUDY: List<BuiltinPattern> = listOf(
-        BuiltinPattern("Partido alto", PA_UP, bpm = 70),
-        BuiltinPattern("Teleco-teco 1", TT1_UP, bpm = 70),
-        BuiltinPattern("Teleco-teco 2", TT2_UP, bpm = 70),
-        BuiltinPattern("Teleco-teco 3", TT3_UP, bpm = 70),
-        BuiltinPattern("Teleco-teco 4", TT4_UP, bpm = 70),
-        BuiltinPattern("Bossa nova", BOSSA_UP, bpm = 70),
+        BuiltinPattern("Bossa nova clave", BOSSA_UP, bpm = 70),
         BuiltinPattern("Samba clap (palma)", SAMBA_CLAP, bpm = 70),
-        BuiltinPattern("Entrada 1 → teleco-teco", TT1_UP, bpm = 70,
-            opening = tamborimLine(setOf(0, 1, 3, 5, 6, 8, 10, 12, 13, 15))),
-        BuiltinPattern("Entrada 2 → teleco-teco", TT1_UP, bpm = 70,
-            opening = tamborimLine(setOf(0, 2, 4, 6, 8, 10, 12, 13, 14))),
-        BuiltinPattern("Entrada 3 → teleco-teco", TT1_UP, bpm = 70,
-            opening = tamborimLine(setOf(0, 2, 4, 6, 8, 10, 12, 14, 15))),
-        BuiltinPattern("Entrada 4 → teleco-teco", TT1_UP, bpm = 70,
-            opening = tamborimLine(setOf(0, 2, 4, 6, 8, 10, 12, 15))),
-        BuiltinPattern("Entrada 5 → teleco-teco", TT1_UP, bpm = 70,
-            opening = tamborimLine(setOf(0, 3, 6, 8, 10, 13, 15))),
-        BuiltinPattern("Entrada 6 → teleco-teco", TT1_UP, bpm = 70,
-            opening = tamborimLine(setOf(0, 3, 6, 8, 10, 12, 15))),
-        BuiltinPattern("Entrada 7 → teleco-teco", TT1_UP, bpm = 70,
-            opening = tamborimLine(setOf(4, 6, 8, 10, 12, 13, 15), accented = setOf(1))),
-        BuiltinPattern("Entrada 8 → partido alto", PA_UP, bpm = 70,
-            opening = tamborimLine(setOf(4, 6, 8, 10, 13, 15), accented = setOf(1))),
+        BuiltinPattern("Entrada 1 (Oded) → teleco-teco", TELECO_LOOP, bpm = 80,
+            opening = builtin("M:2,2,4,16;tamborim=0,2,1,0,1,2,0,2,0,2,0,2,0,2,1,0")),
+        BuiltinPattern("Entrada 2 (Oded) → teleco-teco", TELECO_LOOP, bpm = 70,
+            opening = builtin("M:2,2,4,16;tamborim=0,2,0,2,0,2,0,2,0,2,0,2,0,2,1,0")),
     )
 
     /** Track presets: the marcação surdo (◐··●, the classic samba marking) and the
