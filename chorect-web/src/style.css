@@ -108,6 +108,12 @@ html, body, #app {
 body {
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  /* Text is selectable/copyable (notes, names, rule texts); only interactive
+     controls opt out below so taps don't trigger accidental selections. */
+}
+
+button, summary, select, .chip, .pal-chip, .ms-tag, .drum-label, .rail-btn,
+.glyph, .tone-chip, .transport-play, .block-cell, .drum-side .lrow, .drum-load-pop .lrow {
   user-select: none;
   -webkit-user-select: none;
 }

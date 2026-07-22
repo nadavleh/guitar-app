@@ -285,12 +285,16 @@ export class SambaLooperUI {
     if (!legendDismissed) {
       const closeBtn = el("button", { class: "tune-btn", "aria-label": "Dismiss" }, [icon("close", 16)]);
       closeBtn.addEventListener("click", () => { legendDismissed = true; this.rerender(); });
+      const legendLine = (head: string, rest: string) => el("div", { class: "et-muted", style: "line-height:1.5" }, [
+        el("b", { style: "color:var(--text-primary)" }, [head]), rest,
+      ]);
       wrap.appendChild(el("div", { class: "et-card drum-legend", style: `background:var(--surface2)` }, [
-        el("div", { class: "row" }, [
-          el("div", { class: "et-muted", style: "flex:1" }, [
-            "Tap a cell = cycle its voice · long-press / right-click = clear. Tools: " +
-            "Accent ✓ + tap a hit = louder hit (teal ring) · Dyn ✓ + tap a hit = cycle its " +
-            "volume 100→75→50→25 % (shown faded) · Erase ✓ + tap = clear.",
+        el("div", { class: "row", style: "align-items:flex-start" }, [
+          el("div", { style: "flex:1" }, [
+            legendLine("Grid:  ", "tap a cell = cycle its voice · long-press (or right-click) = clear it"),
+            legendLine("Accent tool:  ", "turn it on, then tap a hit → the hit plays louder (teal ring)"),
+            legendLine("Dyn tool:  ", "turn it on, then tap a hit → its volume cycles 100 → 75 → 50 → 25 % (shown faded)"),
+            legendLine("Erase tool:  ", "turn it on, then tap any cell → cleared"),
           ]),
           closeBtn,
         ]),

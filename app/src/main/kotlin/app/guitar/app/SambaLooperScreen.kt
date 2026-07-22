@@ -64,7 +64,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.guitar.theory.BeatFile
@@ -481,14 +484,23 @@ private fun PatternSection(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             ) {
-                Text(
-                    "Tap a cell = cycle its voice · long-press = clear. Tools: Accent ✓ + tap " +
-                        "a hit = louder hit (teal ring) · Dyn ✓ + tap a hit = cycle its volume " +
-                        "100→75→50→25 % (shown faded) · Erase ✓ + tap = clear.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    @Composable
+                    fun legendLine(head: String, rest: String) {
+                        Text(
+                            buildAnnotatedString {
+                                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(head) }
+                                append(rest)
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    legendLine("Grid:  ", "tap a cell = cycle its voice · long-press = clear it")
+                    legendLine("Accent tool:  ", "turn it on, then tap a hit → the hit plays louder (teal ring)")
+                    legendLine("Dyn tool:  ", "turn it on, then tap a hit → its volume cycles 100 → 75 → 50 → 25 % (faded)")
+                    legendLine("Erase tool:  ", "turn it on, then tap any cell → cleared")
+                }
                 IconButton(onClick = { legendDismissed = true }) {
                     Icon(Icons.Rounded.Close, contentDescription = "Dismiss", modifier = Modifier.size(18.dp))
                 }
@@ -1019,14 +1031,18 @@ private fun BlocksSection(blocks: BlocksState) {
         }
     }
 
-    // Rule/notes of the phrases in use, shown under the grid.
-    val noted = LinkedHashSet<String>()
-    for (t in blk.tracks) for (p in t.cells) {
-        if (p != null && p.note.isNotEmpty() && noted.add(p.label)) {
-            Spacer(Modifier.height(4.dp))
-            Text("※ ${p.label}: ${p.note}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // Rule/notes of the phrases in use, shown under the grid (selectable → copyable).
+    androidx.compose.foundation.text.selection.SelectionContainer {
+        Column {
+            val noted = LinkedHashSet<String>()
+            for (t in blk.tracks) for (p in t.cells) {
+                if (p != null && p.note.isNotEmpty() && noted.add(p.label)) {
+                    Spacer(Modifier.height(4.dp))
+                    Text("※ ${p.label}: ${p.note}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
     }
     Spacer(Modifier.height(10.dp))
