@@ -122,6 +122,9 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     // Which track's mixer popup (volumes/remove) is open — triggered from the
     // palette's Mixer chip, anchored at that track's row label.
     var mixerFor by remember { mutableStateOf<String?>(null) }
+    // Track whose row is being saved as a named phrase (palette 💾 chip).
+    var phraseSaveFor by remember { mutableStateOf<PercussionInstrument?>(null) }
+    var phraseName by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -166,6 +169,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             } else {
                 PatternSection(
                     samba = samba,
+                    blocks = blocks,
                     eraseMode = eraseMode,
                     onEraseMode = { eraseMode = it },
                     accentMode = accentMode,
@@ -184,7 +188,11 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
         val selInst = samba.editPattern.instruments.firstOrNull { it.id == samba.selectedTrackId }
         if (selInst != null) {
             Spacer(Modifier.height(6.dp))
-            PaletteBar(samba, selInst, onMixer = { mixerFor = selInst.id })
+            PaletteBar(
+                samba, selInst,
+                onMixer = { mixerFor = selInst.id },
+                onSavePhrase = { phraseSaveFor = selInst },
+            )
         }
 
         Spacer(Modifier.height(8.dp))
@@ -202,6 +210,36 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             inlineBpm = true,
         )
         if (toneSheetOpen) ToneSheet(state, onDismiss = { toneSheetOpen = false })
+
+        // Save-as-phrase dialog: names the selected track's row into the phrase
+        // library (accents + dynamics included). Same name as a preset replaces it.
+        phraseSaveFor?.let { inst ->
+            AlertDialog(
+                onDismissRequest = { phraseSaveFor = null },
+                title = { Text("Save track as phrase") },
+                text = {
+                    OutlinedTextField(
+                        value = phraseName,
+                        onValueChange = { phraseName = it },
+                        label = { Text("Phrase name (same name replaces a preset)") },
+                        singleLine = true,
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = phraseName.isNotBlank(),
+                        onClick = {
+                            val row = samba.editPattern.grid[inst.id] ?: emptyList()
+                            if (blocks.saveTrackAsPreset(inst, row, phraseName)) {
+                                phraseSaveFor = null
+                                phraseName = ""
+                            }
+                        },
+                    ) { Text("Save") }
+                },
+                dismissButton = { TextButton(onClick = { phraseSaveFor = null }) { Text("Cancel") } },
+            )
+        }
     }
 }
 
@@ -211,6 +249,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
 @Composable
 private fun PatternSection(
     samba: SambaLooperState,
+    blocks: BlocksState,
     eraseMode: Boolean,
     onEraseMode: (Boolean) -> Unit,
     accentMode: Boolean,
@@ -289,7 +328,7 @@ private fun PatternSection(
                         DropdownMenuItem(text = { Text("From a preset track",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant) }, enabled = false, onClick = {})
-                        for (p in app.guitar.theory.PercussionBuiltins.PRESET_TRACKS) {
+                        for (p in blocks.allPresets()) {
                             DropdownMenuItem(
                                 text = { Text("★ ${p.label}") },
                                 onClick = { openingMenu = false; samba.addOpeningFromPreset(p) },
@@ -338,8 +377,8 @@ private fun PatternSection(
         } else {
             OutlinedButton(onClick = { onDynMode(true); onEraseMode(false); onAccentMode(false) }) { Text("Dyn") }
         }
-        OutlinedButton(onClick = { saveName = ""; saveDialog = true }) { Text("Save…") }
-        LoadBeatsControl(samba)
+        OutlinedButton(onClick = { saveName = samba.loadedName ?: ""; saveDialog = true }) { Text("Save…") }
+        LoadBeatsControl(samba, blocks)
         OutlinedButton(onClick = { samba.clearAll() }) { Text("Clear all") }
         OutlinedButton(onClick = { samba.undo() }, enabled = samba.canUndo) { Text("↶ Undo") }
         // Notes toggle (the editor shows under the beat header).
@@ -362,7 +401,7 @@ private fun PatternSection(
                 DropdownMenuItem(text = { Text("Track presets",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant) }, enabled = false, onClick = {})
-                for (p in app.guitar.theory.PercussionBuiltins.PRESET_TRACKS) {
+                for (p in blocks.allPresets()) {
                     DropdownMenuItem(
                         text = { Text("★ ${p.label}") },
                         onClick = { samba.addPresetTrack(p); addMenu = false },
@@ -762,7 +801,7 @@ private fun TranslateControl(samba: SambaLooperState) {
 @Composable
 private fun BlocksSection(blocks: BlocksState) {
     val blk = blocks.block
-    val saved by blocks.savedBlocks.collectAsState(initial = emptyMap())
+    val saved = blocks.savedBlocks
     var pick by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     // Header: name + phrase-count stepper.
@@ -822,6 +861,12 @@ private fun BlocksSection(blocks: BlocksState) {
             }
         }
         OutlinedButton(onClick = { pick = null; blocks.clear() }) { Text("Clear") }
+        // Metronome: overlay a wood click on the block (higher on each bar's "1").
+        if (blocks.metronomeOn) {
+            Button(onClick = { blocks.toggleMetronome() }) { Text("Metronome ✓") }
+        } else {
+            OutlinedButton(onClick = { blocks.toggleMetronome() }) { Text("Metronome") }
+        }
         var addOpen by remember { mutableStateOf(false) }
         Box {
             Button(onClick = { addOpen = true }) { Text("+ Track ▾") }
@@ -970,7 +1015,7 @@ private fun BlocksSection(blocks: BlocksState) {
  *  position is REMEMBERED across openings — the phone keeps the grid full-width
  *  (web uses a constantly-open side panel with the same content). */
 @Composable
-private fun LoadBeatsControl(samba: SambaLooperState) {
+private fun LoadBeatsControl(samba: SambaLooperState, blocks: BlocksState) {
     val saved by samba.savedPatterns.collectAsState(initial = emptyMap())
     var open by remember { mutableStateOf(false) }
     // Hoisted above the menu so closing/reopening keeps the scroll position.
@@ -978,7 +1023,7 @@ private fun LoadBeatsControl(samba: SambaLooperState) {
     Box {
         OutlinedButton(onClick = { open = true }) { Text("Load…") }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            BeatList(samba, saved, listScroll, onLoaded = { open = false })
+            BeatList(samba, blocks, saved, listScroll, onLoaded = { open = false })
         }
     }
 }
@@ -986,6 +1031,7 @@ private fun LoadBeatsControl(samba: SambaLooperState) {
 @Composable
 private fun BeatList(
     samba: SambaLooperState,
+    blocks: BlocksState,
     saved: Map<String, app.guitar.theory.SavedBeat>,
     listScroll: androidx.compose.foundation.ScrollState,
     onLoaded: () -> Unit,
@@ -1039,9 +1085,26 @@ private fun BeatList(
             }
         }
         // Track presets: tap to ADD the chunk as a track to the current beat.
+        // User-defined phrases (👤) can be deleted; save one via the track palette's 💾.
         header("Track presets")
-        for (p in app.guitar.theory.PercussionBuiltins.PRESET_TRACKS) {
-            beatRow("★ ${p.label}" + if (p.swing > 0) " ~${p.swing}%" else "", selected = false) {
+        val customs = blocks.customPresets.keys
+        for (p in blocks.allPresets()) {
+            val isCustom = p.label in customs
+            beatRow(
+                "★ ${p.label}" + (if (p.swing > 0) " ~${p.swing}%" else "") + (if (isCustom) " 👤" else ""),
+                selected = false,
+                trailing = if (!isCustom) null else ({
+                    Text(
+                        "✕",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { blocks.deleteTrackPreset(p.label) }
+                            .padding(4.dp),
+                    )
+                }),
+            ) {
                 samba.addPresetTrack(p)
             }
         }
@@ -1295,7 +1358,12 @@ private fun InstrumentRow(
  *  voice (tapping also previews the sound), or Erase. Mixer opens the volume
  *  popup at the track's row; ✕ deselects. */
 @Composable
-private fun PaletteBar(samba: SambaLooperState, inst: PercussionInstrument, onMixer: () -> Unit) {
+private fun PaletteBar(
+    samba: SambaLooperState,
+    inst: PercussionInstrument,
+    onMixer: () -> Unit,
+    onSavePhrase: () -> Unit = {},
+) {
     val brush = samba.brush
     Row(
         modifier = Modifier
@@ -1332,6 +1400,10 @@ private fun PaletteBar(samba: SambaLooperState, inst: PercussionInstrument, onMi
         PalChip("Mixer", selected = false, tool = true, onTap = onMixer)
         Spacer(Modifier.width(6.dp))
         PalChip("⧉ Dup", selected = false, tool = true) { samba.duplicateTrack(inst) }
+        Spacer(Modifier.width(6.dp))
+        // Save this track's row as a named PHRASE (custom preset): joins the
+        // library everywhere; a built-in's name REPLACES it (edit-and-resave).
+        PalChip("💾", selected = false, tool = true, onTap = onSavePhrase)
         Spacer(Modifier.width(6.dp))
         PalChip("✕", selected = false, tool = true) { samba.selectTrack(inst.id) }
     }

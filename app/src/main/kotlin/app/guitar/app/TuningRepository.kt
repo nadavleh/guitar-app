@@ -358,33 +358,62 @@ class TuningRepository(private val context: Context) {
 
     private val keyDrumBlocks = stringPreferencesKey("drum_blocks")
 
-    /** User-saved drum BLOCKS (phrase sequences), by name. Each line is one
-     *  [app.guitar.theory.DrumBlock.encode] value (which embeds the name). */
-    val drumBlocks: Flow<Map<String, app.guitar.theory.DrumBlock>> =
+    /** User-saved drum BLOCKS as RAW encoded lines ([app.guitar.theory.DrumBlock.encode]
+     *  values, which embed the name). Decoding happens in BlocksState, where the
+     *  custom phrase library is available to resolve user-defined phrase labels. */
+    val drumBlockLines: Flow<List<String>> =
         context.tuningDataStore.data.map { prefs ->
-            val out = LinkedHashMap<String, app.guitar.theory.DrumBlock>()
-            for (line in (prefs[keyDrumBlocks] ?: "").split("\n")) {
-                val b = app.guitar.theory.DrumBlock.decode(line) ?: continue
-                out[b.name] = b
-            }
-            out
+            (prefs[keyDrumBlocks] ?: "").split("\n").filter { it.contains('=') }
         }
 
-    suspend fun saveDrumBlock(block: app.guitar.theory.DrumBlock) {
+    /** Save/overwrite a block (keyed by the name embedded before '='). */
+    suspend fun saveDrumBlock(encoded: String) {
+        val name = encoded.substringBefore('=')
+        if (name.isEmpty()) return
         context.tuningDataStore.edit { prefs ->
             val lines = (prefs[keyDrumBlocks] ?: "").split("\n")
-                .mapNotNull { app.guitar.theory.DrumBlock.decode(it) }
-                .filter { it.name != block.name } + block
-            prefs[keyDrumBlocks] = lines.joinToString("\n") { it.encode() }
+                .filter { it.contains('=') && it.substringBefore('=') != name } + encoded
+            prefs[keyDrumBlocks] = lines.joinToString("\n")
         }
     }
 
     suspend fun deleteDrumBlock(name: String) {
         context.tuningDataStore.edit { prefs ->
             val lines = (prefs[keyDrumBlocks] ?: "").split("\n")
-                .mapNotNull { app.guitar.theory.DrumBlock.decode(it) }
-                .filter { it.name != name }
-            prefs[keyDrumBlocks] = lines.joinToString("\n") { it.encode() }
+                .filter { it.contains('=') && it.substringBefore('=') != name }
+            prefs[keyDrumBlocks] = lines.joinToString("\n")
+        }
+    }
+
+    private val keyDrumTrackPresets = stringPreferencesKey("drum_track_presets")
+
+    /** USER-DEFINED phrases (custom track presets), label → decoded PresetTrack.
+     *  Stored one [app.guitar.theory.encodePresetTrack] value per line. */
+    val drumTrackPresets: Flow<Map<String, app.guitar.theory.PercussionBuiltins.PresetTrack>> =
+        context.tuningDataStore.data.map { prefs ->
+            val out = LinkedHashMap<String, app.guitar.theory.PercussionBuiltins.PresetTrack>()
+            for (line in (prefs[keyDrumTrackPresets] ?: "").split("\n")) {
+                val p = app.guitar.theory.decodePresetTrack(line) ?: continue
+                out[p.label] = p
+            }
+            out
+        }
+
+    suspend fun saveDrumTrackPreset(encoded: String) {
+        val label = encoded.substringBefore('=')
+        if (label.isEmpty()) return
+        context.tuningDataStore.edit { prefs ->
+            val lines = (prefs[keyDrumTrackPresets] ?: "").split("\n")
+                .filter { it.contains('=') && it.substringBefore('=') != label } + encoded
+            prefs[keyDrumTrackPresets] = lines.joinToString("\n")
+        }
+    }
+
+    suspend fun deleteDrumTrackPreset(label: String) {
+        context.tuningDataStore.edit { prefs ->
+            val lines = (prefs[keyDrumTrackPresets] ?: "").split("\n")
+                .filter { it.contains('=') && it.substringBefore('=') != label }
+            prefs[keyDrumTrackPresets] = lines.joinToString("\n")
         }
     }
 

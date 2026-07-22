@@ -17,6 +17,8 @@ import app.guitar.theory.PERCUSSION_ACCENT
 import app.guitar.theory.PERCUSSION_DYN
 import app.guitar.theory.PERCUSSION_DYN_FACTORS
 import app.guitar.theory.materializedTemplate
+import app.guitar.theory.mergedPresets
+import app.guitar.theory.encodePresetTrack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -51,6 +53,53 @@ class BlocksState(
     var currentCol by mutableStateOf(-1)
         private set
 
+    /** Overlay a wood-click metronome (higher click on each bar's "1"). */
+    var metronomeOn by mutableStateOf(false)
+        private set
+    fun toggleMetronome() { metronomeOn = !metronomeOn }
+    private val mClick: FloatArray by lazy { synthWood(2000.0, 45) }
+    private val mAccent: FloatArray by lazy { synthWood(2800.0, 45) }
+    private fun synthWood(freqHz: Double, ms: Int, sr: Int = 44100): FloatArray {
+        val n = sr * ms / 1000
+        val buf = FloatArray(n)
+        val w = 2.0 * Math.PI * freqHz / sr
+        for (i in 0 until n) buf[i] = (Math.sin(w * i) * Math.exp(-6.0 * i / n) * 0.7).toFloat()
+        return buf
+    }
+
+    /** USER-DEFINED phrases (custom track presets) + raw saved-block lines,
+     *  mirrored from the repo so the library resolves synchronously. */
+    var customPresets by mutableStateOf<Map<String, PresetTrack>>(emptyMap())
+        private set
+    private var savedBlockLines by mutableStateOf<List<String>>(emptyList())
+
+    init {
+        scope.launch { repo.drumTrackPresets.collect { customPresets = it } }
+        scope.launch { repo.drumBlockLines.collect { savedBlockLines = it } }
+    }
+
+    /** Library lookup: a user phrase with a built-in's label REPLACES it. */
+    fun resolvePreset(label: String): PresetTrack? =
+        customPresets[label] ?: PercussionBuiltins.presetByLabel(label)
+
+    /** All phrases (built-ins overridden/extended by the user's). */
+    fun allPresets(): List<PresetTrack> = mergedPresets(customPresets.values)
+
+    /** Save a Beat-editor track as a named phrase (custom track preset). The row's
+     *  accents + dynamics ride along in the raw values; clones save as their base
+     *  instrument. Returns false when the label is empty/has reserved chars. */
+    fun saveTrackAsPreset(inst: PercussionInstrument, row: List<Int?>, label: String): Boolean {
+        val clean = label.trim()
+        if (clean.isEmpty() || clean.any { it in "=:,|@~" || it == '\n' }) return false
+        val base = PercussionCatalog.byId(PercussionCatalog.baseId(inst.id)) ?: inst
+        val template = List(16) { i -> row.getOrNull(i) }
+        val preset = PresetTrack(clean, base, template, swing = 0)
+        scope.launch { repo.saveDrumTrackPreset(encodePresetTrack(preset)) }
+        return true
+    }
+
+    fun deleteTrackPreset(label: String) { scope.launch { repo.deleteDrumTrackPreset(label) } }
+
     private var job: Job? = null
     private val synth = PercussionSynth()
     private val cache = HashMap<Pair<PercussionInstrument, Int>, FloatArray>()
@@ -77,7 +126,7 @@ class BlocksState(
     /** Phrases available for a track's instrument (block cells are per-instrument). */
     fun phrasesFor(inst: PercussionInstrument): List<PresetTrack> {
         val base = PercussionCatalog.baseId(inst.id)
-        return PercussionBuiltins.PRESET_TRACKS.filter { PercussionCatalog.baseId(it.instrument.id) == base }
+        return allPresets().filter { PercussionCatalog.baseId(it.instrument.id) == base }
     }
 
     fun mergeWith(other: DrumBlock) {
@@ -86,9 +135,21 @@ class BlocksState(
 
     // ---- save / load ----
 
-    val savedBlocks get() = repo.drumBlocks
+    /** Saved blocks decoded against the CURRENT phrase library (custom + built-in). */
+    val savedBlocks: Map<String, DrumBlock>
+        get() {
+            val out = LinkedHashMap<String, DrumBlock>()
+            for (line in savedBlockLines) {
+                val b = DrumBlock.decode(line, ::resolvePreset) ?: continue
+                out[b.name] = b
+            }
+            return out
+        }
 
-    fun saveCurrent() { val snapshot = block; scope.launch { repo.saveDrumBlock(snapshot) } }
+    fun saveCurrent() {
+        val encoded = block.encode(::resolvePreset)
+        scope.launch { repo.saveDrumBlock(encoded) }
+    }
     fun loadBlock(b: DrumBlock) { block = b }
     fun deleteSaved(name: String) { scope.launch { repo.deleteDrumBlock(name) } }
 
@@ -131,6 +192,18 @@ class BlocksState(
                             audio.playSamplesAt(buffer(t.instrument, voice), gain, (delayMs * sr / 1000).toInt())
                         }
                         onsetMs += PercussionTiming.swungSlotMs(slot, bpm, swing, meter)
+                    }
+                }
+                // Metronome click track: one click per beat on the straight clock,
+                // higher click on each bar's "1" (bars are 8 slots in 2/4 · 1/16).
+                if (metronomeOn) {
+                    val baseMs = PercussionTiming.slotMs(bpm, meter.division)
+                    var slot = 0
+                    while (slot < 16) {
+                        val barDown = slot % meter.slotsPerBar == 0
+                        val delayMs = ((colStartNanos - System.nanoTime()) / 1_000_000 + slot * baseMs).coerceAtLeast(0)
+                        audio.playSamplesAt(if (barDown) mAccent else mClick, if (barDown) 0.9f else 0.6f, (delayMs * sr / 1000).toInt())
+                        slot += meter.slotsPerBeat
                     }
                 }
                 // Columns advance on the STRAIGHT clock (16 × base slot) for all tracks.

@@ -213,6 +213,9 @@ export class App {
       getSaved: () => state.drumBlocks,
       save: (name, enc) => state.saveDrumBlock(name, enc),
       del: (name) => state.deleteDrumBlock(name),
+      getTrackPresets: () => state.drumTrackPresets,
+      saveTrackPreset: (name, enc) => state.saveDrumTrackPreset(name, enc),
+      delTrackPreset: (name) => state.deleteDrumTrackPreset(name),
       loadSample: (inst, voice) => loadDrumSample(state.audio, inst, voice),
     });
     this.sambaUI = new SambaLooperUI(this.samba, this.drumBlocks, state, this.ear, () => state.closeSheet());

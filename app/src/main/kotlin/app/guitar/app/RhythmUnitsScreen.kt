@@ -185,6 +185,13 @@ private fun RhythmPhrasesBody(rp: RhythmPhraseState) {
         Button(onClick = { rp.toggle() }, enabled = rp.phrase != null) {
             Text(if (rp.isPlaying) "Stop ■" else "Play ▶")
         }
+        Spacer(Modifier.width(8.dp))
+        // Background metronome under the phrase (soft lower click on the beats).
+        if (rp.metronomeOn) {
+            Button(onClick = { rp.toggleMetronome() }) { Text("Metronome ✓") }
+        } else {
+            OutlinedButton(onClick = { rp.toggleMetronome() }) { Text("Metronome") }
+        }
         Spacer(Modifier.weight(1f))
         Text("${rp.bpm} BPM", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }

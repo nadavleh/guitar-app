@@ -18,7 +18,7 @@ import { transportDock, toneSheet } from "./transport";
 import { AppState } from "./appState";
 import {
   PercussionInstrument, PercussionPattern, voicesFor, voiceOf, BUILTIN_PATTERNS, STUDY_PATTERNS,
-  PRESET_TRACKS, PresetTrack, DIVISIONS, encodeBeatFile, decodeBeatFile, BuiltinPattern,
+  PresetTrack, DIVISIONS, encodeBeatFile, decodeBeatFile, BuiltinPattern,
 } from "../theory";
 
 /** Time signatures offered in the Time dropdown (beatsPerBar / beatUnit). */
@@ -234,7 +234,7 @@ export class SambaLooperUI {
         emptyRow.addEventListener("click", () => { this.openingMenuOpen = false; s.addOpening(); });
         pop.appendChild(emptyRow);
         pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary);cursor:default;font-size:11px" }, ["From a preset track"]));
-        for (const p of PRESET_TRACKS) {
+        for (const p of this.blocks.allPresets()) {
           const row = el("div", { class: "lrow" }, [`★ ${p.label}`]);
           row.addEventListener("click", () => { this.openingMenuOpen = false; s.addOpeningFromPreset(p); });
           pop.appendChild(row);
@@ -617,9 +617,10 @@ export class SambaLooperUI {
       }
       addWrap.appendChild(pop);
     }
+    const metro = btn(b.metronomeOn ? "Metronome ✓" : "Metronome", () => { b.toggleMetronome(); this.rerender(); }, b.metronomeOn ? "btn primary" : "btn");
     wrap.appendChild(el("div", { class: "et-row-gap" }, [
       btn("Save block", () => b.saveCurrent()), loadWrap, mergeWrap,
-      btn("Clear", () => b.clear()), addWrap,
+      btn("Clear", () => b.clear()), metro, addWrap,
     ]));
 
     if (blk.tracks.length === 0) {
@@ -718,12 +719,26 @@ export class SambaLooperUI {
     mixer.addEventListener("click", () => { this.openVoiceMenu = this.openVoiceMenu === inst.id ? null : inst.id; this.rerender(); });
     const dup = el("button", { class: "pal-chip pal-tool", title: "Duplicate this track (same sound + pattern)" }, ["⧉ Dup"]);
     dup.addEventListener("click", () => s.duplicateTrack(inst));
+    // Save this track's row as a named PHRASE (custom preset): joins the library
+    // everywhere (+ Add, opening picker, beats list, Blocks palette). Using a
+    // built-in's name REPLACES it (edit-and-resave of presaved tracks).
+    const savePhrase = el("button", { class: "pal-chip pal-tool", title: "Save this track as a phrase / preset" }, ["💾 Phrase"]);
+    savePhrase.addEventListener("click", () => {
+      const row = s.editPattern.grid.get(inst.id);
+      if (!row) return;
+      const suggested = `${inst.displayName.split(" ")[0]} — `;
+      const name = window.prompt("Phrase name (same name as a preset replaces it):", suggested);
+      if (name === null) return;
+      if (!this.blocks.saveTrackAsPreset(inst, [...row], name)) {
+        window.alert("Name can't be empty or contain = : , | @ ~");
+      }
+    });
     const close = el("button", { class: "pal-chip pal-tool", "aria-label": "Deselect track" }, ["✕"]);
     close.addEventListener("click", () => s.selectTrack(inst.id));
 
     return el("div", { class: "drum-palette" }, [
       el("span", { class: "pal-name" }, [inst.displayName]),
-      chips, mixer, dup, close,
+      chips, mixer, dup, savePhrase, close,
     ]);
   }
 
@@ -772,7 +787,7 @@ export class SambaLooperUI {
       const pop = el("div", { class: "drum-load-pop" });
       // One-press preset tracks first (instrument + a filled row in one go).
       pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary);cursor:default;font-size:11px" }, ["Track presets"]));
-      for (const p of PRESET_TRACKS) {
+      for (const p of this.blocks.allPresets()) {
         const row = el("div", { class: "lrow" }, [`★ ${p.label}`]);
         row.addEventListener("click", () => { s.addPresetTrack(p); this.addMenuOpen = false; this.rerender(); });
         pop.appendChild(row);
@@ -795,7 +810,11 @@ export class SambaLooperUI {
   private saveControl(): HTMLElement {
     const s = this.samba;
     const wrap = el("div", { style: "position:relative" });
-    wrap.appendChild(btn(this.saveOpen ? "Save ✕" : "Save…", () => { this.saveOpen = !this.saveOpen; this.addMenuOpen = false; this.rerender(); }));
+    wrap.appendChild(btn(this.saveOpen ? "Save ✕" : "Save…", () => {
+      this.saveOpen = !this.saveOpen;
+      if (this.saveOpen && !this.saveName) this.saveName = this.samba.loadedName ?? "";
+      this.addMenuOpen = false; this.rerender();
+    }));
     if (this.saveOpen) {
       const input = el("input", { type: "text", placeholder: "Beat name", style: "width:150px" }) as HTMLInputElement;
       input.value = this.saveName;
@@ -825,10 +844,19 @@ export class SambaLooperUI {
     header("Grooves");
     for (const b of [...BUILTIN_PATTERNS, ...STUDY_PATTERNS]) beatRow(b);
     // Track presets: tap to ADD the chunk as a track to the current beat.
+    // User-defined phrases (👤) can be deleted; save one via the track palette's 💾.
     header("Track presets");
-    for (const p of PRESET_TRACKS) {
+    const customs = this.blocks.customLabels();
+    for (const p of this.blocks.allPresets()) {
+      const isCustom = customs.has(p.label);
+      const label = `★ ${p.label}` + (p.swing ? ` ~${p.swing}%` : "") + (isCustom ? " 👤" : "");
       const row = el("div", { class: "lrow", title: p.note ?? "tap to add this track to the current beat" },
-        [`★ ${p.label}` + (p.swing ? ` ~${p.swing}%` : "")]);
+        isCustom ? [el("span", { style: "flex:1" }, [label])] : [label]);
+      if (isCustom) {
+        const del = el("button", { class: "btn text" }, ["✕"]);
+        del.addEventListener("click", (e) => { e.stopPropagation(); this.blocks.deleteTrackPreset(p.label); this.rerender(); });
+        row.appendChild(del);
+      }
       row.addEventListener("click", () => { s.addPresetTrack(p); this.rerender(); });
       side.appendChild(row);
     }

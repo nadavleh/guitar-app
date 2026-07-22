@@ -10,11 +10,13 @@
 // drifts, and a swung phrase followed by a straight one snaps back naturally.
 
 import {
-  DrumBlock, materializedTemplate, PresetTrack, PRESET_TRACKS,
+  DrumBlock, materializedTemplate, PresetTrack, presetByLabel, basePercussionId,
+  encodePresetTrack, decodePresetTrack, mergedPresets,
   PercussionInstrument, PercussionCatalog, slotMs, swungSlotMs, PercussionMeter,
   PERCUSSION_ACCENT, PERCUSSION_DYN, PERCUSSION_DYN_FACTORS, voiceCount,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
+import { synthClick, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -24,6 +26,10 @@ export interface BlocksDeps {
   getSaved: () => Map<string, string>;       // name → DrumBlock.encode()
   save: (name: string, encoded: string) => void;
   del: (name: string) => void;
+  /** USER-DEFINED phrases (custom track presets), label → encodePresetTrack(). */
+  getTrackPresets: () => Map<string, string>;
+  saveTrackPreset: (label: string, encoded: string) => void;
+  delTrackPreset: (label: string) => void;
   /** Load a bundled one-shot sample for (instrument, voice), or null → synth fallback. */
   loadSample: (inst: PercussionInstrument, voice: number) => Promise<Float32Array | null>;
 }
@@ -38,6 +44,12 @@ export class BlocksState {
   isPlaying = false;
   /** Column currently sounding (0-based), or -1 when stopped. */
   currentCol = -1;
+
+  /** Overlay a wood-click metronome (higher click on each bar's "1"). */
+  metronomeOn = false;
+  private readonly mClick = synthClick(BEAT_CLICK_HZ, 45);
+  private readonly mAccent = synthClick(ACCENT_CLICK_HZ, 45);
+  toggleMetronome() { this.metronomeOn = !this.metronomeOn; this.notify(); }
 
   private token = 0;
   private synth = new PercussionSynth();
@@ -66,17 +78,53 @@ export class BlocksState {
   setPhraseCount(n: number) { this.block = this.block.withPhraseCount(n); this.notify(); }
   clear() { this.block = DrumBlock.empty(this.block.name, this.block.phraseCount); this.notify(); }
 
+  // ---- the phrase library: built-ins + user-defined phrases ----
+
+  /** Library lookup: a user phrase with a built-in's label REPLACES it. */
+  private resolvePreset = (label: string): PresetTrack | undefined => {
+    const enc = this.deps.getTrackPresets().get(label);
+    const custom = enc ? decodePresetTrack(enc) : null;
+    return custom ?? presetByLabel(label);
+  };
+
+  /** All phrases (built-ins overridden/extended by the user's). */
+  allPresets(): PresetTrack[] {
+    const customs: PresetTrack[] = [];
+    for (const enc of this.deps.getTrackPresets().values()) {
+      const p = decodePresetTrack(enc);
+      if (p) customs.push(p);
+    }
+    return mergedPresets(customs);
+  }
+
+  /** Labels of the user-defined phrases (deletable / marked in lists). */
+  customLabels(): Set<string> { return new Set(this.deps.getTrackPresets().keys()); }
+
+  /** Save a Beat-editor track as a named phrase (custom track preset). The row's
+   *  accents + dynamics ride along in the raw values; clones save as their base
+   *  instrument. Returns false when the label is empty/has reserved chars. */
+  saveTrackAsPreset(inst: PercussionInstrument, row: (number | null)[], label: string): boolean {
+    const clean = label.trim();
+    if (!clean || [...'=:,|@~', "\n"].some((ch) => clean.includes(ch))) return false;
+    const base = PercussionCatalog.byId(basePercussionId(inst.id)) ?? inst;
+    const template = Array.from({ length: 16 }, (_, i) => row[i] ?? null);
+    this.deps.saveTrackPreset(clean, encodePresetTrack({ label: clean, instrument: base, template, swing: 0 }));
+    this.notify();
+    return true;
+  }
+
+  deleteTrackPreset(label: string) { this.deps.delTrackPreset(label); this.notify(); }
+
   /** Phrases available for a track's instrument (block cells are per-instrument). */
   phrasesFor(inst: PercussionInstrument): PresetTrack[] {
-    const base = (id: string) => id.split("#")[0];
-    return PRESET_TRACKS.filter((p) => base(p.instrument.id) === base(inst.id));
+    return this.allPresets().filter((p) => basePercussionId(p.instrument.id) === basePercussionId(inst.id));
   }
 
   /** Merge candidates: saved blocks with the same phrase count. */
   mergeCandidates(): { name: string; block: DrumBlock }[] {
     const out: { name: string; block: DrumBlock }[] = [];
     for (const [name, enc] of this.deps.getSaved()) {
-      const b = DrumBlock.decode(enc);
+      const b = DrumBlock.decode(enc, this.resolvePreset);
       if (b && b.phraseCount === this.block.phraseCount && name !== this.block.name) out.push({ name, block: b });
     }
     return out;
@@ -92,12 +140,12 @@ export class BlocksState {
   savedBlocks(): Map<string, DrumBlock> {
     const out = new Map<string, DrumBlock>();
     for (const [name, enc] of this.deps.getSaved()) {
-      const b = DrumBlock.decode(enc);
+      const b = DrumBlock.decode(enc, this.resolvePreset);
       if (b) out.set(name, b);
     }
     return out;
   }
-  saveCurrent() { this.deps.save(this.block.name, this.block.encode()); this.notify(); }
+  saveCurrent() { this.deps.save(this.block.name, this.block.encode(this.resolvePreset)); this.notify(); }
   loadBlock(b: DrumBlock) {
     this.block = b;
     for (const t of b.tracks) this.ensureSamplesFor(t.instrument);
@@ -172,6 +220,15 @@ export class BlocksState {
             const dyn = Math.floor(raw / PERCUSSION_DYN);
             const gain = (accented ? 1.4 : 1) * PERCUSSION_DYN_FACTORS[dyn];
             this.deps.audio.playSamples(this.buffer(t.instrument, voice), gain, colStart + this.onsetSec(slot, swing));
+          }
+        }
+        // Metronome click track: one click per beat on the straight clock,
+        // higher click on each bar's "1" (bars are 8 slots in 2/4 · 1/16).
+        if (this.metronomeOn) {
+          const baseSec = slotMs(this.bpm, PHRASE_METER.division) / 1000;
+          for (let slot = 0; slot < PHRASE_SLOTS; slot += PHRASE_METER.slotsPerBeat) {
+            const barDownbeat = slot % PHRASE_METER.slotsPerBar === 0;
+            this.deps.audio.playSamples(barDownbeat ? this.mAccent : this.mClick, barDownbeat ? 0.9 : 0.6, colStart + slot * baseSec);
           }
         }
         // Columns advance on the STRAIGHT clock (16 × base slot) for all tracks.

@@ -61,13 +61,15 @@ data class DrumBlock(
     /** Serialize: "name=instId:lbl,lbl,…|instId:…" — phrases referenced by label
      *  (empty cell = empty label). A cell whose swing was overridden away from
      *  its library default is written "label@swing". Labels contain none of
-     *  '=', '|', ':', ',' (or a trailing "@<digits>"). */
-    fun encode(): String =
+     *  '=', '|', ':', ',' (or a trailing "@<digits>"). [resolve] is the phrase
+     *  library (built-ins by default; pass a merged lookup when custom phrases
+     *  exist). */
+    fun encode(resolve: (String) -> PresetTrack? = PercussionBuiltins::presetByLabel): String =
         name + "=" + tracks.joinToString("|") { t ->
             t.instrument.id + ":" + t.cells.joinToString(",") { c ->
                 if (c == null) ""
                 else {
-                    val libSwing = PercussionBuiltins.presetByLabel(c.label)?.swing ?: 0
+                    val libSwing = resolve(c.label)?.swing ?: 0
                     if (c.swing != libSwing) "${c.label}@${c.swing}" else c.label
                 }
             }
@@ -80,8 +82,13 @@ data class DrumBlock(
             DrumBlock(name, emptyList(), phraseCount)
 
         /** Parse a value produced by [encode]; null on structural garbage. Unknown
-         *  phrase labels become empty cells (forward compatibility). */
-        fun decode(s: String): DrumBlock? {
+         *  phrase labels become empty cells (forward compatibility). [resolve] is
+         *  the phrase library (built-ins by default; pass a merged lookup when
+         *  custom phrases exist). */
+        fun decode(
+            s: String,
+            resolve: (String) -> PresetTrack? = PercussionBuiltins::presetByLabel,
+        ): DrumBlock? {
             val eq = s.indexOf('=')
             if (eq <= 0) return null
             val name = s.substring(0, eq)
@@ -100,10 +107,9 @@ data class DrumBlock(
                         val at = lbl.lastIndexOf('@')
                         val overridden = if (at > 0) lbl.substring(at + 1).toIntOrNull() else null
                         if (overridden != null) {
-                            PercussionBuiltins.presetByLabel(lbl.substring(0, at))
-                                ?.copy(swing = overridden.coerceIn(0, 100))
+                            resolve(lbl.substring(0, at))?.copy(swing = overridden.coerceIn(0, 100))
                         } else {
-                            PercussionBuiltins.presetByLabel(lbl)
+                            resolve(lbl)
                         }
                     }
                 }
@@ -115,6 +121,39 @@ data class DrumBlock(
             return runCatching { DrumBlock(name, tracks, phraseCount) }.getOrNull()
         }
     }
+}
+
+/**
+ * Persistence codec for USER-DEFINED phrases (custom track presets): a track
+ * built in the Beat editor, saved by name, joining the phrase library. A custom
+ * phrase with a built-in's label REPLACES it everywhere (edit-and-resave).
+ * Format: "label=instBaseId:swing:cells" (cells = raw values, "-" = silent).
+ * Labels must not contain '=', ':', ',', '|', '@', '~', or newlines.
+ */
+fun encodePresetTrack(p: PresetTrack): String =
+    p.label + "=" + PercussionCatalog.baseId(p.instrument.id) + ":" + p.swing + ":" +
+        p.template.joinToString(",") { it?.toString() ?: "-" }
+
+fun decodePresetTrack(s: String): PresetTrack? {
+    val eq = s.indexOf('=')
+    if (eq <= 0) return null
+    val label = s.substring(0, eq)
+    val parts = s.substring(eq + 1).split(":")
+    if (parts.size != 3) return null
+    val inst = PercussionCatalog.byId(parts[0]) ?: return null
+    val swing = parts[1].toIntOrNull()?.coerceIn(0, 100) ?: return null
+    val cells = parts[2].split(",").map { if (it == "-") null else it.toIntOrNull() ?: return null }
+    if (cells.size != 16) return null
+    return PresetTrack(label, inst, cells, swing = swing)
+}
+
+/** The phrase library: built-ins with [custom] phrases merged in — a custom
+ *  phrase whose label matches a built-in REPLACES it; new labels append. */
+fun mergedPresets(custom: Collection<PresetTrack>): List<PresetTrack> {
+    val byLabel = LinkedHashMap<String, PresetTrack>()
+    for (p in PercussionBuiltins.PRESET_TRACKS) byLabel[p.label] = p
+    for (p in custom) byLabel[p.label] = p
+    return byLabel.values.toList()
 }
 
 /**

@@ -23,14 +23,23 @@ export class RhythmPhraseState {
   isPlaying = false;
   currentSlot = -1;
 
+  /** Background metronome: soft, LOWER-pitched clicks on the beats (higher of
+   *  the two on bar downbeats) so it reads under the phrase's woodblock. */
+  metronomeOn = false;
+  toggleMetronome(): void { this.metronomeOn = !this.metronomeOn; this.deps.onChange(); }
+
   private token = 0;
   private onsetAccent = new Map<number, boolean>();
   private readonly click: Float32Array;
   private readonly accentClick: Float32Array;
+  private readonly mClick: Float32Array;
+  private readonly mAccent: Float32Array;
 
   constructor(private deps: RhythmPhraseDeps) {
     this.click = synthClick(2000, 45);
     this.accentClick = synthClick(2800, 45);
+    this.mClick = synthClick(1000, 45);
+    this.mAccent = synthClick(1400, 45);
   }
 
   generate(): void {
@@ -70,8 +79,14 @@ export class RhythmPhraseState {
 
   private scheduleClickAt(slot: number, whenSec: number): void {
     const accent = this.onsetAccent.get(slot);
-    if (accent === undefined) return;
-    this.deps.audio.playSamples(accent ? this.accentClick : this.click, accent ? 1.0 : 0.72, whenSec);
+    if (accent !== undefined) {
+      this.deps.audio.playSamples(accent ? this.accentClick : this.click, accent ? 1.0 : 0.72, whenSec);
+    }
+    // Background metronome on the beats (soft; bar downbeats slightly higher).
+    if (this.metronomeOn && this.phrase && slot % SLOTS_PER_BEAT === 0) {
+      const bar = slot % (this.phrase.beatsPerBar * SLOTS_PER_BEAT) === 0;
+      this.deps.audio.playSamples(bar ? this.mAccent : this.mClick, bar ? 0.55 : 0.4, whenSec);
+    }
   }
 
   private async loop(p: RhythmPhrase, token: number): Promise<void> {

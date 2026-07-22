@@ -187,10 +187,11 @@ export class RhythmUnitsUI {
       el("span", { style: "font-size:13px" }, ["Time"]), timeChips,
     ]));
 
-    // Transport: Generate + Play/Stop + BPM
+    // Transport: Generate + Play/Stop + Metronome + BPM
     body.appendChild(el("div", { class: "row", style: "margin-top:8px;align-items:center;gap:8px" }, [
       btn("Generate ↻", () => rp.generate()),
       btn(rp.isPlaying ? "Stop ■" : "Play ▶", () => rp.toggle(), "btn primary"),
+      btn(rp.metronomeOn ? "Metronome ✓" : "Metronome", () => { rp.toggleMetronome(); this.rerender(); }, rp.metronomeOn ? "btn primary" : "btn"),
       el("span", { style: "flex:1" }),
       el("span", { class: "mono", style: "font-weight:600" }, [`${rp.bpm} BPM`]),
     ]));

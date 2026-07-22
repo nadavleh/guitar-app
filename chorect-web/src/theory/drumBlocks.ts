@@ -10,9 +10,12 @@
 // column c+1 on the straight clock.
 
 import {
-  PercussionInstrument, PercussionCatalog, PERCUSSION_ACCENT,
-  PresetTrack, presetByLabel,
+  PercussionInstrument, PercussionCatalog, PERCUSSION_ACCENT, PRESET_TRACKS,
+  PresetTrack, presetByLabel, basePercussionId,
 } from "./percussion";
+
+/** The phrase library lookup used by block encode/decode. */
+export type PresetResolver = (label: string) => PresetTrack | null | undefined;
 
 export const MAX_BLOCK_PHRASES = 8;
 
@@ -76,18 +79,18 @@ export class DrumBlock {
    *  (empty cell = empty label). A cell whose swing was overridden away from its
    *  library default is written "label@swing". Labels contain none of '=', '|',
    *  ':', ',' (or a trailing "@<digits>"). */
-  encode(): string {
+  encode(resolve: PresetResolver = presetByLabel): string {
     return this.name + "=" + this.tracks.map((t) =>
       t.instrument.id + ":" + t.cells.map((c) => {
         if (!c) return "";
-        const libSwing = presetByLabel(c.label)?.swing ?? 0;
+        const libSwing = resolve(c.label)?.swing ?? 0;
         return (c.swing ?? 0) !== libSwing ? `${c.label}@${c.swing ?? 0}` : c.label;
       }).join(",")).join("|");
   }
 
   /** Parse a value produced by `encode`; null on structural garbage. Unknown
    *  phrase labels become empty cells (forward compatibility). */
-  static decode(s: string): DrumBlock | null {
+  static decode(s: string, resolve: PresetResolver = presetByLabel): DrumBlock | null {
     const eq = s.indexOf("=");
     if (eq <= 0) return null;
     const name = s.substring(0, eq);
@@ -106,10 +109,10 @@ export class DrumBlock {
         const at = lbl.lastIndexOf("@");
         const overridden = at > 0 ? parseInt(lbl.substring(at + 1), 10) : NaN;
         if (!Number.isNaN(overridden)) {
-          const base = presetByLabel(lbl.substring(0, at));
+          const base = resolve(lbl.substring(0, at));
           return base ? { ...base, swing: Math.min(Math.max(overridden, 0), 100) } : null;
         }
-        return presetByLabel(lbl) ?? null;
+        return resolve(lbl) ?? null;
       });
       if (phraseCount === -1) phraseCount = cells.length;
       if (cells.length !== phraseCount) return null;
@@ -118,6 +121,48 @@ export class DrumBlock {
     if (phraseCount < 1 || phraseCount > MAX_BLOCK_PHRASES) return null;
     return new DrumBlock(name, tracks, phraseCount);
   }
+}
+
+/**
+ * Persistence codec for USER-DEFINED phrases (custom track presets): a track
+ * built in the Beat editor, saved by name, joining the phrase library. A custom
+ * phrase with a built-in's label REPLACES it everywhere (edit-and-resave).
+ * Format: "label=instBaseId:swing:cells" (cells = raw values, "-" = silent).
+ * Labels must not contain '=', ':', ',', '|', '@', '~', or newlines.
+ */
+export function encodePresetTrack(p: PresetTrack): string {
+  return p.label + "=" + basePercussionId(p.instrument.id) + ":" + (p.swing ?? 0) + ":" +
+    p.template.map((c) => (c === null ? "-" : String(c))).join(",");
+}
+
+export function decodePresetTrack(s: string): PresetTrack | null {
+  const eq = s.indexOf("=");
+  if (eq <= 0) return null;
+  const label = s.substring(0, eq);
+  const parts = s.substring(eq + 1).split(":");
+  if (parts.length !== 3) return null;
+  const inst = PercussionCatalog.byId(parts[0]);
+  if (!inst) return null;
+  const swing = parseInt(parts[1], 10);
+  if (Number.isNaN(swing)) return null;
+  const cells: (number | null)[] = [];
+  for (const c of parts[2].split(",")) {
+    if (c === "-") { cells.push(null); continue; }
+    const n = parseInt(c, 10);
+    if (Number.isNaN(n)) return null;
+    cells.push(n);
+  }
+  if (cells.length !== 16) return null;
+  return { label, instrument: inst, template: cells, swing: Math.min(Math.max(swing, 0), 100) };
+}
+
+/** The phrase library: built-ins with `custom` phrases merged in — a custom
+ *  phrase whose label matches a built-in REPLACES it; new labels append. */
+export function mergedPresets(custom: Iterable<PresetTrack>): PresetTrack[] {
+  const byLabel = new Map<string, PresetTrack>();
+  for (const p of PRESET_TRACKS) byLabel.set(p.label, p);
+  for (const p of custom) byLabel.set(p.label, p);
+  return [...byLabel.values()];
 }
 
 /**

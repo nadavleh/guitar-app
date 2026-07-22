@@ -39,6 +39,14 @@ class RhythmPhraseState(
 
     private val click = synthClick(2000.0, 45)
     private val accentClick = synthClick(2800.0, 45)
+    private val mClick = synthClick(1000.0, 45)
+    private val mAccent = synthClick(1400.0, 45)
+
+    /** Background metronome: soft, LOWER-pitched clicks on the beats (higher of
+     *  the two on bar downbeats) so it reads under the phrase's woodblock. */
+    var metronomeOn by mutableStateOf(false)
+        private set
+    fun toggleMetronome() { metronomeOn = !metronomeOn }
 
     fun generate() {
         stop()
@@ -68,10 +76,18 @@ class RhythmPhraseState(
     }
 
     private fun scheduleClick(slot: Int, delayMs: Double, sr: Int) {
-        val accent = onsetAccent[slot] ?: return
         val frames = (delayMs * sr / 1000.0).toInt().coerceAtLeast(0)
-        if (accent) audio.playSamplesAt(accentClick, 1.0f, frames)
-        else audio.playSamplesAt(click, 0.72f, frames)
+        val accent = onsetAccent[slot]
+        if (accent != null) {
+            if (accent) audio.playSamplesAt(accentClick, 1.0f, frames)
+            else audio.playSamplesAt(click, 0.72f, frames)
+        }
+        // Background metronome on the beats (soft; bar downbeats slightly higher).
+        val p = phrase
+        if (metronomeOn && p != null && slot % RhythmPhrases.SLOTS_PER_BEAT == 0) {
+            val bar = slot % (p.beatsPerBar * RhythmPhrases.SLOTS_PER_BEAT) == 0
+            audio.playSamplesAt(if (bar) mAccent else mClick, if (bar) 0.55f else 0.4f, frames)
+        }
     }
 
     private suspend fun loop(p: RhythmPhrase) {
