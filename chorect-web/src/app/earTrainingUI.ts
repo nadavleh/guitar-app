@@ -389,9 +389,14 @@ export class EarTrainingUI {
     };
 
     // Major/Minor shift sits on the LEFT; the bar label fills the rest on the right.
+    // The chosen side gets a SOLID opaque fill (shift-chip) — the regular selected
+    // tint was too subtle to tell which keyboard is active.
+    const majorChip = chip("Major", !ear.keyboardMinor, () => { if (ear.keyboardMinor) ear.toggleKeyboardShift(); });
+    const minorChip = chip("⇧ Minor", ear.keyboardMinor, () => { if (!ear.keyboardMinor) ear.toggleKeyboardShift(); });
+    majorChip.classList.add("shift-chip");
+    minorChip.classList.add("shift-chip");
     const header = el("div", { class: "row" }, [
-      chip("Major", !ear.keyboardMinor, () => { if (ear.keyboardMinor) ear.toggleKeyboardShift(); }),
-      chip("⇧ Minor", ear.keyboardMinor, () => { if (!ear.keyboardMinor) ear.toggleKeyboardShift(); }),
+      majorChip, minorChip,
       el("span", { class: "ans-label", style: "flex:1;text-align:right" }, [`Bar ${bar + 1} answer`]),
     ]);
 

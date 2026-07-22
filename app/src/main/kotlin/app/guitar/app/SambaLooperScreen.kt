@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
@@ -134,28 +135,25 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
 
         Spacer(Modifier.height(8.dp))
 
-        // ----- Main row: the scrollable pattern editor + a constantly-open,
-        // scrollable beats side panel (grooves / study / saved — replaces the
-        // old Load… popup). -----
-        Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                PatternSection(
-                    samba = samba,
-                    eraseMode = eraseMode,
-                    onEraseMode = { eraseMode = it },
-                    accentMode = accentMode,
-                    onAccentMode = { accentMode = it },
-                    scaleX = scaleX, scaleY = scaleY, offsetX = offsetX, offsetY = offsetY,
-                    mixerFor = mixerFor,
-                    onMixerDismiss = { mixerFor = null },
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            BeatSidebar(samba, modifier = Modifier.width(150.dp).fillMaxHeight())
+        // ----- Scrollable body: the pattern grid + its controls. (On the phone a
+        // permanent side panel squeezes the grid, so beats load from a scrolling
+        // popup — with remembered scroll position — unlike web's side panel.) -----
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+        ) {
+            PatternSection(
+                samba = samba,
+                eraseMode = eraseMode,
+                onEraseMode = { eraseMode = it },
+                accentMode = accentMode,
+                onAccentMode = { accentMode = it },
+                scaleX = scaleX, scaleY = scaleY, offsetX = offsetX, offsetY = offsetY,
+                mixerFor = mixerFor,
+                onMixerDismiss = { mixerFor = null },
+            )
         }
 
         // Voice palette for the selected track — pinned above the transport dock so
@@ -250,9 +248,28 @@ private fun PatternSection(
                 color = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.width(10.dp))
-            // The opening (when present) renders as its own grid section above the loop.
+            // The opening (when present) renders as its own grid section above the
+            // loop; "＋ Opening ▾" starts one empty or pre-filled with a preset chunk.
             if (samba.opening == null) {
-                OutlinedButton(onClick = { samba.addOpening() }, contentPadding = STEP_PAD) { Text("＋ Opening") }
+                var openingMenu by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedButton(onClick = { openingMenu = true }, contentPadding = STEP_PAD) { Text("＋ Opening ▾") }
+                    DropdownMenu(expanded = openingMenu, onDismissRequest = { openingMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("(empty opening)") },
+                            onClick = { openingMenu = false; samba.addOpening() },
+                        )
+                        DropdownMenuItem(text = { Text("From a preset track",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant) }, enabled = false, onClick = {})
+                        for (p in app.guitar.theory.PercussionBuiltins.PRESET_TRACKS) {
+                            DropdownMenuItem(
+                                text = { Text("★ ${p.label}") },
+                                onClick = { openingMenu = false; samba.addOpeningFromPreset(p) },
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -289,6 +306,7 @@ private fun PatternSection(
             OutlinedButton(onClick = { onAccentMode(true); onEraseMode(false) }) { Text("Accent") }
         }
         OutlinedButton(onClick = { saveName = ""; saveDialog = true }) { Text("Save…") }
+        LoadBeatsControl(samba)
         OutlinedButton(onClick = { samba.clearAll() }) { Text("Clear all") }
         OutlinedButton(onClick = { samba.undo() }, enabled = samba.canUndo) { Text("↶ Undo") }
         // Notes toggle (the editor shows under the beat header).
@@ -700,18 +718,36 @@ private fun TranslateControl(samba: SambaLooperState) {
     }
 }
 
-/** Constantly-open, scrollable beats side panel: Grooves / Study / Saved.
- *  Replaces the old Load… popup; the loaded beat's row is highlighted. */
+/** Load… control: a scrolling beats popup (Grooves + Saved) whose scroll
+ *  position is REMEMBERED across openings — the phone keeps the grid full-width
+ *  (web uses a constantly-open side panel with the same content). */
 @Composable
-private fun BeatSidebar(samba: SambaLooperState, modifier: Modifier = Modifier) {
+private fun LoadBeatsControl(samba: SambaLooperState) {
     val saved by samba.savedPatterns.collectAsState(initial = emptyMap())
+    var open by remember { mutableStateOf(false) }
+    // Hoisted above the menu so closing/reopening keeps the scroll position.
+    val listScroll = rememberScrollState()
+    Box {
+        OutlinedButton(onClick = { open = true }) { Text("Load…") }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            BeatList(samba, saved, listScroll, onLoaded = { open = false })
+        }
+    }
+}
+
+@Composable
+private fun BeatList(
+    samba: SambaLooperState,
+    saved: Map<String, app.guitar.theory.SavedBeat>,
+    listScroll: androidx.compose.foundation.ScrollState,
+    onLoaded: () -> Unit,
+) {
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+        modifier = Modifier
+            .width(280.dp)
+            .heightIn(max = 420.dp)
             .padding(6.dp)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(listScroll),
     ) {
         @Composable
         fun header(t: String) {
@@ -748,15 +784,10 @@ private fun BeatSidebar(samba: SambaLooperState, modifier: Modifier = Modifier) 
         }
 
         header("Grooves")
-        for (b in app.guitar.theory.PercussionBuiltins.ALL) {
+        for (b in app.guitar.theory.PercussionBuiltins.ALL + app.guitar.theory.PercussionBuiltins.STUDY) {
             beatRow(b.name + if (b.opening != null) " ▶¹" else "", samba.loadedName == b.name) {
                 samba.loadPattern(b.pattern, b.name, b.bpm, opening = b.opening)
-            }
-        }
-        header("Study")
-        for (b in app.guitar.theory.PercussionBuiltins.STUDY) {
-            beatRow(b.name + if (b.opening != null) " ▶¹" else "", samba.loadedName == b.name) {
-                samba.loadPattern(b.pattern, b.name, b.bpm, opening = b.opening)
+                onLoaded()
             }
         }
         header("Saved")
@@ -777,6 +808,7 @@ private fun BeatSidebar(samba: SambaLooperState, modifier: Modifier = Modifier) 
                 },
             ) {
                 samba.loadPattern(beat.main, name, opening = beat.opening, notes = beat.notes)
+                onLoaded()
             }
         }
         if (saved.isEmpty()) {

@@ -466,7 +466,6 @@ export const PARTIDO_ALTO_PLATINELAS = builtin(
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */
 export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "teleco-teco 1", pattern: TELECOTECO_1 },
-  { name: "teleco-teco 2", pattern: TELECOTECO_2 },
   { name: "Partido alto (official)", pattern: PARTIDO_ALTO_OFFICIAL, bpm: 70 },
   { name: "Partido alto (dec)", pattern: PARTIDO_ALTO_DEC, bpm: 70 },
   { name: "Platinelas pandeiro — partido alto", pattern: PARTIDO_ALTO_PLATINELAS, bpm: 70 },
@@ -477,18 +476,52 @@ export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "Arrasta-pé", pattern: ARRASTA_PE, bpm: 100 },
 ];
 
-/** A one-press preset TRACK ("+ Add ▾" → presets): a 16-slot row template tiled
- *  across the current loop on `instrument` (cloned if already present). */
-export interface PresetTrack { label: string; instrument: PercussionInstrument; template: (number | null)[]; }
+/** A one-press preset TRACK ("+ Add ▾" → presets, also the phrase "chunks" the
+ *  Blocks feature sequences): a 16-slot row template tiled across the current
+ *  loop on `instrument` (cloned if already present). `swing` is the chunk's own
+ *  feel (0 = straight; used by Blocks playback); `note` is a playing rule/tip. */
+export interface PresetTrack {
+  label: string;
+  instrument: PercussionInstrument;
+  template: (number | null)[];
+  swing?: number;
+  note?: string;
+}
 
-/** Track presets: the marcação surdo (◐··●, the classic samba marking) and the
- *  teleco-teco tamborim (muted/open clack weave) — added to the CURRENT beat in
- *  one press, matching the rows used across the teleco-teco built-ins. */
+/** Track presets — the single-instrument "chunks": added to the CURRENT beat in
+ *  one press from "+ Add ▾", loadable as an opening entrada, and the phrases the
+ *  Blocks feature sequences. Sources: the teleco-teco built-ins, Oded's
+ *  entradas, and Nadav's variation exports. */
 export const PRESET_TRACKS: PresetTrack[] = [
   { label: "Surdo — marcação", instrument: Surdo,
     template: [1, null, null, 2, 0, null, null, 2, 1, null, null, 2, 0, null, null, 2] },
   { label: "Tamborim — teleco-teco", instrument: Tamborim,
     template: [1, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 0, 1, 2, 0] },
+  { label: "Tamborim — telecoteco var 1", instrument: Tamborim,
+    template: [1, 0, 1, 0, 1, 2, 0, 1, 0, 0, 0, 0, 0, 1, 2, 0] },
+  { label: "Tamborim — telecoteco var 2", instrument: Tamborim,
+    template: [1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 0, 0, 0, 1, 2, 0] },
+  { label: "Tamborim — telecoteco var 3", instrument: Tamborim,
+    template: [1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0] },
+  { label: "Tamborim — levada reta", instrument: Tamborim,
+    template: [0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0],
+    note: "Dynamics vary along the bar even where the stroke is the same." },
+  { label: "Tamborim — chamada", instrument: Tamborim,
+    template: [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
+    swing: 61, note: "Played with ~60% swing." },
+  { label: "Tamborim — entrada 1", instrument: Tamborim,
+    template: [0, 2, 1, 0, 1, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0] },
+  { label: "Tamborim — entrada 2", instrument: Tamborim,
+    template: [0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0] },
+  { label: "Bongo — partido alto", instrument: Bongo,
+    template: [null, 0, null, null, 1, null, 1, null, 1, null, 0, null, null, 1, null, 1] },
+  { label: "Bongo — partido alto var 1", instrument: Bongo,
+    template: [null, 0, null, 0, 1, null, 1, 1, 1, null, 1, 1, 1, null, 1, 1],
+    note: "RULE: when returning to the regular partido alto after this variation, " +
+      "the partido alto gets a strong beat on beat 1 of measure 1 — the same stroke " +
+      "as its measure-2 downbeat (doesn't occur normally)." },
+  { label: "Bongo — partido alto var 2", instrument: Bongo,
+    template: [null, 0, null, 0, 1, null, 0, null, 2, 1, null, 1, null, 1, null, 1] },
 ];
 
 /** A single-line tamborim rhythm from onset slots (`accented` slots get the
@@ -520,9 +553,9 @@ const TELECO_LOOP = builtin("M:2,2,4,16;tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0
 export const STUDY_PATTERNS: BuiltinPattern[] = [
   { name: "Bossa nova clave", pattern: BOSSA_UP, bpm: 70 },
   { name: "Samba clap (palma)", pattern: SAMBA_CLAP, bpm: 70 },
-  { name: "Entrada 1 (Oded) → teleco-teco", pattern: TELECO_LOOP, bpm: 80,
+  { name: "Entrada 1 → teleco-teco", pattern: TELECO_LOOP, bpm: 80,
     opening: builtin("M:2,2,4,16;tamborim=0,2,1,0,1,2,0,2,0,2,0,2,0,2,1,0") },
-  { name: "Entrada 2 (Oded) → teleco-teco", pattern: TELECO_LOOP, bpm: 70,
+  { name: "Entrada 2 → teleco-teco", pattern: TELECO_LOOP, bpm: 70,
     opening: builtin("M:2,2,4,16;tamborim=0,2,0,2,0,2,0,2,0,2,0,2,0,2,1,0") },
 ];
 

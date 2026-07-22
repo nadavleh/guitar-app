@@ -1702,17 +1702,27 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
             // Major/Minor shift sits on the LEFT; the bar label fills the rest, right-aligned.
+            // The chosen side fills SOLID with the primary color — the stock FilterChip
+            // tint was too subtle to tell which keyboard is active.
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 FilterChip(
                     selected = !ear.keyboardMinor,
                     onClick = { if (ear.keyboardMinor) ear.toggleKeyboardShift() },
-                    label = { Text("Major") },
+                    label = { Text("Major", fontWeight = if (!ear.keyboardMinor) FontWeight.Bold else FontWeight.Normal) },
+                    colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
                 )
                 Spacer(Modifier.width(4.dp))
                 FilterChip(
                     selected = ear.keyboardMinor,
                     onClick = { if (!ear.keyboardMinor) ear.toggleKeyboardShift() },
-                    label = { Text("⇧ Minor") },
+                    label = { Text("⇧ Minor", fontWeight = if (ear.keyboardMinor) FontWeight.Bold else FontWeight.Normal) },
+                    colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
                 )
                 Text("Bar ${bar + 1} answer", style = MaterialTheme.typography.labelMedium,
                     textAlign = androidx.compose.ui.text.style.TextAlign.End,

@@ -380,6 +380,14 @@ select.btn option { background: var(--surface2); color: var(--text-primary); }
   border-color: var(--primary);
   color: var(--primary);
 }
+/* The challenge pad's Major/Minor keyboard shift: the chosen side fills SOLID
+   so it's unmistakable which keyboard is active. */
+.chip.shift-chip.selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+  font-weight: 700;
+}
 
 .chip-row {
   display: flex;

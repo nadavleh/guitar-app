@@ -357,9 +357,18 @@ object PercussionBuiltins {
         val opening: PercussionPattern? = null,
     )
 
-    /** A one-press preset TRACK ("+ Add ▾" → presets): a 16-slot row template
-     *  tiled across the current loop on [instrument] (cloned if already present). */
-    data class PresetTrack(val label: String, val instrument: PercussionInstrument, val template: List<Int?>)
+    /** A one-press preset TRACK ("+ Add ▾" → presets, also the phrase "chunks"
+     *  the Blocks feature sequences): a 16-slot row template tiled across the
+     *  current loop on [instrument] (cloned if already present). [swing] is the
+     *  chunk's own feel (0 = straight; used by Blocks playback); [note] is a
+     *  playing rule/tip attached to the chunk. */
+    data class PresetTrack(
+        val label: String,
+        val instrument: PercussionInstrument,
+        val template: List<Int?>,
+        val swing: Int = 0,
+        val note: String = "",
+    )
 
     /** A single-line tamborim rhythm from onset slots ([accented] slots get the
      *  accent flag). Tamborim articulation: an onset directly followed by another
@@ -393,15 +402,16 @@ object PercussionBuiltins {
     val STUDY: List<BuiltinPattern> = listOf(
         BuiltinPattern("Bossa nova clave", BOSSA_UP, bpm = 70),
         BuiltinPattern("Samba clap (palma)", SAMBA_CLAP, bpm = 70),
-        BuiltinPattern("Entrada 1 (Oded) → teleco-teco", TELECO_LOOP, bpm = 80,
+        BuiltinPattern("Entrada 1 → teleco-teco", TELECO_LOOP, bpm = 80,
             opening = builtin("M:2,2,4,16;tamborim=0,2,1,0,1,2,0,2,0,2,0,2,0,2,1,0")),
-        BuiltinPattern("Entrada 2 (Oded) → teleco-teco", TELECO_LOOP, bpm = 70,
+        BuiltinPattern("Entrada 2 → teleco-teco", TELECO_LOOP, bpm = 70,
             opening = builtin("M:2,2,4,16;tamborim=0,2,0,2,0,2,0,2,0,2,0,2,0,2,1,0")),
     )
 
-    /** Track presets: the marcação surdo (◐··●, the classic samba marking) and the
-     *  teleco-teco tamborim (muted/open clack weave) — added to the CURRENT beat
-     *  in one press, matching the rows used across the teleco-teco built-ins. */
+    /** Track presets — the single-instrument "chunks": added to the CURRENT beat
+     *  in one press from "+ Add ▾", loadable as an opening entrada, and the
+     *  phrases the Blocks feature sequences. Sources: the teleco-teco built-ins,
+     *  Oded's entradas, and Nadav's variation exports. */
     val PRESET_TRACKS: List<PresetTrack> = listOf(
         PresetTrack(
             "Surdo — marcação", PercussionCatalog.Surdo,
@@ -410,6 +420,52 @@ object PercussionBuiltins {
         PresetTrack(
             "Tamborim — teleco-teco", PercussionCatalog.Tamborim,
             listOf(1, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 0, 1, 2, 0),
+        ),
+        PresetTrack(
+            "Tamborim — telecoteco var 1", PercussionCatalog.Tamborim,
+            listOf(1, 0, 1, 0, 1, 2, 0, 1, 0, 0, 0, 0, 0, 1, 2, 0),
+        ),
+        PresetTrack(
+            "Tamborim — telecoteco var 2", PercussionCatalog.Tamborim,
+            listOf(1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 0, 0, 0, 1, 2, 0),
+        ),
+        PresetTrack(
+            "Tamborim — telecoteco var 3", PercussionCatalog.Tamborim,
+            listOf(1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0),
+        ),
+        PresetTrack(
+            "Tamborim — levada reta", PercussionCatalog.Tamborim,
+            listOf(0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0),
+            note = "Dynamics vary along the bar even where the stroke is the same.",
+        ),
+        PresetTrack(
+            "Tamborim — chamada", PercussionCatalog.Tamborim,
+            listOf(1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0),
+            swing = 61,
+            note = "Played with ~60% swing.",
+        ),
+        PresetTrack(
+            "Tamborim — entrada 1", PercussionCatalog.Tamborim,
+            listOf(0, 2, 1, 0, 1, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0),
+        ),
+        PresetTrack(
+            "Tamborim — entrada 2", PercussionCatalog.Tamborim,
+            listOf(0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0),
+        ),
+        PresetTrack(
+            "Bongo — partido alto", PercussionCatalog.Bongo,
+            listOf(null, 0, null, null, 1, null, 1, null, 1, null, 0, null, null, 1, null, 1),
+        ),
+        PresetTrack(
+            "Bongo — partido alto var 1", PercussionCatalog.Bongo,
+            listOf(null, 0, null, 0, 1, null, 1, 1, 1, null, 1, 1, 1, null, 1, 1),
+            note = "RULE: when returning to the regular partido alto after this variation, " +
+                "the partido alto gets a strong beat on beat 1 of measure 1 — the same stroke " +
+                "as its measure-2 downbeat (doesn't occur normally).",
+        ),
+        PresetTrack(
+            "Bongo — partido alto var 2", PercussionCatalog.Bongo,
+            listOf(null, 0, null, 0, 1, null, 0, null, 2, 1, null, 1, null, 1, null, 1),
         ),
     )
 
@@ -434,7 +490,6 @@ object PercussionBuiltins {
     /** Grooves offered in the Load… menu (before the user's saved beats). */
     val ALL: List<BuiltinPattern> = listOf(
         BuiltinPattern("teleco-teco 1", TELECOTECO_1),
-        BuiltinPattern("teleco-teco 2", TELECOTECO_2),
         BuiltinPattern("Partido alto (official)", PARTIDO_ALTO_OFFICIAL, bpm = 70),
         BuiltinPattern("Partido alto (dec)", PARTIDO_ALTO_DEC, bpm = 70),
         BuiltinPattern("Platinelas pandeiro — partido alto", PARTIDO_ALTO_PLATINELAS, bpm = 70),

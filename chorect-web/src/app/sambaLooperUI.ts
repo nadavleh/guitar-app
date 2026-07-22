@@ -43,6 +43,8 @@ export class SambaLooperUI {
   private openVoiceMenu: string | null = null;
   private addMenuOpen = false;
   private saveOpen = false;
+  /** Whether the "＋ Opening ▾" picker (empty / from a preset track) is open. */
+  private openingMenuOpen = false;
   private saveName = "";
   /** Shared lane scroll position, preserved across the full re-renders. */
   private laneScrollLeft = 0;
@@ -139,12 +141,12 @@ export class SambaLooperUI {
       document.removeEventListener("pointerdown", this.outsideCloser, true);
       this.outsideCloser = null;
     }
-    if (this.openVoiceMenu !== null || this.addMenuOpen || this.saveOpen) {
+    if (this.openVoiceMenu !== null || this.addMenuOpen || this.saveOpen || this.openingMenuOpen) {
       const onDoc = (e: Event) => {
         if (!(e.target as HTMLElement).closest(".drum-voice-pop, .drum-load-pop")) {
           document.removeEventListener("pointerdown", onDoc, true);
           if (this.outsideCloser === onDoc) this.outsideCloser = null;
-          this.openVoiceMenu = null; this.addMenuOpen = false; this.saveOpen = false;
+          this.openVoiceMenu = null; this.addMenuOpen = false; this.saveOpen = false; this.openingMenuOpen = false;
           this.rerender();
         }
       };
@@ -172,9 +174,27 @@ export class SambaLooperUI {
     if (!s.canUndo) undoBtn.disabled = true;
 
     // Beat header: current beat name + tempo (set by Load / Save / Import). The
-    // opening (when present) renders as its own grid section above the loop.
-    const editToggle = el("span", { class: "drum-edit-toggle" });
-    if (!s.opening) editToggle.appendChild(btn("＋ Opening", () => s.addOpening(), "btn"));
+    // opening (when present) renders as its own grid section above the loop;
+    // "＋ Opening ▾" starts one empty or pre-filled with a preset chunk (entrada).
+    const editToggle = el("span", { class: "drum-edit-toggle", style: "position:relative" });
+    if (!s.opening) {
+      editToggle.appendChild(btn(this.openingMenuOpen ? "＋ Opening ✕" : "＋ Opening ▾", () => {
+        this.openingMenuOpen = !this.openingMenuOpen; this.addMenuOpen = false; this.saveOpen = false; this.rerender();
+      }));
+      if (this.openingMenuOpen) {
+        const pop = el("div", { class: "drum-load-pop", style: "right:0" });
+        const emptyRow = el("div", { class: "lrow" }, ["(empty opening)"]);
+        emptyRow.addEventListener("click", () => { this.openingMenuOpen = false; s.addOpening(); });
+        pop.appendChild(emptyRow);
+        pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary);cursor:default;font-size:11px" }, ["From a preset track"]));
+        for (const p of PRESET_TRACKS) {
+          const row = el("div", { class: "lrow" }, [`★ ${p.label}`]);
+          row.addEventListener("click", () => { this.openingMenuOpen = false; s.addOpeningFromPreset(p); });
+          pop.appendChild(row);
+        }
+        editToggle.appendChild(pop);
+      }
+    }
     wrap.appendChild(el("div", { class: "drum-beat-header" }, [
       el("span", { class: "drum-beat-name" }, [s.loadedName ?? "Untitled beat"]),
       el("span", { class: "drum-beat-bpm" }, [`${s.bpm} BPM`]),
@@ -599,9 +619,7 @@ export class SambaLooperUI {
       side.appendChild(row);
     };
     header("Grooves");
-    for (const b of BUILTIN_PATTERNS) beatRow(b);
-    header("Study");
-    for (const b of STUDY_PATTERNS) beatRow(b);
+    for (const b of [...BUILTIN_PATTERNS, ...STUDY_PATTERNS]) beatRow(b);
     header("Saved");
     const saved = s.savedPatterns();
     for (const [name, beat] of saved) {

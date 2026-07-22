@@ -70,6 +70,14 @@ class SambaLooperState(
         editingOpening = true
     }
 
+    /** Create an opening pre-filled with a preset track (e.g. an entrada chunk). */
+    fun addOpeningFromPreset(p: PercussionBuiltins.PresetTrack) {
+        pushUndo()
+        opening = PercussionPattern.empty(emptyList(), pattern.meter)
+            .withPresetTrack(p.instrument, p.template)
+        editingOpening = false
+    }
+
     /** Delete the opening and return to editing the loop. */
     fun removeOpening() {
         if (opening == null) return
