@@ -424,20 +424,11 @@ object PercussionBuiltins {
     private val BOSSA_UP = tamborimLine(setOf(0, 3, 6, 10, 13))
     private val SAMBA_CLAP = tamborimLine(setOf(0, 3, 6), bars = 1)
 
-    /** The teleco-teco tamborim loop the entradas fall into — the same line as
-     *  the "Tamborim — Teleco-teco" track preset. */
-    private val TELECO_LOOP: PercussionPattern =
-        builtin("M:2,2,4,16;tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0")
-
-    /** Study grooves (the "Study" section): comping rhythms plus Oded's two
-     *  entradas — each entrada plays once, then falls into the teleco-teco loop. */
+    /** Study grooves (the "Study" section). (The entrada → teleco-teco combos
+     *  were removed: build them by adding an entrada preset as the opening.) */
     val STUDY: List<BuiltinPattern> = listOf(
         BuiltinPattern("Bossa Nova Clave", BOSSA_UP, bpm = 70),
         BuiltinPattern("Samba Clap (Palma)", SAMBA_CLAP, bpm = 70),
-        BuiltinPattern("Entrada 1 → Teleco-teco", TELECO_LOOP, bpm = 80,
-            opening = builtin("M:2,2,4,16;tamborim=0,2,1,0,1,2,0,2,0,2,0,2,0,2,1,0")),
-        BuiltinPattern("Entrada 2 → Teleco-teco", TELECO_LOOP, bpm = 70,
-            opening = builtin("M:2,2,4,16;tamborim=0,2,0,2,0,2,0,2,0,2,0,2,0,2,1,0")),
     )
 
     /** Track presets — the single-instrument "chunks": added to the CURRENT beat
@@ -451,19 +442,19 @@ object PercussionBuiltins {
         ),
         PresetTrack(
             "Tamborim — Teleco-teco", PercussionCatalog.Tamborim,
-            listOf(1, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 0, 1, 2, 0),
+            listOf(2001, 0, 2001, 0, 2001, 2002, 0, 2001, 0, 2001, 0, 2001, 0, 2001, 2002, 0),
         ),
         PresetTrack(
             "Tamborim — Telecoteco Var 1", PercussionCatalog.Tamborim,
-            listOf(1, 0, 1, 0, 1, 2, 0, 1, 0, 0, 0, 0, 0, 1, 2, 0),
+            listOf(2001, 0, 2001, 0, 2001, 2002, 0, 2001, 0, 0, 0, 0, 0, 2001, 2002, 0),
         ),
         PresetTrack(
             "Tamborim — Telecoteco Var 2", PercussionCatalog.Tamborim,
-            listOf(1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 0, 0, 0, 1, 2, 0),
+            listOf(2001, 0, 2001, 0, 2001, 2002, 0, 2001, 2002, 0, 0, 0, 0, 2001, 2002, 0),
         ),
         PresetTrack(
             "Tamborim — Telecoteco Var 3", PercussionCatalog.Tamborim,
-            listOf(1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0),
+            listOf(2001, 0, 2001, 0, 2001, 2002, 0, 2001, 2002, 0, 2001, 2002, 0, 2001, 2002, 0),
         ),
         // Corrected per Nadav's export: each beat = ACCENTED clack, muted clack at
         // 75 % (dyn level 1), tap, clack — with a light 10 % swing.
@@ -474,9 +465,9 @@ object PercussionBuiltins {
         ),
         PresetTrack(
             "Tamborim — Chamada", PercussionCatalog.Tamborim,
-            listOf(1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0),
-            swing = 61,
-            note = "Played with ~60% swing.",
+            listOf(2001, 0, 2001, 0, 0, 0, 2001, 0, 0, 0, 2001, 0, 0, 0, 2001, 0),
+            swing = 20,
+            note = "Played with ~20% swing.",
         ),
         // From Nadav's export: accented clacks, taps, and 50 %-dyn clacks (2000s).
         PresetTrack(
@@ -485,11 +476,11 @@ object PercussionBuiltins {
         ),
         PresetTrack(
             "Tamborim — Entrada 1", PercussionCatalog.Tamborim,
-            listOf(0, 2, 1, 0, 1, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0),
+            listOf(0, 2002, 2001, 0, 2001, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 2001, 0),
         ),
         PresetTrack(
             "Tamborim — Entrada 2", PercussionCatalog.Tamborim,
-            listOf(0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0),
+            listOf(0, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 2001, 0),
         ),
         PresetTrack(
             "Bongo — Partido Alto", PercussionCatalog.Bongo,

@@ -527,28 +527,28 @@ export const PRESET_TRACKS: PresetTrack[] = [
   { label: "Surdo — Marcação", instrument: Surdo,
     template: [1, null, null, 2, 0, null, null, 2, 1, null, null, 2, 0, null, null, 2] },
   { label: "Tamborim — Teleco-teco", instrument: Tamborim,
-    template: [1, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 0, 1, 2, 0] },
+    template: [2001, 0, 2001, 0, 2001, 2002, 0, 2001, 0, 2001, 0, 2001, 0, 2001, 2002, 0] },
   { label: "Tamborim — Telecoteco Var 1", instrument: Tamborim,
-    template: [1, 0, 1, 0, 1, 2, 0, 1, 0, 0, 0, 0, 0, 1, 2, 0] },
+    template: [2001, 0, 2001, 0, 2001, 2002, 0, 2001, 0, 0, 0, 0, 0, 2001, 2002, 0] },
   { label: "Tamborim — Telecoteco Var 2", instrument: Tamborim,
-    template: [1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 0, 0, 0, 1, 2, 0] },
+    template: [2001, 0, 2001, 0, 2001, 2002, 0, 2001, 2002, 0, 0, 0, 0, 2001, 2002, 0] },
   { label: "Tamborim — Telecoteco Var 3", instrument: Tamborim,
-    template: [1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0] },
+    template: [2001, 0, 2001, 0, 2001, 2002, 0, 2001, 2002, 0, 2001, 2002, 0, 2001, 2002, 0] },
   // Corrected per Nadav's export: each beat = ACCENTED clack, muted clack at
   // 75 % (dyn level 1), tap, clack — with a light 10 % swing.
   { label: "Tamborim — Levada Reta", instrument: Tamborim,
     template: [100, 1001, 2, 0, 100, 1001, 2, 0, 100, 1001, 2, 0, 100, 1001, 2, 0],
     swing: 10 },
   { label: "Tamborim — Chamada", instrument: Tamborim,
-    template: [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
-    swing: 61, note: "Played with ~60% swing." },
+    template: [2001, 0, 2001, 0, 0, 0, 2001, 0, 0, 0, 2001, 0, 0, 0, 2001, 0],
+    swing: 20, note: "Played with ~20% swing." },
   // From Nadav's export: accented clacks, taps, and 50 %-dyn clacks (2000s).
   { label: "Tamborim — Palmas", instrument: Tamborim,
     template: [100, 2, 2000, 100, 2, 2000, 100, 2, 100, 2, 2000, 100, 2, 2000, 100, 2] },
   { label: "Tamborim — Entrada 1", instrument: Tamborim,
-    template: [0, 2, 1, 0, 1, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0] },
+    template: [0, 2002, 2001, 0, 2001, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 2001, 0] },
   { label: "Tamborim — Entrada 2", instrument: Tamborim,
-    template: [0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0] },
+    template: [0, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 2001, 0] },
   { label: "Bongo — Partido Alto", instrument: Bongo,
     template: [null, 0, null, null, 1, null, 1, null, 1, null, 0, null, null, 1, null, 1] },
   { label: "Bongo — Partido Alto Var 1", instrument: Bongo,
@@ -581,19 +581,11 @@ function tamborimLine(onsets: number[], accented: number[] = [], bars = 2): Perc
 const BOSSA_UP = tamborimLine([0, 3, 6, 10, 13]);
 const SAMBA_CLAP = tamborimLine([0, 3, 6], [], 1);
 
-/** The teleco-teco tamborim loop the entradas fall into — the same line as the
- *  "Tamborim — Teleco-teco" track preset. */
-const TELECO_LOOP = builtin("M:2,2,4,16;tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0");
-
-/** Study grooves (the "Study" section): comping rhythms plus Oded's two
- *  entradas — each entrada plays once, then falls into the teleco-teco loop. */
+/** Study grooves (the "Study" section). (The entrada → teleco-teco combos were
+ *  removed: build them by adding an entrada preset as the opening.) */
 export const STUDY_PATTERNS: BuiltinPattern[] = [
   { name: "Bossa Nova Clave", pattern: BOSSA_UP, bpm: 70 },
   { name: "Samba Clap (Palma)", pattern: SAMBA_CLAP, bpm: 70 },
-  { name: "Entrada 1 → Teleco-teco", pattern: TELECO_LOOP, bpm: 80,
-    opening: builtin("M:2,2,4,16;tamborim=0,2,1,0,1,2,0,2,0,2,0,2,0,2,1,0") },
-  { name: "Entrada 2 → Teleco-teco", pattern: TELECO_LOOP, bpm: 70,
-    opening: builtin("M:2,2,4,16;tamborim=0,2,0,2,0,2,0,2,0,2,0,2,0,2,1,0") },
 ];
 
 // ---- Beat file (export / import) ----

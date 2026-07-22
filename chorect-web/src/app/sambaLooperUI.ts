@@ -85,6 +85,37 @@ export class SambaLooperUI {
   private hoverCell: { track: number; slot: number; inOpening: boolean } | null = null;
   /** Copied region (rows × slots of raw cell values). */
   private cellClipboard: (number | null)[][] | null = null;
+  /** The visual rubber-band rectangle that follows the cursor during a right-drag
+   *  (Windows-desktop style). Lives on <body>, so grid rebuilds don't kill it. */
+  private marqueeEl: HTMLElement | null = null;
+
+  /** Start the marquee at the press point and track the pointer until release. */
+  private startMarquee(x0: number, y0: number): void {
+    this.killMarquee();
+    const m = el("div", { class: "drum-marquee" });
+    m.style.left = `${x0}px`;
+    m.style.top = `${y0}px`;
+    document.body.appendChild(m);
+    this.marqueeEl = m;
+    const onMove = (e: PointerEvent) => {
+      m.style.left = `${Math.min(x0, e.clientX)}px`;
+      m.style.top = `${Math.min(y0, e.clientY)}px`;
+      m.style.width = `${Math.abs(e.clientX - x0)}px`;
+      m.style.height = `${Math.abs(e.clientY - y0)}px`;
+    };
+    const onUp = () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      this.killMarquee();
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+
+  private killMarquee(): void {
+    this.marqueeEl?.remove();
+    this.marqueeEl = null;
+  }
 
   /** Ctrl+C: copy the selected rectangle. False = no selection (let native copy run). */
   copySelection(): boolean {
@@ -571,6 +602,7 @@ export class SambaLooperUI {
       if ((e as PointerEvent).button === 2) {
         this.selStart = { track: trackIndex, slot, inOpening };
         this.selRect = { inOpening, t0: trackIndex, t1: trackIndex, s0: slot, s1: slot };
+        this.startMarquee((e as PointerEvent).clientX, (e as PointerEvent).clientY);
         this.rerender();
         return;
       }

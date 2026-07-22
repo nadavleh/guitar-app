@@ -852,6 +852,12 @@ select.et-select {
 .drum-cell.playhead { border-color: var(--text-primary); }
 /* Right-drag rectangle selection (Ctrl+C copies, Ctrl+V pastes at the hovered cell). */
 .drum-cell.sel { outline: 2px dashed var(--feedback); outline-offset: -2px; }
+/* The rubber-band that follows the cursor during the drag (Windows-desktop style). */
+.drum-marquee {
+  position: fixed; z-index: 90; pointer-events: none;
+  border: 1px solid var(--feedback);
+  background: color-mix(in srgb, var(--feedback) 18%, transparent);
+}
 .drum-cell.accent { border-color: var(--feedback); font-weight: 700; font-size: 18px; }
 .drum-cells.dim { opacity: 0.4; }
 /* Quarter-note division rule between each group of four 16th cells; heavier at
