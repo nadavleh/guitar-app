@@ -600,6 +600,39 @@ data class BeatFile(
 }
 
 /**
+ * Phrase file (export / import): a JSON envelope around ONE user-defined phrase
+ * (custom track preset), so phrases can be shared between devices like beats.
+ * The Import button accepts both file kinds and dispatches on "format".
+ */
+object PhraseFile {
+    const val FORMAT = "chorect-phrase"
+
+    fun encode(p: PercussionBuiltins.PresetTrack): String {
+        fun esc(s: String) = buildString {
+            for (c in s) when (c) {
+                '"' -> append("\\\""); '\\' -> append("\\\\")
+                '\n' -> append("\\n"); '\r' -> append("\\r"); '\t' -> append("\\t")
+                else -> append(c)
+            }
+        }
+        return buildString {
+            append("{\n")
+            append("  \"format\": \"").append(FORMAT).append("\",\n")
+            append("  \"version\": 1,\n")
+            append("  \"phrase\": \"").append(esc(encodePresetTrack(p))).append("\"\n")
+            append("}\n")
+        }
+    }
+
+    /** Parse a phrase file; null on anything unrecognizable. */
+    fun decode(text: String): PercussionBuiltins.PresetTrack? {
+        val fields = parseFlatJsonObject(text) ?: return null
+        if (fields["format"] != FORMAT) return null
+        return decodePresetTrack(fields["phrase"] ?: return null)
+    }
+}
+
+/**
  * A saved beat: the loop, an optional one-shot opening (entrada) played once
  * before it, and free-text [notes]. Persisted as "main", "main~opening", or
  * "main~opening~notes" (empty middle part when there's no opening) — '~' never

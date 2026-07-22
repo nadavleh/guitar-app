@@ -25,6 +25,21 @@ class DrumBlocksTest {
         assertNull(b.withPhraseCount(2).tracks[1].cells.getOrNull(2))
     }
 
+    @Test fun `phrase file round-trips a custom phrase incl accents, dynamics and swing`() {
+        val custom = PercussionBuiltins.PresetTrack(
+            "My Groove Phrase", PercussionCatalog.Tamborim,
+            listOf(100, 1001, 2, 0, null, 1, null, 0, 100, 1001, 2, 0, null, 1, null, 0),
+            swing = 35,
+        )
+        val decoded = PhraseFile.decode(PhraseFile.encode(custom))
+        assertEquals(custom, decoded)
+        // The preset codec itself round-trips too (persistence path).
+        assertEquals(custom, decodePresetTrack(encodePresetTrack(custom)))
+        // Garbage / wrong format is rejected.
+        assertNull(PhraseFile.decode("""{"format":"chorect-beat","pattern":"x"}"""))
+        assertNull(PhraseFile.decode("nonsense"))
+    }
+
     @Test fun `per-cell swing override round-trips and default swing stays plain`() {
         var b = DrumBlock.empty("Swing", 2).withTrack(PercussionCatalog.Tamborim)
         b = b.withCell(0, 0, teleco.copy(swing = 55)).withCell(0, 1, teleco)

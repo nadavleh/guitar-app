@@ -19,6 +19,7 @@ import { AppState } from "./appState";
 import {
   PercussionInstrument, PercussionPattern, voicesFor, voiceOf, BUILTIN_PATTERNS, STUDY_PATTERNS,
   PresetTrack, DIVISIONS, encodeBeatFile, decodeBeatFile, BuiltinPattern,
+  encodePhraseFile, decodePhraseFile,
 } from "../theory";
 
 /** Time signatures offered in the Time dropdown (beatsPerBar / beatUnit). */
@@ -853,6 +854,10 @@ export class SambaLooperUI {
       const row = el("div", { class: "lrow", title: p.note ?? "tap to add this track to the current beat" },
         isCustom ? [el("span", { style: "flex:1" }, [label])] : [label]);
       if (isCustom) {
+        // ⤓ exports the phrase as a .chorect-phrase.json (Import reads it back).
+        const exp = el("button", { class: "btn text", title: "Export this phrase" }, ["⤓"]);
+        exp.addEventListener("click", (e) => { e.stopPropagation(); this.exportPhrase(p); });
+        row.appendChild(exp);
         const del = el("button", { class: "btn text" }, ["✕"]);
         del.addEventListener("click", (e) => { e.stopPropagation(); this.blocks.deleteTrackPreset(p.label); this.rerender(); });
         row.appendChild(del);
@@ -891,7 +896,20 @@ export class SambaLooperUI {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  /** Pick a Chorect beat file and load it (pattern + name + tempo + swing). */
+  /** Download a phrase as a Chorect phrase file (Import reads it back). */
+  private exportPhrase(p: PresetTrack): void {
+    const json = encodePhraseFile(p);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = el("a", { href: url, download: `${p.label.replace(/[^\w-]+/g, "_")}.chorect-phrase.json` }) as HTMLAnchorElement;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  /** Pick a Chorect file and load it: a BEAT file loads into the editor; a
+   *  PHRASE file joins the track-preset library (dispatch on "format"). */
   private importBeat(): void {
     const input = el("input", { type: "file", accept: ".json,application/json", style: "display:none" }) as HTMLInputElement;
     input.addEventListener("change", () => {
@@ -899,10 +917,20 @@ export class SambaLooperUI {
       if (!file) return;
       const reader = new FileReader();
       reader.onload = () => {
-        const parsed = decodeBeatFile(String(reader.result ?? ""));
-        if (!parsed) { window.alert("Not a valid Chorect beat file."); return; }
-        this.samba.loadPattern(parsed.pattern, parsed.name, parsed.bpm, parsed.swing, parsed.opening, parsed.notes);
-        this.rerender();
+        const text = String(reader.result ?? "");
+        const beat = decodeBeatFile(text);
+        if (beat) {
+          this.samba.loadPattern(beat.pattern, beat.name, beat.bpm, beat.swing, beat.opening, beat.notes);
+          this.rerender();
+          return;
+        }
+        const phrase = decodePhraseFile(text);
+        if (phrase && this.blocks.savePhrase(phrase)) {
+          window.alert(`Phrase "${phrase.label}" imported into Track presets.`);
+          this.rerender();
+          return;
+        }
+        window.alert("Not a valid Chorect beat or phrase file.");
       };
       reader.readAsText(file);
     });

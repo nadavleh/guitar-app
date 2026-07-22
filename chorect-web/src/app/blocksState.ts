@@ -100,17 +100,23 @@ export class BlocksState {
   /** Labels of the user-defined phrases (deletable / marked in lists). */
   customLabels(): Set<string> { return new Set(this.deps.getTrackPresets().keys()); }
 
+  /** Store a complete phrase in the library as-is (its own swing included) —
+   *  used by phrase-file import. Returns false on an empty/reserved-char label. */
+  savePhrase(p: PresetTrack): boolean {
+    const clean = p.label.trim();
+    if (!clean || [...'=:,|@~', "\n"].some((ch) => clean.includes(ch))) return false;
+    this.deps.saveTrackPreset(clean, encodePresetTrack({ ...p, label: clean }));
+    this.notify();
+    return true;
+  }
+
   /** Save a Beat-editor track as a named phrase (custom track preset). The row's
    *  accents + dynamics ride along in the raw values; clones save as their base
    *  instrument. Returns false when the label is empty/has reserved chars. */
   saveTrackAsPreset(inst: PercussionInstrument, row: (number | null)[], label: string): boolean {
-    const clean = label.trim();
-    if (!clean || [...'=:,|@~', "\n"].some((ch) => clean.includes(ch))) return false;
     const base = PercussionCatalog.byId(basePercussionId(inst.id)) ?? inst;
     const template = Array.from({ length: 16 }, (_, i) => row[i] ?? null);
-    this.deps.saveTrackPreset(clean, encodePresetTrack({ label: clean, instrument: base, template, swing: 0 }));
-    this.notify();
-    return true;
+    return this.savePhrase({ label, instrument: base, template, swing: 0 });
   }
 
   deleteTrackPreset(label: string) { this.deps.delTrackPreset(label); this.notify(); }

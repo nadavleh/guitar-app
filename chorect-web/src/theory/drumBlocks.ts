@@ -156,6 +156,22 @@ export function decodePresetTrack(s: string): PresetTrack | null {
   return { label, instrument: inst, template: cells, swing: Math.min(Math.max(swing, 0), 100) };
 }
 
+/** Phrase file (export / import): a JSON envelope around ONE user-defined
+ *  phrase, so phrases can be shared between devices like beats. The Import
+ *  button accepts both file kinds and dispatches on "format". */
+export function encodePhraseFile(p: PresetTrack): string {
+  return JSON.stringify({ format: "chorect-phrase", version: 1, phrase: encodePresetTrack(p) }, null, 2);
+}
+
+export function decodePhraseFile(text: string): PresetTrack | null {
+  let obj: unknown;
+  try { obj = JSON.parse(text); } catch { return null; }
+  if (!obj || typeof obj !== "object") return null;
+  const o = obj as Record<string, unknown>;
+  if (o.format !== "chorect-phrase" || typeof o.phrase !== "string") return null;
+  return decodePresetTrack(o.phrase);
+}
+
 /** The phrase library: built-ins with `custom` phrases merged in — a custom
  *  phrase whose label matches a built-in REPLACES it; new labels append. */
 export function mergedPresets(custom: Iterable<PresetTrack>): PresetTrack[] {

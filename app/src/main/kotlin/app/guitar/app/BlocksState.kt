@@ -85,17 +85,22 @@ class BlocksState(
     /** All phrases (built-ins overridden/extended by the user's). */
     fun allPresets(): List<PresetTrack> = mergedPresets(customPresets.values)
 
+    /** Store a complete phrase in the library as-is (its own swing included) —
+     *  used by phrase-file import. Returns false on an empty/reserved-char label. */
+    fun savePhrase(p: PresetTrack): Boolean {
+        val clean = p.label.trim()
+        if (clean.isEmpty() || clean.any { it in "=:,|@~" || it == '\n' }) return false
+        scope.launch { repo.saveDrumTrackPreset(encodePresetTrack(p.copy(label = clean))) }
+        return true
+    }
+
     /** Save a Beat-editor track as a named phrase (custom track preset). The row's
      *  accents + dynamics ride along in the raw values; clones save as their base
      *  instrument. Returns false when the label is empty/has reserved chars. */
     fun saveTrackAsPreset(inst: PercussionInstrument, row: List<Int?>, label: String): Boolean {
-        val clean = label.trim()
-        if (clean.isEmpty() || clean.any { it in "=:,|@~" || it == '\n' }) return false
         val base = PercussionCatalog.byId(PercussionCatalog.baseId(inst.id)) ?: inst
         val template = List(16) { i -> row.getOrNull(i) }
-        val preset = PresetTrack(clean, base, template, swing = 0)
-        scope.launch { repo.saveDrumTrackPreset(encodePresetTrack(preset)) }
-        return true
+        return savePhrase(PresetTrack(label, base, template, swing = 0))
     }
 
     fun deleteTrackPreset(label: String) { scope.launch { repo.deleteDrumTrackPreset(label) } }

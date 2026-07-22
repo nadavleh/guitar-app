@@ -280,13 +280,31 @@ private fun PatternSection(
             }
         }
     }
+    var phraseToExport by remember { mutableStateOf<app.guitar.theory.PercussionBuiltins.PresetTrack?>(null) }
+    val phraseExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        val p = phraseToExport
+        if (uri != null && p != null) runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { os ->
+                os.write(app.guitar.theory.PhraseFile.encode(p).toByteArray())
+            }
+        }
+        phraseToExport = null
+    }
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) runCatching {
             val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
                 ?: return@runCatching
-            BeatFile.decode(text)?.let { samba.loadPattern(it.pattern, it.name, it.bpm, it.swing, it.opening, it.notes) }
+            val beat = BeatFile.decode(text)
+            if (beat != null) {
+                samba.loadPattern(beat.pattern, beat.name, beat.bpm, beat.swing, beat.opening, beat.notes)
+            } else {
+                // A phrase file joins the track-preset library instead.
+                app.guitar.theory.PhraseFile.decode(text)?.let { blocks.savePhrase(it) }
+            }
         }
     }
 
@@ -378,7 +396,10 @@ private fun PatternSection(
             OutlinedButton(onClick = { onDynMode(true); onEraseMode(false); onAccentMode(false) }) { Text("Dyn") }
         }
         OutlinedButton(onClick = { saveName = samba.loadedName ?: ""; saveDialog = true }) { Text("Save…") }
-        LoadBeatsControl(samba, blocks)
+        LoadBeatsControl(samba, blocks, onExportPhrase = { p ->
+            phraseToExport = p
+            phraseExportLauncher.launch(p.label.replace(Regex("[^\\w-]+"), "_") + ".chorect-phrase.json")
+        })
         OutlinedButton(onClick = { samba.clearAll() }) { Text("Clear all") }
         OutlinedButton(onClick = { samba.undo() }, enabled = samba.canUndo) { Text("↶ Undo") }
         // Notes toggle (the editor shows under the beat header).
@@ -1015,7 +1036,11 @@ private fun BlocksSection(blocks: BlocksState) {
  *  position is REMEMBERED across openings — the phone keeps the grid full-width
  *  (web uses a constantly-open side panel with the same content). */
 @Composable
-private fun LoadBeatsControl(samba: SambaLooperState, blocks: BlocksState) {
+private fun LoadBeatsControl(
+    samba: SambaLooperState,
+    blocks: BlocksState,
+    onExportPhrase: (app.guitar.theory.PercussionBuiltins.PresetTrack) -> Unit = {},
+) {
     val saved by samba.savedPatterns.collectAsState(initial = emptyMap())
     var open by remember { mutableStateOf(false) }
     // Hoisted above the menu so closing/reopening keeps the scroll position.
@@ -1023,7 +1048,7 @@ private fun LoadBeatsControl(samba: SambaLooperState, blocks: BlocksState) {
     Box {
         OutlinedButton(onClick = { open = true }) { Text("Load…") }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            BeatList(samba, blocks, saved, listScroll, onLoaded = { open = false })
+            BeatList(samba, blocks, saved, listScroll, onLoaded = { open = false }, onExportPhrase = onExportPhrase)
         }
     }
 }
@@ -1035,6 +1060,7 @@ private fun BeatList(
     saved: Map<String, app.guitar.theory.SavedBeat>,
     listScroll: androidx.compose.foundation.ScrollState,
     onLoaded: () -> Unit,
+    onExportPhrase: (app.guitar.theory.PercussionBuiltins.PresetTrack) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -1094,15 +1120,27 @@ private fun BeatList(
                 "★ ${p.label}" + (if (p.swing > 0) " ~${p.swing}%" else "") + (if (isCustom) " 👤" else ""),
                 selected = false,
                 trailing = if (!isCustom) null else ({
-                    Text(
-                        "✕",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .clickable { blocks.deleteTrackPreset(p.label) }
-                            .padding(4.dp),
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // ⤓ exports the phrase as a .chorect-phrase.json (Import reads it back).
+                        Text(
+                            "⤓",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable { onExportPhrase(p) }
+                                .padding(4.dp),
+                        )
+                        Text(
+                            "✕",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable { blocks.deleteTrackPreset(p.label) }
+                                .padding(4.dp),
+                        )
+                    }
                 }),
             ) {
                 samba.addPresetTrack(p)
