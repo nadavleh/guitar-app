@@ -15,7 +15,7 @@ import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../au
 
 export const DISPLAY_FRETS = 14;
 /** App version shown beside the header wordmark. Keep in sync with package.json on release. */
-export const APP_VERSION = "2.26.0";
+export const APP_VERSION = "2.27.0";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 
@@ -124,6 +124,7 @@ interface Persisted {
   customTunings: Record<string, number[]>;
   challengeScores: ChallengeScore[];
   drumPatterns: Record<string, string>;
+  drumBlocks: Record<string, string>;
   drumVolumes: Record<string, number>;
   chordSlots?: string[];
 }
@@ -197,6 +198,8 @@ export class AppState {
   challengeScores: ChallengeScore[] = [];
   /** Saved drum beats: name → encoded PercussionPattern string (insertion order). */
   drumPatterns = new Map<string, string>();
+  /** Saved drum BLOCKS (phrase sequences), name -> DrumBlock.encode(). */
+  drumBlocks = new Map<string, string>();
   /** Drum mixer volumes: "<instId>" (global) or "<instId>:<voice>" → 0..1. */
   drumVolumes = new Map<string, number>();
 
@@ -280,6 +283,7 @@ export class AppState {
       }
       if (Array.isArray(p.challengeScores)) this.challengeScores = p.challengeScores.slice();
       if (p.drumPatterns) for (const [name, enc] of Object.entries(p.drumPatterns)) this.drumPatterns.set(name, enc);
+      if (p.drumBlocks) for (const [name, enc] of Object.entries(p.drumBlocks)) this.drumBlocks.set(name, enc);
       if (p.drumVolumes) for (const [k, v] of Object.entries(p.drumVolumes)) {
         if (typeof v === "number") this.drumVolumes.set(k, Math.min(Math.max(v, 0), 1));
       }
@@ -320,6 +324,7 @@ export class AppState {
       customTunings,
       challengeScores: this.challengeScores,
       drumPatterns: Object.fromEntries(this.drumPatterns),
+      drumBlocks: Object.fromEntries(this.drumBlocks),
       drumVolumes: Object.fromEntries(this.drumVolumes),
       chordSlots: this.chordSlots,
     };
@@ -340,6 +345,12 @@ export class AppState {
     });
   }
 
+  saveDrumBlock(name: string, encoded: string): void {
+    this.commit(() => { this.drumBlocks.set(name, encoded); });
+  }
+  deleteDrumBlock(name: string): void {
+    this.commit(() => { this.drumBlocks.delete(name); });
+  }
   saveDrumPattern(name: string, encoded: string): void {
     this.commit(() => { this.drumPatterns.set(name, encoded); });
   }

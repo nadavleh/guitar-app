@@ -900,6 +900,25 @@ select.et-select {
 }
 .drum-cell.count.beat { color: var(--text-primary); font-weight: 800; font-size: 11px; }
 
+/* ---------- Blocks (phrase sequencer) ---------- */
+.block-name {
+  width: 150px; padding: 6px 10px; font-size: 13px; font-weight: 700;
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text-primary);
+}
+.block-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.block-label-wrap { width: 118px; flex: 0 0 118px; display: flex; align-items: center; gap: 2px; }
+.block-track-label { font-weight: 700; font-size: 13px; flex: 1; }
+.block-cells { display: flex; gap: 6px; flex: 1 1 auto; flex-wrap: wrap; }
+.block-cell {
+  flex: 1 1 0; min-width: 92px; min-height: 44px; padding: 4px 8px;
+  border-radius: 10px; border: 1px solid var(--line); cursor: pointer;
+  background: var(--surface2); color: var(--text-primary); font-size: 12px; line-height: 1.25;
+}
+.block-cell.empty { color: var(--text-secondary); border-style: dashed; }
+.block-cell.picking { border-color: var(--primary); border-width: 2px; }
+.block-cell.playing { border-color: var(--feedback); border-width: 2px; background: color-mix(in srgb, var(--feedback) 16%, var(--surface2)); }
+
 /* Per-beat notes editor. */
 .drum-notes {
   width: 100%; box-sizing: border-box; margin: 6px 0; padding: 8px 10px;

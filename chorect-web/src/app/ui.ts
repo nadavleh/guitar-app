@@ -14,6 +14,7 @@ import { TunerState } from "./tunerState";
 import { EarTrainingState, EarSubMode } from "./earTrainingState";
 import { EarTrainingUI } from "./earTrainingUI";
 import { SambaLooperState } from "./sambaLooperState";
+import { BlocksState } from "./blocksState";
 import { SambaLooperUI } from "./sambaLooperUI";
 import { DecomposeUI } from "./decomposeUI";
 import { LoopState } from "./loopState";
@@ -154,6 +155,7 @@ export class App {
   private ear: EarTrainingState;
   private earUI: EarTrainingUI;
   private samba: SambaLooperState;
+  private drumBlocks: BlocksState;
   private sambaUI: SambaLooperUI;
   private decomposeUI: DecomposeUI;
   private loop: LoopState;
@@ -205,7 +207,15 @@ export class App {
       getVolumes: () => state.drumVolumes,
       saveVolume: (key, value) => state.setDrumVolume(key, value),
     });
-    this.sambaUI = new SambaLooperUI(this.samba, state, this.ear, () => state.closeSheet());
+    this.drumBlocks = new BlocksState({
+      audio: state.audio,
+      onChange: () => this.scheduleRender(),
+      getSaved: () => state.drumBlocks,
+      save: (name, enc) => state.saveDrumBlock(name, enc),
+      del: (name) => state.deleteDrumBlock(name),
+      loadSample: (inst, voice) => loadDrumSample(state.audio, inst, voice),
+    });
+    this.sambaUI = new SambaLooperUI(this.samba, this.drumBlocks, state, this.ear, () => state.closeSheet());
     this.cavaq = new CavaqProgState({
       audio: state.audio,
       tuningProvider: () => state.liveTuning,
@@ -474,6 +484,7 @@ export class App {
     // Leaving the Ear screen halts its looper but keeps all state (Kotlin DisposableEffect).
     if (route !== Sheet.EarTraining && this.ear.isLooping) this.ear.stopLoop();
     if (route !== Sheet.SambaLooper && this.samba.isPlaying) this.samba.stop();
+    if (route !== Sheet.SambaLooper && this.drumBlocks.isPlaying) this.drumBlocks.stop();
     if (route !== Sheet.CavaqProgressions && this.cavaq.isPlaying) this.cavaq.stop();
     if (route !== Sheet.RhythmUnits && this.rhythmUnits.isPlaying) this.rhythmUnits.stop();
     if (route !== Sheet.RhythmUnits && this.rhythmPhrase.isPlaying) this.rhythmPhrase.stop();

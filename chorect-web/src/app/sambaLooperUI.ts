@@ -9,15 +9,16 @@
 // Clear all/Erase/Accent stay in the same header row.
 
 import { SambaLooperState } from "./sambaLooperState";
+import { BlocksState } from "./blocksState";
 import { EarTrainingState } from "./earTrainingState";
 import { Colors } from "./theme";
-import { el, btn, slider } from "./dom";
+import { el, btn, slider, segmented } from "./dom";
 import { icon } from "./icons";
 import { transportDock, toneSheet } from "./transport";
 import { AppState } from "./appState";
 import {
   PercussionInstrument, PercussionPattern, voicesFor, voiceOf, BUILTIN_PATTERNS, STUDY_PATTERNS,
-  PRESET_TRACKS, DIVISIONS, encodeBeatFile, decodeBeatFile, BuiltinPattern,
+  PRESET_TRACKS, PresetTrack, DIVISIONS, encodeBeatFile, decodeBeatFile, BuiltinPattern,
 } from "../theory";
 
 /** Time signatures offered in the Time dropdown (beatsPerBar / beatUnit). */
@@ -64,8 +65,19 @@ export class SambaLooperUI {
   private notesCaret = 0;
   private lastNotesEditMs = 0;
 
+  /** Which view the screen shows: the step-grid Beat editor or the phrase Blocks. */
+  private viewMode: "beat" | "blocks" = "beat";
+  /** Blocks: cell whose phrase palette is open (tap a block cell to pick). */
+  private blockPick: { track: number; col: number } | null = null;
+  private blockLoadOpen = false;
+  private blockMergeOpen = false;
+  private blockAddOpen = false;
+  /** Dyn tool (per-slot dynamics): tap a hit to cycle 100→75→50→25 %. */
+  private dynMode = false;
+
   constructor(
     private samba: SambaLooperState,
+    private blocks: BlocksState,
     private state: AppState,
     private ear: EarTrainingState,
     private onBack: () => void,
@@ -78,10 +90,41 @@ export class SambaLooperUI {
     // header
     screen.appendChild(el("div", { class: "tool-topbar" }, [
       el("div", { class: "tool-title" }, ["DRUMS"]),
-      btn("Back", () => { s.stop(); this.onBack(); }),
+      btn("Back", () => { s.stop(); this.blocks.stop(); this.onBack(); }),
     ]));
 
     screen.appendChild(el("div", { class: "v-gap-8" }));
+
+    // [Beat | Blocks] — the step-grid editor vs. the phrase sequencer.
+    screen.appendChild(el("div", { style: "margin-bottom:6px" }, [
+      segmented<"beat" | "blocks">(
+        [{ value: "beat", label: "Beat" }, { value: "blocks", label: "Blocks" }],
+        this.viewMode,
+        (v) => {
+          this.viewMode = v;
+          if (v === "beat") this.blocks.stop(); else this.samba.stop();
+          this.rerender();
+        },
+      ),
+    ]));
+
+    if (this.viewMode === "blocks") {
+      const body = el("div", { class: "et-scroll" });
+      body.appendChild(this.blocksBody());
+      screen.appendChild(el("div", { class: "drum-main" }, [body]));
+      screen.appendChild(transportDock({
+        playing: this.blocks.isPlaying,
+        onPlayStop: () => this.blocks.toggle(),
+        bpm: this.blocks.bpm,
+        onBpm: (v) => this.blocks.setBpm(v),
+        inlineBpm: true,
+        toneLabel: this.state.sound,
+        onTone: () => { this.toneSheetOpen = true; this.rerender(); },
+      }));
+      container.appendChild(screen);
+      if (this.toneSheetOpen) container.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.rerender(); }));
+      return;
+    }
 
     // Main row: the scrolling pattern editor + a constantly-open, scrollable
     // beats side panel (grooves / study / saved — replaces the Load… popup).
@@ -166,10 +209,14 @@ export class SambaLooperUI {
     // Header row: Erase / Accent / Save… / Load… / Clear all / + Add ▾.
     const erase = this.eraseMode
       ? btn("Erase ✓", () => { this.eraseMode = false; this.rerender(); }, "btn primary")
-      : btn("Erase", () => { this.eraseMode = true; this.accentMode = false; this.rerender(); });
+      : btn("Erase", () => { this.eraseMode = true; this.accentMode = false; this.dynMode = false; this.rerender(); });
     const accent = this.accentMode
       ? btn("Accent ✓", () => { this.accentMode = false; this.rerender(); }, "btn primary")
-      : btn("Accent", () => { this.accentMode = true; this.eraseMode = false; this.rerender(); });
+      : btn("Accent", () => { this.accentMode = true; this.eraseMode = false; this.dynMode = false; this.rerender(); });
+    // Dyn: tap a hit to cycle its per-slot volume 100 → 75 → 50 → 25 %.
+    const dyn = this.dynMode
+      ? btn("Dyn ✓", () => { this.dynMode = false; this.rerender(); }, "btn primary")
+      : btn("Dyn", () => { this.dynMode = true; this.eraseMode = false; this.accentMode = false; this.rerender(); });
     const undoBtn = btn("↶ Undo", () => { s.undo(); this.rerender(); });
     if (!s.canUndo) undoBtn.disabled = true;
 
@@ -205,7 +252,7 @@ export class SambaLooperUI {
     const notesBtn = btn(s.beatNotes || this.notesOpen ? "📝 Notes ✓" : "📝 Notes",
       () => { this.notesOpen = !this.notesOpen; this.rerender(); }, s.beatNotes ? "btn primary" : "btn");
     wrap.appendChild(el("div", { class: "et-row-gap" }, [
-      erase, accent, this.saveControl(), btn("Clear all", () => s.clearAll()),
+      erase, accent, dyn, this.saveControl(), btn("Clear all", () => s.clearAll()),
       undoBtn, notesBtn, btn("Export", () => this.exportBeat()), btn("Import", () => this.importBeat()),
       this.addInstrumentControl(),
     ]));
@@ -455,9 +502,15 @@ export class SambaLooperUI {
       : voice === 0 ? Colors.primary
       : voice === 1 ? Colors.scaleTone
       : Colors.chordTone;
+    // Per-slot dynamics: quieter hits render faded (Dyn tool cycles the level).
+    const dynLevel = voice === null ? 0 : pat.dynLevelAt(inst, slot);
+    const dynStyle = dynLevel > 0 ? `;opacity:${(1 - 0.22 * dynLevel).toFixed(2)}` : "";
     const cls = "drum-cell" + (isPlayhead ? " playhead" : "") + (accented ? " accent" : "");
-    const c = el("div", { class: cls, style: `background:${fill}` },
-      [voice !== null ? voiceOf(inst, voice).glyph : ""]);
+    const c = el("div", {
+      class: cls,
+      style: `background:${fill}${dynStyle}`,
+      title: dynLevel > 0 ? `${100 - dynLevel * 25}%` : "",
+    }, [voice !== null ? voiceOf(inst, voice).glyph : ""]);
 
     // tap = cycle/erase/accent; long-press = clear. Any edit first targets this
     // cell's section (loop or opening).
@@ -474,6 +527,7 @@ export class SambaLooperUI {
       s.editOpening(inOpening);
       if (this.eraseMode) s.clearCell(inst, slot);
       else if (this.accentMode) s.toggleAccent(inst, slot);
+      else if (this.dynMode) s.dynCycle(inst, slot);
       // Selected track follows the palette brush; other tracks keep cycling.
       else if (s.selectedTrackId === inst.id) s.applyBrush(inst, slot);
       else s.toggleSlot(inst, slot);
@@ -488,6 +542,141 @@ export class SambaLooperUI {
       s.clearCell(inst, slot);
     });
     return c;
+  }
+
+  // ---------- BLOCKS view ----------
+
+  /** Short chip label for a phrase: drop the "Instrument — " prefix. */
+  private phraseShort(p: PresetTrack): string {
+    const i = p.label.indexOf("— ");
+    return i < 0 ? p.label : p.label.substring(i + 2);
+  }
+
+  /** The Blocks phrase sequencer: block header (name / phrases / save / load /
+   *  merge / + track), the tracks × phrase-columns grid (tap a cell to pick its
+   *  phrase from the palette below), and the playing column highlight. */
+  private blocksBody(): HTMLElement {
+    const b = this.blocks;
+    const blk = b.block;
+    const wrap = el("div", {});
+
+    // Header: name + phrase-count stepper.
+    const nameInput = el("input", { type: "text", value: blk.name, class: "block-name" }) as HTMLInputElement;
+    nameInput.addEventListener("change", () => b.rename(nameInput.value.trim() || "Block"));
+    const minus = btn("−", () => b.setPhraseCount(blk.phraseCount - 1));
+    if (blk.phraseCount <= 1) minus.disabled = true;
+    const plus = btn("+", () => b.setPhraseCount(blk.phraseCount + 1));
+    if (blk.phraseCount >= 8) plus.disabled = true;
+    wrap.appendChild(el("div", { class: "et-row-gap" }, [
+      nameInput,
+      el("span", { class: "drum-setup-label" }, ["Phrases"]),
+      minus, el("span", { class: "drum-setup-val" }, [String(blk.phraseCount)]), plus,
+    ]));
+
+    // Actions: save / load / merge / clear / + track.
+    const loadWrap = el("div", { style: "position:relative" });
+    loadWrap.appendChild(btn(this.blockLoadOpen ? "Load ✕" : "Load…", () => { this.blockLoadOpen = !this.blockLoadOpen; this.blockMergeOpen = false; this.blockAddOpen = false; this.rerender(); }));
+    if (this.blockLoadOpen) {
+      const pop = el("div", { class: "drum-load-pop" });
+      const saved = b.savedBlocks();
+      for (const [name, blkSaved] of saved) {
+        const del = el("button", { class: "btn text" }, ["✕"]);
+        del.addEventListener("click", (e) => { e.stopPropagation(); b.deleteSaved(name); this.rerender(); });
+        const row = el("div", { class: "lrow" }, [el("span", { style: "flex:1" }, [name]), del]);
+        row.addEventListener("click", () => { b.loadBlock(blkSaved); this.blockLoadOpen = false; this.rerender(); });
+        pop.appendChild(row);
+      }
+      if (saved.size === 0) pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary)" }, ["(no saved blocks yet)"]));
+      loadWrap.appendChild(pop);
+    }
+    const mergeWrap = el("div", { style: "position:relative" });
+    mergeWrap.appendChild(btn(this.blockMergeOpen ? "Merge ✕" : "Merge with…", () => { this.blockMergeOpen = !this.blockMergeOpen; this.blockLoadOpen = false; this.blockAddOpen = false; this.rerender(); }));
+    if (this.blockMergeOpen) {
+      const pop = el("div", { class: "drum-load-pop" });
+      const candidates = b.mergeCandidates();
+      for (const cand of candidates) {
+        const row = el("div", { class: "lrow" }, [cand.name]);
+        row.addEventListener("click", () => { b.mergeWith(cand.block); this.blockMergeOpen = false; this.rerender(); });
+        pop.appendChild(row);
+      }
+      if (candidates.length === 0) pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary)" }, [`(no saved blocks with ${blk.phraseCount} phrases)`]));
+      mergeWrap.appendChild(pop);
+    }
+    const addWrap = el("div", { style: "position:relative" });
+    addWrap.appendChild(btn(this.blockAddOpen ? "+ Track ✕" : "+ Track ▾", () => { this.blockAddOpen = !this.blockAddOpen; this.blockLoadOpen = false; this.blockMergeOpen = false; this.rerender(); }, "btn primary"));
+    if (this.blockAddOpen) {
+      const pop = el("div", { class: "drum-load-pop" });
+      for (const inst of b.instrumentsToAdd()) {
+        const row = el("div", { class: "lrow" }, [inst.displayName]);
+        row.addEventListener("click", () => { b.addTrack(inst); this.blockAddOpen = false; this.rerender(); });
+        pop.appendChild(row);
+      }
+      addWrap.appendChild(pop);
+    }
+    wrap.appendChild(el("div", { class: "et-row-gap" }, [
+      btn("Save block", () => b.saveCurrent()), loadWrap, mergeWrap,
+      btn("Clear", () => b.clear()), addWrap,
+    ]));
+
+    if (blk.tracks.length === 0) {
+      wrap.appendChild(el("div", { class: "et-muted", style: "margin-top:14px" }, [
+        "A block sequences phrases: add a track (instrument), then tap its cells to place phrases — e.g. entrada → variation → teleco-teco → variation. Each phrase plays with its own swing; the block loops.",
+      ]));
+      return wrap;
+    }
+
+    // Grid: rows = tracks, columns = phrase slots.
+    blk.tracks.forEach((t, ti) => {
+      const label = el("div", { class: "block-track-label" }, [t.instrument.displayName]);
+      const rm = el("button", { class: "btn text", title: "Remove track" }, ["✕"]);
+      rm.addEventListener("click", () => { this.blockPick = null; b.removeTrack(ti); });
+      const cells = el("div", { class: "block-cells" });
+      for (let c = 0; c < blk.phraseCount; c++) {
+        const phrase = t.cells[c];
+        const active = b.isPlaying && b.currentCol === c;
+        const picking = this.blockPick?.track === ti && this.blockPick?.col === c;
+        const cls = "block-cell" + (active ? " playing" : "") + (picking ? " picking" : "") + (phrase ? "" : " empty");
+        const badges = phrase?.swing ? ` ~${phrase.swing}%` : "";
+        const cell = el("button", { class: cls, title: phrase?.note ?? "" }, [
+          phrase ? this.phraseShort(phrase) + badges + (phrase.note ? " ※" : "") : "＋",
+        ]);
+        cell.addEventListener("click", () => {
+          this.blockPick = picking ? null : { track: ti, col: c };
+          this.rerender();
+        });
+        cells.appendChild(cell);
+      }
+      wrap.appendChild(el("div", { class: "block-row" }, [el("div", { class: "block-label-wrap" }, [label, rm]), cells]));
+    });
+
+    // Phrase palette for the picked cell.
+    const pick = this.blockPick;
+    if (pick && pick.track < blk.tracks.length) {
+      const track = blk.tracks[pick.track];
+      const chips = el("div", { class: "pal-chips" });
+      const noneChip = el("button", { class: "pal-chip" }, ["(empty)"]);
+      noneChip.addEventListener("click", () => { b.setCell(pick.track, pick.col, null); this.blockPick = null; this.rerender(); });
+      chips.appendChild(noneChip);
+      for (const p of b.phrasesFor(track.instrument)) {
+        const chip = el("button", { class: "pal-chip", title: p.note ?? "" }, [this.phraseShort(p) + (p.swing ? ` ~${p.swing}%` : "")]);
+        chip.addEventListener("click", () => { b.setCell(pick.track, pick.col, p); this.blockPick = null; this.rerender(); });
+        chips.appendChild(chip);
+      }
+      wrap.appendChild(el("div", { class: "drum-palette", style: "margin-top:10px" }, [
+        el("span", { class: "pal-name" }, [`${track.instrument.displayName} · phrase ${pick.col + 1}`]),
+        chips,
+      ]));
+    }
+
+    // Rule/notes of the phrases in use, shown under the grid.
+    const noted = new Set<string>();
+    for (const t of blk.tracks) for (const p of t.cells) {
+      if (p?.note && !noted.has(p.label)) {
+        noted.add(p.label);
+        wrap.appendChild(el("div", { class: "et-muted", style: "font-size:12px;margin-top:6px" }, [`※ ${p.label}: ${p.note}`]));
+      }
+    }
+    return wrap;
   }
 
   /** Bottom voice palette for the selected track: pick the "brush" a cell tap

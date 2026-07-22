@@ -36,6 +36,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -85,15 +86,22 @@ import app.guitar.theory.PercussionVoices
 @Composable
 fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     val samba = state.sambaLooper
+    val blocks = state.drumBlocks
     // Guard on currentSheet so a rotation (which disposes+recreates this composable
     // when the portrait/landscape layout swaps) doesn't stop playback — only a real
     // navigation away does.
-    DisposableEffect(Unit) { onDispose { if (state.currentSheet != Sheet.SambaLooper) samba.stop() } }
+    DisposableEffect(Unit) {
+        onDispose { if (state.currentSheet != Sheet.SambaLooper) { samba.stop(); blocks.stop() } }
+    }
 
+    // [Beat | Blocks]: the step-grid editor vs. the phrase sequencer.
+    var blocksMode by remember { mutableStateOf(false) }
     // Eraser tool: when on, tapping a cell clears it instead of cycling its voice.
     var eraseMode by remember { mutableStateOf(false) }
     // Accent tool: when on, tapping a non-silent cell toggles its accent (louder hit).
     var accentMode by remember { mutableStateOf(false) }
+    // Dyn tool: tap a hit to cycle its per-slot volume 100 → 75 → 50 → 25 %.
+    var dynMode by remember { mutableStateOf(false) }
     // Free-transform state for the drum-loop grid (#6). scaleX/scaleY are INDEPENDENT so
     // you can stretch just the width (widen narrow cells) or just the height. Two-finger
     // pinch zooms + pans; single-finger drag pans once zoomed. Pure render-layer effect
@@ -130,9 +138,18 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 maxLines = 1,
                 modifier = Modifier.weight(1f),
             )
-            OutlinedButton(onClick = { samba.stop(); onBack() }) { Text("Back") }
+            OutlinedButton(onClick = { samba.stop(); blocks.stop(); onBack() }) { Text("Back") }
         }
 
+        Spacer(Modifier.height(8.dp))
+
+        // [Beat | Blocks] toggle.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = !blocksMode,
+                onClick = { blocksMode = false; blocks.stop() }, label = { Text("Beat") })
+            FilterChip(selected = blocksMode,
+                onClick = { blocksMode = true; samba.stop() }, label = { Text("Blocks") })
+        }
         Spacer(Modifier.height(8.dp))
 
         // ----- Scrollable body: the pattern grid + its controls. (On the phone a
@@ -144,16 +161,22 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
         ) {
-            PatternSection(
-                samba = samba,
-                eraseMode = eraseMode,
-                onEraseMode = { eraseMode = it },
-                accentMode = accentMode,
-                onAccentMode = { accentMode = it },
-                scaleX = scaleX, scaleY = scaleY, offsetX = offsetX, offsetY = offsetY,
-                mixerFor = mixerFor,
-                onMixerDismiss = { mixerFor = null },
-            )
+            if (blocksMode) {
+                BlocksSection(blocks)
+            } else {
+                PatternSection(
+                    samba = samba,
+                    eraseMode = eraseMode,
+                    onEraseMode = { eraseMode = it },
+                    accentMode = accentMode,
+                    onAccentMode = { accentMode = it },
+                    dynMode = dynMode,
+                    onDynMode = { dynMode = it },
+                    scaleX = scaleX, scaleY = scaleY, offsetX = offsetX, offsetY = offsetY,
+                    mixerFor = mixerFor,
+                    onMixerDismiss = { mixerFor = null },
+                )
+            }
         }
 
         // Voice palette for the selected track — pinned above the transport dock so
@@ -166,12 +189,14 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
 
         Spacer(Modifier.height(8.dp))
         TransportDock(
-            playing = samba.isPlaying,
-            onPlayStop = { if (samba.isPlaying) samba.stop() else samba.start() },
-            bpm = samba.bpm,
-            // samba's playback loop re-reads `bpm` live every slot (see
-            // SambaLooperState.start()), so no restart is needed here.
-            onBpm = { samba.bpm = it },
+            playing = if (blocksMode) blocks.isPlaying else samba.isPlaying,
+            onPlayStop = {
+                if (blocksMode) blocks.toggle()
+                else if (samba.isPlaying) samba.stop() else samba.start()
+            },
+            bpm = if (blocksMode) blocks.bpm else samba.bpm,
+            // both playback loops re-read `bpm` live, so no restart is needed here.
+            onBpm = { if (blocksMode) blocks.bpm = it else samba.bpm = it },
             toneLabel = state.sound.name,
             onTone = { toneSheetOpen = true },
             inlineBpm = true,
@@ -190,6 +215,8 @@ private fun PatternSection(
     onEraseMode: (Boolean) -> Unit,
     accentMode: Boolean,
     onAccentMode: (Boolean) -> Unit,
+    dynMode: Boolean = false,
+    onDynMode: (Boolean) -> Unit = {},
     scaleX: androidx.compose.runtime.MutableFloatState,
     scaleY: androidx.compose.runtime.MutableFloatState,
     offsetX: androidx.compose.runtime.MutableFloatState,
@@ -297,13 +324,19 @@ private fun PatternSection(
         if (eraseMode) {
             Button(onClick = { onEraseMode(false) }) { Text("Erase ✓") }
         } else {
-            OutlinedButton(onClick = { onEraseMode(true); onAccentMode(false) }) { Text("Erase") }
+            OutlinedButton(onClick = { onEraseMode(true); onAccentMode(false); onDynMode(false) }) { Text("Erase") }
         }
         // Accent: when on, tapping a hit toggles its accent (played louder).
         if (accentMode) {
             Button(onClick = { onAccentMode(false) }) { Text("Accent ✓") }
         } else {
-            OutlinedButton(onClick = { onAccentMode(true); onEraseMode(false) }) { Text("Accent") }
+            OutlinedButton(onClick = { onAccentMode(true); onEraseMode(false); onDynMode(false) }) { Text("Accent") }
+        }
+        // Dyn: tap a hit to cycle its per-slot volume 100 → 75 → 50 → 25 %.
+        if (dynMode) {
+            Button(onClick = { onDynMode(false) }) { Text("Dyn ✓") }
+        } else {
+            OutlinedButton(onClick = { onDynMode(true); onEraseMode(false); onAccentMode(false) }) { Text("Dyn") }
         }
         OutlinedButton(onClick = { saveName = ""; saveDialog = true }) { Text("Save…") }
         LoadBeatsControl(samba)
@@ -539,6 +572,7 @@ private fun PatternSection(
                         kitSize = kit.size,
                         eraseMode = eraseMode,
                         accentMode = accentMode,
+                        dynMode = dynMode,
                         pat = pat,
                         inOpening = inOpening,
                         mixerOpen = mixerFor == inst.id && samba.editingOpening == inOpening,
@@ -718,6 +752,199 @@ private fun TranslateControl(samba: SambaLooperState) {
     }
 }
 
+/** Blocks: the phrase sequencer (mirrors chorect-web's blocksBody). Header
+ *  (name / phrase-count / save / load / merge / clear / + track), the tracks ×
+ *  phrase-columns grid (tap a cell, pick its phrase from the palette below),
+ *  the playing column highlighted, and the used phrases' rule notes. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BlocksSection(blocks: BlocksState) {
+    val blk = blocks.block
+    val saved by blocks.savedBlocks.collectAsState(initial = emptyMap())
+    var pick by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+
+    // Header: name + phrase-count stepper.
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = blk.name,
+            onValueChange = { blocks.rename(it) },
+            label = { Text("Block name") },
+            singleLine = true,
+            modifier = Modifier.width(170.dp),
+        )
+        Spacer(Modifier.width(12.dp))
+        Text("Phrases", style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.width(4.dp))
+        OutlinedButton(onClick = { blocks.setPhraseCount(blk.phraseCount - 1) },
+            enabled = blk.phraseCount > 1, contentPadding = STEP_PAD) { Text("−") }
+        Text("  ${blk.phraseCount}  ", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        OutlinedButton(onClick = { blocks.setPhraseCount(blk.phraseCount + 1) },
+            enabled = blk.phraseCount < 8, contentPadding = STEP_PAD) { Text("+") }
+    }
+    Spacer(Modifier.height(6.dp))
+
+    // Actions.
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        OutlinedButton(onClick = { blocks.saveCurrent() }) { Text("Save block") }
+        var loadOpen by remember { mutableStateOf(false) }
+        Box {
+            OutlinedButton(onClick = { loadOpen = true }) { Text("Load…") }
+            DropdownMenu(expanded = loadOpen, onDismissRequest = { loadOpen = false }) {
+                for ((name, b) in saved) {
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(name, modifier = Modifier.weight(1f))
+                                TextButton(onClick = { blocks.deleteSaved(name) }) { Text("✕") }
+                            }
+                        },
+                        onClick = { blocks.loadBlock(b); loadOpen = false },
+                    )
+                }
+                if (saved.isEmpty()) {
+                    DropdownMenuItem(text = { Text("(no saved blocks yet)") }, enabled = false, onClick = {})
+                }
+            }
+        }
+        var mergeOpen by remember { mutableStateOf(false) }
+        Box {
+            OutlinedButton(onClick = { mergeOpen = true }) { Text("Merge with…") }
+            DropdownMenu(expanded = mergeOpen, onDismissRequest = { mergeOpen = false }) {
+                val candidates = saved.filter { it.value.phraseCount == blk.phraseCount && it.key != blk.name }
+                for ((name, b) in candidates) {
+                    DropdownMenuItem(text = { Text(name) }, onClick = { blocks.mergeWith(b); mergeOpen = false })
+                }
+                if (candidates.isEmpty()) {
+                    DropdownMenuItem(text = { Text("(no saved blocks with ${blk.phraseCount} phrases)") }, enabled = false, onClick = {})
+                }
+            }
+        }
+        OutlinedButton(onClick = { pick = null; blocks.clear() }) { Text("Clear") }
+        var addOpen by remember { mutableStateOf(false) }
+        Box {
+            Button(onClick = { addOpen = true }) { Text("+ Track ▾") }
+            DropdownMenu(expanded = addOpen, onDismissRequest = { addOpen = false }) {
+                for (inst in blocks.instrumentsToAdd()) {
+                    DropdownMenuItem(text = { Text(inst.displayName) },
+                        onClick = { blocks.addTrack(inst); addOpen = false })
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+
+    if (blk.tracks.isEmpty()) {
+        Text(
+            "A block sequences phrases: add a track (instrument), then tap its cells to " +
+                "place phrases — e.g. entrada → variation → teleco-teco → variation. " +
+                "Each phrase plays with its own swing; the block loops.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+
+    // Grid: rows = tracks, columns = phrase slots.
+    val teal = LocalSignal.current.feedback
+    blk.tracks.forEachIndexed { ti, t ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+            Text(
+                t.instrument.displayName,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                modifier = Modifier.width(84.dp),
+            )
+            Text("✕", style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable { pick = null; blocks.removeTrack(ti) }
+                    .padding(4.dp))
+            Spacer(Modifier.width(4.dp))
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                for (c in 0 until blk.phraseCount) {
+                    val phrase = t.cells[c]
+                    val active = blocks.isPlaying && blocks.currentCol == c
+                    val picking = pick == (ti to c)
+                    val border = when {
+                        active -> teal
+                        picking -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.outline
+                    }
+                    val label = phrase?.let {
+                        val i = it.label.indexOf("— ")
+                        (if (i < 0) it.label else it.label.substring(i + 2)) +
+                            (if (it.swing > 0) " ~${it.swing}%" else "") +
+                            (if (it.note.isNotEmpty()) " ※" else "")
+                    } ?: "＋"
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 44.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (active) teal.copy(alpha = 0.16f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            )
+                            .border(if (active || picking) 2.dp else 1.dp, border, RoundedCornerShape(10.dp))
+                            .clickable { pick = if (picking) null else (ti to c) }
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelSmall,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            color = if (phrase != null) MaterialTheme.colorScheme.onSurface
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Phrase palette for the picked cell.
+    pick?.let { (ti, c) ->
+        if (ti < blk.tracks.size) {
+            val track = blk.tracks[ti]
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "${track.instrument.displayName} · phrase ${c + 1}",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                PalChip("(empty)", selected = false) { blocks.setCell(ti, c, null); pick = null }
+                for (p in blocks.phrasesFor(track.instrument)) {
+                    val i = p.label.indexOf("— ")
+                    val short = (if (i < 0) p.label else p.label.substring(i + 2)) +
+                        (if (p.swing > 0) " ~${p.swing}%" else "")
+                    PalChip(short, selected = false) { blocks.setCell(ti, c, p); pick = null }
+                }
+            }
+        }
+    }
+
+    // Rule/notes of the phrases in use, shown under the grid.
+    val noted = LinkedHashSet<String>()
+    for (t in blk.tracks) for (p in t.cells) {
+        if (p != null && p.note.isNotEmpty() && noted.add(p.label)) {
+            Spacer(Modifier.height(4.dp))
+            Text("※ ${p.label}: ${p.note}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+}
+
 /** Load… control: a scrolling beats popup (Grooves + Saved) whose scroll
  *  position is REMEMBERED across openings — the phone keeps the grid full-width
  *  (web uses a constantly-open side panel with the same content). */
@@ -871,6 +1098,7 @@ private fun InstrumentRow(
     accentMode: Boolean,
     pat: app.guitar.theory.PercussionPattern,
     inOpening: Boolean,
+    dynMode: Boolean = false,
     mixerOpen: Boolean = false,
     onMixerDismiss: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -1003,6 +1231,7 @@ private fun InstrumentRow(
                     isBeatStart = slot % slotsPerBeat == 0,
                     eraseMode = eraseMode,
                     accentMode = accentMode,
+                    dynMode = dynMode,
                     pat = pat,
                     inOpening = inOpening,
                     modifier = Modifier.weight(1f).fillMaxHeight().padding(1.dp),
@@ -1149,11 +1378,14 @@ private fun Cell(
     accentMode: Boolean,
     pat: app.guitar.theory.PercussionPattern,
     inOpening: Boolean,
+    dynMode: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalSignal.current
     val voice = pat.voiceAt(instrument, slot)
     val accented = pat.isAccented(instrument, slot)
+    // Per-slot dynamics: quieter hits render faded (Dyn tool cycles the level).
+    val dynLevel = if (voice == null) 0 else pat.dynLevelAt(instrument, slot)
     // Playhead lights the section that's actually sounding: the opening rows
     // during the opening pass, the loop rows afterwards.
     val isPlayhead = samba.isPlaying && samba.currentSlot == slot && samba.playingOpening == inOpening
@@ -1170,12 +1402,13 @@ private fun Cell(
     // regardless of which voice — the printed glyph already distinguishes voices).
     // Multicolor voices restored (user: "I miss the multicolors of the instruments
     // voices") — voice 1 = act, voice 2 = blue, voice 3+ = teal, as pre-Signal.
-    val fill = when (voice) {
+    val fillBase = when (voice) {
         null -> emptyFill
         0 -> MaterialTheme.colorScheme.primary
         1 -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.secondary
     }
+    val fill = if (dynLevel > 0) fillBase.copy(alpha = fillBase.alpha * (1f - 0.22f * dynLevel)) else fillBase
     // Border precedence: playhead > accent ring (feedback teal) > none.
     val borderWidth = if (isPlayhead) 2.dp else if (accented) 2.dp else 0.dp
     val borderColor = when {
@@ -1188,7 +1421,7 @@ private fun Cell(
             .clip(RoundedCornerShape(4.dp))
             .background(fill)
             .border(borderWidth, borderColor, RoundedCornerShape(4.dp))
-            .pointerInput(instrument, slot, eraseMode, accentMode) {
+            .pointerInput(instrument, slot, eraseMode, accentMode, dynMode) {
                 // Tap = cycle/erase/accent. A DELIBERATE long press (≥1.5 s) clears the
                 // cell — long enough that it won't fire by accident while tapping.
                 awaitEachGesture {
@@ -1209,6 +1442,7 @@ private fun Cell(
                         when {
                             eraseMode -> samba.clearCell(instrument, slot)
                             accentMode -> samba.toggleAccent(instrument, slot)
+                            dynMode -> samba.dynCycle(instrument, slot)
                             // Selected track follows the palette brush; others keep cycling.
                             samba.selectedTrackId == instrument.id -> samba.applyBrush(instrument, slot)
                             else -> samba.toggleSlot(instrument, slot)

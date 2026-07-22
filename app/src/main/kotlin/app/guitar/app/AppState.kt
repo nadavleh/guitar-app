@@ -469,6 +469,11 @@ class AppState(
     /** App-lifetime Metronome state (standalone click track). */
     val metronome: MetronomeState by lazy { MetronomeState(audio = audio, scope = scope) }
 
+    /** App-lifetime Blocks state (the drum machine's phrase sequencer). */
+    val drumBlocks: BlocksState by lazy {
+        BlocksState(audio = audio, scope = scope, repo = repo, sampleLoader = drumSampleLoader)
+    }
+
     @JvmName("applyA4Hz")
     fun setA4Hz(value: Float) {
         val clamped = value.coerceIn(435f, 445f)

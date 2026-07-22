@@ -313,6 +313,11 @@ class SambaLooperState(
         commit(editPattern.accentToggled(instrument, slot))
     }
 
+    /** Cycle a hit's per-slot volume 100 → 75 → 50 → 25 % (Dyn tool). */
+    fun dynCycle(instrument: PercussionInstrument, slot: Int) {
+        commit(editPattern.dynCycled(instrument, slot))
+    }
+
     /** Clear a single cell (long-press) without cycling through the voices. */
     fun clearCell(instrument: PercussionInstrument, slot: Int) {
         commit(editPattern.withCell(instrument, slot, null))
@@ -475,8 +480,11 @@ class SambaLooperState(
                     val buf = buffer(inst, v)
                     val peak = peakOffsetFrames(inst, v, buf)
                     val advance = if (peak > sr / 50) minOf(peak, baseFrames) else 0
-                    // Accented hits play ~1.4× louder (mixer clamps overall).
-                    val gain = effectiveGain(inst, v) * (if (snapshot.isAccented(inst, slot)) 1.4f else 1f)
+                    // Accented hits play ~1.4× louder (mixer clamps overall); per-slot
+                    // dynamics scale the hit down (100/75/50/25 %).
+                    val gain = effectiveGain(inst, v) *
+                        (if (snapshot.isAccented(inst, slot)) 1.4f else 1f) *
+                        app.guitar.theory.PERCUSSION_DYN_FACTORS[snapshot.dynLevelAt(inst, slot)]
                     audio.playSamplesAt(buf, gain, baseFrames - advance)
                 }
             }

@@ -5,7 +5,7 @@
 import {
   PercussionInstrument, PercussionCatalog, basePercussionId, PresetTrack,
   PercussionMeter, PercussionPattern, swungSlotMs, voiceCount,
-  BEAT_UNITS, DIVISIONS, BATIDA_CAVACO_1,
+  BEAT_UNITS, DIVISIONS, BATIDA_CAVACO_1, PERCUSSION_DYN_FACTORS,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
 import { synthClick, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
@@ -340,6 +340,8 @@ export class SambaLooperState {
   }
 
   toggleAccent(instrument: PercussionInstrument, slot: number) { this.commit(this.editPattern.accentToggled(instrument, slot)); }
+  /** Cycle a hit's per-slot volume 100 → 75 → 50 → 25 % (Dyn tool). */
+  dynCycle(instrument: PercussionInstrument, slot: number) { this.commit(this.editPattern.dynCycled(instrument, slot)); }
   clearCell(instrument: PercussionInstrument, slot: number) { this.commit(this.editPattern.withCell(instrument, slot, null)); }
   clearRow(instrument: PercussionInstrument) { this.commit(this.editPattern.clearedRow(instrument)); }
   clearAll() { this.commit(PercussionPattern.empty(this.editPattern.instruments, this.editPattern.meter)); }
@@ -480,8 +482,11 @@ export class SambaLooperState {
         const peak = this.peakOffsetSec(inst, v, buf);
         const now = this.deps.audio.now();
         const advance = peak > 0.02 ? Math.min(peak, Math.max(when - now, 0)) : 0;
-        // Accented hits play ~1.4× louder (mixer clamps overall).
-        const gain = this.effectiveGain(inst, v) * (snapshot.isAccented(inst, slot) ? 1.4 : 1);
+        // Accented hits play ~1.4× louder (mixer clamps overall); per-slot
+        // dynamics scale the hit down (100/75/50/25 %).
+        const gain = this.effectiveGain(inst, v)
+          * (snapshot.isAccented(inst, slot) ? 1.4 : 1)
+          * PERCUSSION_DYN_FACTORS[snapshot.dynLevelAt(inst, slot)];
         this.deps.audio.playSamples(buf, gain, when - advance);
       }
     };

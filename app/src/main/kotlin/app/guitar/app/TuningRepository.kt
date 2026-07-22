@@ -356,6 +356,38 @@ class TuningRepository(private val context: Context) {
         }
     }
 
+    private val keyDrumBlocks = stringPreferencesKey("drum_blocks")
+
+    /** User-saved drum BLOCKS (phrase sequences), by name. Each line is one
+     *  [app.guitar.theory.DrumBlock.encode] value (which embeds the name). */
+    val drumBlocks: Flow<Map<String, app.guitar.theory.DrumBlock>> =
+        context.tuningDataStore.data.map { prefs ->
+            val out = LinkedHashMap<String, app.guitar.theory.DrumBlock>()
+            for (line in (prefs[keyDrumBlocks] ?: "").split("\n")) {
+                val b = app.guitar.theory.DrumBlock.decode(line) ?: continue
+                out[b.name] = b
+            }
+            out
+        }
+
+    suspend fun saveDrumBlock(block: app.guitar.theory.DrumBlock) {
+        context.tuningDataStore.edit { prefs ->
+            val lines = (prefs[keyDrumBlocks] ?: "").split("\n")
+                .mapNotNull { app.guitar.theory.DrumBlock.decode(it) }
+                .filter { it.name != block.name } + block
+            prefs[keyDrumBlocks] = lines.joinToString("\n") { it.encode() }
+        }
+    }
+
+    suspend fun deleteDrumBlock(name: String) {
+        context.tuningDataStore.edit { prefs ->
+            val lines = (prefs[keyDrumBlocks] ?: "").split("\n")
+                .mapNotNull { app.guitar.theory.DrumBlock.decode(it) }
+                .filter { it.name != name }
+            prefs[keyDrumBlocks] = lines.joinToString("\n") { it.encode() }
+        }
+    }
+
     /** Entries "name=<encodedBeat>" joined by newline. A newline is used (not
      *  ';') because an encoded pattern itself contains ';' and '|'/'=' — only a
      *  newline is guaranteed absent from both encode() output and (single-line)

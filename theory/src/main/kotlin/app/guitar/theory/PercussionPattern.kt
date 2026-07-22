@@ -46,6 +46,14 @@ data class PercussionMeter(
 /** Accent flag folded into a cell's raw value: raw = voice + ACCENT when accented. */
 const val PERCUSSION_ACCENT = 100
 
+/** Per-slot dynamics folded into a cell's raw value: raw += 1000 × dynLevel.
+ *  Level 0 = 100 % (default), 1 = 75 %, 2 = 50 %, 3 = 25 %. So the full cell
+ *  encoding is raw = voice + 100·accent + 1000·dynLevel. Older app versions
+ *  reject cells with a dyn level and skip the whole beat (the established
+ *  forward-compat path). */
+const val PERCUSSION_DYN = 1000
+val PERCUSSION_DYN_FACTORS = listOf(1.0f, 0.75f, 0.5f, 0.25f)
+
 /**
  * A percussion loop grid. For each instrument there is a list of cells (one per
  * slot of [meter]); a cell is either `null` (silent) or a raw value encoding a
@@ -77,8 +85,9 @@ data class PercussionPattern(
                 "${inst.id} row must have ${meter.totalSlots} slots, got ${row.size}"
             }
             row.forEach { v ->
-                require(v == null || (v % PERCUSSION_ACCENT) in 0 until inst.voiceCount &&
-                    v / PERCUSSION_ACCENT <= 1 && v >= 0) {
+                // raw = voice + 100·accent + 1000·dynLevel
+                require(v == null || (v >= 0 && (v % PERCUSSION_ACCENT) in 0 until inst.voiceCount &&
+                    (v / PERCUSSION_ACCENT) % 10 <= 1 && v / PERCUSSION_DYN <= 3)) {
                     "${inst.id} has out-of-range cell value $v"
                 }
             }
@@ -90,12 +99,25 @@ data class PercussionPattern(
 
     /** Whether the (non-silent) cell is an accented hit. */
     fun isAccented(instrument: PercussionInstrument, slot: Int): Boolean =
-        (grid.getValue(instrument.id)[slot] ?: 0) >= PERCUSSION_ACCENT
+        ((grid.getValue(instrument.id)[slot] ?: 0) / PERCUSSION_ACCENT) % 10 == 1
 
     /** Toggle the accent on a non-silent cell (no-op on silent cells). */
     fun accentToggled(instrument: PercussionInstrument, slot: Int): PercussionPattern {
         val raw = grid.getValue(instrument.id)[slot] ?: return this
-        val next = if (raw >= PERCUSSION_ACCENT) raw - PERCUSSION_ACCENT else raw + PERCUSSION_ACCENT
+        val next = if (isAccented(instrument, slot)) raw - PERCUSSION_ACCENT else raw + PERCUSSION_ACCENT
+        val newRow = grid.getValue(instrument.id).toMutableList().also { it[slot] = next }
+        return copy(grid = grid + (instrument.id to newRow))
+    }
+
+    /** Per-slot dynamic level (0 = 100 %, 1 = 75 %, 2 = 50 %, 3 = 25 %). */
+    fun dynLevelAt(instrument: PercussionInstrument, slot: Int): Int =
+        (grid.getValue(instrument.id)[slot] ?: 0) / PERCUSSION_DYN
+
+    /** Cycle a non-silent cell's dynamic level 100 → 75 → 50 → 25 → 100 (Dyn tool). */
+    fun dynCycled(instrument: PercussionInstrument, slot: Int): PercussionPattern {
+        val raw = grid.getValue(instrument.id)[slot] ?: return this
+        val level = raw / PERCUSSION_DYN
+        val next = raw - level * PERCUSSION_DYN + ((level + 1) % 4) * PERCUSSION_DYN
         val newRow = grid.getValue(instrument.id).toMutableList().also { it[slot] = next }
         return copy(grid = grid + (instrument.id to newRow))
     }
@@ -105,19 +127,22 @@ data class PercussionPattern(
 
     /**
      * Advance a cell one step in the cycle:
-     * `null → 0 → 1 → … → (voiceCount-1) → null`. An accent survives voice cycling.
+     * `null → 0 → 1 → … → (voiceCount-1) → null`. The accent AND the dynamic
+     * level survive voice cycling.
      */
     fun cycled(instrument: PercussionInstrument, slot: Int): PercussionPattern {
         require(slot in 0 until slots)
         val count = instrument.voiceCount
         val cur = voiceAt(instrument, slot)
         val accent = isAccented(instrument, slot)
+        val dyn = dynLevelAt(instrument, slot)
         val next = when {
             cur == null -> 0
             cur >= count - 1 -> null
             else -> cur + 1
         }
-        return withCell(instrument, slot, next?.plus(if (accent) PERCUSSION_ACCENT else 0))
+        return withCell(instrument, slot,
+            next?.plus(if (accent) PERCUSSION_ACCENT else 0)?.plus(dyn * PERCUSSION_DYN))
     }
 
     fun withCell(instrument: PercussionInstrument, slot: Int, voice: Int?): PercussionPattern {
@@ -271,9 +296,10 @@ data class PercussionPattern(
                 val cells = rowStr.substring(eq + 1).split(",")
                 if (cells.size != meter.totalSlots) return null
                 val row = cells.map { c -> if (c == "-") null else c.toIntOrNull() ?: return null }
-                // Raw cell = voice or voice + PERCUSSION_ACCENT (accented hit).
+                // Raw cell = voice + 100·accent + 1000·dynLevel.
                 if (row.any { it != null &&
-                        !(it >= 0 && it / PERCUSSION_ACCENT <= 1 && (it % PERCUSSION_ACCENT) in 0 until inst.voiceCount) }) return null
+                        !(it >= 0 && (it / PERCUSSION_ACCENT) % 10 <= 1 && it / PERCUSSION_DYN <= 3 &&
+                            (it % PERCUSSION_ACCENT) in 0 until inst.voiceCount) }) return null
                 instruments.add(inst)
                 grid[id] = row
             }
@@ -368,7 +394,13 @@ object PercussionBuiltins {
         val template: List<Int?>,
         val swing: Int = 0,
         val note: String = "",
+        /** When true, whatever phrase FOLLOWS this one in a block gains a strong
+         *  beat on 1 (its measure-2 downbeat stroke) — the partido-alto return rule. */
+        val addsReturnDownbeat: Boolean = false,
     )
+
+    /** Find a preset track by its label (block cells reference phrases by label). */
+    fun presetByLabel(label: String): PresetTrack? = PRESET_TRACKS.firstOrNull { it.label == label }
 
     /** A single-line tamborim rhythm from onset slots ([accented] slots get the
      *  accent flag). Tamborim articulation: an onset directly followed by another
@@ -462,6 +494,7 @@ object PercussionBuiltins {
             note = "RULE: when returning to the regular partido alto after this variation, " +
                 "the partido alto gets a strong beat on beat 1 of measure 1 — the same stroke " +
                 "as its measure-2 downbeat (doesn't occur normally).",
+            addsReturnDownbeat = true,
         ),
         PresetTrack(
             "Bongo — partido alto var 2", PercussionCatalog.Bongo,

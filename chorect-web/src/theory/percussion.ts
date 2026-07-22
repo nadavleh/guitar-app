@@ -94,6 +94,13 @@ export const PERCUSSION_SLOTS = 16;
 /** Accent flag folded into a cell's raw value: raw = voice + PERCUSSION_ACCENT. */
 export const PERCUSSION_ACCENT = 100;
 
+/** Per-slot dynamics folded into a cell's raw value: raw += 1000 × dynLevel.
+ *  Level 0 = 100 % (default), 1 = 75 %, 2 = 50 %, 3 = 25 %. Full cell encoding:
+ *  raw = voice + 100·accent + 1000·dynLevel. Older app versions reject cells
+ *  with a dyn level and skip the whole beat (the forward-compat path). */
+export const PERCUSSION_DYN = 1000;
+export const PERCUSSION_DYN_FACTORS = [1.0, 0.75, 0.5, 0.25] as const;
+
 /** Allowed beat units (the lower number of the time signature). */
 export const BEAT_UNITS = [2, 4, 8] as const;
 /** Allowed subdivision values (the "1/N" note each beat is split into). */
@@ -179,23 +186,38 @@ export class PercussionPattern {
 
   /** Whether the (non-silent) cell is an accented hit. */
   isAccented(instrument: PercussionInstrument, slot: number): boolean {
-    return (this.grid.get(instrument.id)![slot] ?? 0) >= PERCUSSION_ACCENT;
+    return Math.floor(((this.grid.get(instrument.id)![slot] ?? 0) / PERCUSSION_ACCENT)) % 10 === 1;
   }
 
   /** Toggle the accent on a non-silent cell (no-op on silent cells). */
   accentToggled(instrument: PercussionInstrument, slot: number): PercussionPattern {
     const raw = this.grid.get(instrument.id)![slot];
     if (raw === null) return this;
-    return this.withCell(instrument, slot, raw >= PERCUSSION_ACCENT ? raw - PERCUSSION_ACCENT : raw + PERCUSSION_ACCENT);
+    return this.withCell(instrument, slot, this.isAccented(instrument, slot) ? raw - PERCUSSION_ACCENT : raw + PERCUSSION_ACCENT);
   }
 
-  /** Cycle the voice `null → 0 → … → last → null`; an accent survives cycling. */
+  /** Per-slot dynamic level (0 = 100 %, 1 = 75 %, 2 = 50 %, 3 = 25 %). */
+  dynLevelAt(instrument: PercussionInstrument, slot: number): number {
+    return Math.floor((this.grid.get(instrument.id)![slot] ?? 0) / PERCUSSION_DYN);
+  }
+
+  /** Cycle a non-silent cell's dynamic level 100 → 75 → 50 → 25 → 100 (Dyn tool). */
+  dynCycled(instrument: PercussionInstrument, slot: number): PercussionPattern {
+    const raw = this.grid.get(instrument.id)![slot];
+    if (raw === null) return this;
+    const level = Math.floor(raw / PERCUSSION_DYN);
+    return this.withCell(instrument, slot, raw - level * PERCUSSION_DYN + ((level + 1) % 4) * PERCUSSION_DYN);
+  }
+
+  /** Cycle the voice `null → 0 → … → last → null`; the accent AND the dynamic
+   *  level survive cycling. */
   cycled(instrument: PercussionInstrument, slot: number): PercussionPattern {
     const count = instrument.voices.length;
     const cur = this.voiceAt(instrument, slot);
     const accent = this.isAccented(instrument, slot);
+    const dyn = this.dynLevelAt(instrument, slot);
     const next = cur === null ? 0 : cur >= count - 1 ? null : cur + 1;
-    return this.withCell(instrument, slot, next === null ? null : next + (accent ? PERCUSSION_ACCENT : 0));
+    return this.withCell(instrument, slot, next === null ? null : next + (accent ? PERCUSSION_ACCENT : 0) + dyn * PERCUSSION_DYN);
   }
 
   withCell(instrument: PercussionInstrument, slot: number, voice: number | null): PercussionPattern {
@@ -365,8 +387,9 @@ export class PercussionPattern {
       for (const c of cells) {
         if (c === "-") { row.push(null); continue; }
         const n = parseInt(c, 10);
-        // Raw cell = voice or voice + PERCUSSION_ACCENT (accented hit).
-        if (Number.isNaN(n) || n < 0 || Math.floor(n / PERCUSSION_ACCENT) > 1 ||
+        // Raw cell = voice + 100·accent + 1000·dynLevel.
+        if (Number.isNaN(n) || n < 0 || Math.floor(n / PERCUSSION_ACCENT) % 10 > 1 ||
+            Math.floor(n / PERCUSSION_DYN) > 3 ||
             (n % PERCUSSION_ACCENT) >= instrument.voices.length) return null;
         row.push(n);
       }
@@ -486,6 +509,14 @@ export interface PresetTrack {
   template: (number | null)[];
   swing?: number;
   note?: string;
+  /** When true, whatever phrase FOLLOWS this one in a block gains a strong beat
+   *  on 1 (its measure-2 downbeat stroke) — the partido-alto return rule. */
+  addsReturnDownbeat?: boolean;
+}
+
+/** Find a preset track by its label (block cells reference phrases by label). */
+export function presetByLabel(label: string): PresetTrack | undefined {
+  return PRESET_TRACKS.find((p) => p.label === label);
 }
 
 /** Track presets — the single-instrument "chunks": added to the CURRENT beat in
@@ -519,7 +550,8 @@ export const PRESET_TRACKS: PresetTrack[] = [
     template: [null, 0, null, 0, 1, null, 1, 1, 1, null, 1, 1, 1, null, 1, 1],
     note: "RULE: when returning to the regular partido alto after this variation, " +
       "the partido alto gets a strong beat on beat 1 of measure 1 — the same stroke " +
-      "as its measure-2 downbeat (doesn't occur normally)." },
+      "as its measure-2 downbeat (doesn't occur normally).",
+    addsReturnDownbeat: true },
   { label: "Bongo — partido alto var 2", instrument: Bongo,
     template: [null, 0, null, 0, 1, null, 0, null, 2, 1, null, 1, null, 1, null, 1] },
 ];
