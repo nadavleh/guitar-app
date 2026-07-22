@@ -368,6 +368,15 @@ export class App {
         this.scheduleRender();
         return;
       }
+      // Ctrl/Cmd-C copies a right-drag cell selection (falls through to the
+      // native text copy when no cells are selected); Ctrl/Cmd-V pastes the
+      // copied strikes at the hovered cell.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && sheet === Sheet.SambaLooper) {
+        if (this.sambaUI.copySelection()) { e.preventDefault(); return; }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v" && sheet === Sheet.SambaLooper) {
+        if (this.sambaUI.pasteAtHover()) { e.preventDefault(); return; }
+      }
 
       if (e.code === "Space") {
         if (sheet === Sheet.SambaLooper) { e.preventDefault(); if (this.samba.isPlaying) this.samba.stop(); else this.samba.start(); }

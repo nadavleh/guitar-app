@@ -850,6 +850,8 @@ select.et-select {
   border: 2px solid transparent;
 }
 .drum-cell.playhead { border-color: var(--text-primary); }
+/* Right-drag rectangle selection (Ctrl+C copies, Ctrl+V pastes at the hovered cell). */
+.drum-cell.sel { outline: 2px dashed var(--feedback); outline-offset: -2px; }
 .drum-cell.accent { border-color: var(--feedback); font-weight: 700; font-size: 18px; }
 .drum-cells.dim { opacity: 0.4; }
 /* Quarter-note division rule between each group of four 16th cells; heavier at

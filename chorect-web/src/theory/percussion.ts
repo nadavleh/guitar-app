@@ -542,6 +542,9 @@ export const PRESET_TRACKS: PresetTrack[] = [
   { label: "Tamborim — Chamada", instrument: Tamborim,
     template: [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
     swing: 61, note: "Played with ~60% swing." },
+  // From Nadav's export: accented clacks, taps, and 50 %-dyn clacks (2000s).
+  { label: "Tamborim — Palmas", instrument: Tamborim,
+    template: [100, 2, 2000, 100, 2, 2000, 100, 2, 100, 2, 2000, 100, 2, 2000, 100, 2] },
   { label: "Tamborim — Entrada 1", instrument: Tamborim,
     template: [0, 2, 1, 0, 1, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0] },
   { label: "Tamborim — Entrada 2", instrument: Tamborim,

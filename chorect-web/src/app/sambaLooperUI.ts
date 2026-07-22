@@ -76,6 +76,42 @@ export class SambaLooperUI {
   /** Dyn tool (per-slot dynamics): tap a hit to cycle 100→75→50→25 %. */
   private dynMode = false;
 
+  // ---- rectangle select + copy/paste of strikes (web only) ----
+  /** Anchor cell of an in-progress right-drag selection. */
+  private selStart: { track: number; slot: number; inOpening: boolean } | null = null;
+  /** The selected rectangle (inclusive), or null. */
+  private selRect: { inOpening: boolean; t0: number; t1: number; s0: number; s1: number } | null = null;
+  /** Cell the mouse is currently over — the Ctrl+V paste anchor. */
+  private hoverCell: { track: number; slot: number; inOpening: boolean } | null = null;
+  /** Copied region (rows × slots of raw cell values). */
+  private cellClipboard: (number | null)[][] | null = null;
+
+  /** Ctrl+C: copy the selected rectangle. False = no selection (let native copy run). */
+  copySelection(): boolean {
+    const r = this.selRect;
+    if (!r) return false;
+    const pat = r.inOpening ? this.samba.opening : this.samba.pattern;
+    if (!pat) return false;
+    const rows: (number | null)[][] = [];
+    for (let t = r.t0; t <= Math.min(r.t1, pat.instruments.length - 1); t++) {
+      const inst = pat.instruments[t];
+      const row: (number | null)[] = [];
+      for (let s = r.s0; s <= Math.min(r.s1, pat.slots - 1); s++) row.push(pat.grid.get(inst.id)![s]);
+      rows.push(row);
+    }
+    this.cellClipboard = rows;
+    return rows.length > 0;
+  }
+
+  /** Ctrl+V: paste the copied region anchored at the hovered cell. */
+  pasteAtHover(): boolean {
+    const h = this.hoverCell, cb = this.cellClipboard;
+    if (!h || !cb) return false;
+    this.samba.editOpening(h.inOpening);
+    this.samba.pasteCells(h.track, h.slot, cb);
+    return true;
+  }
+
   constructor(
     private samba: SambaLooperState,
     private blocks: BlocksState,
@@ -295,6 +331,7 @@ export class SambaLooperUI {
             legendLine("Accent tool:  ", "turn it on, then tap a hit → the hit plays louder (teal ring)"),
             legendLine("Dyn tool:  ", "turn it on, then tap a hit → its volume cycles 100 → 75 → 50 → 25 % (shown faded)"),
             legendLine("Erase tool:  ", "turn it on, then tap any cell → cleared"),
+            legendLine("Copy strikes:  ", "right-click + drag to select a rectangle → Ctrl+C copies · hover a target cell → Ctrl+V pastes"),
           ]),
           closeBtn,
         ]),
@@ -468,7 +505,7 @@ export class SambaLooperUI {
     const cells = el("div", { class: audible ? "drum-cells" : "drum-cells dim" });
     const perBeat = Math.max(slotsPerBeat, 1);
     for (let slot = 0; slot < slots; slot++) {
-      cells.appendChild(this.cell(inst, slot, Math.floor(slot / perBeat), slot % perBeat === 0, pat, inOpening));
+      cells.appendChild(this.cell(inst, slot, Math.floor(slot / perBeat), slot % perBeat === 0, pat, inOpening, index));
       // Beat separators: a visible vertical rule after each beat (each group of four
       // 16ths), heavier at bar lines, so the quarter-note divisions read clearly.
       if ((slot + 1) % slotsPerBeat === 0 && slot !== slots - 1) {
@@ -494,7 +531,7 @@ export class SambaLooperUI {
   /** UNTOUCHED gesture logic (tap = cycle/erase/accent; long-press/right-click
    *  = clear) — per-voice multicolor fill restored (voice 0/1/else ->
    *  primary/scaleTone/chordTone), the pre-Signal mapping. */
-  private cell(inst: PercussionInstrument, slot: number, beatIndex: number, isBeatStart: boolean, pat: PercussionPattern, inOpening: boolean): HTMLElement {
+  private cell(inst: PercussionInstrument, slot: number, beatIndex: number, isBeatStart: boolean, pat: PercussionPattern, inOpening: boolean, trackIndex: number): HTMLElement {
     const s = this.samba;
     const voice = pat.voiceAt(inst, slot);
     const accented = pat.isAccented(inst, slot);
@@ -514,23 +551,60 @@ export class SambaLooperUI {
     // Per-slot dynamics: quieter hits render faded (Dyn tool cycles the level).
     const dynLevel = voice === null ? 0 : pat.dynLevelAt(inst, slot);
     const dynStyle = dynLevel > 0 ? `;opacity:${(1 - 0.22 * dynLevel).toFixed(2)}` : "";
-    const cls = "drum-cell" + (isPlayhead ? " playhead" : "") + (accented ? " accent" : "");
+    const r = this.selRect;
+    const inSel = r !== null && r.inOpening === inOpening &&
+      trackIndex >= r.t0 && trackIndex <= r.t1 && slot >= r.s0 && slot <= r.s1;
+    const cls = "drum-cell" + (isPlayhead ? " playhead" : "") + (accented ? " accent" : "") + (inSel ? " sel" : "");
     const c = el("div", {
       class: cls,
       style: `background:${fill}${dynStyle}`,
       title: dynLevel > 0 ? `${100 - dynLevel * 25}%` : "",
     }, [voice !== null ? voiceOf(inst, voice).glyph : ""]);
 
-    // tap = cycle/erase/accent; long-press = clear. Any edit first targets this
-    // cell's section (loop or opening).
+    // tap = cycle/erase/accent; long-press = clear; RIGHT-drag = rectangle
+    // selection (Ctrl+C copies it, hover a cell + Ctrl+V pastes). A plain
+    // right-click (no drag) still clears the single cell. Any edit first
+    // targets this cell's section (loop or opening).
     let longPressed = false;
     let timer: number | undefined;
-    c.addEventListener("pointerdown", () => {
+    c.addEventListener("pointerdown", (e) => {
+      if ((e as PointerEvent).button === 2) {
+        this.selStart = { track: trackIndex, slot, inOpening };
+        this.selRect = { inOpening, t0: trackIndex, t1: trackIndex, s0: slot, s1: slot };
+        this.rerender();
+        return;
+      }
+      // A left-click anywhere dismisses an existing selection.
+      if (this.selRect) { this.selRect = null; this.rerender(); }
       longPressed = false;
       timer = window.setTimeout(() => { longPressed = true; s.editOpening(inOpening); s.clearCell(inst, slot); }, LONG_PRESS_MS);
     });
     const cancel = () => { if (timer) { clearTimeout(timer); timer = undefined; } };
-    c.addEventListener("pointerup", () => {
+    c.addEventListener("pointerenter", () => {
+      this.hoverCell = { track: trackIndex, slot, inOpening };
+      const a = this.selStart;
+      if (a && a.inOpening === inOpening) {
+        this.selRect = {
+          inOpening,
+          t0: Math.min(a.track, trackIndex), t1: Math.max(a.track, trackIndex),
+          s0: Math.min(a.slot, slot), s1: Math.max(a.slot, slot),
+        };
+        this.rerender();
+      }
+    });
+    c.addEventListener("pointerup", (e) => {
+      if ((e as PointerEvent).button === 2) {
+        const r = this.selRect;
+        this.selStart = null;
+        // No drag → the classic right-click single-cell clear.
+        if (r && r.t0 === r.t1 && r.s0 === r.s1) {
+          this.selRect = null;
+          s.editOpening(inOpening);
+          s.clearCell(inst, slot);
+        }
+        this.rerender();
+        return;
+      }
       cancel();
       if (longPressed) return;
       s.editOpening(inOpening);
@@ -543,13 +617,8 @@ export class SambaLooperUI {
     });
     c.addEventListener("pointerleave", cancel);
     c.addEventListener("pointercancel", cancel);
-    // Right-click clears the slot (desktop convenience; mirrors the long-press).
-    c.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      cancel();
-      s.editOpening(inOpening);
-      s.clearCell(inst, slot);
-    });
+    // Suppress the native context menu over cells (right button is selection/clear).
+    c.addEventListener("contextmenu", (e) => { e.preventDefault(); cancel(); });
     return c;
   }
 

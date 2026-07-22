@@ -478,6 +478,11 @@ object PercussionBuiltins {
             swing = 61,
             note = "Played with ~60% swing.",
         ),
+        // From Nadav's export: accented clacks, taps, and 50 %-dyn clacks (2000s).
+        PresetTrack(
+            "Tamborim — Palmas", PercussionCatalog.Tamborim,
+            listOf(100, 2, 2000, 100, 2, 2000, 100, 2, 100, 2, 2000, 100, 2, 2000, 100, 2),
+        ),
         PresetTrack(
             "Tamborim — Entrada 1", PercussionCatalog.Tamborim,
             listOf(0, 2, 1, 0, 1, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0),

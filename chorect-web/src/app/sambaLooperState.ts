@@ -5,7 +5,7 @@
 import {
   PercussionInstrument, PercussionCatalog, basePercussionId, PresetTrack,
   PercussionMeter, PercussionPattern, swungSlotMs, voiceCount,
-  BEAT_UNITS, DIVISIONS, BATIDA_CAVACO_1, PERCUSSION_DYN_FACTORS,
+  BEAT_UNITS, DIVISIONS, BATIDA_CAVACO_1, PERCUSSION_DYN_FACTORS, PERCUSSION_ACCENT,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
 import { synthClick, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
@@ -342,6 +342,25 @@ export class SambaLooperState {
   toggleAccent(instrument: PercussionInstrument, slot: number) { this.commit(this.editPattern.accentToggled(instrument, slot)); }
   /** Cycle a hit's per-slot volume 100 → 75 → 50 → 25 % (Dyn tool). */
   dynCycle(instrument: PercussionInstrument, slot: number) { this.commit(this.editPattern.dynCycled(instrument, slot)); }
+
+  /** Paste a copied cell region (rows × slots of raw values) anchored at
+   *  (trackIndex, slot) of the edited grid — spreading right/down, clipped at
+   *  the edges. Cells whose voice doesn't exist on the target row are skipped. */
+  pasteCells(trackIndex: number, slot: number, cells: (number | null)[][]) {
+    let pat = this.editPattern;
+    for (let r = 0; r < cells.length; r++) {
+      const inst = pat.instruments[trackIndex + r];
+      if (!inst) break;
+      for (let c = 0; c < cells[r].length; c++) {
+        const s = slot + c;
+        if (s >= pat.slots) break;
+        const v = cells[r][c];
+        if (v !== null && (v % PERCUSSION_ACCENT) >= inst.voices.length) continue;
+        pat = pat.withCell(inst, s, v);
+      }
+    }
+    this.commit(pat);
+  }
   clearCell(instrument: PercussionInstrument, slot: number) { this.commit(this.editPattern.withCell(instrument, slot, null)); }
   clearRow(instrument: PercussionInstrument) { this.commit(this.editPattern.clearedRow(instrument)); }
   clearAll() { this.commit(PercussionPattern.empty(this.editPattern.instruments, this.editPattern.meter)); }
