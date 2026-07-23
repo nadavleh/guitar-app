@@ -23,6 +23,10 @@ export interface BlockTrack {
   instrument: PercussionInstrument;
   /** One phrase per column; null = silent for that column. Size == phraseCount. */
   cells: (PresetTrack | null)[];
+  /** Optional OPENING cell: on the block's FIRST pass this plays instead of
+   *  cells[0]; every loop after plays cells[0] and skips the opening. Null/absent
+   *  = this track plays cells[0] even on the first pass. */
+  opening?: PresetTrack | null;
 }
 
 export class DrumBlock {
@@ -48,6 +52,13 @@ export class DrumBlock {
   /** Append an empty track for `instrument` (instruments may repeat). */
   withTrack(instrument: PercussionInstrument): DrumBlock {
     return new DrumBlock(this.name, [...this.tracks, { instrument, cells: Array(this.phraseCount).fill(null) }], this.phraseCount);
+  }
+
+  /** Set a track's OPENING cell (plays instead of its first phrase on pass 1). */
+  withOpeningCell(track: number, phrase: PresetTrack | null): DrumBlock {
+    if (track < 0 || track >= this.tracks.length) return this;
+    const tracks = this.tracks.map((t, i) => (i !== track ? t : { ...t, opening: phrase }));
+    return new DrumBlock(this.name, tracks, this.phraseCount);
   }
 
   withoutTrack(index: number): DrumBlock {
@@ -80,12 +91,15 @@ export class DrumBlock {
    *  library default is written "label@swing". Labels contain none of '=', '|',
    *  ':', ',' (or a trailing "@<digits>"). */
   encode(resolve: PresetResolver = presetByLabel): string {
-    return this.name + "=" + this.tracks.map((t) =>
-      t.instrument.id + ":" + t.cells.map((c) => {
-        if (!c) return "";
-        const libSwing = resolve(c.label)?.swing ?? 0;
-        return (c.swing ?? 0) !== libSwing ? `${c.label}@${c.swing ?? 0}` : c.label;
-      }).join(",")).join("|");
+    const cellStr = (c: PresetTrack): string => {
+      const libSwing = resolve(c.label)?.swing ?? 0;
+      return (c.swing ?? 0) !== libSwing ? `${c.label}@${c.swing ?? 0}` : c.label;
+    };
+    return this.name + "=" + this.tracks.map((t) => {
+      // A leading "^cell" is the track's OPENING (plays once, pass 1).
+      const prefix = t.opening ? "^" + cellStr(t.opening) + "," : "";
+      return t.instrument.id + ":" + prefix + t.cells.map((c) => (c ? cellStr(c) : "")).join(",");
+    }).join("|");
   }
 
   /** Parse a value produced by `encode`; null on structural garbage. Unknown
@@ -103,7 +117,7 @@ export class DrumBlock {
       if (colon <= 0) return null;
       const inst = PercussionCatalog.resolve(trackStr.substring(0, colon));
       if (!inst) continue;
-      const cells = trackStr.substring(colon + 1).split(",").map((lbl): PresetTrack | null => {
+      const parseCell = (lbl: string): PresetTrack | null => {
         if (!lbl) return null;
         // "label@swing" = a per-cell swing override on the library phrase.
         const at = lbl.lastIndexOf("@");
@@ -113,10 +127,18 @@ export class DrumBlock {
           return base ? { ...base, swing: Math.min(Math.max(overridden, 0), 100) } : null;
         }
         return resolve(lbl) ?? null;
-      });
+      };
+      let parts = trackStr.substring(colon + 1).split(",");
+      // A leading "^cell" is the track's OPENING (plays once, pass 1).
+      let opening: PresetTrack | null = null;
+      if (parts.length > 0 && parts[0].startsWith("^")) {
+        opening = parseCell(parts[0].substring(1));
+        parts = parts.slice(1);
+      }
+      const cells = parts.map(parseCell);
       if (phraseCount === -1) phraseCount = cells.length;
       if (cells.length !== phraseCount) return null;
-      tracks.push({ instrument: inst, cells });
+      tracks.push({ instrument: inst, cells, opening });
     }
     if (phraseCount < 1 || phraseCount > MAX_BLOCK_PHRASES) return null;
     return new DrumBlock(name, tracks, phraseCount);
@@ -154,6 +176,30 @@ export function decodePresetTrack(s: string): PresetTrack | null {
   }
   if (cells.length !== 16) return null;
   return { label, instrument: inst, template: cells, swing: Math.min(Math.max(swing, 0), 100) };
+}
+
+/** Block file (export / import): a JSON envelope around one block PLUS the
+ *  user-defined phrases it references, so a block is portable to another device
+ *  (the phrases are restored into the library on import). */
+export function encodeBlockFile(blockEncoded: string, customPhrases: PresetTrack[]): string {
+  return JSON.stringify({
+    format: "chorect-block",
+    version: 1,
+    block: blockEncoded,
+    phrases: customPhrases.map((p) => encodePresetTrack(p)).join("\n"),
+  }, null, 2);
+}
+
+export function decodeBlockFile(text: string): { block: string; phrases: PresetTrack[] } | null {
+  let obj: unknown;
+  try { obj = JSON.parse(text); } catch { return null; }
+  if (!obj || typeof obj !== "object") return null;
+  const o = obj as Record<string, unknown>;
+  if (o.format !== "chorect-block" || typeof o.block !== "string") return null;
+  const phrases = typeof o.phrases === "string"
+    ? o.phrases.split("\n").map(decodePresetTrack).filter((p): p is PresetTrack => p !== null)
+    : [];
+  return { block: o.block, phrases };
 }
 
 /** Phrase file (export / import): a JSON envelope around ONE user-defined

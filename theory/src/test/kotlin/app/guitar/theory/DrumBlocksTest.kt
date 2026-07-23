@@ -52,6 +52,44 @@ class DrumBlocksTest {
         assertEquals(1, Regex("@\\d+").findAll(b.encode()).count())
     }
 
+    @Test fun `opening cell encodes with a caret prefix and round-trips`() {
+        var b = DrumBlock.empty("Entrada block", 2)
+            .withTrack(PercussionCatalog.Tamborim)
+            .withTrack(PercussionCatalog.Bongo)
+        b = b.withCell(0, 0, teleco).withCell(0, 1, teleco).withCell(1, 0, pa)
+            .withOpeningCell(0, paVar1)
+        assertEquals(paVar1, b.tracks[0].opening)
+        assertNull(b.tracks[1].opening)
+        val enc = b.encode()
+        assertTrue(enc.contains(":^"))                 // opening rides as a "^cell" prefix
+        val decoded = DrumBlock.decode(enc)!!
+        assertEquals(b, decoded)
+        assertEquals(paVar1, decoded.tracks[0].opening)
+        // Clearing the opening drops the prefix; per-cell swing survives on openings.
+        assertEquals(b.withOpeningCell(0, null), DrumBlock.decode(b.withOpeningCell(0, null).encode()))
+        val swung = b.withOpeningCell(0, paVar1.copy(swing = 40))
+        assertEquals(40, DrumBlock.decode(swung.encode())!!.tracks[0].opening?.swing)
+    }
+
+    @Test fun `block file embeds custom phrases and round-trips`() {
+        val custom = PercussionBuiltins.PresetTrack(
+            "My Entrada", PercussionCatalog.Tamborim,
+            listOf(100, 2, 1, 0, null, 1, null, 0, 100, 2, 1, 0, null, 1, null, 0),
+            swing = 15,
+        )
+        val resolve = { lbl: String -> if (lbl == custom.label) custom else PercussionBuiltins.presetByLabel(lbl) }
+        var b = DrumBlock.empty("Portable", 2).withTrack(PercussionCatalog.Tamborim)
+        b = b.withCell(0, 0, teleco).withCell(0, 1, teleco).withOpeningCell(0, custom)
+        val file = BlockFile.encode(b.encode(resolve), listOf(custom))
+        val (encodedBlock, phrases) = BlockFile.decode(file)!!
+        assertEquals(listOf(custom), phrases)
+        val restored = DrumBlock.decode(encodedBlock) { lbl -> phrases.firstOrNull { it.label == lbl } ?: PercussionBuiltins.presetByLabel(lbl) }
+        assertEquals(b, restored)
+        // Wrong format / garbage rejected.
+        assertNull(BlockFile.decode("""{"format":"chorect-beat","pattern":"x"}"""))
+        assertNull(BlockFile.decode("nonsense"))
+    }
+
     @Test fun `blocks merge only when phrase counts match`() {
         val a = DrumBlock.empty("A", 4).withTrack(PercussionCatalog.Tamborim).withCell(0, 0, teleco)
         val c = DrumBlock.empty("C", 4).withTrack(PercussionCatalog.Bongo).withCell(0, 0, pa)

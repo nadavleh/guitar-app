@@ -356,6 +356,17 @@ class SambaLooperState(
         if (!isPlaying) audio.playSamples(buffer(p.instrument, 0), effectiveGain(p.instrument, 0))
     }
 
+    /** Replace the whole beat with JUST this phrase as one looping track — the
+     *  quickest way to loop a presaved phrase on its own. The other tracks, the
+     *  opening and the notes go away (Undo restores them); the beat takes the
+     *  phrase's name and swing. */
+    fun loadPresetAsBeat(p: PercussionBuiltins.PresetTrack) {
+        val solo = PercussionPattern.empty(emptyList(), pattern.meter)
+            .withPresetTrack(p.instrument, p.template)
+        loadPattern(solo, p.label, swing = p.swing)
+        if (!isPlaying) audio.playSamples(buffer(p.instrument, 0), effectiveGain(p.instrument, 0))
+    }
+
     /** Remove [inst] from the kit, also clearing its mute/solo/selection state. */
     fun removeInstrument(inst: PercussionInstrument) {
         commit(editPattern.removeInstrument(inst))

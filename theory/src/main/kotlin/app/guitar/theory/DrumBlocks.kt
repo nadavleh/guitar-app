@@ -18,6 +18,10 @@ data class BlockTrack(
     val instrument: PercussionInstrument,
     /** One phrase per column; null = silent for that column. Size == phraseCount. */
     val cells: List<PresetTrack?>,
+    /** Optional OPENING cell: on the block's FIRST pass this plays instead of
+     *  cells[0]; every loop after plays cells[0] and skips the opening. Null =
+     *  this track plays cells[0] even on the first pass. */
+    val opening: PresetTrack? = null,
 )
 
 data class DrumBlock(
@@ -39,6 +43,13 @@ data class DrumBlock(
     /** Append an empty track for [instrument] (instruments may repeat). */
     fun withTrack(instrument: PercussionInstrument): DrumBlock =
         copy(tracks = tracks + BlockTrack(instrument, List(phraseCount) { null }))
+
+    /** Set a track's OPENING cell (plays instead of its first phrase on pass 1). */
+    fun withOpeningCell(track: Int, phrase: PresetTrack?): DrumBlock {
+        if (track !in tracks.indices) return this
+        val t = tracks[track]
+        return copy(tracks = tracks.toMutableList().also { it[track] = t.copy(opening = phrase) })
+    }
 
     fun withoutTrack(index: Int): DrumBlock =
         if (index in tracks.indices) copy(tracks = tracks.filterIndexed { i, _ -> i != index }) else this
@@ -64,16 +75,17 @@ data class DrumBlock(
      *  '=', '|', ':', ',' (or a trailing "@<digits>"). [resolve] is the phrase
      *  library (built-ins by default; pass a merged lookup when custom phrases
      *  exist). */
-    fun encode(resolve: (String) -> PresetTrack? = PercussionBuiltins::presetByLabel): String =
-        name + "=" + tracks.joinToString("|") { t ->
-            t.instrument.id + ":" + t.cells.joinToString(",") { c ->
-                if (c == null) ""
-                else {
-                    val libSwing = resolve(c.label)?.swing ?: 0
-                    if (c.swing != libSwing) "${c.label}@${c.swing}" else c.label
-                }
-            }
+    fun encode(resolve: (String) -> PresetTrack? = PercussionBuiltins::presetByLabel): String {
+        fun cellStr(c: PresetTrack): String {
+            val libSwing = resolve(c.label)?.swing ?: 0
+            return if (c.swing != libSwing) "${c.label}@${c.swing}" else c.label
         }
+        return name + "=" + tracks.joinToString("|") { t ->
+            // A leading "^cell" is the track's OPENING (plays once, pass 1).
+            val prefix = t.opening?.let { "^" + cellStr(it) + "," } ?: ""
+            t.instrument.id + ":" + prefix + t.cells.joinToString(",") { c -> c?.let(::cellStr) ?: "" }
+        }
+    }
 
     companion object {
         const val MAX_PHRASES = 8
@@ -100,22 +112,28 @@ data class DrumBlock(
                 val colon = trackStr.indexOf(':')
                 if (colon <= 0) return null
                 val inst = PercussionCatalog.resolve(trackStr.substring(0, colon)) ?: continue
-                val cells = trackStr.substring(colon + 1).split(",").map { lbl ->
-                    if (lbl.isEmpty()) null
-                    else {
-                        // "label@swing" = a per-cell swing override on the library phrase.
-                        val at = lbl.lastIndexOf('@')
-                        val overridden = if (at > 0) lbl.substring(at + 1).toIntOrNull() else null
-                        if (overridden != null) {
-                            resolve(lbl.substring(0, at))?.copy(swing = overridden.coerceIn(0, 100))
-                        } else {
-                            resolve(lbl)
-                        }
+                fun parseCell(lbl: String): PresetTrack? {
+                    if (lbl.isEmpty()) return null
+                    // "label@swing" = a per-cell swing override on the library phrase.
+                    val at = lbl.lastIndexOf('@')
+                    val overridden = if (at > 0) lbl.substring(at + 1).toIntOrNull() else null
+                    return if (overridden != null) {
+                        resolve(lbl.substring(0, at))?.copy(swing = overridden.coerceIn(0, 100))
+                    } else {
+                        resolve(lbl)
                     }
                 }
+                var parts = trackStr.substring(colon + 1).split(",")
+                // A leading "^cell" is the track's OPENING (plays once, pass 1).
+                var opening: PresetTrack? = null
+                if (parts.isNotEmpty() && parts[0].startsWith("^")) {
+                    opening = parseCell(parts[0].drop(1))
+                    parts = parts.drop(1)
+                }
+                val cells = parts.map(::parseCell)
                 if (phraseCount == -1) phraseCount = cells.size
                 if (cells.size != phraseCount) return null
-                tracks.add(BlockTrack(inst, cells))
+                tracks.add(BlockTrack(inst, cells, opening))
             }
             if (phraseCount !in 1..MAX_PHRASES) return null
             return runCatching { DrumBlock(name, tracks, phraseCount) }.getOrNull()

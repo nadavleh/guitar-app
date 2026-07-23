@@ -21,14 +21,18 @@ the rights to.
 | Pandeiro | `pandeiro_0.wav` | bass (open) |
 | | `pandeiro_1.wav` | bass (muted) |
 | | `pandeiro_2.wav` | slap |
-| | `pandeiro_3.wav` | **jingle (platinela)** |
-| | `pandeiro_4.wav` | **jingle hi** |
+| | `pandeiro_3.wav` | jingle (platinela) |
 | Agogô | `agogo_0.wav` | low bell |
 | | `agogo_1.wav` | high bell |
 
-For just the pandeiro shimmer, drop in `pandeiro_3.wav` and `pandeiro_4.wav` — short one-shot
-jingle hits work best (the looper retriggers them per sixteenth). Keep them trimmed to a tight
-onset so each hit lands on the beat.
+Short one-shot jingle hits work best (the looper retriggers them per sixteenth). Keep samples
+trimmed to a tight onset so each hit lands on the beat.
+
+The bundled `pandeiro_*.wav` come from real-pandeiro recordings (built reproducibly by
+`tools/build_pandeiro_samples.py`): bass + platinela by **Paulo_Gonçalves via freesound.org**
+(CC-BY 4.0), slap by **katusm via freesound.org** (CC0); the muted bass is a damped copy of the
+same bass hit. The other instruments still come from the Ableton Latin Percussion preview set
+(`tools/build_drum_samples.py`).
 
 After adding files, reload the app and open a Drums voice popup: each voice shows **sample** or
 **synth** so you can confirm the file loaded.

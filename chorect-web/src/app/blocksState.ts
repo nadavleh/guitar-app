@@ -12,6 +12,7 @@
 import {
   DrumBlock, materializedTemplate, PresetTrack, presetByLabel, basePercussionId,
   encodePresetTrack, decodePresetTrack, mergedPresets,
+  encodeBlockFile, decodeBlockFile,
   PercussionInstrument, PercussionCatalog, slotMs, swungSlotMs, PercussionMeter,
   PERCUSSION_ACCENT, PERCUSSION_DYN, PERCUSSION_DYN_FACTORS, voiceCount,
 } from "../theory";
@@ -44,6 +45,9 @@ export class BlocksState {
   isPlaying = false;
   /** Column currently sounding (0-based), or -1 when stopped. */
   currentCol = -1;
+  /** True while the block's very FIRST column plays (openings sound instead of
+   *  each track's first phrase); false once the loop wraps. */
+  openingPass = false;
 
   /** Overlay a wood-click metronome (higher click on each bar's "1"). */
   metronomeOn = false;
@@ -66,12 +70,18 @@ export class BlocksState {
   rename(name: string) { this.block = this.block.withName(name); this.notify(); }
   addTrack(inst: PercussionInstrument) { this.block = this.block.withTrack(inst); this.ensureSamplesFor(inst); this.notify(); }
   removeTrack(index: number) { this.block = this.block.withoutTrack(index); this.notify(); }
-  setCell(track: number, col: number, phrase: PresetTrack | null) { this.block = this.block.withCell(track, col, phrase); this.notify(); }
+  /** col === -1 targets the track's OPENING cell (plays once, pass 1). */
+  setCell(track: number, col: number, phrase: PresetTrack | null) {
+    this.block = col === -1 ? this.block.withOpeningCell(track, phrase) : this.block.withCell(track, col, phrase);
+    this.notify();
+  }
 
   /** Override one cell's swing (0–100): the phrase keeps its own clock, so a
-   *  swung cell over straight tracks stays bar-aligned. Saved with the block. */
+   *  swung cell over straight tracks stays bar-aligned. Saved with the block.
+   *  col === -1 targets the opening cell. */
   setCellSwing(track: number, col: number, swing: number) {
-    const phrase = this.block.tracks[track]?.cells[col];
+    const t = this.block.tracks[track];
+    const phrase = col === -1 ? t?.opening : t?.cells[col];
     if (!phrase) return;
     this.setCell(track, col, { ...phrase, swing: Math.min(Math.max(Math.round(swing), 0), 100) });
   }
@@ -104,7 +114,7 @@ export class BlocksState {
    *  used by phrase-file import. Returns false on an empty/reserved-char label. */
   savePhrase(p: PresetTrack): boolean {
     const clean = p.label.trim();
-    if (!clean || [...'=:,|@~', "\n"].some((ch) => clean.includes(ch))) return false;
+    if (!clean || [...'=:,|@~^', "\n"].some((ch) => clean.includes(ch))) return false;
     this.deps.saveTrackPreset(clean, encodePresetTrack({ ...p, label: clean }));
     this.notify();
     return true;
@@ -152,6 +162,37 @@ export class BlocksState {
     return out;
   }
   saveCurrent() { this.deps.save(this.block.name, this.block.encode(this.resolvePreset)); this.notify(); }
+
+  // ---- block files (export / import) ----
+
+  /** Block file: the encoded block plus every USER-DEFINED phrase it references
+   *  (cells + openings), so the block is portable to another device. */
+  exportBlockFile(): string {
+    const customs = this.deps.getTrackPresets();
+    const used = new Map<string, PresetTrack>();
+    for (const t of this.block.tracks) {
+      for (const cell of [...t.cells, t.opening ?? null]) {
+        if (!cell || used.has(cell.label)) continue;
+        const enc = customs.get(cell.label);
+        const p = enc ? decodePresetTrack(enc) : null;
+        if (p) used.set(cell.label, p);
+      }
+    }
+    return encodeBlockFile(this.block.encode(this.resolvePreset), [...used.values()]);
+  }
+
+  /** Import a block file: restore its embedded phrases into the library, then
+   *  decode the block (preferring the embedded phrases) and load it. */
+  importBlockFile(text: string): boolean {
+    const parsed = decodeBlockFile(text);
+    if (!parsed) return false;
+    const byLabel = new Map(parsed.phrases.map((p) => [p.label, p] as const));
+    for (const p of parsed.phrases) this.savePhrase(p);
+    const b = DrumBlock.decode(parsed.block, (lbl) => byLabel.get(lbl) ?? this.resolvePreset(lbl));
+    if (!b) return false;
+    this.loadBlock(b);
+    return true;
+  }
   loadBlock(b: DrumBlock) {
     this.block = b;
     for (const t of b.tracks) this.ensureSamplesFor(t.instrument);
@@ -211,10 +252,19 @@ export class BlocksState {
         const c = colIndex % cols;
         this.currentCol = c;
         this.notify();
+        this.openingPass = colIndex === 0;
         // Schedule the whole column for every track: each phrase with ITS swing.
+        // What a track plays at absolute column ci: its OPENING at ci 0 (if set),
+        // its cells afterwards — so `prev` (the return rule's input) tracks what
+        // actually sounded, and no return rule fires before anything played.
         for (const t of snapshot.tracks) {
-          const phrase = t.cells[c];
-          const prev = t.cells[(c - 1 + cols) % cols];
+          const playedAt = (ci: number): PresetTrack | null => {
+            if (ci < 0) return null;
+            if (ci === 0 && t.opening) return t.opening;
+            return t.cells[ci % cols];
+          };
+          const phrase = playedAt(colIndex);
+          const prev = playedAt(colIndex - 1);
           const tmpl = materializedTemplate(phrase, prev);
           if (!tmpl || !phrase) continue;
           const swing = phrase.swing ?? 0;
@@ -250,6 +300,7 @@ export class BlocksState {
     this.isPlaying = false;
     this.token++;
     this.currentCol = -1;
+    this.openingPass = false;
     this.deps.audio.stop();
     this.notify();
   }

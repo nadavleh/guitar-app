@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.guitar.audio.AudioEngine
 import app.guitar.audio.PercussionSynth
+import app.guitar.theory.BlockFile
 import app.guitar.theory.DrumBlock
 import app.guitar.theory.PercussionBuiltins
 import app.guitar.theory.PercussionBuiltins.PresetTrack
@@ -53,6 +54,11 @@ class BlocksState(
     var currentCol by mutableStateOf(-1)
         private set
 
+    /** True while the block's very FIRST column plays (openings sound instead of
+     *  each track's first phrase); false once the loop wraps. */
+    var openingPass by mutableStateOf(false)
+        private set
+
     /** Overlay a wood-click metronome (higher click on each bar's "1"). */
     var metronomeOn by mutableStateOf(false)
         private set
@@ -89,7 +95,7 @@ class BlocksState(
      *  used by phrase-file import. Returns false on an empty/reserved-char label. */
     fun savePhrase(p: PresetTrack): Boolean {
         val clean = p.label.trim()
-        if (clean.isEmpty() || clean.any { it in "=:,|@~" || it == '\n' }) return false
+        if (clean.isEmpty() || clean.any { it in "=:,|@~^" || it == '\n' }) return false
         scope.launch { repo.saveDrumTrackPreset(encodePresetTrack(p.copy(label = clean))) }
         return true
     }
@@ -117,12 +123,17 @@ class BlocksState(
     fun rename(name: String) { block = block.copy(name = name.ifBlank { "Block" }) }
     fun addTrack(inst: PercussionInstrument) { block = block.withTrack(inst) }
     fun removeTrack(index: Int) { block = block.withoutTrack(index) }
-    fun setCell(track: Int, col: Int, phrase: PresetTrack?) { block = block.withCell(track, col, phrase) }
+    /** col == -1 targets the track's OPENING cell (plays once, pass 1). */
+    fun setCell(track: Int, col: Int, phrase: PresetTrack?) {
+        block = if (col == -1) block.withOpeningCell(track, phrase) else block.withCell(track, col, phrase)
+    }
 
     /** Override one cell's swing (0–100): the phrase keeps its own clock, so a
-     *  swung cell over straight tracks stays bar-aligned. Saved with the block. */
+     *  swung cell over straight tracks stays bar-aligned. Saved with the block.
+     *  col == -1 targets the opening cell. */
     fun setCellSwing(track: Int, col: Int, swing: Int) {
-        val phrase = block.tracks.getOrNull(track)?.cells?.getOrNull(col) ?: return
+        val t = block.tracks.getOrNull(track)
+        val phrase = (if (col == -1) t?.opening else t?.cells?.getOrNull(col)) ?: return
         setCell(track, col, phrase.copy(swing = swing.coerceIn(0, 100)))
     }
     fun setPhraseCount(n: Int) { block = block.withPhraseCount(n) }
@@ -155,6 +166,32 @@ class BlocksState(
         val encoded = block.encode(::resolvePreset)
         scope.launch { repo.saveDrumBlock(encoded) }
     }
+
+    // ---- block files (export / import) ----
+
+    /** Block file: the encoded block plus every USER-DEFINED phrase it references
+     *  (cells + openings), so the block is portable to another device. */
+    fun exportBlockFile(): String {
+        val used = LinkedHashMap<String, PresetTrack>()
+        for (t in block.tracks) {
+            for (cell in t.cells + t.opening) {
+                if (cell == null || used.containsKey(cell.label)) continue
+                customPresets[cell.label]?.let { used[cell.label] = it }
+            }
+        }
+        return BlockFile.encode(block.encode(::resolvePreset), used.values.toList())
+    }
+
+    /** Import a block file: restore its embedded phrases into the library, then
+     *  decode the block (preferring the embedded phrases) and load it. */
+    fun importBlockFile(text: String): Boolean {
+        val (encodedBlock, phrases) = BlockFile.decode(text) ?: return false
+        val byLabel = phrases.associateBy { it.label }
+        for (p in phrases) savePhrase(p)
+        val b = DrumBlock.decode(encodedBlock) { lbl -> byLabel[lbl] ?: resolvePreset(lbl) } ?: return false
+        loadBlock(b)
+        return true
+    }
     fun loadBlock(b: DrumBlock) { block = b }
     fun deleteSaved(name: String) { scope.launch { repo.deleteDrumBlock(name) } }
 
@@ -179,10 +216,20 @@ class BlocksState(
                 val cols = snapshot.phraseCount
                 val c = colIndex % cols
                 currentCol = c
+                openingPass = colIndex == 0
                 // Schedule the whole column for every track: each phrase with ITS swing.
+                // What a track plays at absolute column ci: its OPENING at ci 0 (if
+                // set), its cells afterwards — so `prev` (the return rule's input)
+                // tracks what actually sounded, and no return rule fires before
+                // anything played.
                 for (t in snapshot.tracks) {
-                    val phrase = t.cells[c]
-                    val prev = t.cells[(c - 1 + cols) % cols]
+                    fun playedAt(ci: Int): PresetTrack? = when {
+                        ci < 0 -> null
+                        ci == 0 && t.opening != null -> t.opening
+                        else -> t.cells[ci % cols]
+                    }
+                    val phrase = playedAt(colIndex)
+                    val prev = playedAt(colIndex - 1)
                     val tmpl = materializedTemplate(phrase, prev) ?: continue
                     val swing = phrase?.swing ?: 0
                     var onsetMs = 0L
@@ -225,6 +272,7 @@ class BlocksState(
         job?.cancel()
         job = null
         currentCol = -1
+        openingPass = false
         audio.stop()
     }
 

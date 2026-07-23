@@ -498,6 +498,12 @@ object PercussionBuiltins {
             "Bongo — Partido Alto Var 2", PercussionCatalog.Bongo,
             listOf(null, 0, null, 0, 1, null, 0, null, 2, 1, null, 1, null, 1, null, 1),
         ),
+        PresetTrack(
+            "Bongo — Partido Alto Opening", PercussionCatalog.Bongo,
+            listOf(null, null, 0, null, 1, null, 1, null, 1, null, 0, null, 3, 1, null, 1),
+            note = "One-shot entrada into the partido alto — use as an opening (▶¹) " +
+                "before the groove.",
+        ),
     )
 
     // Partido-alto grooves (from Nadav's exported beats): the teleco-teco
@@ -625,6 +631,45 @@ object PhraseFile {
         val fields = parseFlatJsonObject(text) ?: return null
         if (fields["format"] != FORMAT) return null
         return decodePresetTrack(fields["phrase"] ?: return null)
+    }
+}
+
+/**
+ * Block file (export / import): a JSON envelope around one block PLUS the
+ * user-defined phrases it references, so a block is portable to another device
+ * (the phrases are restored into the library on import). Flat-JSON friendly:
+ * the phrase list is newline-joined inside one string field.
+ */
+object BlockFile {
+    const val FORMAT = "chorect-block"
+
+    fun encode(blockEncoded: String, customPhrases: List<PercussionBuiltins.PresetTrack>): String {
+        fun esc(s: String) = buildString {
+            for (c in s) when (c) {
+                '"' -> append("\\\""); '\\' -> append("\\\\")
+                '\n' -> append("\\n"); '\r' -> append("\\r"); '\t' -> append("\\t")
+                else -> append(c)
+            }
+        }
+        return buildString {
+            append("{\n")
+            append("  \"format\": \"").append(FORMAT).append("\",\n")
+            append("  \"version\": 1,\n")
+            append("  \"block\": \"").append(esc(blockEncoded)).append("\",\n")
+            append("  \"phrases\": \"")
+                .append(esc(customPhrases.joinToString("\n") { encodePresetTrack(it) }))
+                .append("\"\n")
+            append("}\n")
+        }
+    }
+
+    /** Parse a block file → (encoded block, embedded custom phrases). */
+    fun decode(text: String): Pair<String, List<PercussionBuiltins.PresetTrack>>? {
+        val fields = parseFlatJsonObject(text) ?: return null
+        if (fields["format"] != FORMAT) return null
+        val block = fields["block"] ?: return null
+        val phrases = (fields["phrases"] ?: "").split("\n").mapNotNull { decodePresetTrack(it) }
+        return block to phrases
     }
 }
 

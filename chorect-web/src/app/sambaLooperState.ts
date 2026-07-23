@@ -393,6 +393,16 @@ export class SambaLooperState {
     if (!this.isPlaying) this.deps.audio.playSamples(this.buffer(p.instrument, 0), this.effectiveGain(p.instrument, 0));
   }
 
+  /** Replace the whole beat with JUST this phrase as one looping track — the
+   *  quickest way to loop a presaved phrase on its own. The other tracks, the
+   *  opening and the notes go away (Undo restores them); the beat takes the
+   *  phrase's name and swing. */
+  loadPresetAsBeat(p: PresetTrack) {
+    const solo = PercussionPattern.empty([], this.pattern.meter).withPresetTrack(p.instrument, p.template);
+    this.loadPattern(solo, p.label, null, p.swing ?? 0, null, "");
+    this.loadSamplesFor(p.instrument);
+  }
+
   /** Remove `inst` from the kit, also clearing its mute/solo/selection state. */
   removeInstrument(inst: PercussionInstrument) {
     this.commit(this.editPattern.removeInstrument(inst));

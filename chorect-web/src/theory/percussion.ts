@@ -559,6 +559,9 @@ export const PRESET_TRACKS: PresetTrack[] = [
     addsReturnDownbeat: true },
   { label: "Bongo — Partido Alto Var 2", instrument: Bongo,
     template: [null, 0, null, 0, 1, null, 0, null, 2, 1, null, 1, null, 1, null, 1] },
+  { label: "Bongo — Partido Alto Opening", instrument: Bongo,
+    template: [null, null, 0, null, 1, null, 1, null, 1, null, 0, null, 3, 1, null, 1],
+    note: "One-shot entrada into the partido alto — use as an opening (▶¹) before the groove." },
 ];
 
 /** A single-line tamborim rhythm from onset slots (`accented` slots get the

@@ -930,6 +930,10 @@ select.et-select {
   background: var(--surface2); color: var(--text-primary); font-size: 12px; line-height: 1.25;
 }
 .block-cell.empty { color: var(--text-secondary); border-style: dashed; }
+/* The opening cell (col ▶¹): one-shot, plays instead of phrase 1 on the first
+   pass only — dashed teal with a gap separating it from the looped columns. */
+.block-cell.opening { border-style: dashed; border-color: var(--primary); margin-right: 10px; flex-grow: 0.6; }
+.block-cell.opening.empty { opacity: 0.75; }
 .block-cell.picking { border-color: var(--primary); border-width: 2px; }
 .block-cell.playing { border-color: var(--feedback); border-width: 2px; background: color-mix(in srgb, var(--feedback) 16%, var(--surface2)); }
 

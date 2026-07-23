@@ -182,6 +182,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                     scaleX = scaleX, scaleY = scaleY, offsetX = offsetX, offsetY = offsetY,
                     mixerFor = mixerFor,
                     onMixerDismiss = { mixerFor = null },
+                    onBlockImported = { blocksMode = true; samba.stop() },
                 )
             }
         }
@@ -265,6 +266,7 @@ private fun PatternSection(
     offsetY: androidx.compose.runtime.MutableFloatState,
     mixerFor: String? = null,
     onMixerDismiss: () -> Unit = {},
+    onBlockImported: () -> Unit = {},
 ) {
     // ----- Section header: Save / Clear / Erase / Accent / Notes -----
     var saveDialog by remember { mutableStateOf(false) }
@@ -304,6 +306,9 @@ private fun PatternSection(
             val beat = BeatFile.decode(text)
             if (beat != null) {
                 samba.loadPattern(beat.pattern, beat.name, beat.bpm, beat.swing, beat.opening, beat.notes)
+            } else if (blocks.importBlockFile(text)) {
+                // A block file loads into the Blocks view.
+                onBlockImported()
             } else {
                 // A phrase file joins the track-preset library instead.
                 app.guitar.theory.PhraseFile.decode(text)?.let { blocks.savePhrase(it) }
@@ -835,7 +840,30 @@ private fun TranslateControl(samba: SambaLooperState) {
 private fun BlocksSection(blocks: BlocksState) {
     val blk = blocks.block
     val saved = blocks.savedBlocks
+    // Picked cell: (track, col); col == -1 is the track's OPENING cell.
     var pick by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    val context = LocalContext.current
+
+    // Export the block to a JSON file (embeds the custom phrases it references,
+    // so it's portable); Import reads one back. Same shape as chorect-web.
+    val exportBlockLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri != null) runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { os ->
+                os.write(blocks.exportBlockFile().toByteArray())
+            }
+        }
+    }
+    val importBlockLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) runCatching {
+            val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
+                ?: return@runCatching
+            blocks.importBlockFile(text)
+        }
+    }
 
     // Header: name + phrase-count stepper.
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -893,6 +921,10 @@ private fun BlocksSection(blocks: BlocksState) {
                 }
             }
         }
+        OutlinedButton(onClick = {
+            exportBlockLauncher.launch(blk.name.replace(Regex("[^\\w-]+"), "_") + ".chorect-block.json")
+        }) { Text("Export") }
+        OutlinedButton(onClick = { importBlockLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }) { Text("Import") }
         OutlinedButton(onClick = { pick = null; blocks.clear() }) { Text("Clear") }
         // Metronome: overlay a wood click on the block (higher on each bar's "1").
         if (blocks.metronomeOn) {
@@ -943,13 +975,21 @@ private fun BlocksSection(blocks: BlocksState) {
                     .padding(4.dp))
             Spacer(Modifier.width(4.dp))
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                for (c in 0 until blk.phraseCount) {
-                    val phrase = t.cells[c]
-                    val active = blocks.isPlaying && blocks.currentCol == c
+                // Column -1 = the OPENING cell: plays instead of phrase 1 on the
+                // block's first pass only; every loop after skips it.
+                for (c in -1 until blk.phraseCount) {
+                    val isOpening = c == -1
+                    val phrase = if (isOpening) t.opening else t.cells[c]
+                    val active = blocks.isPlaying && if (isOpening) {
+                        blocks.openingPass && blocks.currentCol == 0 && t.opening != null
+                    } else {
+                        blocks.currentCol == c && !(c == 0 && blocks.openingPass && t.opening != null)
+                    }
                     val picking = pick == (ti to c)
                     val border = when {
                         active -> teal
                         picking -> MaterialTheme.colorScheme.primary
+                        isOpening -> MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
                         else -> MaterialTheme.colorScheme.outline
                     }
                     val label = phrase?.let {
@@ -957,10 +997,10 @@ private fun BlocksSection(blocks: BlocksState) {
                         (if (i < 0) it.label else it.label.substring(i + 2)) +
                             (if (it.swing > 0) " ~${it.swing}%" else "") +
                             (if (it.note.isNotEmpty()) " ※" else "")
-                    } ?: "＋"
+                    } ?: (if (isOpening) "▶¹" else "＋")
                     Box(
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(if (isOpening) 0.6f else 1f)
                             .heightIn(min = 44.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(
@@ -980,6 +1020,8 @@ private fun BlocksSection(blocks: BlocksState) {
                                     else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    // Visual gap between the one-shot opening and the looped columns.
+                    if (isOpening) Spacer(Modifier.width(5.dp))
                 }
             }
         }
@@ -989,11 +1031,11 @@ private fun BlocksSection(blocks: BlocksState) {
     pick?.let { (ti, c) ->
         if (ti < blk.tracks.size) {
             val track = blk.tracks[ti]
-            val current = track.cells[c]
+            val current = if (c == -1) track.opening else track.cells[c]
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    "${track.instrument.displayName} · phrase ${c + 1}",
+                    "${track.instrument.displayName} · ${if (c == -1) "opening ▶¹" else "phrase ${c + 1}"}",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
@@ -1035,7 +1077,7 @@ private fun BlocksSection(blocks: BlocksState) {
     androidx.compose.foundation.text.selection.SelectionContainer {
         Column {
             val noted = LinkedHashSet<String>()
-            for (t in blk.tracks) for (p in t.cells) {
+            for (t in blk.tracks) for (p in t.cells + t.opening) {
                 if (p != null && p.note.isNotEmpty() && noted.add(p.label)) {
                     Spacer(Modifier.height(4.dp))
                     Text("※ ${p.label}: ${p.note}",
@@ -1135,29 +1177,42 @@ private fun BeatList(
             beatRow(
                 "★ ${p.label}" + (if (p.swing > 0) " ~${p.swing}%" else "") + (if (isCustom) " 👤" else ""),
                 selected = false,
-                trailing = if (!isCustom) null else ({
+                trailing = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // ⤓ exports the phrase as a .chorect-phrase.json (Import reads it back).
+                        // ◎ loops the phrase ALONE: replaces the whole beat with just
+                        // this track (Undo brings the previous beat back).
                         Text(
-                            "⤓",
+                            "◎",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .clickable { onExportPhrase(p) }
+                                .clickable { samba.loadPresetAsBeat(p) }
                                 .padding(4.dp),
                         )
-                        Text(
-                            "✕",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .clickable { blocks.deleteTrackPreset(p.label) }
-                                .padding(4.dp),
-                        )
+                        if (isCustom) {
+                            // ⤓ exports the phrase as a .chorect-phrase.json (Import reads it back).
+                            Text(
+                                "⤓",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .clickable { onExportPhrase(p) }
+                                    .padding(4.dp),
+                            )
+                            Text(
+                                "✕",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .clickable { blocks.deleteTrackPreset(p.label) }
+                                    .padding(4.dp),
+                            )
+                        }
                     }
-                }),
+                },
             ) {
                 samba.addPresetTrack(p)
             }

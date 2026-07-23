@@ -714,6 +714,7 @@ export class SambaLooperUI {
     const metro = btn(b.metronomeOn ? "Metronome ✓" : "Metronome", () => { b.toggleMetronome(); this.rerender(); }, b.metronomeOn ? "btn primary" : "btn");
     wrap.appendChild(el("div", { class: "et-row-gap" }, [
       btn("Save block", () => b.saveCurrent()), loadWrap, mergeWrap,
+      btn("Export", () => this.exportBlock()), btn("Import", () => this.importBeat()),
       btn("Clear", () => b.clear()), metro, addWrap,
     ]));
 
@@ -730,14 +731,22 @@ export class SambaLooperUI {
       const rm = el("button", { class: "btn text", title: "Remove track" }, ["✕"]);
       rm.addEventListener("click", () => { this.blockPick = null; b.removeTrack(ti); });
       const cells = el("div", { class: "block-cells" });
-      for (let c = 0; c < blk.phraseCount; c++) {
-        const phrase = t.cells[c];
-        const active = b.isPlaying && b.currentCol === c;
+      // Column -1 = the OPENING cell: plays instead of phrase 1 on the block's
+      // first pass only; every loop after skips it and plays phrase 1.
+      for (let c = -1; c < blk.phraseCount; c++) {
+        const isOpening = c === -1;
+        const phrase = isOpening ? (t.opening ?? null) : t.cells[c];
+        const active = b.isPlaying && (isOpening
+          ? b.openingPass && b.currentCol === 0 && !!t.opening
+          : b.currentCol === c && !(c === 0 && b.openingPass && t.opening));
         const picking = this.blockPick?.track === ti && this.blockPick?.col === c;
-        const cls = "block-cell" + (active ? " playing" : "") + (picking ? " picking" : "") + (phrase ? "" : " empty");
+        const cls = "block-cell" + (isOpening ? " opening" : "") + (active ? " playing" : "") + (picking ? " picking" : "") + (phrase ? "" : " empty");
         const badges = phrase?.swing ? ` ~${phrase.swing}%` : "";
-        const cell = el("button", { class: cls, title: phrase?.note ?? "" }, [
-          phrase ? this.phraseShort(phrase) + badges + (phrase.note ? " ※" : "") : "＋",
+        const cell = el("button", {
+          class: cls,
+          title: isOpening ? "Opening: plays instead of phrase 1 on the first pass only" : phrase?.note ?? "",
+        }, [
+          phrase ? this.phraseShort(phrase) + badges + (phrase.note ? " ※" : "") : (isOpening ? "▶¹" : "＋"),
         ]);
         cell.addEventListener("click", () => {
           this.blockPick = picking ? null : { track: ti, col: c };
@@ -752,7 +761,7 @@ export class SambaLooperUI {
     const pick = this.blockPick;
     if (pick && pick.track < blk.tracks.length) {
       const track = blk.tracks[pick.track];
-      const current = track.cells[pick.col];
+      const current = pick.col === -1 ? (track.opening ?? null) : track.cells[pick.col];
       const chips = el("div", { class: "pal-chips" });
       const noneChip = el("button", { class: current ? "pal-chip" : "pal-chip on" }, ["(empty)"]);
       noneChip.addEventListener("click", () => { b.setCell(pick.track, pick.col, null); this.rerender(); });
@@ -766,7 +775,7 @@ export class SambaLooperUI {
       const close = el("button", { class: "pal-chip pal-tool", "aria-label": "Close" }, ["✕"]);
       close.addEventListener("click", () => { this.blockPick = null; this.rerender(); });
       wrap.appendChild(el("div", { class: "drum-palette", style: "margin-top:10px" }, [
-        el("span", { class: "pal-name" }, [`${track.instrument.displayName} · phrase ${pick.col + 1}`]),
+        el("span", { class: "pal-name" }, [`${track.instrument.displayName} · ${pick.col === -1 ? "opening ▶¹" : `phrase ${pick.col + 1}`}`]),
         chips, close,
       ]));
       // Per-cell swing override: THIS phrase's own clock (0 = straight).
@@ -780,7 +789,7 @@ export class SambaLooperUI {
 
     // Rule/notes of the phrases in use, shown under the grid.
     const noted = new Set<string>();
-    for (const t of blk.tracks) for (const p of t.cells) {
+    for (const t of blk.tracks) for (const p of [...t.cells, t.opening ?? null]) {
       if (p?.note && !noted.has(p.label)) {
         noted.add(p.label);
         wrap.appendChild(el("div", { class: "et-muted", style: "font-size:12px;margin-top:6px" }, [`※ ${p.label}: ${p.note}`]));
@@ -824,7 +833,7 @@ export class SambaLooperUI {
       const name = window.prompt("Phrase name (same name as a preset replaces it):", suggested);
       if (name === null) return;
       if (!this.blocks.saveTrackAsPreset(inst, [...row], name)) {
-        window.alert("Name can't be empty or contain = : , | @ ~");
+        window.alert("Name can't be empty or contain = : , | @ ~ ^");
       }
     });
     const close = el("button", { class: "pal-chip pal-tool", "aria-label": "Deselect track" }, ["✕"]);
@@ -945,7 +954,12 @@ export class SambaLooperUI {
       const isCustom = customs.has(p.label);
       const label = `★ ${p.label}` + (p.swing ? ` ~${p.swing}%` : "") + (isCustom ? " 👤" : "");
       const row = el("div", { class: "lrow", title: p.note ?? "tap to add this track to the current beat" },
-        isCustom ? [el("span", { style: "flex:1" }, [label])] : [label]);
+        [el("span", { style: "flex:1" }, [label])]);
+      // ◎ loops the phrase ALONE: replaces the whole beat with just this track
+      // (Undo brings the previous beat back).
+      const solo = el("button", { class: "btn text", title: "Loop this phrase alone (replaces the current beat; Undo restores it)" }, ["◎"]);
+      solo.addEventListener("click", (e) => { e.stopPropagation(); s.loadPresetAsBeat(p); this.rerender(); });
+      row.appendChild(solo);
       if (isCustom) {
         // ⤓ exports the phrase as a .chorect-phrase.json (Import reads it back).
         const exp = el("button", { class: "btn text", title: "Export this phrase" }, ["⤓"]);
@@ -989,6 +1003,20 @@ export class SambaLooperUI {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  /** Download the current block as a Chorect block file (embeds the custom
+   *  phrases it references, so it's portable to another device). */
+  private exportBlock(): void {
+    const name = this.blocks.block.name.trim() || "block";
+    const json = this.blocks.exportBlockFile();
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = el("a", { href: url, download: `${name.replace(/[^\w-]+/g, "_")}.chorect-block.json` }) as HTMLAnchorElement;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   /** Download a phrase as a Chorect phrase file (Import reads it back). */
   private exportPhrase(p: PresetTrack): void {
     const json = encodePhraseFile(p);
@@ -1002,7 +1030,9 @@ export class SambaLooperUI {
   }
 
   /** Pick a Chorect file and load it: a BEAT file loads into the editor; a
-   *  PHRASE file joins the track-preset library (dispatch on "format"). */
+   *  BLOCK file loads into the Blocks view (its embedded phrases join the
+   *  library); a PHRASE file joins the track-preset library (dispatch on
+   *  "format"). */
   private importBeat(): void {
     const input = el("input", { type: "file", accept: ".json,application/json", style: "display:none" }) as HTMLInputElement;
     input.addEventListener("change", () => {
@@ -1017,13 +1047,18 @@ export class SambaLooperUI {
           this.rerender();
           return;
         }
+        if (this.blocks.importBlockFile(text)) {
+          this.viewMode = "blocks";
+          this.rerender();
+          return;
+        }
         const phrase = decodePhraseFile(text);
         if (phrase && this.blocks.savePhrase(phrase)) {
           window.alert(`Phrase "${phrase.label}" imported into Track presets.`);
           this.rerender();
           return;
         }
-        window.alert("Not a valid Chorect beat or phrase file.");
+        window.alert("Not a valid Chorect beat, block, or phrase file.");
       };
       reader.readAsText(file);
     });
