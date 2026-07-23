@@ -204,12 +204,12 @@ const isMin = cShapes.every((sh) => chosenCost <= movementCost(prev, sh));
 check("pickMinMovement returns the lowest-cost voicing", isMin && idx >= 0 && idx < cShapes.length);
 
 // --- Built-in grooves are valid (16 slots, in-range voice indices) ---
-let builtinsOk = BUILTIN_PATTERNS.length === 2;
+let builtinsOk = BUILTIN_PATTERNS.length >= 5;
 for (const b of BUILTIN_PATTERNS) {
   const rt = PercussionPattern.decode(b.pattern.encode());
   if (!rt || rt.encode() !== b.pattern.encode()) builtinsOk = false;
 }
-check("built-in grooves (teleco-teco 1/2) are valid & round-trip", builtinsOk);
+check("built-in grooves are valid & round-trip", builtinsOk);
 
 // --- Drum accents: toggle, survive voice cycling, round-trip encode/decode ---
 {

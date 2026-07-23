@@ -43,6 +43,7 @@ SR = 44100
 # override the isolated-recording group picks.
 RETA_OVERRIDES = {
     4: 23.59,   # finger (open) — Nadav's pick: brighter (7.6 kHz) than the isolated take
+    5: 15.33,   # finger (closed) — Nadav's pick: much higher-pitched than the isolated take
 }
 
 GROUPS = ["bass_open", "bass_closed", "finger_open", "finger_closed",

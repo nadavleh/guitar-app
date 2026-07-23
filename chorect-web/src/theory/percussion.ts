@@ -537,9 +537,23 @@ export const PARTIDO_ALTO_PLATINELAS = builtin(
   "bongo=0,0,-,0,1,-,0,-,1,-,0,-,3,1,2,0",
 );
 
+// Nadav's samba groove (from his exported beat): reta pandeiro (track swing 33)
+// + marcação surdo + three tamborims — teleco-teco, levada reta (track swing 10)
+// and palmas — plus Samba 1's agogô line at 25 % dynamics (quiet backing bells;
+// replaced the plain "Samba 1" groove).
+export const TRES_TAMBORINS = builtin(
+  "M:2,2,4,16;" +
+  "pandeiro@33=101,2005,2007,2,0,2004,2006,4,101,2005,2007,2,0,4,6,4" + "|" +
+  "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
+  "tamborim=2001,0,2001,0,2001,2002,0,2001,0,2001,0,2001,0,2001,2002,0" + "|" +
+  "tamborim#2@10=100,1001,2,0,100,1001,2,0,100,1001,2,0,100,1001,2,0" + "|" +
+  "tamborim#3=100,2,2000,100,2,2000,100,2,100,2,2000,100,2,2000,100,2" + "|" +
+  "agogo=3000,-,-,3001,3001,-,3000,-,3000,-,3001,-,3001,3001,-,3000",
+);
+
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */
 export const BUILTIN_PATTERNS: BuiltinPattern[] = [
-  { name: "Samba 1", pattern: TELECOTECO_1 },
+  { name: "3 Tamborims, Pandeiro & Surdo", pattern: TRES_TAMBORINS, bpm: 80 },
   { name: "Partido Alto Groove (Official)", pattern: PARTIDO_ALTO_OFFICIAL, bpm: 70 },
   { name: "Partido Alto Groove (Dec)", pattern: PARTIDO_ALTO_DEC, bpm: 70 },
   { name: "Platinelas Pandeiro — Partido Alto Groove", pattern: PARTIDO_ALTO_PLATINELAS, bpm: 70 },

@@ -365,6 +365,20 @@ object PercussionBuiltins {
             "agogo=0,-,0,-,1,-,-,0,-,0,-,1,-,-,0,-",
     )
 
+    /** Nadav's samba groove (from his exported beat): reta pandeiro (track
+     *  swing 33) + marcação surdo + three tamborims — teleco-teco, levada reta
+     *  (track swing 10) and palmas — plus Samba 1's agogô line at 25 % dynamics
+     *  (quiet backing bells; replaced the plain "Samba 1" groove). */
+    val TRES_TAMBORINS: PercussionPattern = builtin(
+        "M:2,2,4,16;" +
+            "pandeiro@33=101,2005,2007,2,0,2004,2006,4,101,2005,2007,2,0,4,6,4" + "|" +
+            "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
+            "tamborim=2001,0,2001,0,2001,2002,0,2001,0,2001,0,2001,0,2001,2002,0" + "|" +
+            "tamborim#2@10=100,1001,2,0,100,1001,2,0,100,1001,2,0,100,1001,2,0" + "|" +
+            "tamborim#3=100,2,2000,100,2,2000,100,2,100,2,2000,100,2,2000,100,2" + "|" +
+            "agogo=3000,-,-,3001,3001,-,3000,-,3000,-,3001,-,3001,3001,-,3000",
+    )
+
     /** Batida do cavaco 1 — the default samba groove for the new default kit
      *  (surdo + tamborim + bongo): the teleco-teco surdo/tamborim with a steady
      *  hi/lo bongo comp on the off-beats. */
@@ -563,7 +577,7 @@ object PercussionBuiltins {
 
     /** Grooves offered in the Load… menu (before the user's saved beats). */
     val ALL: List<BuiltinPattern> = listOf(
-        BuiltinPattern("Samba 1", TELECOTECO_1),
+        BuiltinPattern("3 Tamborims, Pandeiro & Surdo", TRES_TAMBORINS, bpm = 80),
         BuiltinPattern("Partido Alto Groove (Official)", PARTIDO_ALTO_OFFICIAL, bpm = 70),
         BuiltinPattern("Partido Alto Groove (Dec)", PARTIDO_ALTO_DEC, bpm = 70),
         BuiltinPattern("Platinelas Pandeiro — Partido Alto Groove", PARTIDO_ALTO_PLATINELAS, bpm = 70),
