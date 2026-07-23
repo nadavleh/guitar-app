@@ -54,6 +54,11 @@ class BlocksState(
     var currentCol by mutableStateOf(-1)
         private set
 
+    /** 16th-slot inside the current column (0-15, straight clock), or -1 when
+     *  stopped — drives the playhead inside the mini phrase grids. */
+    var currentSlot by mutableStateOf(-1)
+        private set
+
     /** True while the block's very FIRST column plays (openings sound instead of
      *  each track's first phrase); false once the loop wraps. */
     var openingPass by mutableStateOf(false)
@@ -261,11 +266,20 @@ class BlocksState(
                         slot += meter.slotsPerBeat
                     }
                 }
-                // Columns advance on the STRAIGHT clock (16 × base slot) for all tracks.
-                val colDurMs = PercussionTiming.slotMs(bpm, meter.division) * 16
-                colStartNanos += colDurMs * 1_000_000
+                // Columns advance on the STRAIGHT clock (16 × base slot) for all
+                // tracks. Walk the 16 slots for the UI playhead (audio is already
+                // queued); the last delay ends ~30 ms early so the next column
+                // schedules in time.
+                val slotDurMs = PercussionTiming.slotMs(bpm, meter.division)
+                for (sl in 0 until 16) {
+                    if (!isPlaying) break
+                    currentSlot = sl
+                    val targetNanos = colStartNanos + (sl + 1) * slotDurMs * 1_000_000
+                    val early = if (sl == 15) 30 else 0
+                    delay(((targetNanos - System.nanoTime()) / 1_000_000 - early).coerceAtLeast(0))
+                }
+                colStartNanos += slotDurMs * 16 * 1_000_000
                 colIndex++
-                delay(((colStartNanos - System.nanoTime()) / 1_000_000 - 30).coerceAtLeast(0))
             }
         }
     }
@@ -275,6 +289,7 @@ class BlocksState(
         job?.cancel()
         job = null
         currentCol = -1
+        currentSlot = -1
         openingPass = false
         audio.stop()
     }

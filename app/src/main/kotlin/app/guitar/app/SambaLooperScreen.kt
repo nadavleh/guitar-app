@@ -1059,24 +1059,27 @@ private fun BlocksSection(blocks: BlocksState) {
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 // Mini 16-step strip: a tick per onset — accents
-                                // taller/teal, dyn levels dimmer, gap per quarter.
+                                // taller/teal, dyn levels dimmer, gap per quarter;
+                                // the playing cell rings the sounding 16th.
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     phrase.template.forEachIndexed { i, raw ->
-                                        if (i > 0) Spacer(Modifier.width(if (i % 4 == 0) 3.5.dp else 1.5.dp))
+                                        if (i > 0) Spacer(Modifier.width(if (i % 4 == 0) 5.dp else 2.dp))
                                         val acc = raw != null && (raw / 100) % 10 == 1
                                         val dynA = if (raw != null) 1f - 0.25f * (raw / 1000) else 1f
+                                        val isPh = active && blocks.currentSlot == i
                                         Box(
                                             Modifier
-                                                .width(3.dp)
-                                                .height(if (acc) 11.dp else 8.dp)
-                                                .clip(RoundedCornerShape(1.5.dp))
+                                                .width(5.dp)
+                                                .height(if (acc) 16.dp else 12.dp)
+                                                .clip(RoundedCornerShape(2.dp))
                                                 .background(
                                                     when {
                                                         raw == null -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
                                                         acc -> teal.copy(alpha = dynA)
                                                         else -> MaterialTheme.colorScheme.primary.copy(alpha = dynA)
                                                     },
-                                                ),
+                                                )
+                                                .then(if (isPh) Modifier.border(1.5.dp, teal, RoundedCornerShape(2.dp)) else Modifier),
                                         )
                                     }
                                 }

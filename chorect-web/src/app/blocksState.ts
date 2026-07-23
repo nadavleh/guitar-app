@@ -45,6 +45,9 @@ export class BlocksState {
   isPlaying = false;
   /** Column currently sounding (0-based), or -1 when stopped. */
   currentCol = -1;
+  /** 16th-slot inside the current column (0-15, straight clock), or -1 when
+   *  stopped — drives the playhead inside the mini phrase grids. */
+  currentSlot = -1;
   /** True while the block's very FIRST column plays (openings sound instead of
    *  each track's first phrase); false once the loop wraps. */
   openingPass = false;
@@ -291,10 +294,17 @@ export class BlocksState {
           }
         }
         // Columns advance on the STRAIGHT clock (16 × base slot) for all tracks.
-        const colDurSec = (slotMs(this.bpm, PHRASE_METER.division) * PHRASE_SLOTS) / 1000;
-        colStart += colDurSec;
+        // Walk the 16 slots for the UI playhead (audio is already queued);
+        // the last sleep ends ~30 ms early so the next column schedules in time.
+        const slotSec = slotMs(this.bpm, PHRASE_METER.division) / 1000;
+        for (let sl = 0; sl < PHRASE_SLOTS && this.isPlaying && token === this.token; sl++) {
+          this.currentSlot = sl;
+          this.notify();
+          const target = colStart + (sl + 1) * slotSec;
+          await sleep(Math.max((target - this.deps.audio.now()) * 1000 - (sl === PHRASE_SLOTS - 1 ? 30 : 0), 0));
+        }
+        colStart += PHRASE_SLOTS * slotSec;
         colIndex++;
-        await sleep(Math.max((colStart - this.deps.audio.now()) * 1000 - 30, 0));
       }
     })();
   }
@@ -303,6 +313,7 @@ export class BlocksState {
     this.isPlaying = false;
     this.token++;
     this.currentCol = -1;
+    this.currentSlot = -1;
     this.openingPass = false;
     this.deps.audio.stop();
     this.notify();

@@ -768,7 +768,7 @@ export class SambaLooperUI {
       const badges = phrase?.swing ? ` ~${phrase.swing}%` : "";
       const text = phrase ? this.phraseShort(phrase) + badges + (phrase.note ? " ※" : "") : (isOpening ? "▶¹" : "＋");
       const content: (HTMLElement | string)[] = phrase && this.blockMiniGrid
-        ? [el("div", { class: "mini-name" }, [text]), this.miniPhraseGrid(phrase)]
+        ? [el("div", { class: "mini-name" }, [text]), this.miniPhraseGrid(phrase, active ? b.currentSlot : -1)]
         : [text];
       const cell = el("button", {
         class: cls,
@@ -1053,14 +1053,17 @@ export class SambaLooperUI {
 
   /** Mini 16-step strip of a phrase's template (the Blocks "Grid" toggle):
    *  a filled tick per onset — accents taller/teal, dyn levels dimmer, a small
-   *  gap at each quarter. */
-  private miniPhraseGrid(p: PresetTrack): HTMLElement {
+   *  gap at each quarter. `ph` (0-15) rings the slot the playhead is on. */
+  private miniPhraseGrid(p: PresetTrack, ph = -1): HTMLElement {
     const g = el("div", { class: "mini-grid" });
     p.template.forEach((raw, i) => {
       const on = raw !== null && raw !== undefined;
       const acc = on && Math.floor((raw as number) / 100) % 10 === 1;
       const dyn = on ? Math.floor((raw as number) / 1000) : 0;
-      const c = el("div", { class: "mini-cell" + (on ? " on" : "") + (acc ? " acc" : "") + (i % 4 === 0 && i > 0 ? " beat" : "") });
+      const c = el("div", {
+        class: "mini-cell" + (on ? " on" : "") + (acc ? " acc" : "")
+          + (i % 4 === 0 && i > 0 ? " beat" : "") + (i === ph ? " ph" : ""),
+      });
       if (on && dyn > 0) c.style.opacity = String(1 - 0.25 * dyn);
       g.appendChild(c);
     });
