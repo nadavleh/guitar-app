@@ -5,7 +5,7 @@
 import {
   PercussionInstrument, PercussionCatalog, basePercussionId, PresetTrack,
   PercussionMeter, PercussionPattern, swungSlotMs, voiceCount,
-  BEAT_UNITS, DIVISIONS, BATIDA_CAVACO_1, PERCUSSION_DYN_FACTORS, PERCUSSION_ACCENT,
+  BEAT_UNITS, DIVISIONS, PERCUSSION_DYN_FACTORS, PERCUSSION_ACCENT,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
 import { synthClick, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
@@ -64,9 +64,9 @@ export function decodeBeatPatterns(s: string): SavedBeatValue | null {
 }
 
 export class SambaLooperState {
-  // Default-load "Batida do Cavaco 1" (surdo + tamborim + bongo) so the machine opens
-  // with a musical starting point on the default kit. Clear all / Load swaps it out.
-  pattern: PercussionPattern = BATIDA_CAVACO_1;
+  // Open on a CLEAN SLATE — no tracks at all. Build a beat with ＋ Add ▾ or by
+  // tapping a groove / track preset in the side panel.
+  pattern: PercussionPattern = PercussionPattern.empty([]);
   /** Optional one-shot "opening" (entrada) played once before the loop starts. */
   opening: PercussionPattern | null = null;
   /** Which pattern the grid is editing: the loop (false) or the opening (true). */
@@ -78,7 +78,7 @@ export class SambaLooperState {
   isPlaying = false;
   currentSlot = -1;
   /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
-  loadedName: string | null = "Batida do Cavaco 1";
+  loadedName: string | null = null;
   /** Free-text notes attached to the current beat (saved + exported with it). */
   beatNotes = "";
 
@@ -405,6 +405,17 @@ export class SambaLooperState {
     const solo = PercussionPattern.empty([], this.pattern.meter).withPresetTrack(p.instrument, p.template, p.swing ?? 0);
     this.loadPattern(solo, p.label, null, 0, null, "");
     this.loadSamplesFor(p.instrument);
+  }
+
+  /** Remove EVERY track from the edited section (clean slate; the meter and
+   *  the opening/loop split stay). Undo restores them. */
+  removeAllTracks() {
+    this.commit(PercussionPattern.empty([], this.editPattern.meter));
+    this.muted.clear();
+    this.soloed.clear();
+    this.selectedTrackId = null;
+    this.brush = "cycle";
+    this.notify();
   }
 
   /** Remove `inst` from the kit, also clearing its mute/solo/selection state. */

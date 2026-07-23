@@ -334,6 +334,7 @@ export class SambaLooperUI {
       () => { this.notesOpen = !this.notesOpen; this.rerender(); }, s.beatNotes ? "btn primary" : "btn");
     wrap.appendChild(el("div", { class: "et-row-gap" }, [
       erase, accent, dyn, this.saveControl(), btn("Clear all", () => s.clearAll()),
+      btn("✕ Tracks", () => s.removeAllTracks(), "btn", "remove ALL tracks (Undo restores them)"),
       undoBtn, notesBtn, btn("Export", () => this.exportBeat()), btn("Import", () => this.importBeat()),
       this.addInstrumentControl(),
     ]));
@@ -413,6 +414,11 @@ export class SambaLooperUI {
     const loop = s.pattern;
     wrap.appendChild(this.countRow(loop));
     loop.instruments.forEach((inst, i) => wrap.appendChild(this.instrumentRow(inst, i, loop, false)));
+    if (loop.instruments.length === 0) {
+      wrap.appendChild(el("div", { class: "et-muted", style: "margin:10px 0" }, [
+        "Clean slate — add a track with ＋ Add ▾, or tap a groove / track preset in the side panel.",
+      ]));
+    }
     wrap.appendChild(el("div", { class: "drum-caption" }, [loop.meter.describe()]));
 
     // Compact card: tap-tempo + swing.
@@ -549,7 +555,12 @@ export class SambaLooperUI {
       labelInner,
       el("div", { class: "drum-ms" }, [mTag, sTag]),
     ]);
-    // Drag the label to reorder the track within its section.
+    // Drag the label to reorder the track within its section. A press starting
+    // inside the mixer popup (its sliders live in this draggable label) must
+    // NOT become an HTML5 drag — that hijacked every mixer-slider drag.
+    label.addEventListener("pointerdown", (e) => {
+      label.draggable = !(e.target as HTMLElement).closest(".drum-voice-pop");
+    });
     label.addEventListener("dragstart", (e) => { this.dragIndex = index; this.dragFromOpening = inOpening; e.dataTransfer?.setData("text/plain", String(index)); });
     label.addEventListener("dragend", () => { this.dragIndex = null; });
 
@@ -736,37 +747,47 @@ export class SambaLooperUI {
       return wrap;
     }
 
-    // Grid: rows = tracks, columns = phrase slots.
+    // Grid: one COLUMN per track (instrument), phrases stacked VERTICALLY —
+    // time flows downward. Row ▶¹ = the opening (plays instead of phrase 1 on
+    // the block's first pass only); rows 1..N = the looped phrases.
+    const cellBtn = (ti: number, c: number): HTMLElement => {
+      const t = blk.tracks[ti];
+      const isOpening = c === -1;
+      const phrase = isOpening ? (t.opening ?? null) : t.cells[c];
+      const active = b.isPlaying && (isOpening
+        ? b.openingPass && b.currentCol === 0 && !!t.opening
+        : b.currentCol === c && !(c === 0 && b.openingPass && t.opening));
+      const picking = this.blockPick?.track === ti && this.blockPick?.col === c;
+      const cls = "block-cell" + (isOpening ? " opening" : "") + (active ? " playing" : "") + (picking ? " picking" : "") + (phrase ? "" : " empty");
+      const badges = phrase?.swing ? ` ~${phrase.swing}%` : "";
+      const cell = el("button", {
+        class: cls,
+        title: isOpening ? "Opening: plays instead of phrase 1 on the first pass only" : phrase?.note ?? "",
+      }, [
+        phrase ? this.phraseShort(phrase) + badges + (phrase.note ? " ※" : "") : (isOpening ? "▶¹" : "＋"),
+      ]);
+      cell.addEventListener("click", () => {
+        this.blockPick = picking ? null : { track: ti, col: c };
+        this.rerender();
+      });
+      return cell;
+    };
+    const headRow = el("div", { class: "block-grid-row" }, [el("div", { class: "block-rowlabel" }, [""])]);
     blk.tracks.forEach((t, ti) => {
-      const label = el("div", { class: "block-track-label" }, [t.instrument.displayName]);
       const rm = el("button", { class: "btn text", title: "Remove track" }, ["✕"]);
       rm.addEventListener("click", () => { this.blockPick = null; b.removeTrack(ti); });
-      const cells = el("div", { class: "block-cells" });
-      // Column -1 = the OPENING cell: plays instead of phrase 1 on the block's
-      // first pass only; every loop after skips it and plays phrase 1.
-      for (let c = -1; c < blk.phraseCount; c++) {
-        const isOpening = c === -1;
-        const phrase = isOpening ? (t.opening ?? null) : t.cells[c];
-        const active = b.isPlaying && (isOpening
-          ? b.openingPass && b.currentCol === 0 && !!t.opening
-          : b.currentCol === c && !(c === 0 && b.openingPass && t.opening));
-        const picking = this.blockPick?.track === ti && this.blockPick?.col === c;
-        const cls = "block-cell" + (isOpening ? " opening" : "") + (active ? " playing" : "") + (picking ? " picking" : "") + (phrase ? "" : " empty");
-        const badges = phrase?.swing ? ` ~${phrase.swing}%` : "";
-        const cell = el("button", {
-          class: cls,
-          title: isOpening ? "Opening: plays instead of phrase 1 on the first pass only" : phrase?.note ?? "",
-        }, [
-          phrase ? this.phraseShort(phrase) + badges + (phrase.note ? " ※" : "") : (isOpening ? "▶¹" : "＋"),
-        ]);
-        cell.addEventListener("click", () => {
-          this.blockPick = picking ? null : { track: ti, col: c };
-          this.rerender();
-        });
-        cells.appendChild(cell);
-      }
-      wrap.appendChild(el("div", { class: "block-row" }, [el("div", { class: "block-label-wrap" }, [label, rm]), cells]));
+      headRow.appendChild(el("div", { class: "block-col-head" }, [
+        el("span", { class: "block-track-label" }, [t.instrument.displayName]), rm,
+      ]));
     });
+    wrap.appendChild(headRow);
+    for (let c = -1; c < blk.phraseCount; c++) {
+      const row = el("div", { class: c === -1 ? "block-grid-row opening-row" : "block-grid-row" }, [
+        el("div", { class: "block-rowlabel" }, [c === -1 ? "▶¹" : String(c + 1)]),
+      ]);
+      blk.tracks.forEach((_, ti) => row.appendChild(cellBtn(ti, c)));
+      wrap.appendChild(row);
+    }
 
     // Phrase palette for the picked cell (stays open so the swing can be tuned).
     const pick = this.blockPick;

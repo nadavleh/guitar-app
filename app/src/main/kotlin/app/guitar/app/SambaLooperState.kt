@@ -40,10 +40,9 @@ class SambaLooperState(
      *  back to the built-in synth. Injected so the pure state stays Context-free. */
     private val sampleLoader: (PercussionInstrument, Int) -> FloatArray? = { _, _ -> null },
 ) {
-    // Default-load the "Batida do Cavaco 1" groove (surdo + tamborim + bongo) so the
-    // machine opens with a musical starting point on the default kit. The user can
-    // Clear all or Load another beat from there.
-    var pattern by mutableStateOf(PercussionBuiltins.BATIDA_CAVACO_1)
+    // Open on a CLEAN SLATE — no tracks at all. Build a beat with "+ Add" or by
+    // loading a groove / track preset from the beats popup.
+    var pattern by mutableStateOf(PercussionPattern.empty(emptyList()))
         private set
 
     /** Optional one-shot "opening" (entrada) played once before the loop starts. */
@@ -100,7 +99,7 @@ class SambaLooperState(
     }
 
     /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
-    var loadedName by mutableStateOf<String?>("Batida do Cavaco 1")
+    var loadedName by mutableStateOf<String?>(null)
         private set
 
     /** Free-text notes attached to the current beat (saved + exported with it). */
@@ -402,6 +401,16 @@ class SambaLooperState(
 
     /** The slot [inst]'s playhead is on right now (grid highlight). */
     fun playheadSlotFor(inst: PercussionInstrument): Int = trackPlayhead[inst.id] ?: currentSlot
+
+    /** Remove EVERY track from the edited section (clean slate; the meter and
+     *  the opening/loop split stay). Undo restores them. */
+    fun removeAllTracks() {
+        commit(PercussionPattern.empty(emptyList(), editPattern.meter))
+        muted = emptySet()
+        soloed = emptySet()
+        selectedTrackId = null
+        brush = Brush.Cycle
+    }
 
     /** Remove [inst] from the kit, also clearing its mute/solo/selection state. */
     fun removeInstrument(inst: PercussionInstrument) {

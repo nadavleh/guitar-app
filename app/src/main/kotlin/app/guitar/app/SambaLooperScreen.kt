@@ -409,6 +409,8 @@ private fun PatternSection(
             phraseExportLauncher.launch(p.label.replace(Regex("[^\\w-]+"), "_") + ".chorect-phrase.json")
         })
         OutlinedButton(onClick = { samba.clearAll() }) { Text("Clear all") }
+        // Remove ALL tracks (clean slate; Undo restores them).
+        OutlinedButton(onClick = { samba.removeAllTracks() }) { Text("✕ Tracks") }
         OutlinedButton(onClick = { samba.undo() }, enabled = samba.canUndo) { Text("↶ Undo") }
         // Notes toggle (the editor shows under the beat header).
         if (samba.beatNotes.isNotEmpty() || notesOpen) {
@@ -661,6 +663,14 @@ private fun PatternSection(
                     if (i != kit.lastIndex) {
                         Spacer(Modifier.height(6.dp))
                     }
+                }
+                if (kit.isEmpty() && !inOpening) {
+                    Text(
+                        "Clean slate — add a track with ＋ Add ▾, or load a groove / track preset from Load…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 10.dp),
+                    )
                 }
                 caption(pat.meter.describe())
             }
@@ -956,29 +966,48 @@ private fun BlocksSection(blocks: BlocksState) {
         return
     }
 
-    // Grid: rows = tracks, columns = phrase slots.
+    // Grid: one COLUMN per track (instrument), phrases stacked VERTICALLY —
+    // time flows downward. Row ▶¹ = the opening (plays instead of phrase 1 on
+    // the block's first pass only); rows 1..N = the looped phrases.
     val teal = LocalSignal.current.feedback
-    blk.tracks.forEachIndexed { ti, t ->
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Spacer(Modifier.width(26.dp))
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            blk.tracks.forEachIndexed { ti, t ->
+                Row(
+                    Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        t.instrument.displayName,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                    Text("✕", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { pick = null; blocks.removeTrack(ti) }
+                            .padding(4.dp))
+                }
+            }
+        }
+    }
+    for (c in -1 until blk.phraseCount) {
+        val isOpening = c == -1
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-            Text(
-                t.instrument.displayName,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                modifier = Modifier.width(84.dp),
-            )
-            Text("✕", style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .clickable { pick = null; blocks.removeTrack(ti) }
-                    .padding(4.dp))
-            Spacer(Modifier.width(4.dp))
+            Box(Modifier.width(26.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    if (isOpening) "▶¹" else "${c + 1}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                // Column -1 = the OPENING cell: plays instead of phrase 1 on the
-                // block's first pass only; every loop after skips it.
-                for (c in -1 until blk.phraseCount) {
-                    val isOpening = c == -1
+                blk.tracks.forEachIndexed { ti, t ->
                     val phrase = if (isOpening) t.opening else t.cells[c]
                     val active = blocks.isPlaying && if (isOpening) {
                         blocks.openingPass && blocks.currentCol == 0 && t.opening != null
@@ -1000,7 +1029,7 @@ private fun BlocksSection(blocks: BlocksState) {
                     } ?: (if (isOpening) "▶¹" else "＋")
                     Box(
                         modifier = Modifier
-                            .weight(if (isOpening) 0.6f else 1f)
+                            .weight(1f)
                             .heightIn(min = 44.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(
@@ -1020,11 +1049,11 @@ private fun BlocksSection(blocks: BlocksState) {
                                     else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    // Visual gap between the one-shot opening and the looped columns.
-                    if (isOpening) Spacer(Modifier.width(5.dp))
                 }
             }
         }
+        // Visual gap between the one-shot opening row and the looped rows.
+        if (isOpening) Spacer(Modifier.height(8.dp))
     }
 
     // Phrase palette for the picked cell (stays open so the swing can be tuned).

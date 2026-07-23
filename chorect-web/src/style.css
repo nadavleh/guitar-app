@@ -920,19 +920,25 @@ select.et-select {
   background: var(--surface2); border: 1px solid var(--line); border-radius: 8px;
   color: var(--text-primary);
 }
-.block-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
-.block-label-wrap { width: 118px; flex: 0 0 118px; display: flex; align-items: center; gap: 2px; }
-.block-track-label { font-weight: 700; font-size: 13px; flex: 1; }
-.block-cells { display: flex; gap: 6px; flex: 1 1 auto; flex-wrap: wrap; }
+/* Blocks grid: one COLUMN per track, phrases stacked vertically (time flows
+   down). The narrow left gutter numbers the rows (▶¹ = the opening). */
+.block-grid-row { display: flex; align-items: stretch; gap: 6px; margin: 5px 0; }
+.block-rowlabel {
+  flex: 0 0 26px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--text-secondary);
+}
+.block-col-head { flex: 1 1 0; min-width: 92px; display: flex; align-items: center; justify-content: center; gap: 2px; }
+.block-track-label { font-weight: 700; font-size: 13px; }
 .block-cell {
   flex: 1 1 0; min-width: 92px; min-height: 44px; padding: 4px 8px;
   border-radius: 10px; border: 1px solid var(--line); cursor: pointer;
   background: var(--surface2); color: var(--text-primary); font-size: 12px; line-height: 1.25;
 }
 .block-cell.empty { color: var(--text-secondary); border-style: dashed; }
-/* The opening cell (col ▶¹): one-shot, plays instead of phrase 1 on the first
-   pass only — dashed teal with a gap separating it from the looped columns. */
-.block-cell.opening { border-style: dashed; border-color: var(--primary); margin-right: 10px; flex-grow: 0.6; }
+/* The opening row (▶¹): one-shot, plays instead of phrase 1 on the first pass
+   only — dashed teal, with a gap separating it from the looped rows. */
+.block-grid-row.opening-row { margin-bottom: 12px; }
+.block-cell.opening { border-style: dashed; border-color: var(--primary); }
 .block-cell.opening.empty { opacity: 0.75; }
 .block-cell.picking { border-color: var(--primary); border-width: 2px; }
 .block-cell.playing { border-color: var(--feedback); border-width: 2px; background: color-mix(in srgb, var(--feedback) 16%, var(--surface2)); }

@@ -13,7 +13,9 @@ Voice map (PercussionCatalog's 8-voice Pandeiro):
     pandeiro_0  bass (open)      pandeiro_4  finger (open)
     pandeiro_1  bass (closed)    pandeiro_5  finger (closed)
     pandeiro_2  slap             pandeiro_6  heel (open)
-    pandeiro_3  jingle (KEPT — freesound platinela, not in this recording)
+    pandeiro_3  jingle (KEPT — the original Ableton-preview one-shot; the
+                recording has no jingle-only hit, and Nadav rejected the
+                freesound platinela that briefly replaced it in v2.30.0)
     pandeiro_7  heel (closed)
 
 Per group the best take = highest (decay x peak-closeness-to-group-max) with no

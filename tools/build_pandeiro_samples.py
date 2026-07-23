@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Build the PANDEIRO one-shot WAVs from freely-licensed recordings of a REAL
+"""SUPERSEDED (v2.31.0): the bundled pandeiro is now built from NADAV'S OWN
+recording by build_pandeiro_from_recording.py, and the jingle reverted to the
+Ableton preview. Do NOT re-run this — it would clobber both. Kept only as the
+recipe for fetching freesound preview MP3s without auth.
+
+Build the PANDEIRO one-shot WAVs from freely-licensed recordings of a REAL
 goat-leather pandeiro (replacing the Ableton Latin Percussion previews, which
 sounded thin for this instrument).
 

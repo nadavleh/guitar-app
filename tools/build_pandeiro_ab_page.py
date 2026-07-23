@@ -33,8 +33,10 @@ CYCLE = ["bass_closed", "finger_closed", "heel_closed", "slap",
          "bass_open", "finger_open", "heel_open", "finger_open"]
 VOICE_OF = {"bass_open": 0, "bass_closed": 1, "slap": 2,
             "finger_open": 4, "finger_closed": 5, "heel_open": 6, "heel_closed": 7}
-BRIGHT_FIRST = {"finger_open", "heel_open"}   # rank by brightness, not ring
-N_CANDIDATES = 4
+# Rank these by brightness (spectral centroid), not ring — Nadav found the
+# isolated finger takes too low-pitched.
+BRIGHT_FIRST = {"finger_open", "finger_closed", "heel_open"}
+N_CANDIDATES = 5
 
 
 def load_mono(path):

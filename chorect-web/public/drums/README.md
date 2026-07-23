@@ -28,10 +28,9 @@ the rights to.
 Short one-shot jingle hits work best (the looper retriggers them per sixteenth). Keep samples
 trimmed to a tight onset so each hit lands on the beat.
 
-The bundled `pandeiro_*.wav` come from real-pandeiro recordings (built reproducibly by
-`tools/build_pandeiro_samples.py`): bass + platinela by **Paulo_Gonçalves via freesound.org**
-(CC-BY 4.0), slap by **katusm via freesound.org** (CC0); the muted bass is a damped copy of the
-same bass hit. The other instruments still come from the Ableton Latin Percussion preview set
+The bundled `pandeiro_*.wav` are **Nadav's own pandeiro recording** (voices 0–2 and 4–7, built
+reproducibly by `tools/build_pandeiro_from_recording.py` from `tools/recordings/`); the jingle
+(voice 3) and all other instruments come from the Ableton Latin Percussion preview set
 (`tools/build_drum_samples.py`).
 
 After adding files, reload the app and open a Drums voice popup: each voice shows **sample** or

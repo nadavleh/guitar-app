@@ -24,8 +24,8 @@ export function clear(node: HTMLElement): void {
 }
 
 /** A button with text + click handler. */
-export function btn(text: string, onClick: () => void, cls = "btn"): HTMLButtonElement {
-  const b = el("button", { class: cls }, [text]);
+export function btn(text: string, onClick: () => void, cls = "btn", title = ""): HTMLButtonElement {
+  const b = el("button", title ? { class: cls, title } : { class: cls }, [text]);
   b.addEventListener("click", onClick);
   return b;
 }
@@ -61,7 +61,8 @@ export function chipRow<T>(
   return row;
 }
 
-/** A labeled slider that reports its live value. */
+/** A labeled slider that reports its live value. Hovering + mouse wheel
+ *  nudges the value by one step (or 1 % of the range for fine-step sliders). */
 export function slider(min: number, max: number, value: number, onInput: (v: number) => void, step = 1): HTMLInputElement {
   const s = el("input", { type: "range", min: String(min), max: String(max), step: String(step), value: String(value) });
   // Throttle to one state update per animation frame: a drag fires "input" per
@@ -76,6 +77,15 @@ export function slider(min: number, max: number, value: number, onInput: (v: num
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     onInput(parseFloat(s.value));
   });
+  // Wheel on hover nudges by one step (fine-step sliders move 1% of the range).
+  s.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const nudge = Math.max(step, (max - min) / 100);
+    const v = Math.min(Math.max(parseFloat(s.value) + (e.deltaY < 0 ? nudge : -nudge), min), max);
+    s.value = String(v);
+    onInput(v);
+  }, { passive: false });
   return s;
 }
 
