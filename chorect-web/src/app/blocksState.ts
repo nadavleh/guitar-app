@@ -12,7 +12,7 @@
 import {
   DrumBlock, materializedTemplate, PresetTrack, presetByLabel, basePercussionId,
   encodePresetTrack, decodePresetTrack, mergedPresets,
-  encodeBlockFile, decodeBlockFile,
+  encodeBlockFile, decodeBlockFile, BUILTIN_BLOCKS,
   PercussionInstrument, PercussionCatalog, slotMs, swungSlotMs, PercussionMeter,
   PERCUSSION_ACCENT, PERCUSSION_DYN, PERCUSSION_DYN_FACTORS, voiceCount,
 } from "../theory";
@@ -139,9 +139,23 @@ export class BlocksState {
     return this.allPresets().filter((p) => basePercussionId(p.instrument.id) === basePercussionId(inst.id));
   }
 
-  /** Merge candidates: saved blocks with the same phrase count. */
+  /** BUILT-IN blocks, decoded against the current phrase library (custom
+   *  phrases with matching labels substitute into them too). */
+  builtinBlocks(): { name: string; block: DrumBlock }[] {
+    const out: { name: string; block: DrumBlock }[] = [];
+    for (const enc of BUILTIN_BLOCKS) {
+      const b = DrumBlock.decode(enc, this.resolvePreset);
+      if (b) out.push({ name: b.name, block: b });
+    }
+    return out;
+  }
+
+  /** Merge candidates: built-in + saved blocks with the same phrase count. */
   mergeCandidates(): { name: string; block: DrumBlock }[] {
     const out: { name: string; block: DrumBlock }[] = [];
+    for (const { name, block } of this.builtinBlocks()) {
+      if (block.phraseCount === this.block.phraseCount && name !== this.block.name) out.push({ name, block });
+    }
     for (const [name, enc] of this.deps.getSaved()) {
       const b = DrumBlock.decode(enc, this.resolvePreset);
       if (b && b.phraseCount === this.block.phraseCount && name !== this.block.name) out.push({ name, block: b });

@@ -707,6 +707,14 @@ export class SambaLooperUI {
     loadWrap.appendChild(btn(this.blockLoadOpen ? "Load ✕" : "Load…", () => { this.blockLoadOpen = !this.blockLoadOpen; this.blockMergeOpen = false; this.blockAddOpen = false; this.rerender(); }));
     if (this.blockLoadOpen) {
       const pop = el("div", { class: "drum-load-pop" });
+      // Built-in blocks first (not deletable), then the user's saved blocks.
+      pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary);cursor:default;font-size:11px" }, ["Built-in"]));
+      for (const { name, block } of b.builtinBlocks()) {
+        const row = el("div", { class: "lrow" }, [`★ ${name}`]);
+        row.addEventListener("click", () => { b.loadBlock(block); this.blockLoadOpen = false; this.rerender(); });
+        pop.appendChild(row);
+      }
+      pop.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary);cursor:default;font-size:11px" }, ["Saved"]));
       const saved = b.savedBlocks();
       for (const [name, blkSaved] of saved) {
         const del = el("button", { class: "btn text" }, ["✕"]);

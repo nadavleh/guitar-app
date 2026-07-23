@@ -90,6 +90,18 @@ class DrumBlocksTest {
         assertNull(BlockFile.decode("nonsense"))
     }
 
+    @Test fun `built-in blocks decode fully against the built-in phrase library`() {
+        for (enc in BUILTIN_BLOCKS) {
+            val b = DrumBlock.decode(enc)
+            assertTrue(b != null && !b.isEmpty(), "built-in block failed to decode: $enc")
+        }
+        val tb = DrumBlock.decode(BUILTIN_BLOCKS.first())!!
+        assertEquals("Tamborim Block", tb.name)
+        assertEquals(8, tb.phraseCount)
+        assertEquals("Tamborim — Entrada 1", tb.tracks[0].opening?.label)
+        assertTrue(tb.tracks[0].cells.all { it != null })   // every phrase label resolved
+    }
+
     @Test fun `blocks merge only when phrase counts match`() {
         val a = DrumBlock.empty("A", 4).withTrack(PercussionCatalog.Tamborim).withCell(0, 0, teleco)
         val c = DrumBlock.empty("C", 4).withTrack(PercussionCatalog.Bongo).withCell(0, 0, pa)

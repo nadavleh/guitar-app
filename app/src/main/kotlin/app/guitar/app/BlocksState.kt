@@ -167,6 +167,11 @@ class BlocksState(
             return out
         }
 
+    /** BUILT-IN blocks, decoded against the current phrase library (custom
+     *  phrases with matching labels substitute into them too). */
+    val builtinBlocks: List<DrumBlock>
+        get() = app.guitar.theory.BUILTIN_BLOCKS.mapNotNull { DrumBlock.decode(it, ::resolvePreset) }
+
     fun saveCurrent() {
         val encoded = block.encode(::resolvePreset)
         scope.launch { repo.saveDrumBlock(encoded) }

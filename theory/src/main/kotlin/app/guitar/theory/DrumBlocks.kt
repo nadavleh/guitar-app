@@ -142,6 +142,21 @@ data class DrumBlock(
 }
 
 /**
+ * BUILT-IN blocks (encoded [DrumBlock] strings): offered in the Blocks Load…
+ * list above the user's saved blocks, decoded against the CURRENT phrase
+ * library so custom phrases with matching labels still substitute. Keep in
+ * sync with chorect-web's BUILTIN_BLOCKS.
+ */
+val BUILTIN_BLOCKS: List<String> = listOf(
+    // Nadav's tamborim study block: Entrada 1 opening, then teleco-teco
+    // alternating with its three variations across 8 phrases.
+    "Tamborim Block=tamborim:^Tamborim — Entrada 1,Tamborim — Teleco-teco," +
+        "Tamborim — Telecoteco Var 1,Tamborim — Teleco-teco,Tamborim — Telecoteco Var 2," +
+        "Tamborim — Teleco-teco,Tamborim — Telecoteco Var 3,Tamborim — Telecoteco Var 1," +
+        "Tamborim — Telecoteco Var 2",
+)
+
+/**
  * Persistence codec for USER-DEFINED phrases (custom track presets): a track
  * built in the Beat editor, saved by name, joining the phrase library. A custom
  * phrase with a built-in's label REPLACES it everywhere (edit-and-resave).

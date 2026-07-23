@@ -201,8 +201,9 @@ class PercussionPatternTest {
         // Setting 100 clears the entry; removing the track drops it.
         assertTrue(!p.withTrackVolume("agogo", 100).encode().contains("agogo%"))
         assertTrue(p.removeInstrument(PercussionCatalog.Agogo).trackVolume.containsKey("agogo").not())
-        // The shipped groove carries the quiet agogô.
-        assertEquals(20, PercussionBuiltins.TRES_TAMBORINS.trackVolumeOf("agogo"))
+        // The samba bell line lives in the phrase library (add on demand).
+        assertEquals("agogo",
+            PercussionBuiltins.PRESET_TRACKS.first { it.label == "Agogô — Samba" }.instrument.id)
     }
 
     @Test fun `duplicated track clones the instrument and round-trips`() {

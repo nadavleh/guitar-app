@@ -570,17 +570,15 @@ export const PARTIDO_ALTO_PLATINELAS = builtin(
 
 // Nadav's samba groove (from his exported beat): reta pandeiro (track swing 33)
 // + marcação surdo + three tamborims — teleco-teco, levada reta (track swing 10)
-// and palmas — plus Samba 1's agogô line as quiet backing bells via TRACK
-// volume 20 % (dynamics stay reserved for articulation contrast within a
-// track; replaced the plain "Samba 1" groove).
+// and palmas. (Samba 1's agogô line lives in the phrase library as
+// "Agogô — Samba" — add it on demand; replaced the plain "Samba 1" groove.)
 export const TRES_TAMBORINS = builtin(
   "M:2,2,4,16;" +
   "pandeiro@33=101,2005,2007,2,0,2004,2006,4,101,2005,2007,2,0,4,6,4" + "|" +
   "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
   "tamborim=2001,0,2001,0,2001,2002,0,2001,0,2001,0,2001,0,2001,2002,0" + "|" +
   "tamborim#2@10=100,1001,2,0,100,1001,2,0,100,1001,2,0,100,1001,2,0" + "|" +
-  "tamborim#3=100,2,2000,100,2,2000,100,2,100,2,2000,100,2,2000,100,2" + "|" +
-  "agogo%20=0,-,-,1,1,-,0,-,0,-,1,-,1,1,-,0",
+  "tamborim#3=100,2,2000,100,2,2000,100,2,100,2,2000,100,2,2000,100,2",
 );
 
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */
@@ -666,6 +664,10 @@ export const PRESET_TRACKS: PresetTrack[] = [
     template: [101, 2005, 2007, 2, 0, 2004, 2006, 4, 101, 2005, 2007, 2, 0, 4, 6, 4],
     swing: 33,
     note: "Nadav's reta — bass accented, closed taps at 50%. Also good straight or ~50% swing." },
+  // Samba 1's agogô bells (low ▼ / high ▲) — usually mixed quiet (track volume).
+  { label: "Agogô — Samba", instrument: Agogo,
+    template: [0, null, null, 1, 1, null, 0, null, 0, null, 1, null, 1, 1, null, 0],
+    note: "The classic samba bell line — usually mixed quiet (lower the track volume)." },
 ];
 
 /** A single-line tamborim rhythm from onset slots (`accented` slots get the

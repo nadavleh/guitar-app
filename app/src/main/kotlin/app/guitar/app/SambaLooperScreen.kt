@@ -913,6 +913,19 @@ private fun BlocksSection(blocks: BlocksState) {
         Box {
             OutlinedButton(onClick = { loadOpen = true }) { Text("Load…") }
             DropdownMenu(expanded = loadOpen, onDismissRequest = { loadOpen = false }) {
+                // Built-in blocks first (not deletable), then the user's saved blocks.
+                DropdownMenuItem(text = { Text("Built-in",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant) }, enabled = false, onClick = {})
+                for (b in blocks.builtinBlocks) {
+                    DropdownMenuItem(
+                        text = { Text("★ ${b.name}") },
+                        onClick = { blocks.loadBlock(b); loadOpen = false },
+                    )
+                }
+                DropdownMenuItem(text = { Text("Saved",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant) }, enabled = false, onClick = {})
                 for ((name, b) in saved) {
                     DropdownMenuItem(
                         text = {
@@ -933,12 +946,15 @@ private fun BlocksSection(blocks: BlocksState) {
         Box {
             OutlinedButton(onClick = { mergeOpen = true }) { Text("Merge with…") }
             DropdownMenu(expanded = mergeOpen, onDismissRequest = { mergeOpen = false }) {
-                val candidates = saved.filter { it.value.phraseCount == blk.phraseCount && it.key != blk.name }
+                val candidates =
+                    blocks.builtinBlocks.filter { it.phraseCount == blk.phraseCount && it.name != blk.name }
+                        .associateBy { it.name } +
+                        saved.filter { it.value.phraseCount == blk.phraseCount && it.key != blk.name }
                 for ((name, b) in candidates) {
                     DropdownMenuItem(text = { Text(name) }, onClick = { blocks.mergeWith(b); mergeOpen = false })
                 }
                 if (candidates.isEmpty()) {
-                    DropdownMenuItem(text = { Text("(no saved blocks with ${blk.phraseCount} phrases)") }, enabled = false, onClick = {})
+                    DropdownMenuItem(text = { Text("(no blocks with ${blk.phraseCount} phrases)") }, enabled = false, onClick = {})
                 }
             }
         }

@@ -178,6 +178,19 @@ export function decodePresetTrack(s: string): PresetTrack | null {
   return { label, instrument: inst, template: cells, swing: Math.min(Math.max(swing, 0), 100) };
 }
 
+/** BUILT-IN blocks (encoded DrumBlock strings): offered in the Blocks Load…
+ *  list above the user's saved blocks, decoded against the CURRENT phrase
+ *  library so custom phrases with matching labels still substitute. Keep in
+ *  sync with theory/DrumBlocks.kt's BUILTIN_BLOCKS. */
+export const BUILTIN_BLOCKS: string[] = [
+  // Nadav's tamborim study block: Entrada 1 opening, then teleco-teco
+  // alternating with its three variations across 8 phrases.
+  "Tamborim Block=tamborim:^Tamborim — Entrada 1,Tamborim — Teleco-teco," +
+    "Tamborim — Telecoteco Var 1,Tamborim — Teleco-teco,Tamborim — Telecoteco Var 2," +
+    "Tamborim — Teleco-teco,Tamborim — Telecoteco Var 3,Tamborim — Telecoteco Var 1," +
+    "Tamborim — Telecoteco Var 2",
+];
+
 /** Block file (export / import): a JSON envelope around one block PLUS the
  *  user-defined phrases it references, so a block is portable to another device
  *  (the phrases are restored into the library on import). */
