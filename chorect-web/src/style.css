@@ -940,6 +940,13 @@ select.et-select {
 .block-grid-row.opening-row { margin-bottom: 12px; }
 .block-cell.opening { border-style: dashed; border-color: var(--primary); }
 .block-cell.opening.empty { opacity: 0.75; }
+/* The "Grid" toggle: each cell's phrase as a mini 16-step strip. */
+.mini-name { font-size: 10px; line-height: 1.2; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini-grid { display: flex; gap: 2px; align-items: center; justify-content: center; }
+.mini-cell { width: 5px; height: 8px; border-radius: 2px; flex: 0 0 auto; background: color-mix(in srgb, var(--text-secondary) 28%, transparent); }
+.mini-cell.beat { margin-left: 4px; }
+.mini-cell.on { background: var(--primary); }
+.mini-cell.on.acc { background: var(--feedback); height: 11px; }
 .block-cell.picking { border-color: var(--primary); border-width: 2px; }
 .block-cell.playing { border-color: var(--feedback); border-width: 2px; background: color-mix(in srgb, var(--feedback) 16%, var(--surface2)); }
 

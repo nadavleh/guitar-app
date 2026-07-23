@@ -852,6 +852,8 @@ private fun BlocksSection(blocks: BlocksState) {
     val saved = blocks.savedBlocks
     // Picked cell: (track, col); col == -1 is the track's OPENING cell.
     var pick by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    // Grid toggle: render each cell's phrase as a mini 16-step strip.
+    var miniGrid by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     // Export the block to a JSON file (embeds the custom phrases it references,
@@ -941,6 +943,12 @@ private fun BlocksSection(blocks: BlocksState) {
             Button(onClick = { blocks.toggleMetronome() }) { Text("Metronome ✓") }
         } else {
             OutlinedButton(onClick = { blocks.toggleMetronome() }) { Text("Metronome") }
+        }
+        // Grid: show each phrase as a mini 16-step strip inside its cell.
+        if (miniGrid) {
+            Button(onClick = { miniGrid = false }) { Text("Grid ✓") }
+        } else {
+            OutlinedButton(onClick = { miniGrid = true }) { Text("Grid") }
         }
         var addOpen by remember { mutableStateOf(false) }
         Box {
@@ -1041,13 +1049,47 @@ private fun BlocksSection(blocks: BlocksState) {
                             .padding(4.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.labelSmall,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            color = if (phrase != null) MaterialTheme.colorScheme.onSurface
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (miniGrid && phrase != null) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                    maxLines = 1,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                // Mini 16-step strip: a tick per onset — accents
+                                // taller/teal, dyn levels dimmer, gap per quarter.
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    phrase.template.forEachIndexed { i, raw ->
+                                        if (i > 0) Spacer(Modifier.width(if (i % 4 == 0) 3.5.dp else 1.5.dp))
+                                        val acc = raw != null && (raw / 100) % 10 == 1
+                                        val dynA = if (raw != null) 1f - 0.25f * (raw / 1000) else 1f
+                                        Box(
+                                            Modifier
+                                                .width(3.dp)
+                                                .height(if (acc) 11.dp else 8.dp)
+                                                .clip(RoundedCornerShape(1.5.dp))
+                                                .background(
+                                                    when {
+                                                        raw == null -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+                                                        acc -> teal.copy(alpha = dynA)
+                                                        else -> MaterialTheme.colorScheme.primary.copy(alpha = dynA)
+                                                    },
+                                                ),
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelSmall,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                color = if (phrase != null) MaterialTheme.colorScheme.onSurface
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }

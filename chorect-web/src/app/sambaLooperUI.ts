@@ -73,6 +73,8 @@ export class SambaLooperUI {
   private blockLoadOpen = false;
   private blockMergeOpen = false;
   private blockAddOpen = false;
+  /** Blocks: render each cell's phrase as a mini 16-step grid (Grid toggle). */
+  private blockMiniGrid = false;
   /** Dyn tool (per-slot dynamics): tap a hit to cycle 100→75→50→25 %. */
   private dynMode = false;
 
@@ -734,10 +736,14 @@ export class SambaLooperUI {
       addWrap.appendChild(pop);
     }
     const metro = btn(b.metronomeOn ? "Metronome ✓" : "Metronome", () => { b.toggleMetronome(); this.rerender(); }, b.metronomeOn ? "btn primary" : "btn");
+    const gridToggle = btn(this.blockMiniGrid ? "Grid ✓" : "Grid",
+      () => { this.blockMiniGrid = !this.blockMiniGrid; this.rerender(); },
+      this.blockMiniGrid ? "btn primary" : "btn",
+      "show each phrase as a mini 16-step grid");
     wrap.appendChild(el("div", { class: "et-row-gap" }, [
       btn("Save block", () => b.saveCurrent()), loadWrap, mergeWrap,
       btn("Export", () => this.exportBlock()), btn("Import", () => this.importBeat()),
-      btn("Clear", () => b.clear()), metro, addWrap,
+      btn("Clear", () => b.clear()), metro, gridToggle, addWrap,
     ]));
 
     if (blk.tracks.length === 0) {
@@ -760,12 +766,14 @@ export class SambaLooperUI {
       const picking = this.blockPick?.track === ti && this.blockPick?.col === c;
       const cls = "block-cell" + (isOpening ? " opening" : "") + (active ? " playing" : "") + (picking ? " picking" : "") + (phrase ? "" : " empty");
       const badges = phrase?.swing ? ` ~${phrase.swing}%` : "";
+      const text = phrase ? this.phraseShort(phrase) + badges + (phrase.note ? " ※" : "") : (isOpening ? "▶¹" : "＋");
+      const content: (HTMLElement | string)[] = phrase && this.blockMiniGrid
+        ? [el("div", { class: "mini-name" }, [text]), this.miniPhraseGrid(phrase)]
+        : [text];
       const cell = el("button", {
         class: cls,
         title: isOpening ? "Opening: plays instead of phrase 1 on the first pass only" : phrase?.note ?? "",
-      }, [
-        phrase ? this.phraseShort(phrase) + badges + (phrase.note ? " ※" : "") : (isOpening ? "▶¹" : "＋"),
-      ]);
+      }, content);
       cell.addEventListener("click", () => {
         this.blockPick = picking ? null : { track: ti, col: c };
         this.rerender();
@@ -1041,6 +1049,22 @@ export class SambaLooperUI {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  /** Mini 16-step strip of a phrase's template (the Blocks "Grid" toggle):
+   *  a filled tick per onset — accents taller/teal, dyn levels dimmer, a small
+   *  gap at each quarter. */
+  private miniPhraseGrid(p: PresetTrack): HTMLElement {
+    const g = el("div", { class: "mini-grid" });
+    p.template.forEach((raw, i) => {
+      const on = raw !== null && raw !== undefined;
+      const acc = on && Math.floor((raw as number) / 100) % 10 === 1;
+      const dyn = on ? Math.floor((raw as number) / 1000) : 0;
+      const c = el("div", { class: "mini-cell" + (on ? " on" : "") + (acc ? " acc" : "") + (i % 4 === 0 && i > 0 ? " beat" : "") });
+      if (on && dyn > 0) c.style.opacity = String(1 - 0.25 * dyn);
+      g.appendChild(c);
+    });
+    return g;
   }
 
   /** Download the current block as a Chorect block file (embeds the custom
