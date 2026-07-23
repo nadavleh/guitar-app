@@ -74,7 +74,7 @@ class SambaLooperState(
     fun addOpeningFromPreset(p: PercussionBuiltins.PresetTrack) {
         pushUndo()
         opening = PercussionPattern.empty(emptyList(), pattern.meter)
-            .withPresetTrack(p.instrument, p.template)
+            .withPresetTrack(p.instrument, p.template, p.swing)
         editingOpening = false
     }
 
@@ -353,7 +353,8 @@ class SambaLooperState(
     /** One-press preset track (marcação surdo / teleco-teco tamborim): adds the
      *  instrument (cloned if present) with its row pre-filled, and auditions it. */
     fun addPresetTrack(p: PercussionBuiltins.PresetTrack) {
-        commit(editPattern.withPresetTrack(p.instrument, p.template))
+        // The phrase's own swing lands on the new TRACK (audible while global is 0).
+        commit(editPattern.withPresetTrack(p.instrument, p.template, p.swing))
         if (!isPlaying) audio.playSamples(buffer(p.instrument, 0), effectiveGain(p.instrument, 0))
     }
 
@@ -362,11 +363,45 @@ class SambaLooperState(
      *  opening and the notes go away (Undo restores them); the beat takes the
      *  phrase's name and swing. */
     fun loadPresetAsBeat(p: PercussionBuiltins.PresetTrack) {
+        // The phrase's swing rides on the TRACK (global swing reset to 0), so
+        // adding more tracks later doesn't inherit it.
         val solo = PercussionPattern.empty(emptyList(), pattern.meter)
-            .withPresetTrack(p.instrument, p.template)
-        loadPattern(solo, p.label, swing = p.swing)
+            .withPresetTrack(p.instrument, p.template, p.swing)
+        loadPattern(solo, p.label, swing = 0)
         if (!isPlaying) audio.playSamples(buffer(p.instrument, 0), effectiveGain(p.instrument, 0))
     }
+
+    // ---- Per-track swing (see PercussionPattern.trackSwing) ----
+
+    /** The swing a track actually plays with: global overrides when nonzero. */
+    fun effectiveTrackSwing(snapshot: PercussionPattern, id: String): Int =
+        if (swing > 0) swing else snapshot.trackSwing[id] ?: 0
+
+    /** Set one track's own swing (audible only while the global swing is 0).
+     *  Part of the pattern → undo/save/export carry it. */
+    fun setTrackSwing(inst: PercussionInstrument, v: Int) {
+        commit(editPattern.withTrackSwing(inst.id, v))
+    }
+
+    /** Onset shift (ms, ≤ 0) of a track's slot vs the master clock's. */
+    private fun trackOnsetDeltaMs(snapshot: PercussionPattern, id: String, slot: Int): Long {
+        val s = effectiveTrackSwing(snapshot, id)
+        if (s == swing) return 0
+        var d = 0L
+        for (k in 0 until slot) {
+            d += PercussionTiming.swungSlotMs(k, bpm, s, snapshot.meter) -
+                PercussionTiming.swungSlotMs(k, bpm, swing, snapshot.meter)
+        }
+        return d
+    }
+
+    /** MULTIPLE PLAYHEADS: tracks with their own swing carry their own playhead
+     *  slot (they anticipate the master clock); straight tracks follow [currentSlot]. */
+    var trackPlayhead by mutableStateOf<Map<String, Int>>(emptyMap())
+        private set
+
+    /** The slot [inst]'s playhead is on right now (grid highlight). */
+    fun playheadSlotFor(inst: PercussionInstrument): Int = trackPlayhead[inst.id] ?: currentSlot
 
     /** Remove [inst] from the kit, also clearing its mute/solo/selection state. */
     fun removeInstrument(inst: PercussionInstrument) {
@@ -489,9 +524,15 @@ class SambaLooperState(
                 for (inst in snapshot.instruments) {
                     if (!isAudible(inst)) continue
                     val v = snapshot.voiceAt(inst, slot) ?: continue
+                    // Per-TRACK swing: the master clock walks the GLOBAL swing grid;
+                    // a track with its own swing (honored while global is 0) shifts
+                    // each hit by its clock's onset difference — ≤ 0.4 slot of
+                    // ANTICIPATION, safely inside the one-slot lookahead.
+                    val instFrames =
+                        (((delayMs + trackOnsetDeltaMs(snapshot, inst.id, slot)) * sr) / 1000).toInt()
                     val buf = buffer(inst, v)
                     val peak = peakOffsetFrames(inst, v, buf)
-                    val advance = if (peak > sr / 50) minOf(peak, baseFrames) else 0
+                    val advance = if (peak > sr / 50) minOf(peak, instFrames) else 0
                     // Accented hits play ~1.4× louder (mixer clamps overall); per-slot
                     // dynamics scale the hit down (100/75/50/25 %).
                     val gain = effectiveGain(inst, v) *
@@ -499,11 +540,33 @@ class SambaLooperState(
                         app.guitar.theory.PERCUSSION_DYN_FACTORS[snapshot.dynLevelAt(inst, slot)]
                     // Self-choking instruments (pandeiro): each hit damps the track's
                     // previous one at its own onset (kit ids are unique per track).
-                    audio.playSamplesAt(buf, gain, baseFrames - advance, if (inst.selfChoke) inst.id else null)
+                    audio.playSamplesAt(buf, gain, (instFrames - advance).coerceAtLeast(0), if (inst.selfChoke) inst.id else null)
                 }
             }
             var nextOnsetNanos = System.nanoTime()
             var first = true
+
+            // MULTIPLE PLAYHEADS: a track with its own swing gets its playhead
+            // updated by a child coroutine at ITS onset (which anticipates the
+            // master clock's). Children die with this scheduler job.
+            fun CoroutineScope.schedulePlayheads(snapshot: PercussionPattern, slot: Int, delayMs: Long) {
+                if (swing > 0) {
+                    if (trackPlayhead.isNotEmpty()) trackPlayhead = emptyMap()
+                    return
+                }
+                val groups = HashMap<Int, MutableList<String>>()
+                for (inst in snapshot.instruments) {
+                    val s = snapshot.trackSwing[inst.id] ?: 0
+                    if (s > 0) groups.getOrPut(s) { mutableListOf() }.add(inst.id)
+                }
+                for ((_, ids) in groups) {
+                    val fireIn = (delayMs + trackOnsetDeltaMs(snapshot, ids[0], slot)).coerceAtLeast(0)
+                    launch {
+                        delay(fireIn)
+                        if (isPlaying) trackPlayhead = trackPlayhead + ids.associateWith { slot }
+                    }
+                }
+            }
 
             // ---- Opening: one pass of the (non-empty) opening pattern, then the loop.
             val op = opening
@@ -517,8 +580,13 @@ class SambaLooperState(
                     nextOnsetNanos += slotMs * 1_000_000
                     val delayMs = ((nextOnsetNanos - System.nanoTime()) / 1_000_000).coerceAtLeast(0)
                     // Next up: the opening's next slot, or the loop's downbeat when it ends.
-                    if (slot + 1 < op.slots) scheduleSlot(op, slot + 1, delayMs)
-                    else scheduleSlot(pattern, 0, delayMs)
+                    if (slot + 1 < op.slots) {
+                        scheduleSlot(op, slot + 1, delayMs)
+                        schedulePlayheads(op, slot + 1, delayMs)
+                    } else {
+                        scheduleSlot(pattern, 0, delayMs)
+                        schedulePlayheads(pattern, 0, delayMs)
+                    }
                     delay(delayMs)
                 }
                 playingOpening = false
@@ -535,7 +603,10 @@ class SambaLooperState(
                     val nextSlot = (slot + 1) % snapshot.slots
                     val nextSnapshot = if (nextSlot == 0) pattern else snapshot
                     val delayMs = ((nextOnsetNanos - System.nanoTime()) / 1_000_000).coerceAtLeast(0)
-                    if (nextSlot < nextSnapshot.slots) scheduleSlot(nextSnapshot, nextSlot, delayMs)
+                    if (nextSlot < nextSnapshot.slots) {
+                        scheduleSlot(nextSnapshot, nextSlot, delayMs)
+                        schedulePlayheads(nextSnapshot, nextSlot, delayMs)
+                    }
                     delay(delayMs)
                 }
             }
@@ -544,6 +615,7 @@ class SambaLooperState(
 
     fun stop() {
         isPlaying = false
+        trackPlayhead = emptyMap()
         job?.cancel()
         job = null
         currentSlot = -1

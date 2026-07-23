@@ -158,6 +158,13 @@ check("removeInstrument drops the row", !withCuica.removeInstrument(cuica).hasIn
 const withBogus = withCuica.encode() + "|bogus=" + Array.from({ length: withCuica.slots }, () => "-").join(",");
 const rtBogus = PercussionPattern.decode(withBogus);
 check("decode skips unknown instrument ids", rtBogus !== null && rtBogus.instruments.every((i) => i.id !== "bogus"));
+// per-track swing: encoded as an "@N" id suffix, round-trips, drops with the track
+const swung = withCuica.withTrackSwing("cuica", 33);
+check("per-track swing encodes as id@33 and round-trips",
+  swung.encode().includes("cuica@33=") &&
+  PercussionPattern.decode(swung.encode())?.trackSwingOf("cuica") === 33 &&
+  swung.withTrackSwing("cuica", 0).encode().includes("cuica@") === false &&
+  swung.removeInstrument(cuica).trackSwing.size === 0);
 
 // --- Swing (samba microtiming): anchors 1st/2nd, anticipates 3rd & 4th; preserves loop length; 1/16 only ---
 const straightSum = Array.from({ length: 16 }, (_, i) => swungSlotMs(i, 100, 0, M)).reduce((a, b) => a + b, 0);

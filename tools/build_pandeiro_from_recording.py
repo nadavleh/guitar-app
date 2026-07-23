@@ -29,11 +29,19 @@ from align_drum_onsets import align
 
 HERE = os.path.dirname(__file__)
 SRC = os.path.join(HERE, "recordings", "pandeiro_articulations.wav")
+RETA = os.path.join(HERE, "recordings", "pandeiro_reta_bars.wav")
 OUTS = [
     os.path.join(HERE, "..", "app", "src", "main", "assets", "drums"),
     os.path.join(HERE, "..", "chorect-web", "public", "drums"),
 ]
 SR = 44100
+
+# Takes adopted from the IN-CONTEXT reta recording after A/B listening
+# (build_pandeiro_ab_page.py): voice → onset time in RETA, seconds. These
+# override the isolated-recording group picks.
+RETA_OVERRIDES = {
+    4: 23.59,   # finger (open) — Nadav's pick: brighter (7.6 kHz) than the isolated take
+}
 
 GROUPS = ["bass_open", "bass_closed", "finger_open", "finger_closed",
           "heel_open", "heel_closed", "slap"]
@@ -79,6 +87,33 @@ def finish(mono: np.ndarray) -> np.ndarray:
     return mono.astype(np.float32)
 
 
+def extract_reta(t_sec: float) -> np.ndarray:
+    """Cut the reta-recording hit whose onset is nearest `t_sec` (as labeled on
+    the A/B page), ending at the next onset (where the next stroke choked it),
+    with a 10 ms fade so the truncation doesn't click."""
+    mono = load_mono(RETA)
+    win = int(0.004 * SR)
+    env = np.convolve(np.abs(mono), np.ones(win) / win, mode="same")
+    high, low = 0.035 * env.max(), 0.5 * 0.035 * env.max()
+    onsets, armed, last = [], True, -SR
+    for i in range(len(env)):
+        if armed and env[i] > high and i - last >= int(0.08 * SR):
+            onsets.append(i)
+            last = i
+            armed = False
+        elif not armed and env[i] < low:
+            armed = True
+    k = min(range(len(onsets)), key=lambda j: abs(onsets[j] / SR - t_sec))
+    if abs(onsets[k] / SR - t_sec) > 0.06:
+        raise SystemExit(f"no reta onset near {t_sec}s (nearest {onsets[k]/SR:.2f}s)")
+    o = onsets[k]
+    nxt = onsets[k + 1] if k + 1 < len(onsets) else len(mono)
+    seg = mono[max(0, o - int(0.003 * SR)):nxt].copy()
+    f = min(int(0.010 * SR), len(seg))
+    seg[-f:] *= np.linspace(1, 0, f)
+    return seg
+
+
 def main():
     mono = load_mono(SRC)
     onsets = find_onsets(mono)
@@ -108,16 +143,20 @@ def main():
             if p < 0.7 * gpeak or n < int(0.4 * SR):
                 return -1
             return n
-        best = max(group, key=score)
-        o, n = best
-        cut = mono[max(0, o - int(0.005 * SR)): o + n]
-        buf = finish(cut)
         v = VOICE_OF[name]
+        if v in RETA_OVERRIDES:
+            buf = finish(extract_reta(RETA_OVERRIDES[v]))
+            src_note = f"RETA@{RETA_OVERRIDES[v]}s"
+        else:
+            best = max(group, key=score)
+            o, n = best
+            buf = finish(mono[max(0, o - int(0.005 * SR)): o + n])
+            src_note = f"take@{o/SR:.2f}s"
         for out in OUTS:
             os.makedirs(out, exist_ok=True)
             dst = os.path.normpath(os.path.join(out, f"pandeiro_{v}.wav"))
             sf.write(dst, buf, SR, subtype="PCM_16")
-        print(f"pandeiro_{v}.wav  {name:14s} take@{o/SR:6.2f}s  {len(buf)/SR:.2f}s")
+        print(f"pandeiro_{v}.wav  {name:14s} {src_note}  {len(buf)/SR:.2f}s")
     print("Done (pandeiro_3 jingle left untouched).")
 
 

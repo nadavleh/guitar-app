@@ -167,6 +167,26 @@ class PercussionPatternTest {
         assertEquals(0, PercussionBuiltins.STUDY.count { it.opening != null })
     }
 
+    @Test fun `per-track swing round-trips, rides clones and drops with the track`() {
+        val reta = PercussionBuiltins.PRESET_TRACKS.first { it.label == "Pandeiro — Reta" }
+        var p = PercussionPattern.empty(listOf(PercussionCatalog.Tamborim))
+            .withPresetTrack(reta.instrument, reta.template, reta.swing)
+        assertEquals(33, p.trackSwing["pandeiro"])          // the preset's swing landed on the TRACK
+        assertTrue(p.encode().contains("pandeiro@33="))     // encoded as an id suffix
+        assertEquals(p, PercussionPattern.decode(p.encode()))
+        // Explicit set/clear; clearing removes the map entry (and the suffix).
+        p = p.withTrackSwing("tamborim", 50)
+        assertEquals(p, PercussionPattern.decode(p.encode()))
+        p = p.withTrackSwing("tamborim", 0)
+        assertTrue(!p.encode().contains("tamborim@"))
+        // Duplicating a swung track copies its swing; removing the track drops it.
+        val dup = p.duplicatedTrack(PercussionCatalog.Pandeiro)
+        assertEquals(33, dup.trackSwing["pandeiro#2"])
+        assertEquals(dup, PercussionPattern.decode(dup.encode()))
+        val removed = p.removeInstrument(PercussionCatalog.Pandeiro)
+        assertTrue(removed.trackSwing.isEmpty())
+    }
+
     @Test fun `duplicated track clones the instrument and round-trips`() {
         val p = PercussionBuiltins.BATIDA_CAVACO_1.duplicatedTrack(PercussionCatalog.Surdo)
         assertEquals(listOf("surdo", "surdo#2", "tamborim", "bongo"), p.instruments.map { it.id })

@@ -184,7 +184,24 @@ export class PercussionPattern {
     readonly instruments: ReadonlyArray<PercussionInstrument>,
     readonly grid: ReadonlyMap<string, ReadonlyArray<number | null>>,
     readonly meter: PercussionMeter = PercussionMeter.DEFAULT,
+    /** Per-TRACK swing (instrument id → 1..100). A track plays with its own
+     *  micro-timing clock when the beat's GLOBAL swing is 0 — a nonzero global
+     *  swing OVERRIDES all track values. Anchors (each beat and its 2nd 16th)
+     *  are swing-invariant, so differently-swung tracks re-align every beat.
+     *  Missing id = straight. */
+    readonly trackSwing: ReadonlyMap<string, number> = new Map(),
   ) {}
+
+  /** One track's swing (0 = straight / no entry). */
+  trackSwingOf(id: string): number { return this.trackSwing.get(id) ?? 0; }
+
+  /** Set one track's swing (0 clears the entry — straight). */
+  withTrackSwing(id: string, swing: number): PercussionPattern {
+    const s = Math.min(Math.max(Math.round(swing), 0), 100);
+    const m = new Map(this.trackSwing);
+    if (s === 0) m.delete(id); else m.set(id, s);
+    return new PercussionPattern(this.instruments, this.grid, this.meter, m);
+  }
 
   /** Number of slots in this pattern (= meter.totalSlots). */
   get slots(): number { return this.meter.totalSlots; }
@@ -238,13 +255,13 @@ export class PercussionPattern {
     row[slot] = voice;
     const g = new Map(this.grid);
     g.set(instrument.id, row);
-    return new PercussionPattern(this.instruments, g, this.meter);
+    return new PercussionPattern(this.instruments, g, this.meter, this.trackSwing);
   }
 
   clearedRow(instrument: PercussionInstrument): PercussionPattern {
     const g = new Map(this.grid);
     g.set(instrument.id, Array<number | null>(this.slots).fill(null));
-    return new PercussionPattern(this.instruments, g, this.meter);
+    return new PercussionPattern(this.instruments, g, this.meter, this.trackSwing);
   }
 
   /** Append `instrument` to the kit with a silent row. No-op if already present. */
@@ -252,7 +269,7 @@ export class PercussionPattern {
     if (this.hasInstrument(instrument)) return this;
     const g = new Map(this.grid);
     g.set(instrument.id, Array<number | null>(this.slots).fill(null));
-    return new PercussionPattern([...this.instruments, instrument], g, this.meter);
+    return new PercussionPattern([...this.instruments, instrument], g, this.meter, this.trackSwing);
   }
 
   /** Remove `instrument` (and its row) from the kit. No-op if absent. */
@@ -260,7 +277,9 @@ export class PercussionPattern {
     if (!this.hasInstrument(instrument)) return this;
     const g = new Map(this.grid);
     g.delete(instrument.id);
-    return new PercussionPattern(this.instruments.filter((i) => i.id !== instrument.id), g, this.meter);
+    const sw = new Map(this.trackSwing);
+    sw.delete(instrument.id);
+    return new PercussionPattern(this.instruments.filter((i) => i.id !== instrument.id), g, this.meter, sw);
   }
 
   /** Reorder the kit: move the track at `from` to index `to` (grid unchanged). */
@@ -269,24 +288,25 @@ export class PercussionPattern {
     const list = this.instruments.slice();
     const [item] = list.splice(from, 1);
     list.splice(to, 0, item);
-    return new PercussionPattern(list, this.grid, this.meter);
+    return new PercussionPattern(list, this.grid, this.meter, this.trackSwing);
   }
 
   /** Add a preset TRACK in one press: `base`'s row filled by tiling `template`
    *  (defined on the default 16-slot meter) across this pattern's slots. If the
    *  instrument is already in the kit, the preset lands on a fresh clone track
    *  ("Surdo 2") so the existing line is untouched. */
-  withPresetTrack(base: PercussionInstrument, template: (number | null)[]): PercussionPattern {
+  withPresetTrack(base: PercussionInstrument, template: (number | null)[], swing = 0): PercussionPattern {
     let inst = base;
     if (this.hasInstrument(base)) {
       let n = 2;
       while (this.instruments.some((i) => i.id === `${base.id}#${n}`)) n++;
-      inst = { id: `${base.id}#${n}`, displayName: `${base.displayName} ${n}`, voices: base.voices };
+      inst = { ...base, id: `${base.id}#${n}`, displayName: `${base.displayName} ${n}` };
     }
     const row: (number | null)[] = Array.from({ length: this.meter.totalSlots }, (_, i) => template[i % template.length]);
     const g = new Map(this.grid);
     g.set(inst.id, row);
-    return new PercussionPattern([...this.instruments, inst], g, this.meter);
+    return new PercussionPattern([...this.instruments, inst], g, this.meter, this.trackSwing)
+      .withTrackSwing(inst.id, swing);
   }
 
   /** Duplicate `instrument`'s track: a CLONE instrument (same voices and sound,
@@ -299,12 +319,15 @@ export class PercussionPattern {
     let n = 2;
     while (this.instruments.some((i) => i.id === `${base}#${n}`)) n++;
     const baseInst = PercussionCatalog.byId(base) ?? instrument;
-    const clone: PercussionInstrument = { id: `${base}#${n}`, displayName: `${baseInst.displayName} ${n}`, voices: baseInst.voices };
+    const clone: PercussionInstrument = { ...baseInst, id: `${base}#${n}`, displayName: `${baseInst.displayName} ${n}` };
     const list = this.instruments.slice();
     list.splice(idx + 1, 0, clone);
     const g = new Map(this.grid);
     g.set(clone.id, this.grid.get(instrument.id)!.slice());
-    return new PercussionPattern(list, g, this.meter);
+    const sw = new Map(this.trackSwing);
+    const s = this.trackSwing.get(instrument.id);
+    if (s !== undefined) sw.set(clone.id, s);
+    return new PercussionPattern(list, g, this.meter, sw);
   }
 
   isEmpty(): boolean {
@@ -327,7 +350,7 @@ export class PercussionPattern {
       for (let i = 0; i < slots; i++) out[i] = row[((i - shift) % slots + slots) % slots];
       g.set(id, out);
     }
-    return new PercussionPattern(this.instruments, g, this.meter);
+    return new PercussionPattern(this.instruments, g, this.meter, this.trackSwing);
   }
 
   /**
@@ -344,7 +367,7 @@ export class PercussionPattern {
       for (let k = 0; k < n; k++) out[k] = k < old.length ? old[k] : null;
       g.set(i.id, out);
     }
-    return new PercussionPattern(this.instruments, g, newMeter);
+    return new PercussionPattern(this.instruments, g, newMeter, this.trackSwing);
   }
 
   /**
@@ -355,7 +378,13 @@ export class PercussionPattern {
   encode(): string {
     const m = `M:${this.meter.bars},${this.meter.beatsPerBar},${this.meter.beatUnit},${this.meter.division};`;
     const body = this.instruments
-      .map((i) => `${i.id}=` + this.grid.get(i.id)!.map((v) => (v === null ? "-" : String(v))).join(","))
+      .map((i) => {
+        // A per-track swing rides as an "@N" id suffix; old decoders fail to
+        // resolve "pandeiro@33" and skip the row rather than mis-reading it.
+        const sw = this.trackSwing.get(i.id) ?? 0;
+        const head = sw !== 0 ? `${i.id}@${sw}` : i.id;
+        return `${head}=` + this.grid.get(i.id)!.map((v) => (v === null ? "-" : String(v))).join(",");
+      })
       .join("|");
     return m + body;
   }
@@ -385,10 +414,15 @@ export class PercussionPattern {
     const rows = s.substring(sep + 1).split("|");
     const instruments: PercussionInstrument[] = [];
     const g = new Map<string, (number | null)[]>();
+    const trackSwing = new Map<string, number>();
     for (const rowStr of rows) {
       const eq = rowStr.indexOf("=");
       if (eq < 0) return null;
-      const id = rowStr.substring(0, eq);
+      let id = rowStr.substring(0, eq);
+      // "id@N" = per-track swing (see encode).
+      const at = id.lastIndexOf("@");
+      const swing = at > 0 ? parseInt(id.substring(at + 1), 10) : NaN;
+      if (!Number.isNaN(swing)) id = id.substring(0, at);
       // resolve() also reconstructs duplicated-track clones ("surdo#2"); truly
       // unknown instruments are skipped (forward compatibility).
       const instrument = PercussionCatalog.resolve(id);
@@ -408,8 +442,12 @@ export class PercussionPattern {
       }
       instruments.push(instrument);
       g.set(id, row);
+      if (!Number.isNaN(swing)) {
+        const s2 = Math.min(Math.max(swing, 0), 100);
+        if (s2 !== 0) trackSwing.set(id, s2);
+      }
     }
-    return new PercussionPattern(instruments, g, meter);
+    return new PercussionPattern(instruments, g, meter, trackSwing);
   }
 }
 
@@ -575,12 +613,13 @@ export const PRESET_TRACKS: PresetTrack[] = [
   { label: "Bongo — Partido Alto Opening", instrument: Bongo,
     template: [null, null, 0, null, 1, null, 1, null, 1, null, 0, null, 3, 1, null, 1],
     note: "One-shot entrada into the partido alto — use as an opening (▶¹) before the groove." },
-  // From Nadav's own recording (tools/recordings/pandeiro_reta_bars.wav):
-  // bass closed, finger closed, heel closed, slap | bass open, finger open,
-  // heel open, finger open — one 2/4 bar of 16ths, twice.
+  // From Nadav's own recording + his authored dynamics (pandeiro.chorect.json):
+  // bass closed (accented), finger closed @50%, heel closed @50%, slap |
+  // bass open, finger open, heel open, finger open — bar 2's taps at full.
   { label: "Pandeiro — Reta", instrument: Pandeiro,
-    template: [1, 5, 7, 2, 0, 4, 6, 4, 1, 5, 7, 2, 0, 4, 6, 4],
-    note: "Played straight (reta) — also sounds great swung ~50%." },
+    template: [101, 2005, 2007, 2, 0, 2004, 2006, 4, 101, 2005, 2007, 2, 0, 4, 6, 4],
+    swing: 33,
+    note: "Nadav's reta — bass accented, closed taps at 50%. Also good straight or ~50% swing." },
 ];
 
 /** A single-line tamborim rhythm from onset slots (`accented` slots get the

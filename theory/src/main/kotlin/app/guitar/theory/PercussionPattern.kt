@@ -68,6 +68,12 @@ data class PercussionPattern(
     val instruments: List<PercussionInstrument>,
     val grid: Map<String, List<Int?>>,
     val meter: PercussionMeter = PercussionMeter.DEFAULT,
+    /** Per-TRACK swing (instrument id → 1..100). A track plays with its own
+     *  micro-timing clock when the beat's GLOBAL swing is 0 — a nonzero global
+     *  swing OVERRIDES all track values. Anchors (each beat and its 2nd 16th)
+     *  are swing-invariant, so differently-swung tracks re-align every beat.
+     *  Missing id = straight. */
+    val trackSwing: Map<String, Int> = emptyMap(),
 ) {
     /** Number of slots in this pattern (= meter.totalSlots). */
     val slots: Int get() = meter.totalSlots
@@ -168,7 +174,14 @@ data class PercussionPattern(
         return copy(
             instruments = instruments.filter { it.id != instrument.id },
             grid = grid - instrument.id,
+            trackSwing = trackSwing - instrument.id,
         )
+    }
+
+    /** Set one track's swing (0 clears the entry — straight). */
+    fun withTrackSwing(id: String, swing: Int): PercussionPattern {
+        val s = swing.coerceIn(0, 100)
+        return copy(trackSwing = if (s == 0) trackSwing - id else trackSwing + (id to s))
     }
 
     /** Reorder the kit: move the track at [from] to index [to]. The grid is unchanged
@@ -184,7 +197,7 @@ data class PercussionPattern(
      *  (defined on the default 16-slot meter) across this pattern's slots. If the
      *  instrument is already in the kit, the preset lands on a fresh clone track
      *  ("Surdo 2") so the existing line is untouched. */
-    fun withPresetTrack(base: PercussionInstrument, template: List<Int?>): PercussionPattern {
+    fun withPresetTrack(base: PercussionInstrument, template: List<Int?>, swing: Int = 0): PercussionPattern {
         val inst = if (!hasInstrument(base)) base else {
             var n = 2
             while (instruments.any { it.id == "${base.id}#$n" }) n++
@@ -192,6 +205,7 @@ data class PercussionPattern(
         }
         val row = List(meter.totalSlots) { i -> template[i % template.size] }
         return copy(instruments = instruments + inst, grid = grid + (inst.id to row))
+            .withTrackSwing(inst.id, swing)
     }
 
     /** Duplicate [instrument]'s track: a CLONE instrument (same voices and sound,
@@ -206,7 +220,11 @@ data class PercussionPattern(
         val baseInst = PercussionCatalog.byId(base) ?: instrument
         val clone = baseInst.copy(id = "$base#$n", displayName = "${baseInst.displayName} $n")
         val list = instruments.toMutableList().apply { add(idx + 1, clone) }
-        return PercussionPattern(list, grid + (clone.id to grid.getValue(instrument.id)), meter)
+        val swing = trackSwing[instrument.id]
+        return PercussionPattern(
+            list, grid + (clone.id to grid.getValue(instrument.id)), meter,
+            if (swing != null) trackSwing + (clone.id to swing) else trackSwing,
+        )
     }
 
     fun isEmpty(): Boolean = grid.values.all { row -> row.all { it == null } }
@@ -238,7 +256,7 @@ data class PercussionPattern(
             val old = grid.getValue(inst.id)
             inst.id to List(n) { i -> old.getOrNull(i) }
         }
-        return PercussionPattern(instruments, newGrid, newMeter)
+        return PercussionPattern(instruments, newGrid, newMeter, trackSwing)
     }
 
     /**
@@ -250,7 +268,11 @@ data class PercussionPattern(
     fun encode(): String {
         val m = "M:${meter.bars},${meter.beatsPerBar},${meter.beatUnit},${meter.division};"
         val body = instruments.joinToString("|") { inst ->
-            inst.id + "=" + grid.getValue(inst.id).joinToString(",") { it?.toString() ?: "-" }
+            // A per-track swing rides as an "@N" id suffix; old decoders fail to
+            // resolve "pandeiro@33" and skip the row rather than mis-reading it.
+            val sw = trackSwing[inst.id] ?: 0
+            val head = if (sw != 0) "${inst.id}@$sw" else inst.id
+            head + "=" + grid.getValue(inst.id).joinToString(",") { it?.toString() ?: "-" }
         }
         return m + body
     }
@@ -285,10 +307,15 @@ data class PercussionPattern(
             val rows = s.substring(sep + 1).split("|")
             val instruments = ArrayList<PercussionInstrument>()
             val grid = HashMap<String, List<Int?>>()
+            val trackSwing = HashMap<String, Int>()
             for (rowStr in rows) {
                 val eq = rowStr.indexOf('=')
                 if (eq < 0) return null
-                val id = rowStr.substring(0, eq)
+                var id = rowStr.substring(0, eq)
+                // "id@N" = per-track swing (see encode).
+                val at = id.lastIndexOf('@')
+                val swing = if (at > 0) id.substring(at + 1).toIntOrNull() else null
+                if (swing != null) id = id.substring(0, at)
                 // resolve() also reconstructs duplicated-track clones ("surdo#2");
                 // truly unknown instruments are skipped (forward compatibility).
                 val inst = PercussionCatalog.resolve(id) ?: continue
@@ -302,8 +329,9 @@ data class PercussionPattern(
                             (it % PERCUSSION_ACCENT) in 0 until inst.voiceCount) }) return null
                 instruments.add(inst)
                 grid[id] = row
+                if (swing != null && swing.coerceIn(0, 100) != 0) trackSwing[id] = swing.coerceIn(0, 100)
             }
-            return runCatching { PercussionPattern(instruments, grid, meter) }.getOrNull()
+            return runCatching { PercussionPattern(instruments, grid, meter, trackSwing) }.getOrNull()
         }
     }
 }
@@ -504,13 +532,14 @@ object PercussionBuiltins {
             note = "One-shot entrada into the partido alto — use as an opening (▶¹) " +
                 "before the groove.",
         ),
-        // From Nadav's own recording (tools/recordings/pandeiro_reta_bars.wav):
-        // bass closed, finger closed, heel closed, slap | bass open, finger open,
-        // heel open, finger open — one 2/4 bar of 16ths, twice.
+        // From Nadav's own recording + his authored dynamics (pandeiro.chorect.json):
+        // bass closed (accented), finger closed @50%, heel closed @50%, slap |
+        // bass open, finger open, heel open, finger open — bar 2's taps at full.
         PresetTrack(
             "Pandeiro — Reta", PercussionCatalog.Pandeiro,
-            listOf(1, 5, 7, 2, 0, 4, 6, 4, 1, 5, 7, 2, 0, 4, 6, 4),
-            note = "Played straight (reta) — also sounds great swung ~50%.",
+            listOf(101, 2005, 2007, 2, 0, 2004, 2006, 4, 101, 2005, 2007, 2, 0, 4, 6, 4),
+            swing = 33,
+            note = "Nadav's reta — bass accented, closed taps at 50%. Also good straight or ~50% swing.",
         ),
     )
 

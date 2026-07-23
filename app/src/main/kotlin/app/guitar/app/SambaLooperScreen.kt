@@ -1323,7 +1323,7 @@ private fun InstrumentRow(
                         .padding(vertical = 2.dp),
                 ) {
                     Text(
-                        instrument.displayName + if (selected) " ✓" else "",
+                        instrument.displayName + (if (selected) " ✓" else ""),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                         maxLines = 1,
@@ -1333,6 +1333,19 @@ private fun InstrumentRow(
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
                     )
+                    // A track with its own swing shows a ~N% badge (dim while the
+                    // global swing overrides it).
+                    val tSwing = pat.trackSwing[instrument.id] ?: 0
+                    if (tSwing > 0) {
+                        Text(
+                            " ~$tSwing%",
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                alpha = if (samba.swing > 0) 0.35f else 0.85f,
+                            ),
+                        )
+                    }
                 }
                 // Mixer menu: overall + per-voice volume, plus Remove. Opened from the
                 // palette's Mixer chip; tap outside to dismiss; stays open across
@@ -1351,6 +1364,19 @@ private fun InstrumentRow(
                             value = vol,
                             onValueChange = { samba.setVolume(instrument, it) },
                             valueRange = 0f..1f,
+                        )
+                        // Per-TRACK swing: this track's own clock. Only heard while
+                        // the beat's global swing is 0 (a nonzero global overrides).
+                        val tSwing = samba.editPattern.trackSwing[instrument.id] ?: 0
+                        Text(
+                            "Track swing: $tSwing%" + (if (samba.swing > 0) " (overridden by global swing)" else ""),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Slider(
+                            value = tSwing.toFloat(),
+                            onValueChange = { samba.setTrackSwing(instrument, it.toInt()) },
+                            valueRange = 0f..100f,
                         )
                     }
                     HorizontalDivider()
@@ -1596,8 +1622,9 @@ private fun Cell(
     // Per-slot dynamics: quieter hits render faded (Dyn tool cycles the level).
     val dynLevel = if (voice == null) 0 else pat.dynLevelAt(instrument, slot)
     // Playhead lights the section that's actually sounding: the opening rows
-    // during the opening pass, the loop rows afterwards.
-    val isPlayhead = samba.isPlaying && samba.currentSlot == slot && samba.playingOpening == inOpening
+    // during the opening pass, the loop rows afterwards. Tracks with their own
+    // swing carry their OWN playhead (they anticipate the master clock).
+    val isPlayhead = samba.isPlaying && samba.playheadSlotFor(instrument) == slot && samba.playingOpening == inOpening
     val base = MaterialTheme.colorScheme.surfaceVariant
     // Empty cells are brightened (were near-invisible on the black background) and
     // tinted per beat-group so the quarter-note grouping reads at a glance: the first

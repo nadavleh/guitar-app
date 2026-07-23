@@ -99,7 +99,7 @@ export class SambaLooperState {
   /** Create an opening pre-filled with a preset track (e.g. an entrada chunk). */
   addOpeningFromPreset(p: PresetTrack) {
     this.pushUndo();
-    this.opening = PercussionPattern.empty([], this.pattern.meter).withPresetTrack(p.instrument, p.template);
+    this.opening = PercussionPattern.empty([], this.pattern.meter).withPresetTrack(p.instrument, p.template, p.swing ?? 0);
     this.editingOpening = false;
     this.notify();
   }
@@ -389,7 +389,8 @@ export class SambaLooperState {
   /** One-press preset track (marcação surdo / teleco-teco tamborim): adds the
    *  instrument (cloned if present) with its row pre-filled, and auditions it. */
   addPresetTrack(p: PresetTrack) {
-    this.commit(this.editPattern.withPresetTrack(p.instrument, p.template));
+    // The phrase's own swing lands on the new TRACK (audible while global is 0).
+    this.commit(this.editPattern.withPresetTrack(p.instrument, p.template, p.swing ?? 0));
     this.loadSamplesFor(p.instrument);
     if (!this.isPlaying) this.deps.audio.playSamples(this.buffer(p.instrument, 0), this.effectiveGain(p.instrument, 0));
   }
@@ -399,8 +400,10 @@ export class SambaLooperState {
    *  opening and the notes go away (Undo restores them); the beat takes the
    *  phrase's name and swing. */
   loadPresetAsBeat(p: PresetTrack) {
-    const solo = PercussionPattern.empty([], this.pattern.meter).withPresetTrack(p.instrument, p.template);
-    this.loadPattern(solo, p.label, null, p.swing ?? 0, null, "");
+    // The phrase's swing rides on the TRACK (global swing reset to 0), so adding
+    // more tracks later doesn't inherit it.
+    const solo = PercussionPattern.empty([], this.pattern.meter).withPresetTrack(p.instrument, p.template, p.swing ?? 0);
+    this.loadPattern(solo, p.label, null, 0, null, "");
     this.loadSamplesFor(p.instrument);
   }
 
@@ -508,10 +511,15 @@ export class SambaLooperState {
         if (!this.isAudible(inst)) continue;
         const v = snapshot.voiceAt(inst, slot);
         if (v === null) continue;
+        // Per-TRACK swing: the master clock walks the GLOBAL swing grid; a track
+        // with its own swing (only honored while global is 0) shifts each hit by
+        // its clock's onset difference. Anchors coincide, so the shift is ≤ 0.4
+        // slot of ANTICIPATION — safely inside the one-slot scheduling lookahead.
+        const trackWhen = when + this.trackOnsetDeltaSec(snapshot, inst.id, slot);
         const buf = this.buffer(inst, v);
         const peak = this.peakOffsetSec(inst, v, buf);
         const now = this.deps.audio.now();
-        const advance = peak > 0.02 ? Math.min(peak, Math.max(when - now, 0)) : 0;
+        const advance = peak > 0.02 ? Math.min(peak, Math.max(trackWhen - now, 0)) : 0;
         // Accented hits play ~1.4× louder (mixer clamps overall); per-slot
         // dynamics scale the hit down (100/75/50/25 %).
         const gain = this.effectiveGain(inst, v)
@@ -519,7 +527,7 @@ export class SambaLooperState {
           * PERCUSSION_DYN_FACTORS[snapshot.dynLevelAt(inst, slot)];
         // Self-choking instruments (pandeiro): each hit damps the track's
         // previous one at its own onset (kit ids are unique per track).
-        this.deps.audio.playSamples(buf, gain, when - advance, inst.selfChoke ? inst.id : undefined);
+        this.deps.audio.playSamples(buf, gain, trackWhen - advance, inst.selfChoke ? inst.id : undefined);
       }
     };
     void (async () => {
@@ -537,8 +545,13 @@ export class SambaLooperState {
           const slotSec = swungSlotMs(slot, this.bpm, this.swing, op.meter) / 1000;
           nextOnset += slotSec;
           // Next up: the opening's next slot, or the loop's downbeat when it ends.
-          if (slot + 1 < op.slots) scheduleSlot(op, slot + 1, nextOnset);
-          else scheduleSlot(this.pattern, 0, nextOnset);
+          if (slot + 1 < op.slots) {
+            scheduleSlot(op, slot + 1, nextOnset);
+            this.schedulePlayheads(op, slot + 1, nextOnset, token);
+          } else {
+            scheduleSlot(this.pattern, 0, nextOnset);
+            this.schedulePlayheads(this.pattern, 0, nextOnset, token);
+          }
           this.notify();
           await sleep(Math.max((nextOnset - this.deps.audio.now()) * 1000, 0));
         }
@@ -555,7 +568,10 @@ export class SambaLooperState {
           nextOnset += slotSec;
           const nextSlot = (slot + 1) % snapshot.slots;
           const nextSnapshot = nextSlot === 0 ? this.pattern : snapshot;
-          if (nextSlot < nextSnapshot.slots) scheduleSlot(nextSnapshot, nextSlot, nextOnset);
+          if (nextSlot < nextSnapshot.slots) {
+            scheduleSlot(nextSnapshot, nextSlot, nextOnset);
+            this.schedulePlayheads(nextSnapshot, nextSlot, nextOnset, token);
+          }
           this.notify();
           // Sleep till the next onset (UI playhead only — audio is already queued).
           await sleep(Math.max((nextOnset - this.deps.audio.now()) * 1000, 0));
@@ -569,6 +585,7 @@ export class SambaLooperState {
     this.token++;
     this.currentSlot = -1;
     this.playingOpening = false;
+    this.trackPlayhead.clear();
     this.deps.audio.stop();
     this.notify();
   }
@@ -577,4 +594,62 @@ export class SambaLooperState {
 
   setBpm(v: number) { this.bpm = Math.round(v); this.notify(); }
   setSwing(v: number) { this.swing = Math.round(v); this.notify(); }
+
+  // ---- Per-track swing (see PercussionPattern.trackSwing) ----
+
+  /** The swing a track actually plays with: global overrides when nonzero. */
+  effectiveTrackSwing(snapshot: PercussionPattern, id: string): number {
+    return this.swing > 0 ? this.swing : snapshot.trackSwingOf(id);
+  }
+
+  /** Set one track's own swing (audible only while the global swing is 0).
+   *  Part of the pattern → undo/save/export carry it. */
+  setTrackSwing(inst: PercussionInstrument, v: number) {
+    this.commit(this.editPattern.withTrackSwing(inst.id, v));
+  }
+
+  /** Onset shift (seconds, ≤ 0) of `id`'s slot vs the master clock's. */
+  private trackOnsetDeltaSec(snapshot: PercussionPattern, id: string, slot: number): number {
+    const s = this.effectiveTrackSwing(snapshot, id);
+    if (s === this.swing) return 0;
+    let delta = 0;
+    for (let k = 0; k < slot; k++) {
+      delta += swungSlotMs(k, this.bpm, s, snapshot.meter) - swungSlotMs(k, this.bpm, this.swing, snapshot.meter);
+    }
+    return delta / 1000;
+  }
+
+  /** MULTIPLE PLAYHEADS: tracks with their own swing get their own playhead
+   *  slot, updated by a timer at THEIR onset (which anticipates the master's).
+   *  Straight tracks follow `currentSlot`. */
+  private trackPlayhead = new Map<string, number>();
+
+  /** The slot `inst`'s playhead is on right now (grid highlight). */
+  playheadSlotFor(inst: PercussionInstrument): number {
+    return this.trackPlayhead.get(inst.id) ?? this.currentSlot;
+  }
+
+  private schedulePlayheads(snapshot: PercussionPattern, slot: number, onset: number, token: number) {
+    if (this.swing > 0) {
+      if (this.trackPlayhead.size) { this.trackPlayhead.clear(); this.notify(); }
+      return;
+    }
+    const groups = new Map<number, string[]>();
+    for (const inst of snapshot.instruments) {
+      const s = snapshot.trackSwingOf(inst.id);
+      if (s > 0) {
+        const ids = groups.get(s) ?? [];
+        ids.push(inst.id);
+        groups.set(s, ids);
+      }
+    }
+    for (const [, ids] of groups) {
+      const fireIn = (onset + this.trackOnsetDeltaSec(snapshot, ids[0], slot) - this.deps.audio.now()) * 1000;
+      setTimeout(() => {
+        if (token !== this.token || !this.isPlaying) return;
+        for (const id of ids) this.trackPlayhead.set(id, slot);
+        this.notify();
+      }, Math.max(fireIn, 0));
+    }
+  }
 }

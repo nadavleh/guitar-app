@@ -522,8 +522,18 @@ export class SambaLooperUI {
     const audible = s.isAudible(inst);
 
     const selected = s.selectedTrackId === inst.id && s.editingOpening === inOpening;
+    // A track with its own swing shows a ~N% badge (dim while global swing
+    // overrides it — global > 0 wins).
+    const tSwing = pat.trackSwingOf(inst.id);
+    const swingBadge = tSwing > 0 ? ` ~${tSwing}%` : "";
     const name = el("span", { class: selected ? "name track-sel" : "name", title: "tap to select · drag to reorder · right-click to remove" },
       [inst.displayName + (selected ? " ✓" : "")]);
+    if (swingBadge) {
+      name.appendChild(el("span", {
+        style: `font-size:10px;opacity:${s.swing > 0 ? 0.35 : 0.8}`,
+        title: s.swing > 0 ? "track swing (overridden by the global swing)" : "track swing",
+      }, [swingBadge]));
+    }
     // Tap the name to select the track — opens the voice palette at the bottom.
     name.addEventListener("click", () => { this.openVoiceMenu = null; s.editOpening(inOpening); s.selectTrack(inst.id); });
     // Right-click the track name to remove it.
@@ -580,8 +590,9 @@ export class SambaLooperUI {
     const voice = pat.voiceAt(inst, slot);
     const accented = pat.isAccented(inst, slot);
     // Playhead lights the section that's actually sounding: the opening rows
-    // during the opening pass, the loop rows afterwards.
-    const isPlayhead = s.isPlaying && s.currentSlot === slot && s.playingOpening === inOpening;
+    // during the opening pass, the loop rows afterwards. Tracks with their own
+    // swing carry their OWN playhead (they anticipate the master clock).
+    const isPlayhead = s.isPlaying && s.playheadSlotFor(inst) === slot && s.playingOpening === inOpening;
     // Empty cells brightened (were near-invisible on black) and tinted per beat-group
     // so the quarter-note grouping reads at a glance: first 16th of each beat is
     // brightest; alternating beats step between two shades.
@@ -850,9 +861,17 @@ export class SambaLooperUI {
   private voicePopup(inst: PercussionInstrument): HTMLElement {
     const s = this.samba;
     const vol = s.volumeOf(inst);
+    const tSwing = s.editPattern.trackSwingOf(inst.id);
     const pop = el("div", { class: "drum-voice-pop" }, [
       el("div", { style: "font-weight:600;font-size:13px" }, [`Overall volume: ${Math.round(vol * 100)}%`]),
       slider(0, 1, vol, (v) => s.setVolume(inst, v), 0.01),
+      el("div", { class: "divider-line" }),
+      // Per-TRACK swing: this track's own clock. Only heard while the beat's
+      // global swing is 0 — a nonzero global swing overrides every track.
+      el("div", { style: "font-weight:600;font-size:13px" }, [
+        `Track swing: ${tSwing}%` + (s.swing > 0 ? " (overridden by global swing)" : ""),
+      ]),
+      slider(0, 100, tSwing, (v) => s.setTrackSwing(inst, v), 1),
       el("div", { class: "divider-line" }),
       el("div", { class: "ans-label" }, ["Per-voice volume (tap name to audition)"]),
     ]);
