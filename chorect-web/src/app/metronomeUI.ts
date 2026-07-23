@@ -3,7 +3,7 @@
 // of beat dots that light up on each click (the "1" accented).
 
 import { MetronomeState, METRONOME_TIME_SIGNATURES } from "./metronomeState";
-import { el, btn, slider } from "./dom";
+import { el, btn, valueSlider } from "./dom";
 
 export class MetronomeUI {
   constructor(
@@ -39,15 +39,17 @@ export class MetronomeUI {
     }
     body.appendChild(dots);
 
-    // Transport: Play/Stop + BPM readout.
+    // Transport: Play/Stop + BPM readout (live during drag; double-click to type).
+    const bpmVS = valueSlider((v) => `${Math.round(v)} BPM`, 10, 300, m.bpm, (v) => m.setBpm(v));
+    bpmVS.label.className = "mono";
+    bpmVS.label.style.cssText = "font-weight:700;font-size:16px";
     const playBtn = btn(m.isPlaying ? "Stop ■" : "Play ▶", () => { m.toggle(); this.rerender(); }, "btn primary");
     body.appendChild(el("div", { class: "row", style: "align-items:center;gap:10px" }, [
-      playBtn, el("span", { style: "flex:1" }),
-      el("span", { class: "mono", style: "font-weight:700;font-size:16px" }, [`${m.bpm} BPM`]),
+      playBtn, el("span", { style: "flex:1" }), bpmVS.label,
     ]));
 
     // BPM slider + tap tempo.
-    body.appendChild(el("div", { style: "margin-top:8px" }, [slider(10, 300, m.bpm, (v) => m.setBpm(v))]));
+    body.appendChild(el("div", { style: "margin-top:8px" }, [bpmVS.input]));
     body.appendChild(el("div", { class: "row", style: "margin-top:6px;gap:8px;align-items:center" }, [
       btn("−", () => m.setBpm(m.bpm - 1)),
       btn("+", () => m.setBpm(m.bpm + 1)),

@@ -89,7 +89,9 @@ fun CavaqProgressionsScreen(state: AppState, onBack: () -> Unit) {
         Spacer(Modifier.height(8.dp))
 
         // ---- Tempo ----
-        Text("Tempo: ${cp.bpm} BPM", style = MaterialTheme.typography.bodySmall)
+        NumericValueText("Tempo: ${cp.bpm} BPM", value = cp.bpm.toFloat(), min = 40f, max = 200f,
+            onSet = { cp.changeBpm(it.toInt()) },
+            style = MaterialTheme.typography.bodySmall)
         Slider(value = cp.bpm.toFloat(), onValueChange = { cp.changeBpm(it.toInt()) }, valueRange = 40f..200f)
 
         // ---- Play + position scroller ----

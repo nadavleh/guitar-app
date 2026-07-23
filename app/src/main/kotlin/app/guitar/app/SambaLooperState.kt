@@ -247,22 +247,21 @@ class SambaLooperState(
 
     private fun voiceKey(inst: PercussionInstrument, voiceIndex: Int) = "${inst.id}:$voiceIndex"
 
-    /** Global level of an instrument (default full; clones default like their base). */
-    fun volumeOf(inst: PercussionInstrument): Float =
-        volumes[inst.id] ?: if (PercussionCatalog.baseId(inst.id) == "agogo") 0.1f else 1f   // agogô defaults quiet (user: 10%)
+    /** TRACK level (0..1): lives on the pattern (PercussionPattern.trackVolume),
+     *  so balance travels WITH the beat — saved, exported, undone. */
+    fun volumeOf(inst: PercussionInstrument): Float = editPattern.trackVolumeOf(inst.id) / 100f
 
-    /** Level of one voice (default full, or 50% for the soft tamborim voices). */
+    /** Level of one voice (default full, or 50% for the soft tamborim voices);
+     *  per-voice trims stay per-device (persisted). */
     fun voiceVolumeOf(inst: PercussionInstrument, voiceIndex: Int): Float =
         volumes[voiceKey(inst, voiceIndex)] ?: defaultVoiceVolume(PercussionCatalog.baseId(inst.id), voiceIndex)
 
-    /** Combined gain a hit of [voiceIndex] actually plays at: global × per-voice. */
-    fun effectiveGain(inst: PercussionInstrument, voiceIndex: Int): Float =
-        volumeOf(inst) * voiceVolumeOf(inst, voiceIndex)
+    /** Combined gain a hit of [voiceIndex] actually plays at: track (from [pat]) × per-voice. */
+    fun effectiveGain(inst: PercussionInstrument, voiceIndex: Int, pat: PercussionPattern = editPattern): Float =
+        (pat.trackVolumeOf(inst.id) / 100f) * voiceVolumeOf(inst, voiceIndex)
 
     fun setVolume(inst: PercussionInstrument, value: Float) {
-        val v = value.coerceIn(0f, 1f)
-        volumes = volumes + (inst.id to v)
-        scope.launch { repo.setDrumVolume(inst.id, v) }
+        commit(editPattern.withTrackVolume(inst.id, (value.coerceIn(0f, 1f) * 100).toInt()))
     }
 
     fun setVoiceVolume(inst: PercussionInstrument, voiceIndex: Int, value: Float) {
@@ -544,7 +543,7 @@ class SambaLooperState(
                     val advance = if (peak > sr / 50) minOf(peak, instFrames) else 0
                     // Accented hits play ~1.4× louder (mixer clamps overall); per-slot
                     // dynamics scale the hit down (100/75/50/25 %).
-                    val gain = effectiveGain(inst, v) *
+                    val gain = effectiveGain(inst, v, snapshot) *
                         (if (snapshot.isAccented(inst, slot)) 1.4f else 1f) *
                         app.guitar.theory.PERCUSSION_DYN_FACTORS[snapshot.dynLevelAt(inst, slot)]
                     // Self-choking instruments (pandeiro): each hit damps the track's

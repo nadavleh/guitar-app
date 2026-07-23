@@ -190,6 +190,11 @@ export class PercussionPattern {
      *  are swing-invariant, so differently-swung tracks re-align every beat.
      *  Missing id = straight. */
     readonly trackSwing: ReadonlyMap<string, number> = new Map(),
+    /** Per-TRACK volume percent (instrument id → 1..100; missing = 100). The
+     *  mixer's Overall-volume slider edits this, so track balance travels WITH
+     *  the beat (saved/exported/undone). Per-slot dynamics stay reserved for
+     *  articulation contrast WITHIN a track. */
+    readonly trackVolume: ReadonlyMap<string, number> = new Map(),
   ) {}
 
   /** One track's swing (0 = straight / no entry). */
@@ -200,7 +205,18 @@ export class PercussionPattern {
     const s = Math.min(Math.max(Math.round(swing), 0), 100);
     const m = new Map(this.trackSwing);
     if (s === 0) m.delete(id); else m.set(id, s);
-    return new PercussionPattern(this.instruments, this.grid, this.meter, m);
+    return new PercussionPattern(this.instruments, this.grid, this.meter, m, this.trackVolume);
+  }
+
+  /** One track's volume percent (100 when unset). */
+  trackVolumeOf(id: string): number { return this.trackVolume.get(id) ?? 100; }
+
+  /** Set one track's volume percent (100 clears the entry). */
+  withTrackVolume(id: string, percent: number): PercussionPattern {
+    const v = Math.min(Math.max(Math.round(percent), 0), 100);
+    const m = new Map(this.trackVolume);
+    if (v >= 100) m.delete(id); else m.set(id, v);
+    return new PercussionPattern(this.instruments, this.grid, this.meter, this.trackSwing, m);
   }
 
   /** Number of slots in this pattern (= meter.totalSlots). */
@@ -255,13 +271,13 @@ export class PercussionPattern {
     row[slot] = voice;
     const g = new Map(this.grid);
     g.set(instrument.id, row);
-    return new PercussionPattern(this.instruments, g, this.meter, this.trackSwing);
+    return new PercussionPattern(this.instruments, g, this.meter, this.trackSwing, this.trackVolume);
   }
 
   clearedRow(instrument: PercussionInstrument): PercussionPattern {
     const g = new Map(this.grid);
     g.set(instrument.id, Array<number | null>(this.slots).fill(null));
-    return new PercussionPattern(this.instruments, g, this.meter, this.trackSwing);
+    return new PercussionPattern(this.instruments, g, this.meter, this.trackSwing, this.trackVolume);
   }
 
   /** Append `instrument` to the kit with a silent row. No-op if already present. */
@@ -269,7 +285,7 @@ export class PercussionPattern {
     if (this.hasInstrument(instrument)) return this;
     const g = new Map(this.grid);
     g.set(instrument.id, Array<number | null>(this.slots).fill(null));
-    return new PercussionPattern([...this.instruments, instrument], g, this.meter, this.trackSwing);
+    return new PercussionPattern([...this.instruments, instrument], g, this.meter, this.trackSwing, this.trackVolume);
   }
 
   /** Remove `instrument` (and its row) from the kit. No-op if absent. */
@@ -279,7 +295,9 @@ export class PercussionPattern {
     g.delete(instrument.id);
     const sw = new Map(this.trackSwing);
     sw.delete(instrument.id);
-    return new PercussionPattern(this.instruments.filter((i) => i.id !== instrument.id), g, this.meter, sw);
+    const tv = new Map(this.trackVolume);
+    tv.delete(instrument.id);
+    return new PercussionPattern(this.instruments.filter((i) => i.id !== instrument.id), g, this.meter, sw, tv);
   }
 
   /** Reorder the kit: move the track at `from` to index `to` (grid unchanged). */
@@ -288,7 +306,7 @@ export class PercussionPattern {
     const list = this.instruments.slice();
     const [item] = list.splice(from, 1);
     list.splice(to, 0, item);
-    return new PercussionPattern(list, this.grid, this.meter, this.trackSwing);
+    return new PercussionPattern(list, this.grid, this.meter, this.trackSwing, this.trackVolume);
   }
 
   /** Add a preset TRACK in one press: `base`'s row filled by tiling `template`
@@ -305,7 +323,7 @@ export class PercussionPattern {
     const row: (number | null)[] = Array.from({ length: this.meter.totalSlots }, (_, i) => template[i % template.length]);
     const g = new Map(this.grid);
     g.set(inst.id, row);
-    return new PercussionPattern([...this.instruments, inst], g, this.meter, this.trackSwing)
+    return new PercussionPattern([...this.instruments, inst], g, this.meter, this.trackSwing, this.trackVolume)
       .withTrackSwing(inst.id, swing);
   }
 
@@ -327,7 +345,10 @@ export class PercussionPattern {
     const sw = new Map(this.trackSwing);
     const s = this.trackSwing.get(instrument.id);
     if (s !== undefined) sw.set(clone.id, s);
-    return new PercussionPattern(list, g, this.meter, sw);
+    const tv = new Map(this.trackVolume);
+    const v = this.trackVolume.get(instrument.id);
+    if (v !== undefined) tv.set(clone.id, v);
+    return new PercussionPattern(list, g, this.meter, sw, tv);
   }
 
   isEmpty(): boolean {
@@ -350,7 +371,7 @@ export class PercussionPattern {
       for (let i = 0; i < slots; i++) out[i] = row[((i - shift) % slots + slots) % slots];
       g.set(id, out);
     }
-    return new PercussionPattern(this.instruments, g, this.meter, this.trackSwing);
+    return new PercussionPattern(this.instruments, g, this.meter, this.trackSwing, this.trackVolume);
   }
 
   /**
@@ -367,7 +388,7 @@ export class PercussionPattern {
       for (let k = 0; k < n; k++) out[k] = k < old.length ? old[k] : null;
       g.set(i.id, out);
     }
-    return new PercussionPattern(this.instruments, g, newMeter, this.trackSwing);
+    return new PercussionPattern(this.instruments, g, newMeter, this.trackSwing, this.trackVolume);
   }
 
   /**
@@ -379,10 +400,12 @@ export class PercussionPattern {
     const m = `M:${this.meter.bars},${this.meter.beatsPerBar},${this.meter.beatUnit},${this.meter.division};`;
     const body = this.instruments
       .map((i) => {
-        // A per-track swing rides as an "@N" id suffix; old decoders fail to
-        // resolve "pandeiro@33" and skip the row rather than mis-reading it.
+        // Per-track swing ("@N") and volume ("%N") ride as id suffixes; old
+        // decoders fail to resolve "pandeiro@33%20" and skip the row rather
+        // than mis-reading it.
         const sw = this.trackSwing.get(i.id) ?? 0;
-        const head = sw !== 0 ? `${i.id}@${sw}` : i.id;
+        const vol = this.trackVolume.get(i.id) ?? 100;
+        const head = i.id + (sw !== 0 ? `@${sw}` : "") + (vol < 100 ? `%${vol}` : "");
         return `${head}=` + this.grid.get(i.id)!.map((v) => (v === null ? "-" : String(v))).join(",");
       })
       .join("|");
@@ -415,11 +438,15 @@ export class PercussionPattern {
     const instruments: PercussionInstrument[] = [];
     const g = new Map<string, (number | null)[]>();
     const trackSwing = new Map<string, number>();
+    const trackVolume = new Map<string, number>();
     for (const rowStr of rows) {
       const eq = rowStr.indexOf("=");
       if (eq < 0) return null;
       let id = rowStr.substring(0, eq);
-      // "id@N" = per-track swing (see encode).
+      // "id[@swing][%vol]" — per-track swing/volume suffixes (see encode).
+      const pct = id.lastIndexOf("%");
+      const volume = pct > 0 ? parseInt(id.substring(pct + 1), 10) : NaN;
+      if (!Number.isNaN(volume)) id = id.substring(0, pct);
       const at = id.lastIndexOf("@");
       const swing = at > 0 ? parseInt(id.substring(at + 1), 10) : NaN;
       if (!Number.isNaN(swing)) id = id.substring(0, at);
@@ -446,8 +473,12 @@ export class PercussionPattern {
         const s2 = Math.min(Math.max(swing, 0), 100);
         if (s2 !== 0) trackSwing.set(id, s2);
       }
+      if (!Number.isNaN(volume)) {
+        const v2 = Math.min(Math.max(volume, 0), 100);
+        if (v2 < 100) trackVolume.set(id, v2);
+      }
     }
-    return new PercussionPattern(instruments, g, meter, trackSwing);
+    return new PercussionPattern(instruments, g, meter, trackSwing, trackVolume);
   }
 }
 
@@ -539,8 +570,9 @@ export const PARTIDO_ALTO_PLATINELAS = builtin(
 
 // Nadav's samba groove (from his exported beat): reta pandeiro (track swing 33)
 // + marcação surdo + three tamborims — teleco-teco, levada reta (track swing 10)
-// and palmas — plus Samba 1's agogô line at 25 % dynamics (quiet backing bells;
-// replaced the plain "Samba 1" groove).
+// and palmas — plus Samba 1's agogô line as quiet backing bells via TRACK
+// volume 20 % (dynamics stay reserved for articulation contrast within a
+// track; replaced the plain "Samba 1" groove).
 export const TRES_TAMBORINS = builtin(
   "M:2,2,4,16;" +
   "pandeiro@33=101,2005,2007,2,0,2004,2006,4,101,2005,2007,2,0,4,6,4" + "|" +
@@ -548,7 +580,7 @@ export const TRES_TAMBORINS = builtin(
   "tamborim=2001,0,2001,0,2001,2002,0,2001,0,2001,0,2001,0,2001,2002,0" + "|" +
   "tamborim#2@10=100,1001,2,0,100,1001,2,0,100,1001,2,0,100,1001,2,0" + "|" +
   "tamborim#3=100,2,2000,100,2,2000,100,2,100,2,2000,100,2,2000,100,2" + "|" +
-  "agogo=3000,-,-,3001,3001,-,3000,-,3000,-,3001,-,3001,3001,-,3000",
+  "agogo%20=0,-,-,1,1,-,0,-,0,-,1,-,1,1,-,0",
 );
 
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */

@@ -187,6 +187,24 @@ class PercussionPatternTest {
         assertTrue(removed.trackSwing.isEmpty())
     }
 
+    @Test fun `per-track volume rides the id suffix and combines with swing`() {
+        var p = PercussionPattern.empty(listOf(PercussionCatalog.Agogo, PercussionCatalog.Pandeiro))
+            .withTrackVolume("agogo", 20)
+        assertEquals(20, p.trackVolumeOf("agogo"))
+        assertEquals(100, p.trackVolumeOf("pandeiro"))
+        assertTrue(p.encode().contains("agogo%20="))
+        assertEquals(p, PercussionPattern.decode(p.encode()))
+        // Swing + volume combine on one head: "id@sw%vol".
+        p = p.withTrackSwing("pandeiro", 33).withTrackVolume("pandeiro", 50)
+        assertTrue(p.encode().contains("pandeiro@33%50="))
+        assertEquals(p, PercussionPattern.decode(p.encode()))
+        // Setting 100 clears the entry; removing the track drops it.
+        assertTrue(!p.withTrackVolume("agogo", 100).encode().contains("agogo%"))
+        assertTrue(p.removeInstrument(PercussionCatalog.Agogo).trackVolume.containsKey("agogo").not())
+        // The shipped groove carries the quiet agogô.
+        assertEquals(20, PercussionBuiltins.TRES_TAMBORINS.trackVolumeOf("agogo"))
+    }
+
     @Test fun `duplicated track clones the instrument and round-trips`() {
         val p = PercussionBuiltins.BATIDA_CAVACO_1.duplicatedTrack(PercussionCatalog.Surdo)
         assertEquals(listOf("surdo", "surdo#2", "tamborim", "bongo"), p.instruments.map { it.id })

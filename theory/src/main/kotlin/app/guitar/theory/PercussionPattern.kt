@@ -74,6 +74,11 @@ data class PercussionPattern(
      *  are swing-invariant, so differently-swung tracks re-align every beat.
      *  Missing id = straight. */
     val trackSwing: Map<String, Int> = emptyMap(),
+    /** Per-TRACK volume percent (instrument id → 1..100; missing = 100). The
+     *  mixer's Overall-volume slider edits this, so track balance travels WITH
+     *  the beat (saved/exported/undone). Per-slot dynamics stay reserved for
+     *  articulation contrast WITHIN a track. */
+    val trackVolume: Map<String, Int> = emptyMap(),
 ) {
     /** Number of slots in this pattern (= meter.totalSlots). */
     val slots: Int get() = meter.totalSlots
@@ -175,6 +180,7 @@ data class PercussionPattern(
             instruments = instruments.filter { it.id != instrument.id },
             grid = grid - instrument.id,
             trackSwing = trackSwing - instrument.id,
+            trackVolume = trackVolume - instrument.id,
         )
     }
 
@@ -182,6 +188,15 @@ data class PercussionPattern(
     fun withTrackSwing(id: String, swing: Int): PercussionPattern {
         val s = swing.coerceIn(0, 100)
         return copy(trackSwing = if (s == 0) trackSwing - id else trackSwing + (id to s))
+    }
+
+    /** One track's volume percent (100 when unset). */
+    fun trackVolumeOf(id: String): Int = trackVolume[id] ?: 100
+
+    /** Set one track's volume percent (100 clears the entry). */
+    fun withTrackVolume(id: String, percent: Int): PercussionPattern {
+        val v = percent.coerceIn(0, 100)
+        return copy(trackVolume = if (v >= 100) trackVolume - id else trackVolume + (id to v))
     }
 
     /** Reorder the kit: move the track at [from] to index [to]. The grid is unchanged
@@ -221,9 +236,11 @@ data class PercussionPattern(
         val clone = baseInst.copy(id = "$base#$n", displayName = "${baseInst.displayName} $n")
         val list = instruments.toMutableList().apply { add(idx + 1, clone) }
         val swing = trackSwing[instrument.id]
+        val vol = trackVolume[instrument.id]
         return PercussionPattern(
             list, grid + (clone.id to grid.getValue(instrument.id)), meter,
             if (swing != null) trackSwing + (clone.id to swing) else trackSwing,
+            if (vol != null) trackVolume + (clone.id to vol) else trackVolume,
         )
     }
 
@@ -256,7 +273,7 @@ data class PercussionPattern(
             val old = grid.getValue(inst.id)
             inst.id to List(n) { i -> old.getOrNull(i) }
         }
-        return PercussionPattern(instruments, newGrid, newMeter, trackSwing)
+        return PercussionPattern(instruments, newGrid, newMeter, trackSwing, trackVolume)
     }
 
     /**
@@ -268,10 +285,12 @@ data class PercussionPattern(
     fun encode(): String {
         val m = "M:${meter.bars},${meter.beatsPerBar},${meter.beatUnit},${meter.division};"
         val body = instruments.joinToString("|") { inst ->
-            // A per-track swing rides as an "@N" id suffix; old decoders fail to
-            // resolve "pandeiro@33" and skip the row rather than mis-reading it.
+            // Per-track swing ("@N") and volume ("%N") ride as id suffixes; old
+            // decoders fail to resolve "pandeiro@33%20" and skip the row rather
+            // than mis-reading it.
             val sw = trackSwing[inst.id] ?: 0
-            val head = if (sw != 0) "${inst.id}@$sw" else inst.id
+            val vol = trackVolume[inst.id] ?: 100
+            val head = inst.id + (if (sw != 0) "@$sw" else "") + (if (vol < 100) "%$vol" else "")
             head + "=" + grid.getValue(inst.id).joinToString(",") { it?.toString() ?: "-" }
         }
         return m + body
@@ -308,11 +327,15 @@ data class PercussionPattern(
             val instruments = ArrayList<PercussionInstrument>()
             val grid = HashMap<String, List<Int?>>()
             val trackSwing = HashMap<String, Int>()
+            val trackVolume = HashMap<String, Int>()
             for (rowStr in rows) {
                 val eq = rowStr.indexOf('=')
                 if (eq < 0) return null
                 var id = rowStr.substring(0, eq)
-                // "id@N" = per-track swing (see encode).
+                // "id[@swing][%vol]" — per-track swing/volume suffixes (see encode).
+                val pct = id.lastIndexOf('%')
+                val volume = if (pct > 0) id.substring(pct + 1).toIntOrNull() else null
+                if (volume != null) id = id.substring(0, pct)
                 val at = id.lastIndexOf('@')
                 val swing = if (at > 0) id.substring(at + 1).toIntOrNull() else null
                 if (swing != null) id = id.substring(0, at)
@@ -330,8 +353,9 @@ data class PercussionPattern(
                 instruments.add(inst)
                 grid[id] = row
                 if (swing != null && swing.coerceIn(0, 100) != 0) trackSwing[id] = swing.coerceIn(0, 100)
+                if (volume != null && volume.coerceIn(0, 100) < 100) trackVolume[id] = volume.coerceIn(0, 100)
             }
-            return runCatching { PercussionPattern(instruments, grid, meter, trackSwing) }.getOrNull()
+            return runCatching { PercussionPattern(instruments, grid, meter, trackSwing, trackVolume) }.getOrNull()
         }
     }
 }
@@ -367,8 +391,9 @@ object PercussionBuiltins {
 
     /** Nadav's samba groove (from his exported beat): reta pandeiro (track
      *  swing 33) + marcação surdo + three tamborims — teleco-teco, levada reta
-     *  (track swing 10) and palmas — plus Samba 1's agogô line at 25 % dynamics
-     *  (quiet backing bells; replaced the plain "Samba 1" groove). */
+     *  (track swing 10) and palmas — plus Samba 1's agogô line as quiet backing
+     *  bells via TRACK volume 20 % (dynamics stay reserved for articulation
+     *  contrast within a track; replaced the plain "Samba 1" groove). */
     val TRES_TAMBORINS: PercussionPattern = builtin(
         "M:2,2,4,16;" +
             "pandeiro@33=101,2005,2007,2,0,2004,2006,4,101,2005,2007,2,0,4,6,4" + "|" +
@@ -376,7 +401,7 @@ object PercussionBuiltins {
             "tamborim=2001,0,2001,0,2001,2002,0,2001,0,2001,0,2001,0,2001,2002,0" + "|" +
             "tamborim#2@10=100,1001,2,0,100,1001,2,0,100,1001,2,0,100,1001,2,0" + "|" +
             "tamborim#3=100,2,2000,100,2,2000,100,2,100,2,2000,100,2,2000,100,2" + "|" +
-            "agogo=3000,-,-,3001,3001,-,3000,-,3000,-,3001,-,3001,3001,-,3000",
+            "agogo%20=0,-,-,1,1,-,0,-,0,-,1,-,1,1,-,0",
     )
 
     /** Batida do cavaco 1 — the default samba groove for the new default kit

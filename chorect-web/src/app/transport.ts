@@ -9,7 +9,7 @@
 
 import { AppState, EqBand, SoundName } from "./appState";
 import { EarTrainingState } from "./earTrainingState";
-import { el, slider, switchRow } from "./dom";
+import { el, slider, valueSlider, switchRow } from "./dom";
 import { icon, IconName } from "./icons";
 
 export interface TransportDockOpts {
@@ -46,23 +46,43 @@ export function transportDock(opts: TransportDockOpts): HTMLElement {
   if (opts.bpm !== undefined && opts.onBpm) {
     const bpm = opts.bpm, onBpm = opts.onBpm;
     if (opts.inlineBpm) {
-      // Always-visible readout + slider, no popover (drum machine).
+      // Always-visible readout + slider, no popover (drum machine). The readout
+      // updates live during the drag; double-click it to type a tempo.
+      const vs = valueSlider((v) => String(Math.round(v)), 10, 300, bpm, (v) => onBpm(Math.round(v)));
+      vs.label.className = "transport-bpm-val";
       const readout = el("div", { class: "transport-bpm transport-bpm-inline" }, [
-        el("span", { class: "transport-bpm-val" }, [String(bpm)]),
+        vs.label,
         el("span", { class: "transport-bpm-unit" }, ["BPM"]),
       ]);
-      const s = slider(10, 300, bpm, (v) => onBpm(Math.round(v)));
-      s.classList.add("transport-bpm-slider");
-      children.push(readout, s);
+      vs.input.classList.add("transport-bpm-slider");
+      children.push(readout, vs.input);
     } else {
+      // Both the summary readout and the popover label follow the drag live;
+      // double-click either to type a tempo.
+      const val = el("span", { class: "transport-bpm-val", title: "double-click to type a value" }, [String(bpm)]);
+      const lab = el("div", { class: "label-sm", style: "margin-top:0", title: "double-click to type a value" }, [`Tempo: ${bpm} BPM`]);
+      const s = slider(10, 300, bpm, (v) => onBpm(Math.round(v)), 1, (v) => {
+        val.textContent = String(Math.round(v));
+        lab.textContent = `Tempo: ${Math.round(v)} BPM`;
+      });
+      const typeIn = () => {
+        const raw = window.prompt("Tempo (BPM):", s.value);
+        if (raw === null) return;
+        const n = Math.round(parseFloat(raw.replace(",", ".")));
+        if (Number.isNaN(n)) return;
+        const v = Math.min(Math.max(n, 10), 300);
+        s.value = String(v);
+        val.textContent = String(v);
+        lab.textContent = `Tempo: ${v} BPM`;
+        onBpm(v);
+      };
+      lab.addEventListener("dblclick", typeIn);
+      val.addEventListener("dblclick", typeIn);
       const summary = el("summary", { class: "transport-bpm" }, [
-        el("span", { class: "transport-bpm-val" }, [String(bpm)]),
+        val,
         el("span", { class: "transport-bpm-unit" }, ["BPM"]),
       ]);
-      const pop = el("div", { class: "transport-bpm-pop" }, [
-        el("div", { class: "label-sm", style: "margin-top:0" }, [`Tempo: ${bpm} BPM`]),
-        slider(10, 300, bpm, (v) => onBpm(Math.round(v))),
-      ]);
+      const pop = el("div", { class: "transport-bpm-pop" }, [lab, s]);
       const details = el("details", { class: "transport-bpm-wrap" }, [summary, pop]);
       details.open = bpmExpanded;
       details.addEventListener("toggle", () => { bpmExpanded = details.open; });
@@ -118,17 +138,20 @@ function toneRow(iconName: IconName, content: HTMLElement[]): HTMLElement {
 }
 
 /** Icon + label/value row with a slider directly beneath — Reverb, Strum
- *  spread, Ring sustain. */
+ *  spread, Ring sustain. The value follows the drag live; double-click it to
+ *  type a number. */
 function sliderRow(
-  iconName: IconName, label: string, valueLabel: string, value: number,
+  iconName: IconName, label: string, fmt: (v: number) => string, value: number,
   min: number, max: number, onChange: (v: number) => void,
 ): HTMLElement {
+  const vs = valueSlider(fmt, min, max, value, onChange);
+  vs.label.className = "tone-row-val";
   return toneRow(iconName, [
     el("div", { class: "row" }, [
       el("div", { style: "flex:1" }, [label]),
-      el("div", { class: "tone-row-val" }, [valueLabel]),
+      vs.label,
     ]),
-    slider(min, max, value, onChange),
+    vs.input,
   ]);
 }
 
@@ -145,10 +168,13 @@ function eqRow(state: AppState): HTMLElement {
     ]),
     el("span", { class: "tone-eq-chevron" }, [icon("chevronDown", 18)]),
   ]);
-  const bandSlider = (label: string, band: EqBand, value: number) => el("div", { style: "margin-top:6px" }, [
-    el("div", { class: "label-sm", style: "margin:6px 0 2px" }, [`${label}: ${fmt(value)}`]),
-    slider(-12, 12, value, (v) => state.setEqBand(state.sound, band, v)),
-  ]);
+  const bandSlider = (label: string, band: EqBand, value: number) => {
+    const vs = valueSlider((v) => `${label}: ${fmt(v)}`, -12, 12, value, (v) => state.setEqBand(state.sound, band, v));
+    return el("div", { style: "margin-top:6px" }, [
+      el("div", { class: "label-sm", style: "margin:6px 0 2px" }, [vs.label]),
+      vs.input,
+    ]);
+  };
   const resetBtn = el("button", { class: "btn text" }, ["Flat"]);
   resetBtn.addEventListener("click", () => state.resetEq(state.sound));
   const body = el("div", { class: "tone-eq-body" }, [
@@ -187,15 +213,15 @@ export function toneSheet(state: AppState, ear: EarTrainingState, onClose: () =>
 
   sheet.appendChild(el("div", { class: "divider-line" }));
   const reverbPct = Math.round(state.reverbFor(state.sound) * 100);
-  sheet.appendChild(sliderRow("waves", "Reverb", `${reverbPct}%`, reverbPct, 0, 100,
+  sheet.appendChild(sliderRow("waves", "Reverb", (v) => `${Math.round(v)}%`, reverbPct, 0, 100,
     (v) => state.setReverb(state.sound, v / 100)));
 
   sheet.appendChild(el("div", { class: "divider-line" }));
-  sheet.appendChild(sliderRow("spread", "Strum spread", state.strumMs === 0 ? "at once" : `${state.strumMs} ms`,
+  sheet.appendChild(sliderRow("spread", "Strum spread", (v) => (Math.round(v) === 0 ? "at once" : `${Math.round(v)} ms`),
     state.strumMs, 0, 150, (v) => state.setStrumMs(v)));
 
   sheet.appendChild(el("div", { class: "divider-line" }));
-  sheet.appendChild(sliderRow("timer", "Ring sustain", `${(state.ringSustainMs / 1000).toFixed(1)} s`,
+  sheet.appendChild(sliderRow("timer", "Ring sustain", (v) => `${(v / 1000).toFixed(1)} s`,
     state.ringSustainMs, 300, 4000, (v) => state.setRingSustainMs(v)));
 
   // These two switches mutate a plain field/the audio engine directly rather

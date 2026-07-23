@@ -303,21 +303,20 @@ export class SambaLooperState {
     return !this.muted.has(inst.id) && (this.soloed.size === 0 || this.soloed.has(inst.id));
   }
 
-  /** Global level of an instrument (default full; clones default like their base). */
-  volumeOf(inst: PercussionInstrument): number { return this.volumes.get(inst.id) ?? (basePercussionId(inst.id) === "agogo" ? 0.1 : 1); } // agogô defaults quiet
-  /** Level of one voice (default full, or 50% for the soft tamborim voices). */
+  /** TRACK level (0..1): lives on the pattern (PercussionPattern.trackVolume),
+   *  so balance travels WITH the beat — saved, exported, undone. */
+  volumeOf(inst: PercussionInstrument): number { return this.editPattern.trackVolumeOf(inst.id) / 100; }
+  /** Level of one voice (default full, or 50% for the soft tamborim voices);
+   *  per-voice trims stay per-device (persisted). */
   voiceVolumeOf(inst: PercussionInstrument, voiceIndex: number): number {
     return this.volumes.get(this.voiceKey(inst, voiceIndex)) ?? SambaLooperState.defaultVoiceVolume(basePercussionId(inst.id), voiceIndex);
   }
-  /** Combined gain a hit actually plays at: global × per-voice. */
-  effectiveGain(inst: PercussionInstrument, voiceIndex: number): number {
-    return this.volumeOf(inst) * this.voiceVolumeOf(inst, voiceIndex);
+  /** Combined gain a hit actually plays at: track (from `pat`) × per-voice. */
+  effectiveGain(inst: PercussionInstrument, voiceIndex: number, pat: PercussionPattern = this.editPattern): number {
+    return (pat.trackVolumeOf(inst.id) / 100) * this.voiceVolumeOf(inst, voiceIndex);
   }
   setVolume(inst: PercussionInstrument, value: number) {
-    const v = Math.min(Math.max(value, 0), 1);
-    this.volumes.set(inst.id, v);
-    this.deps.saveVolume(inst.id, v);
-    this.notify();
+    this.commit(this.editPattern.withTrackVolume(inst.id, Math.round(Math.min(Math.max(value, 0), 1) * 100)));
   }
   setVoiceVolume(inst: PercussionInstrument, voiceIndex: number, value: number) {
     const v = Math.min(Math.max(value, 0), 1);
@@ -533,7 +532,7 @@ export class SambaLooperState {
         const advance = peak > 0.02 ? Math.min(peak, Math.max(trackWhen - now, 0)) : 0;
         // Accented hits play ~1.4× louder (mixer clamps overall); per-slot
         // dynamics scale the hit down (100/75/50/25 %).
-        const gain = this.effectiveGain(inst, v)
+        const gain = this.effectiveGain(inst, v, snapshot)
           * (snapshot.isAccented(inst, slot) ? 1.4 : 1)
           * PERCUSSION_DYN_FACTORS[snapshot.dynLevelAt(inst, slot)];
         // Self-choking instruments (pandeiro): each hit damps the track's

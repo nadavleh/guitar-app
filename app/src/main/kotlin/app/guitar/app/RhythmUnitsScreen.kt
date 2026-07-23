@@ -103,7 +103,9 @@ private fun RhythmUnitsBody(ru: RhythmUnitState) {
             Text(if (ru.isPlaying) "Stop ■" else "Play ▶")
         }
         Spacer(Modifier.weight(1f))
-        Text("${ru.bpm} BPM", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        NumericValueText("${ru.bpm} BPM", value = ru.bpm.toFloat(), min = 10f, max = 300f,
+            onSet = { ru.changeBpm(it.toInt()) },
+            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
     Slider(value = ru.bpm.toFloat(), onValueChange = { ru.changeBpm(it.toInt()) }, valueRange = 10f..300f)
     Spacer(Modifier.height(6.dp))
@@ -193,7 +195,9 @@ private fun RhythmPhrasesBody(rp: RhythmPhraseState) {
             OutlinedButton(onClick = { rp.toggleMetronome() }) { Text("Metronome") }
         }
         Spacer(Modifier.weight(1f))
-        Text("${rp.bpm} BPM", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        NumericValueText("${rp.bpm} BPM", value = rp.bpm.toFloat(), min = 10f, max = 300f,
+            onSet = { rp.changeBpm(it.toInt()) },
+            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
     Slider(value = rp.bpm.toFloat(), onValueChange = { rp.changeBpm(it.toInt()) }, valueRange = 10f..300f)
 

@@ -5,7 +5,7 @@ import { AppState } from "./appState";
 import { CavaqProgState } from "./cavaqProgState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { shapeMarks } from "./marks";
-import { el, btn, slider, labelSm, songLinkRow } from "./dom";
+import { el, btn, valueSlider, labelSm, songLinkRow } from "./dom";
 import { CAVAQ_SEQUENCES, noteAt, cavaqSongsForSequence } from "../theory";
 
 const DISPLAY_FRETS = 14;
@@ -51,10 +51,12 @@ export class CavaqProgUI {
       btn("Reset to G", () => cp.chooseKey(7), "btn text"),
     ]));
 
-    // ---- Tempo ----
+    // ---- Tempo (live readout; double-click to type) ----
+    const bpmVS = valueSlider((v) => `Tempo: ${Math.round(v)} BPM`, 40, 200, cp.bpm, (v) => cp.changeBpm(v));
+    bpmVS.label.className = "label-sm";
     screen.appendChild(el("div", { style: "margin-top:8px" }, [
-      labelSm(`Tempo: ${cp.bpm} BPM`),
-      slider(40, 200, cp.bpm, (v) => cp.changeBpm(v)),
+      bpmVS.label,
+      bpmVS.input,
     ]));
 
     // ---- Play + position scroller ----

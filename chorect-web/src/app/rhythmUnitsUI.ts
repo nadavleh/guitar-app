@@ -4,7 +4,7 @@
 
 import { RhythmUnitState } from "./rhythmUnitState";
 import { RhythmPhraseState } from "./rhythmPhraseState";
-import { el, btn, slider, segmented } from "./dom";
+import { el, btn, valueSlider, segmented } from "./dom";
 import {
   RHYTHM_UNITS, RHYTHM_UNITS_RESTS, RhythmUnit, RhythmNoteType, starts,
   RhythmPhrase, phraseOnsets, phraseTotalSlots, PHRASE_TIME_SIGNATURES,
@@ -132,10 +132,13 @@ export class RhythmUnitsUI {
       ["Tap a unit to loop it. Each is one beat; the downbeat is accented."]));
     const playBtn = btn(ru.isPlaying ? "Stop ■" : "Play ▶", () => ru.toggle(), "btn primary");
     if (!ru.selectedId) playBtn.disabled = true;
+    const bpmVS = valueSlider((v) => `${Math.round(v)} BPM`, 10, 300, ru.bpm, (v) => ru.setBpm(v));
+    bpmVS.label.className = "mono";
+    bpmVS.label.style.fontWeight = "600";
     body.appendChild(el("div", { class: "row", style: "margin-top:8px;align-items:center;gap:10px" }, [
-      playBtn, el("span", { style: "flex:1" }), el("span", { class: "mono", style: "font-weight:600" }, [`${ru.bpm} BPM`]),
+      playBtn, el("span", { style: "flex:1" }), bpmVS.label,
     ]));
-    body.appendChild(el("div", { style: "margin-top:6px" }, [slider(10, 300, ru.bpm, (v) => ru.setBpm(v))]));
+    body.appendChild(el("div", { style: "margin-top:6px" }, [bpmVS.input]));
     this.unitSection(body, "Rhythmic units", RHYTHM_UNITS);
     this.unitSection(body, "With rests", RHYTHM_UNITS_RESTS);
   }
@@ -188,19 +191,24 @@ export class RhythmUnitsUI {
     ]));
 
     // Transport: Generate + Play/Stop + Metronome + BPM
+    const pBpmVS = valueSlider((v) => `${Math.round(v)} BPM`, 10, 300, rp.bpm, (v) => rp.setBpm(v));
+    pBpmVS.label.className = "mono";
+    pBpmVS.label.style.fontWeight = "600";
     body.appendChild(el("div", { class: "row", style: "margin-top:8px;align-items:center;gap:8px" }, [
       btn("Generate ↻", () => rp.generate()),
       btn(rp.isPlaying ? "Stop ■" : "Play ▶", () => rp.toggle(), "btn primary"),
       btn(rp.metronomeOn ? "Metronome ✓" : "Metronome", () => { rp.toggleMetronome(); this.rerender(); }, rp.metronomeOn ? "btn primary" : "btn"),
       el("span", { style: "flex:1" }),
-      el("span", { class: "mono", style: "font-weight:600" }, [`${rp.bpm} BPM`]),
+      pBpmVS.label,
     ]));
-    body.appendChild(el("div", { style: "margin-top:6px" }, [slider(10, 300, rp.bpm, (v) => rp.setBpm(v))]));
+    body.appendChild(el("div", { style: "margin-top:6px" }, [pBpmVS.input]));
 
     // Resize control for the notation + grid (web).
+    const sizeVS = valueSlider((v) => `Size ${Math.round(v)}%`, 70, 200,
+      Math.round(this.phraseScale * 100), (v) => { this.phraseScale = v / 100; this.rerender(); });
+    sizeVS.label.style.fontSize = "13px";
     body.appendChild(el("div", { class: "row", style: "margin-top:6px;align-items:center;gap:8px" }, [
-      el("span", { style: "font-size:13px" }, ["Size"]),
-      slider(70, 200, Math.round(this.phraseScale * 100), (v) => { this.phraseScale = v / 100; this.rerender(); }),
+      sizeVS.label, sizeVS.input,
     ]));
 
     const phrase = rp.phrase;

@@ -29,7 +29,7 @@ import { MetronomeUI } from "./metronomeUI";
 import { loadDrumSample } from "./drumSamples";
 import { Timbres } from "../audio";
 import { Colors, withAlpha } from "./theme";
-import { el, clear, btn, segmented, chipRow, slider, switchRow, labelSm } from "./dom";
+import { el, clear, btn, segmented, chipRow, valueSlider, switchRow, labelSm } from "./dom";
 import { toneSheet } from "./transport";
 import {
   PC, Instrument, InstrumentInfo, ChordShape, ScalePosition, VoicingStyle,
@@ -1154,8 +1154,9 @@ export class App {
 
     // ----- Tuner (A4 reference only; ring sustain/strum spread moved to Tone sheet in T6) -----
     sheet.appendChild(this.sectionLabel("Tuner"));
-    sheet.appendChild(el("div", { style: "margin-top:6px" }, [`A4 reference: ${s.a4Hz} Hz`]));
-    sheet.appendChild(slider(435, 445, s.a4Hz, (v) => s.setA4Hz(v)));
+    const a4VS = valueSlider((v) => `A4 reference: ${Math.round(v)} Hz`, 435, 445, s.a4Hz, (v) => s.setA4Hz(v));
+    sheet.appendChild(el("div", { style: "margin-top:6px" }, [a4VS.label]));
+    sheet.appendChild(a4VS.input);
   }
 
   private sectionLabel(text: string): HTMLElement {

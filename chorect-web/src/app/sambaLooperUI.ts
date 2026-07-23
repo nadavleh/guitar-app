@@ -12,7 +12,7 @@ import { SambaLooperState } from "./sambaLooperState";
 import { BlocksState } from "./blocksState";
 import { EarTrainingState } from "./earTrainingState";
 import { Colors } from "./theme";
-import { el, btn, slider, segmented } from "./dom";
+import { el, btn, valueSlider, segmented } from "./dom";
 import { icon } from "./icons";
 import { transportDock, toneSheet } from "./transport";
 import { AppState } from "./appState";
@@ -425,17 +425,17 @@ export class SambaLooperUI {
 
     // Compact card: tap-tempo + swing.
     const swingActive = s.meter.beatUnit === 4 && s.meter.division === 16;
-    const swingSlider = slider(0, 100, s.swing, (v) => s.setSwing(v));
-    swingSlider.disabled = !swingActive;
+    const swingVS = valueSlider(
+      (v) => (!swingActive ? "Swing: 1/16 grid only" : Math.round(v) === 0 ? "Swing: straight" : `Swing: ${Math.round(v)}% (16ths)`),
+      0, 100, s.swing, (v) => s.setSwing(v));
+    swingVS.input.disabled = !swingActive;
     const metroBtn = btn(s.metronomeOn ? "Metronome ✓" : "Metronome", () => { s.toggleMetronome(); this.rerender(); }, s.metronomeOn ? "btn primary" : "btn");
     wrap.appendChild(el("div", { class: "et-card", style: `background:var(--surface2);margin-top:8px` }, [
       el("div", { class: "row", style: "gap:8px" }, [
         btn("Tap tempo", () => s.tapTempo()), metroBtn,
       ]),
-      el("div", { class: "label-sm" }, [
-        !swingActive ? "Swing: 1/16 grid only" : s.swing === 0 ? "Swing: straight" : `Swing: ${s.swing}% (16ths)`,
-      ]),
-      swingSlider,
+      el("div", { class: "label-sm" }, [swingVS.label]),
+      swingVS.input,
     ]));
 
     return wrap;
@@ -553,9 +553,16 @@ export class SambaLooperUI {
     mTag.addEventListener("click", () => s.toggleMute(inst));
     const sTag = el("button", { class: s.soloed.has(inst.id) ? "ms-tag on-s" : "ms-tag" }, ["S"]);
     sTag.addEventListener("click", () => s.toggleSolo(inst));
+    // Mixer right next to M/S: opens this track's volume/swing popup directly.
+    const mixTag = el("button", { class: this.openVoiceMenu === inst.id ? "ms-tag on-s" : "ms-tag", title: "Mixer (volumes + track swing)" }, ["≡"]);
+    mixTag.addEventListener("click", () => {
+      s.editOpening(inOpening);
+      this.openVoiceMenu = this.openVoiceMenu === inst.id ? null : inst.id;
+      this.rerender();
+    });
     const label = el("div", { class: audible ? "drum-label" : "drum-label dim", style: "position:relative;cursor:grab", draggable: "true" }, [
       labelInner,
-      el("div", { class: "drum-ms" }, [mTag, sTag]),
+      el("div", { class: "drum-ms" }, [mTag, sTag, mixTag]),
     ]);
     // Drag the label to reorder the track within its section. A press starting
     // inside the mixer popup (its sliders live in this draggable label) must
@@ -820,9 +827,12 @@ export class SambaLooperUI {
       ]));
       // Per-cell swing override: THIS phrase's own clock (0 = straight).
       if (current) {
+        const cellVS = valueSlider((v) => `Swing of this phrase: ${Math.round(v)}%`,
+          0, 100, current.swing ?? 0, (v) => b.setCellSwing(pick.track, pick.col, v));
+        cellVS.label.className = "drum-setup-label";
+        cellVS.label.style.flex = "0 0 auto";
         wrap.appendChild(el("div", { class: "row", style: "margin-top:6px;gap:10px;align-items:center" }, [
-          el("span", { class: "drum-setup-label", style: "flex:0 0 auto" }, [`Swing of this phrase: ${current.swing ?? 0}%`]),
-          slider(0, 100, current.swing ?? 0, (v) => b.setCellSwing(pick.track, pick.col, v)),
+          cellVS.label, cellVS.input,
         ]));
       }
     }
@@ -891,30 +901,36 @@ export class SambaLooperUI {
     const s = this.samba;
     const vol = s.volumeOf(inst);
     const tSwing = s.editPattern.trackSwingOf(inst.id);
+    // TRACK volume: saved WITH the beat (PercussionPattern.trackVolume).
+    const volVS = valueSlider((v) => `Track volume: ${Math.round(v)}%`,
+      0, 100, Math.round(vol * 100), (v) => s.setVolume(inst, v / 100));
+    // Per-TRACK swing: this track's own clock. Only heard while the beat's
+    // global swing is 0 — a nonzero global swing overrides every track.
+    const swingVS = valueSlider(
+      (v) => `Track swing: ${Math.round(v)}%` + (s.swing > 0 ? " (overridden by global swing)" : ""),
+      0, 100, tSwing, (v) => s.setTrackSwing(inst, v));
     const pop = el("div", { class: "drum-voice-pop" }, [
-      el("div", { style: "font-weight:600;font-size:13px" }, [`Overall volume: ${Math.round(vol * 100)}%`]),
-      slider(0, 1, vol, (v) => s.setVolume(inst, v), 0.01),
+      el("div", { style: "font-weight:600;font-size:13px" }, [volVS.label]),
+      volVS.input,
       el("div", { class: "divider-line" }),
-      // Per-TRACK swing: this track's own clock. Only heard while the beat's
-      // global swing is 0 — a nonzero global swing overrides every track.
-      el("div", { style: "font-weight:600;font-size:13px" }, [
-        `Track swing: ${tSwing}%` + (s.swing > 0 ? " (overridden by global swing)" : ""),
-      ]),
-      slider(0, 100, tSwing, (v) => s.setTrackSwing(inst, v), 1),
+      el("div", { style: "font-weight:600;font-size:13px" }, [swingVS.label]),
+      swingVS.input,
       el("div", { class: "divider-line" }),
       el("div", { class: "ans-label" }, ["Per-voice volume (tap name to audition)"]),
     ]);
     voicesFor(inst).forEach((v, idx) => {
       const src = s.usesSample(inst, idx) ? "sample" : "synth";
       const vvol = s.voiceVolumeOf(inst, idx);
-      const label = el("span", { style: "flex:1" }, [`${v.glyph}   ${v.displayName}   ·   ${Math.round(vvol * 100)}%`]);
+      const vvolVS = valueSlider((x) => `${v.glyph}   ${v.displayName}   ·   ${Math.round(x)}%`,
+        0, 100, Math.round(vvol * 100), (x) => s.setVoiceVolume(inst, idx, x / 100));
+      vvolVS.label.style.flex = "1";
       const row = el("div", { class: "vrow", style: "display:flex;align-items:center;gap:8px" }, [
-        label,
+        vvolVS.label,
         el("span", { style: `font-size:10px;color:${s.usesSample(inst, idx) ? Colors.primary : Colors.textSecondary}` }, [src]),
       ]);
-      label.addEventListener("click", (e) => { e.stopPropagation(); s.preview(inst, idx); });
+      vvolVS.label.addEventListener("click", (e) => { e.stopPropagation(); s.preview(inst, idx); });
       pop.appendChild(row);
-      pop.appendChild(slider(0, 1, vvol, (val) => s.setVoiceVolume(inst, idx, val), 0.01));
+      pop.appendChild(vvolVS.input);
     });
     // Duplicate / Remove this track.
     pop.appendChild(el("div", { class: "divider-line" }));

@@ -113,8 +113,12 @@ fun TransportDock(
         if (bpm != null && onBpm != null) {
             Spacer(Modifier.width(14.dp))
             if (inlineBpm) {
-                // Always-visible readout + inline slider (no popover).
-                Text("$bpm", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                // Always-visible readout + inline slider; double-tap the number to type.
+                NumericValueText(
+                    "$bpm", value = bpm.toFloat(), min = 10f, max = 300f,
+                    onSet = { onBpm(it.toInt()) },
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                )
                 Spacer(Modifier.width(3.dp))
                 Text("BPM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.width(10.dp))
@@ -149,7 +153,12 @@ fun TransportDock(
                     }
                     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                         Column(modifier = Modifier.width(260.dp).padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            Text("Tempo: $bpm BPM", style = MaterialTheme.typography.bodyMedium)
+                            // Double-tap the label to type an exact tempo.
+                            NumericValueText(
+                                "Tempo: $bpm BPM", value = bpm.toFloat(), min = 10f, max = 300f,
+                                onSet = { onBpm(it.toInt()) },
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                             Slider(
                                 value = bpm.toFloat(),
                                 onValueChange = { onBpm(it.toInt()) },

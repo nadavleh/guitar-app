@@ -85,7 +85,9 @@ fun MetronomeScreen(state: AppState, onBack: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Button(onClick = { m.toggle() }) { Text(if (m.isPlaying) "Stop ■" else "Play ▶") }
             Spacer(Modifier.weight(1f))
-            Text("${m.bpm} BPM", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            NumericValueText("${m.bpm} BPM", value = m.bpm.toFloat(), min = 10f, max = 300f,
+                onSet = { m.changeBpm(it.toInt()) },
+                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         }
         Slider(value = m.bpm.toFloat(), onValueChange = { m.changeBpm(it.toInt()) }, valueRange = 10f..300f)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

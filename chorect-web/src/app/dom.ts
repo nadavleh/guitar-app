@@ -62,13 +62,17 @@ export function chipRow<T>(
 }
 
 /** A labeled slider that reports its live value. Hovering + mouse wheel
- *  nudges the value by one step (or 1 % of the range for fine-step sliders). */
-export function slider(min: number, max: number, value: number, onInput: (v: number) => void, step = 1): HTMLInputElement {
+ *  nudges the value by one step (or 1 % of the range for fine-step sliders).
+ *  `live` fires UNTHROTTLED on every movement — full re-renders stay deferred
+ *  while the pointer is down, so pass it to keep a value label current mid-drag. */
+export function slider(min: number, max: number, value: number, onInput: (v: number) => void, step = 1,
+  live?: (v: number) => void): HTMLInputElement {
   const s = el("input", { type: "range", min: String(min), max: String(max), step: String(step), value: String(value) });
   // Throttle to one state update per animation frame: a drag fires "input" per
   // pixel, and each update triggers a full re-render pass upstream.
   let raf = 0;
   s.addEventListener("input", () => {
+    live?.(parseFloat(s.value));
     if (raf) return;
     raf = requestAnimationFrame(() => { raf = 0; onInput(parseFloat(s.value)); });
   });
@@ -84,9 +88,33 @@ export function slider(min: number, max: number, value: number, onInput: (v: num
     const nudge = Math.max(step, (max - min) / 100);
     const v = Math.min(Math.max(parseFloat(s.value) + (e.deltaY < 0 ? nudge : -nudge), min), max);
     s.value = String(v);
+    live?.(v);
     onInput(v);
   }, { passive: false });
   return s;
+}
+
+/** A slider COUPLED to a value label: `fmt(v)` renders the label text, which
+ *  updates LIVE while dragging (the app's full re-renders are press-deferred),
+ *  and DOUBLE-CLICKING the label prompts for a typed value. Place `label` and
+ *  `input` wherever the layout needs them. */
+export function valueSlider(
+  fmt: (v: number) => string, min: number, max: number, value: number,
+  onInput: (v: number) => void, step = 1,
+): { label: HTMLElement; input: HTMLInputElement } {
+  const label = el("span", { title: "double-click to type a value" }, [fmt(value)]);
+  const input = slider(min, max, value, onInput, step, (v) => { label.textContent = fmt(v); });
+  label.addEventListener("dblclick", () => {
+    const raw = window.prompt("Value:", input.value);
+    if (raw === null) return;
+    const n = parseFloat(raw.replace(",", "."));
+    if (Number.isNaN(n)) return;
+    const v = Math.min(Math.max(n, min), max);
+    input.value = String(v);
+    label.textContent = fmt(v);
+    onInput(v);
+  });
+  return { label, input };
 }
 
 /** A toggle switch with a label + optional sub-text. */

@@ -165,6 +165,12 @@ check("per-track swing encodes as id@33 and round-trips",
   PercussionPattern.decode(swung.encode())?.trackSwingOf("cuica") === 33 &&
   swung.withTrackSwing("cuica", 0).encode().includes("cuica@") === false &&
   swung.removeInstrument(cuica).trackSwing.size === 0);
+// per-track volume: "%N" suffix, combines with swing on one head, round-trips
+const quiet = swung.withTrackVolume("cuica", 20);
+check("per-track volume encodes as id@33%20 and round-trips",
+  quiet.encode().includes("cuica@33%20=") &&
+  PercussionPattern.decode(quiet.encode())?.trackVolumeOf("cuica") === 20 &&
+  quiet.withTrackVolume("cuica", 100).encode().includes("%") === false);
 
 // --- Swing (samba microtiming): anchors 1st/2nd, anticipates 3rd & 4th; preserves loop length; 1/16 only ---
 const straightSum = Array.from({ length: 16 }, (_, i) => swungSlotMs(i, 100, 0, M)).reduce((a, b) => a + b, 0);

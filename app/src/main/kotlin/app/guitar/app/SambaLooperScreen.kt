@@ -182,6 +182,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                     scaleX = scaleX, scaleY = scaleY, offsetX = offsetX, offsetY = offsetY,
                     mixerFor = mixerFor,
                     onMixerDismiss = { mixerFor = null },
+                    onMixerOpen = { mixerFor = it },
                     onBlockImported = { blocksMode = true; samba.stop() },
                 )
             }
@@ -266,6 +267,7 @@ private fun PatternSection(
     offsetY: androidx.compose.runtime.MutableFloatState,
     mixerFor: String? = null,
     onMixerDismiss: () -> Unit = {},
+    onMixerOpen: (String) -> Unit = {},
     onBlockImported: () -> Unit = {},
 ) {
     // ----- Section header: Save / Clear / Erase / Accent / Notes -----
@@ -333,8 +335,10 @@ private fun PatternSection(
                 maxLines = 1,
                 modifier = Modifier.weight(1f),
             )
-            Text(
+            NumericValueText(
                 "${samba.bpm} BPM",
+                value = samba.bpm.toFloat(), min = 10f, max = 300f,
+                onSet = { samba.bpm = it.toInt() },
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
@@ -658,6 +662,7 @@ private fun PatternSection(
                         inOpening = inOpening,
                         mixerOpen = mixerFor == inst.id && samba.editingOpening == inOpening,
                         onMixerDismiss = onMixerDismiss,
+                        onMixerOpen = { onMixerOpen(inst.id) },
                         modifier = Modifier.height(ROW_HEIGHT_DP.dp).fillMaxWidth(),
                     )
                     if (i != kit.lastIndex) {
@@ -725,13 +730,17 @@ private fun PatternSection(
             // the 4th early — the samba anticipation feel. On any other division it does
             // nothing, so the slider is disabled and the label says why.
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text(
+                NumericValueText(
                     when {
                         !swingActive -> "Swing: 1/16 grid only"
                         samba.swing == 0 -> "Swing: straight"
                         else -> "Swing: ${samba.swing}% (16ths)"
                     },
-                    style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(140.dp))
+                    value = samba.swing.toFloat(), min = 0f, max = 100f,
+                    onSet = { samba.swing = it.toInt() },
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    modifier = Modifier.width(140.dp))
                 Slider(
                     value = samba.swing.toFloat(),
                     onValueChange = { samba.swing = it.toInt() },
@@ -1133,8 +1142,10 @@ private fun BlocksSection(blocks: BlocksState) {
             // Per-cell swing override: THIS phrase's own clock (0 = straight).
             if (current != null) {
                 Spacer(Modifier.height(2.dp))
-                Text(
+                NumericValueText(
                     "Swing of this phrase: ${current.swing}%",
+                    value = current.swing.toFloat(), min = 0f, max = 100f,
+                    onSet = { blocks.setCellSwing(ti, c, it.toInt()) },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1375,6 +1386,7 @@ private fun InstrumentRow(
     dynMode: Boolean = false,
     mixerOpen: Boolean = false,
     onMixerDismiss: () -> Unit = {},
+    onMixerOpen: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val voices = PercussionVoices.voicesFor(instrument)
@@ -1428,10 +1440,12 @@ private fun InstrumentRow(
                     // Overall instrument volume. Lives in the voice popup so the dense
                     // step-grid stays uncluttered.
                     Column(modifier = Modifier.width(260.dp).padding(horizontal = 12.dp, vertical = 4.dp)) {
+                        // TRACK volume: saved WITH the beat (PercussionPattern.trackVolume).
                         val vol = samba.volumeOf(instrument)
-                        Text(
-                            "Overall volume: ${(vol * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelMedium,
+                        NumericValueText(
+                            "Track volume: ${(vol * 100).toInt()}%",
+                            value = vol * 100, min = 0f, max = 100f,
+                            onSet = { samba.setVolume(instrument, it / 100f) },
                             fontWeight = FontWeight.SemiBold,
                         )
                         Slider(
@@ -1442,9 +1456,10 @@ private fun InstrumentRow(
                         // Per-TRACK swing: this track's own clock. Only heard while
                         // the beat's global swing is 0 (a nonzero global overrides).
                         val tSwing = samba.editPattern.trackSwing[instrument.id] ?: 0
-                        Text(
+                        NumericValueText(
                             "Track swing: $tSwing%" + (if (samba.swing > 0) " (overridden by global swing)" else ""),
-                            style = MaterialTheme.typography.labelMedium,
+                            value = tSwing.toFloat(), min = 0f, max = 100f,
+                            onSet = { samba.setTrackSwing(instrument, it.toInt()) },
                             fontWeight = FontWeight.SemiBold,
                         )
                         Slider(
@@ -1465,12 +1480,12 @@ private fun InstrumentRow(
                     voices.forEachIndexed { idx, v ->
                         val vvol = samba.voiceVolumeOf(instrument, idx)
                         Column(modifier = Modifier.width(260.dp).padding(horizontal = 12.dp, vertical = 2.dp)) {
-                            Text(
+                            // Tap = audition; double-tap = type an exact percent.
+                            NumericValueText(
                                 "${v.glyph}   ${v.displayName}   ·   ${(vvol * 100).toInt()}%",
-                                style = MaterialTheme.typography.labelMedium,
-                                modifier = Modifier.pointerInput(instrument, idx) {
-                                    detectTapGestures(onTap = { samba.preview(instrument, idx) })
-                                },
+                                value = vvol * 100, min = 0f, max = 100f,
+                                onSet = { samba.setVoiceVolume(instrument, idx, it / 100f) },
+                                onTap = { samba.preview(instrument, idx) },
                             )
                             Slider(
                                 value = vvol,
@@ -1496,6 +1511,12 @@ private fun InstrumentRow(
                     onColor = MaterialTheme.colorScheme.error) { samba.toggleMute(instrument) }
                 ToggleTag("S", on = instrument in samba.soloed,
                     onColor = MaterialTheme.colorScheme.primary) { samba.toggleSolo(instrument) }
+                // Mixer right next to M/S: opens this track's volume/swing popup.
+                ToggleTag("≡", on = mixerOpen,
+                    onColor = MaterialTheme.colorScheme.primary) {
+                    samba.editOpening(inOpening)
+                    if (mixerOpen) onMixerDismiss() else onMixerOpen()
+                }
                 // Reorder this track up / down (raise / lower to sit two tracks together).
                 Text("▲", style = MaterialTheme.typography.bodySmall,
                     color = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.surfaceVariant,
