@@ -14,6 +14,10 @@ export interface PercussionInstrument {
   id: string;
   displayName: string;
   voices: PercussionVoice[];
+  /** When true, each new strike CHOKES the previous one on the same track —
+   *  the hand stays on the head (pandeiro), so nothing rings past the next
+   *  hit. The audio engine fades the previous voice at the new hit's onset. */
+  selfChoke?: boolean;
 }
 
 function inst(id: string, displayName: string, voices: [string, string][]): PercussionInstrument {
@@ -24,7 +28,16 @@ function inst(id: string, displayName: string, voices: [string, string][]): Perc
 const Surdo = inst("surdo", "Surdo", [["●", "open (ring)"], ["◐", "muted bass"], ["·", "tap"]]);
 const Tamborim = inst("tamborim", "Tamborim", [["●", "clack"], ["◐", "muted clack"], ["·", "tap"]]);
 const Bongo = inst("bongo", "Bongo", [["▲", "hi"], ["▼", "lo"], ["◇", "rim"], ["✦", "slap"]]);
-const Pandeiro = inst("pandeiro", "Pandeiro", [["●", "bass (open)"], ["◐", "bass (muted)"], ["✦", "slap"], ["○", "jingle"]]);
+// Voices 0-2 + 4-7 are Nadav's own recording (tools/build_pandeiro_from_recording.py);
+// selfChoke: a real pandeiro hand damps the previous stroke at every new hit.
+const Pandeiro: PercussionInstrument = {
+  ...inst("pandeiro", "Pandeiro", [
+    ["●", "bass (open)"], ["◐", "bass (closed)"], ["✦", "slap"], ["○", "jingle"],
+    ["△", "finger (open)"], ["▲", "finger (closed)"],
+    ["▽", "heel (open)"], ["▼", "heel (closed)"],
+  ]),
+  selfChoke: true,
+};
 const Agogo = inst("agogo", "Agogô", [["▼", "low bell"], ["▲", "high bell"]]);
 
 const DEFAULT_KIT: PercussionInstrument[] = [Surdo, Tamborim, Bongo];
@@ -80,7 +93,7 @@ export const PercussionCatalog = {
     const h = id.indexOf("#");
     const n = h < 0 ? NaN : parseInt(id.substring(h + 1), 10);
     if (Number.isNaN(n)) return undefined;
-    return { id, displayName: `${base.displayName} ${n}`, voices: base.voices };
+    return { ...base, id, displayName: `${base.displayName} ${n}` };
   },
 };
 
@@ -562,6 +575,12 @@ export const PRESET_TRACKS: PresetTrack[] = [
   { label: "Bongo — Partido Alto Opening", instrument: Bongo,
     template: [null, null, 0, null, 1, null, 1, null, 1, null, 0, null, 3, 1, null, 1],
     note: "One-shot entrada into the partido alto — use as an opening (▶¹) before the groove." },
+  // From Nadav's own recording (tools/recordings/pandeiro_reta_bars.wav):
+  // bass closed, finger closed, heel closed, slap | bass open, finger open,
+  // heel open, finger open — one 2/4 bar of 16ths, twice.
+  { label: "Pandeiro — Reta", instrument: Pandeiro,
+    template: [1, 5, 7, 2, 0, 4, 6, 4, 1, 5, 7, 2, 0, 4, 6, 4],
+    note: "Played straight (reta) — also sounds great swung ~50%." },
 ];
 
 /** A single-line tamborim rhythm from onset slots (`accented` slots get the

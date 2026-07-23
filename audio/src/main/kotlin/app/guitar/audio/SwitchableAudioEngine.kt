@@ -47,8 +47,8 @@ class SwitchableAudioEngine(
     override fun playSamples(samples: FloatArray, gain: Float) =
         active.playSamples(samples, gain)
 
-    override fun playSamplesAt(samples: FloatArray, gain: Float, delayFrames: Int) =
-        active.playSamplesAt(samples, gain, delayFrames)
+    override fun playSamplesAt(samples: FloatArray, gain: Float, delayFrames: Int, chokeKey: String?) =
+        active.playSamplesAt(samples, gain, delayFrames, chokeKey)
 
     /** Stop BOTH engines — safe regardless of which is active. */
     override fun stop() {

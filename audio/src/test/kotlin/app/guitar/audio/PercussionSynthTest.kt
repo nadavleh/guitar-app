@@ -25,7 +25,7 @@ class PercussionSynthTest {
     @Test fun defaultKitVoiceCountsMatchTheBundledSamples() {
         assertTrue(PercussionCatalog.Surdo.voiceCount == 3)
         assertTrue(PercussionCatalog.Tamborim.voiceCount == 3)
-        assertTrue(PercussionCatalog.Pandeiro.voiceCount == 4)
+        assertTrue(PercussionCatalog.Pandeiro.voiceCount == 8)
         assertTrue(PercussionCatalog.Agogo.voiceCount == 2)
     }
 }

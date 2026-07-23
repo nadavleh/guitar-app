@@ -54,6 +54,9 @@ export class WebAudioEngine {
   private eqHigh: BiquadFilterNode | null = null;
 
   private active = new Set<ActiveVoice>();
+  /** Last scheduled sample per choke key (see playSamples) — the one a new
+   *  same-key hit fades out at its own onset. */
+  private chokeTails = new Map<string, { src: AudioBufferSourceNode; gain: GainNode }>();
   // Default to the MODERN (overhaul) engine, matching Android (AppState.useModernAudio = true).
   private _useModern = true;
 
@@ -417,7 +420,7 @@ export class WebAudioEngine {
    *  omitted/past values start immediately. Always dry (no panner/reverb send) in
    *  both chains — keeps drums punchy — but in MODERN mode still passes through the
    *  limiter via modernMaster. */
-  playSamples(samples: Float32Array, gain = 1, when = 0): void {
+  playSamples(samples: Float32Array, gain = 1, when = 0, chokeKey?: string): void {
     if (samples.length === 0) return;
     const ctx = this.ensure();
     const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
@@ -435,6 +438,21 @@ export class WebAudioEngine {
       g.disconnect();
     };
     this.active.add(entry);
+    const start = when > ctx.currentTime ? when : ctx.currentTime;
+    // Self-choke: fade the PREVIOUS same-key sample out at this hit's onset
+    // (a pandeiro hand damps the old stroke when the new one lands). Hits on a
+    // key are scheduled in time order, so the last stored entry is the one ringing.
+    if (chokeKey !== undefined) {
+      const prev = this.chokeTails.get(chokeKey);
+      if (prev) {
+        try {
+          prev.gain.gain.setValueAtTime(prev.gain.gain.value, Math.max(start - 0.002, ctx.currentTime));
+          prev.gain.gain.linearRampToValueAtTime(0, start + 0.012);
+          prev.src.stop(start + 0.02);
+        } catch { /* already ended */ }
+      }
+      this.chokeTails.set(chokeKey, { src, gain: g });
+    }
     src.start(when > ctx.currentTime ? when : 0);
   }
 
@@ -470,6 +488,7 @@ export class WebAudioEngine {
       }
     }
     this.active.clear();
+    this.chokeTails.clear();
   }
 
   private ensureSynth(): PluckedSynth {

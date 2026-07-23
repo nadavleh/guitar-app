@@ -32,9 +32,15 @@ export class PercussionSynth {
         if (voiceIndex === 1) return this.tamborimClack(true);
         return this.noiseDrum(0.05, 95, 0.30, true, 0.30);
       case "pandeiro":
+        // 0 open bass, 1 closed bass, 2 slap, 3 jingle,
+        // 4/5 finger tap open/closed, 6/7 heel tap open/closed.
         if (voiceIndex === 0) return this.tonedTap(150, 0.22, 13, 0.62);
         if (voiceIndex === 1) return this.tonedTap(155, 0.08, 42, 0.55);
         if (voiceIndex === 2) return this.noiseDrum(0.08, 60, 0.50, true, 0.72);
+        if (voiceIndex === 4) return this.tonedTap(240, 0.14, 22, 0.45);
+        if (voiceIndex === 5) return this.tonedTap(250, 0.06, 55, 0.40);
+        if (voiceIndex === 6) return this.tonedTap(190, 0.14, 22, 0.50);
+        if (voiceIndex === 7) return this.tonedTap(200, 0.06, 55, 0.45);
         return this.jingle();
       case "agogo":
         return voiceIndex === 0 ? this.bell(590) : this.bell(740);

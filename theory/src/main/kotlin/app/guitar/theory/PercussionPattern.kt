@@ -504,6 +504,14 @@ object PercussionBuiltins {
             note = "One-shot entrada into the partido alto — use as an opening (▶¹) " +
                 "before the groove.",
         ),
+        // From Nadav's own recording (tools/recordings/pandeiro_reta_bars.wav):
+        // bass closed, finger closed, heel closed, slap | bass open, finger open,
+        // heel open, finger open — one 2/4 bar of 16ths, twice.
+        PresetTrack(
+            "Pandeiro — Reta", PercussionCatalog.Pandeiro,
+            listOf(1, 5, 7, 2, 0, 4, 6, 4, 1, 5, 7, 2, 0, 4, 6, 4),
+            note = "Played straight (reta) — also sounds great swung ~50%.",
+        ),
     )
 
     // Partido-alto grooves (from Nadav's exported beats): the teleco-teco

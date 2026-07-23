@@ -15,6 +15,10 @@ data class PercussionInstrument(
     val id: String,
     val displayName: String,
     val voices: List<PercussionVoice>,
+    /** When true, each new strike CHOKES the previous one on the same track —
+     *  the hand stays on the head (pandeiro), so nothing rings past the next
+     *  hit. The audio engines fade the previous voice at the new hit's onset. */
+    val selfChoke: Boolean = false,
 ) {
     val voiceCount: Int get() = voices.size
 }
@@ -48,8 +52,13 @@ object PercussionCatalog {
         "●" to "clack", "◐" to "muted clack", "·" to "tap")
     val Bongo = inst("bongo", "Bongo",
         "▲" to "hi", "▼" to "lo", "◇" to "rim", "✦" to "slap")
+    // Voices 0-2 + 4-7 are Nadav's own recording (tools/build_pandeiro_from_recording.py);
+    // selfChoke: a real pandeiro hand damps the previous stroke at every new hit.
     val Pandeiro = inst("pandeiro", "Pandeiro",
-        "●" to "bass (open)", "◐" to "bass (muted)", "✦" to "slap", "○" to "jingle")
+        "●" to "bass (open)", "◐" to "bass (closed)", "✦" to "slap", "○" to "jingle",
+        "△" to "finger (open)", "▲" to "finger (closed)",
+        "▽" to "heel (open)", "▼" to "heel (closed)",
+    ).copy(selfChoke = true)
     val Agogo = inst("agogo", "Agogô",
         "▼" to "low bell", "▲" to "high bell")
 

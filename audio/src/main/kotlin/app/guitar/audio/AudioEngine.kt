@@ -40,8 +40,12 @@ interface AudioEngine {
      * frames after insertion, counted on the MIXER's own clock — sample-accurate
      * lookahead scheduling for sequencers. The pending voice keeps the output
      * loop running, so the countdown never pauses. Default: immediate.
+     *
+     * [chokeKey]: self-choke group — a new voice with the same key fades the
+     * previous one out at its own onset (a pandeiro hand damps the old stroke
+     * when the new one lands). Null = voices ring freely (default).
      */
-    fun playSamplesAt(samples: FloatArray, gain: Float = 1f, delayFrames: Int = 0) =
+    fun playSamplesAt(samples: FloatArray, gain: Float = 1f, delayFrames: Int = 0, chokeKey: String? = null) =
         playSamples(samples, gain)
 
     /** Stop any currently-playing audio immediately. */

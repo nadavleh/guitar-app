@@ -146,7 +146,7 @@ let p = empty;
 const cy: (number | null)[] = [];
 for (let i = 0; i < 4; i++) { p = p.cycled(PercussionCatalog.Surdo, 0); cy.push(p.voiceAt(PercussionCatalog.Surdo, 0)); }
 check("Surdo cell cycles 0,1,2,null", cy[0] === 0 && cy[1] === 1 && cy[2] === 2 && cy[3] === null);
-check("Surdo has 3 voices, Pandeiro 4 (no jingle-hi)", voiceCount(PercussionCatalog.Surdo) === 3 && voiceCount(PercussionCatalog.Pandeiro) === 4);
+check("Surdo has 3 voices, Pandeiro 8 (recorded articulations)", voiceCount(PercussionCatalog.Surdo) === 3 && voiceCount(PercussionCatalog.Pandeiro) === 8);
 // add an instrument → silent row appended; round-trips through encode/decode
 const cuica = PercussionCatalog.byId("cuica")!;
 const withCuica = empty.addInstrument(cuica).cycled(cuica, 2).cycled(PercussionCatalog.Surdo, 0);

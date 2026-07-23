@@ -30,12 +30,17 @@ class PercussionSynth(val sampleRate: Int = 44100) {
             1 -> tamborimClack(muted = true)
             else -> noiseDrum(durSec = 0.05, decay = 95.0, lpAlpha = 0.30, hp = true, amp = 0.30)
         }
-        // Pandeiro: 0 open bass, 1 muted bass (low-mid), 2 slap, 3 jingle.
+        // Pandeiro: 0 open bass, 1 closed bass, 2 slap, 3 jingle,
+        // 4/5 finger tap open/closed, 6/7 heel tap open/closed.
         "pandeiro" -> when (voiceIndex) {
             0 -> tonedTap(freq = 150.0, durSec = 0.22, decay = 13.0, amp = 0.62) // open bass
-            1 -> tonedTap(freq = 155.0, durSec = 0.08, decay = 42.0, amp = 0.55) // muted bass
+            1 -> tonedTap(freq = 155.0, durSec = 0.08, decay = 42.0, amp = 0.55) // closed bass
             2 -> noiseDrum(durSec = 0.08, decay = 60.0, lpAlpha = 0.50, hp = true, amp = 0.72) // slap
-            else -> jingle()
+            3 -> jingle()
+            4 -> tonedTap(freq = 240.0, durSec = 0.14, decay = 22.0, amp = 0.45) // finger open
+            5 -> tonedTap(freq = 250.0, durSec = 0.06, decay = 55.0, amp = 0.40) // finger closed
+            6 -> tonedTap(freq = 190.0, durSec = 0.14, decay = 22.0, amp = 0.50) // heel open
+            else -> tonedTap(freq = 200.0, durSec = 0.06, decay = 55.0, amp = 0.45) // heel closed
         }
         "agogo" -> when (voiceIndex) {
             0 -> bell(freq = 590.0)

@@ -230,7 +230,9 @@ class LegacyAudioTrackEngine(
         addVoice(samples, gain)
     }
 
-    override fun playSamplesAt(samples: FloatArray, gain: Float, delayFrames: Int) {
+    // chokeKey is accepted for interface parity but ignored: legacy voices have
+    // no envelope to fade, and the legacy engine is only the A/B fallback.
+    override fun playSamplesAt(samples: FloatArray, gain: Float, delayFrames: Int, chokeKey: String?) {
         if (!running.get() || samples.isEmpty() || gain <= 0f) return
         addVoice(samples, gain, delayFrames.coerceAtLeast(0))
     }

@@ -11,9 +11,16 @@ class MixVoice(
     val envelope: AmpEnvelope = AmpEnvelope(48000, attackMs = 0.0, releaseMs = 0.0),
     var pan: Double = 0.0,
     var reverbSend: Float = 0f,
+    /** Self-choke group: adding a new voice with the same key schedules this
+     *  voice's release at the new one's start (see [VoiceMixer.addAndCap]). */
+    val chokeKey: String? = null,
 ) {
     /** Frames still to wait before this voice starts sounding (mixer clock). */
     var remainingDelay: Int = delayFrames.coerceAtLeast(0)
+
+    /** Frames until this voice is released (choked by a newer same-key voice);
+     *  -1 = no scheduled choke. Counted down block-by-block in [VoiceMixer.mixBlock]. */
+    var releaseIn: Int = -1
     /** Peak |post-gain sample| of the most recent block this voice contributed to,
      *  for quietest-voice stealing. Initialized high so a freshly-added voice (not
      *  yet mixed) is never chosen as the [VoiceMixer.capVoices] steal target. */
@@ -65,8 +72,14 @@ class VoiceMixer(val sampleRate: Int) {
     }
 
     /** Add a voice and atomically trim to the cap in one synchronized block,
-     *  preventing the output thread from briefly seeing voices over the max. */
+     *  preventing the output thread from briefly seeing voices over the max.
+     *  A voice with a [MixVoice.chokeKey] schedules the release of the previous
+     *  same-key voice at its own start (a pandeiro hand damps the old stroke
+     *  when the new one lands) — hits per key arrive in time order. */
     @Synchronized fun addAndCap(v: MixVoice, max: Int) {
+        if (v.chokeKey != null) {
+            voices.lastOrNull { it.chokeKey == v.chokeKey }?.releaseIn = v.remainingDelay
+        }
         voices.add(v)
         capVoices(max)
     }
@@ -77,6 +90,12 @@ class VoiceMixer(val sampleRate: Int) {
         val it = voices.iterator()
         while (it.hasNext()) {
             val v = it.next()
+            // Scheduled choke: release once the countdown reaches this block
+            // (block-granular — well under the 20 ms release fade itself).
+            if (v.releaseIn >= 0) {
+                v.releaseIn -= count
+                if (v.releaseIn < 0) v.envelope.release()
+            }
             var i = 0
             // Consume any scheduling delay first.
             if (v.remainingDelay > 0) {

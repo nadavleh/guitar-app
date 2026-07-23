@@ -222,7 +222,7 @@ class BlocksState(
                 // set), its cells afterwards — so `prev` (the return rule's input)
                 // tracks what actually sounded, and no return rule fires before
                 // anything played.
-                for (t in snapshot.tracks) {
+                for ((ti, t) in snapshot.tracks.withIndex()) {
                     fun playedAt(ci: Int): PresetTrack? = when {
                         ci < 0 -> null
                         ci == 0 && t.opening != null -> t.opening
@@ -241,7 +241,10 @@ class BlocksState(
                             val dyn = raw / PERCUSSION_DYN
                             val gain = (if (accented) 1.4f else 1f) * PERCUSSION_DYN_FACTORS[dyn]
                             val delayMs = ((colStartNanos - System.nanoTime()) / 1_000_000 + onsetMs).coerceAtLeast(0)
-                            audio.playSamplesAt(buffer(t.instrument, voice), gain, (delayMs * sr / 1000).toInt())
+                            // Self-choke per TRACK (blocks may repeat an instrument —
+                            // two pandeiro players don't damp each other).
+                            val chokeKey = if (t.instrument.selfChoke) "${t.instrument.id}@$ti" else null
+                            audio.playSamplesAt(buffer(t.instrument, voice), gain, (delayMs * sr / 1000).toInt(), chokeKey)
                         }
                         onsetMs += PercussionTiming.swungSlotMs(slot, bpm, swing, meter)
                     }

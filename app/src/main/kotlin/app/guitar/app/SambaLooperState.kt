@@ -305,7 +305,8 @@ class SambaLooperState(
 
     /** Audition a single voice (used by the row-label tap). */
     fun preview(instrument: PercussionInstrument, voiceIndex: Int) {
-        audio.playSamples(buffer(instrument, voiceIndex), effectiveGain(instrument, voiceIndex))
+        audio.playSamplesAt(buffer(instrument, voiceIndex), effectiveGain(instrument, voiceIndex),
+            0, if (instrument.selfChoke) instrument.id else null)
     }
 
     /** Toggle the accent on a non-silent cell (Accent tool). */
@@ -496,7 +497,9 @@ class SambaLooperState(
                     val gain = effectiveGain(inst, v) *
                         (if (snapshot.isAccented(inst, slot)) 1.4f else 1f) *
                         app.guitar.theory.PERCUSSION_DYN_FACTORS[snapshot.dynLevelAt(inst, slot)]
-                    audio.playSamplesAt(buf, gain, baseFrames - advance)
+                    // Self-choking instruments (pandeiro): each hit damps the track's
+                    // previous one at its own onset (kit ids are unique per track).
+                    audio.playSamplesAt(buf, gain, baseFrames - advance, if (inst.selfChoke) inst.id else null)
                 }
             }
             var nextOnsetNanos = System.nanoTime()

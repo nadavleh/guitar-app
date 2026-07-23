@@ -336,7 +336,8 @@ export class SambaLooperState {
 
   preview(instrument: PercussionInstrument, voiceIndex: number) {
     this.ensureSamplesLoaded();
-    this.deps.audio.playSamples(this.buffer(instrument, voiceIndex), this.effectiveGain(instrument, voiceIndex));
+    this.deps.audio.playSamples(this.buffer(instrument, voiceIndex), this.effectiveGain(instrument, voiceIndex),
+      0, instrument.selfChoke ? instrument.id : undefined);
   }
 
   toggleAccent(instrument: PercussionInstrument, slot: number) { this.commit(this.editPattern.accentToggled(instrument, slot)); }
@@ -516,7 +517,9 @@ export class SambaLooperState {
         const gain = this.effectiveGain(inst, v)
           * (snapshot.isAccented(inst, slot) ? 1.4 : 1)
           * PERCUSSION_DYN_FACTORS[snapshot.dynLevelAt(inst, slot)];
-        this.deps.audio.playSamples(buf, gain, when - advance);
+        // Self-choking instruments (pandeiro): each hit damps the track's
+        // previous one at its own onset (kit ids are unique per track).
+        this.deps.audio.playSamples(buf, gain, when - advance, inst.selfChoke ? inst.id : undefined);
       }
     };
     void (async () => {

@@ -257,7 +257,7 @@ export class BlocksState {
         // What a track plays at absolute column ci: its OPENING at ci 0 (if set),
         // its cells afterwards — so `prev` (the return rule's input) tracks what
         // actually sounded, and no return rule fires before anything played.
-        for (const t of snapshot.tracks) {
+        for (const [ti, t] of snapshot.tracks.entries()) {
           const playedAt = (ci: number): PresetTrack | null => {
             if (ci < 0) return null;
             if (ci === 0 && t.opening) return t.opening;
@@ -275,7 +275,10 @@ export class BlocksState {
             const accented = Math.floor(raw / PERCUSSION_ACCENT) % 10 === 1;
             const dyn = Math.floor(raw / PERCUSSION_DYN);
             const gain = (accented ? 1.4 : 1) * PERCUSSION_DYN_FACTORS[dyn];
-            this.deps.audio.playSamples(this.buffer(t.instrument, voice), gain, colStart + this.onsetSec(slot, swing));
+            // Self-choke per TRACK (blocks may repeat an instrument — two
+            // pandeiro players don't damp each other).
+            const chokeKey = t.instrument.selfChoke ? `${t.instrument.id}@${ti}` : undefined;
+            this.deps.audio.playSamples(this.buffer(t.instrument, voice), gain, colStart + this.onsetSec(slot, swing), chokeKey);
           }
         }
         // Metronome click track: one click per beat on the straight clock,

@@ -230,9 +230,9 @@ class AudioTrackEngine(
         addVoice(samples, gain)
     }
 
-    override fun playSamplesAt(samples: FloatArray, gain: Float, delayFrames: Int) {
+    override fun playSamplesAt(samples: FloatArray, gain: Float, delayFrames: Int, chokeKey: String?) {
         if (!running.get() || samples.isEmpty() || gain <= 0f) return
-        addVoice(samples, gain, delayFrames.coerceAtLeast(0))
+        addVoice(samples, gain, delayFrames.coerceAtLeast(0), chokeKey = chokeKey)
     }
 
     /** Add any VoiceSource as a modern voice (envelope + pan + reverb send). */
@@ -259,6 +259,7 @@ class AudioTrackEngine(
         releaseMs: Int = 20,
         pan: Double = 0.0,
         reverbSend: Float = 0f,
+        chokeKey: String? = null,
     ) {
         if (samples.isEmpty()) return
         mixer.addAndCap(
@@ -269,6 +270,7 @@ class AudioTrackEngine(
                 AmpEnvelope(sampleRate, attackMs, releaseMs.toDouble()),
                 pan,
                 reverbSend,
+                chokeKey,
             ),
             MAX_VOICES,
         )
