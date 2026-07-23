@@ -1,4 +1,4 @@
-﻿// Reactive app state, ported from app/.../AppState.kt (Phase 1 subset: Fretboard,
+// Reactive app state, ported from app/.../AppState.kt (Phase 1 subset: Fretboard,
 // Tuner, Options). Persistence uses localStorage in place of Android DataStore.
 //
 // State is a plain observable: mutating methods change fields then call notify(),
