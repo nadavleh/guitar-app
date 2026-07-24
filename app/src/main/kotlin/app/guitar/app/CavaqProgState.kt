@@ -9,8 +9,10 @@ import app.guitar.audio.Timbre
 import app.guitar.theory.CavaqSequence
 import app.guitar.theory.CavaqSequences
 import app.guitar.theory.ChordLibrary
+import app.guitar.theory.ChordQuality
 import app.guitar.theory.ChordShape
 import app.guitar.theory.ChordShapeGenerator
+import app.guitar.theory.cavaquinhoVoicingPool
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
 import app.guitar.theory.ResolvedChord
@@ -71,11 +73,18 @@ class CavaqProgState(
 
     private fun minFret(sh: ChordShape) = sh.frets.filterNotNull().minOrNull() ?: 0
 
+    /** All candidate voicings for a chord. On the 4-string cavaquinho this is the
+     *  comprehensive pool (complete + rootless + no-5th shell) so the voice-leader
+     *  can pick smooth rootless/shell grips; other tunings use the CAGED generator. */
+    private fun voicings(root: PitchClass, q: ChordQuality, tuning: Tuning): List<ChordShape> =
+        if (tuning.stringCount == 4) cavaquinhoVoicingPool(root, q, tuning, maxFret = DISPLAY_FRETS)
+        else gen.shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
+
     /** Candidate starting voicings for the first chord, sorted low → high on the neck. */
     private fun firstShapes(): List<ChordShape> {
         val first = resolved.firstOrNull() ?: return emptyList()
         val (root, q) = ChordLibrary.parse(first.symbol) ?: return emptyList()
-        return gen.shapesFor(root, q, tuningProvider(), frets = DISPLAY_FRETS).sortedBy { minFret(it) }
+        return voicings(root, q, tuningProvider()).sortedBy { minFret(it) }
     }
 
     /** How many neck-region positions the current sequence offers (>= 1 when playable). */
@@ -93,7 +102,7 @@ class CavaqProgState(
             val chosen: ChordShape? = if (i == 0) {
                 if (starts.isEmpty()) null else starts[positionIndex.coerceIn(0, starts.size - 1)]
             } else {
-                val shs = gen.shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
+                val shs = voicings(root, q, tuning)
                 when {
                     shs.isEmpty() -> null
                     prev == null -> shs.sortedBy { minFret(it) }.first()

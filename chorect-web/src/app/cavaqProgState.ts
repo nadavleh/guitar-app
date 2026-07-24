@@ -10,8 +10,8 @@
 // earTrainingState's looper.
 
 import {
-  Tuning, PitchClass, ChordShape, ChordShapeGenerator,
-  ResolvedChord, resolveNamed, parseChord, spellPc,
+  Tuning, PitchClass, ChordShape, ChordShapeGenerator, ChordQuality,
+  ResolvedChord, resolveNamed, parseChord, spellPc, stringCount, cavaquinhoVoicingPool,
   CavaqSequence, CAVAQ_SEQUENCES, cavaqSequenceById, pickMinMovement,
 } from "../theory";
 import { WebAudioEngine, Timbre } from "../audio";
@@ -65,6 +65,15 @@ export class CavaqProgState {
     return fs.length ? Math.min(...fs) : 0;
   }
 
+  /** All candidate voicings for a chord. On the 4-string cavaquinho this is the
+   *  comprehensive pool (complete + rootless + no-5th shell) so the voice-leader
+   *  can pick smooth rootless/shell grips; other tunings use the CAGED generator. */
+  private voicings(root: PitchClass, q: ChordQuality, tuning: Tuning): ChordShape[] {
+    return stringCount(tuning) === 4
+      ? cavaquinhoVoicingPool(root, q, tuning, DISPLAY_FRETS)
+      : this.gen.shapesFor(root, q, tuning, DISPLAY_FRETS);
+  }
+
   /** Candidate starting voicings for the first chord, sorted low → high. */
   private firstShapes(): ChordShape[] {
     const first = this.resolved[0];
@@ -72,7 +81,7 @@ export class CavaqProgState {
     const parsed = parseChord(first.symbol);
     if (!parsed) return [];
     const [root, q] = parsed;
-    return this.gen.shapesFor(root, q, this.deps.tuningProvider(), DISPLAY_FRETS)
+    return this.voicings(root, q, this.deps.tuningProvider())
       .slice()
       .sort((a, b) => this.minFret(a) - this.minFret(b));
   }
@@ -96,7 +105,7 @@ export class CavaqProgState {
       if (i === 0) {
         chosen = starts.length === 0 ? null : starts[Math.min(Math.max(this.positionIndex, 0), starts.length - 1)];
       } else {
-        const shs = this.gen.shapesFor(root, q, tuning, DISPLAY_FRETS);
+        const shs = this.voicings(root, q, tuning);
         if (shs.length === 0) chosen = null;
         else if (prev === null) chosen = shs.slice().sort((a, b) => this.minFret(a) - this.minFret(b))[0];
         else chosen = shs[pickMinMovement(prev, shs)];

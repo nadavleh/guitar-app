@@ -460,6 +460,93 @@ export function essentialShellIntervals(quality: ChordQuality): Set<Interval> {
   return essential;
 }
 
+// ---------- cavaquinho voicing pool (voice-leading) ----------
+
+/**
+ * Comprehensive four-string cavaquinho voicing pool for the Progressions screen's
+ * voice-leading. Mirror of theory/.../CavaquinhoShapes.kt#cavaquinhoVoicingPool.
+ * Every grip sounding all four strings within `maxSpan` frets, classified as
+ * COMPLETE (all chord tones), ROOTLESS (root dropped — 4-note chords; upper-
+ * structure triad on the 3rd) or no-5th SHELL (root + 3rd + 7th), deduped by
+ * interval-per-string signature (lowest position kept). templateName = the kind.
+ * Feeding these to pickMinMovement lets the least-motion rule choose the smooth
+ * rootless/shell voicings a player uses (e.g. the quadradinho).
+ */
+export function cavaquinhoVoicingPool(
+  root: PitchClass,
+  quality: ChordQuality,
+  tuning: Tuning,
+  maxFret = 15,
+  maxSpan = 3,
+): ChordShape[] {
+  const chordPcs = new Set(notesFrom(quality, root));
+  const fifth = pcPlus(root, 7);
+  const fourNote = chordPcs.size >= 4;
+  const hasP5 = chordPcs.has(fifth);
+  const name = `${spellPc(root)}${quality.symbol}`;
+  const n = stringCount(tuning);
+
+  const candidates: number[][] = [];
+  for (let s = 0; s < n; s++) {
+    const list: number[] = [];
+    for (let f = 0; f <= maxFret; f++) {
+      if (chordPcs.has(midiPitchClass(noteAt(tuning, fp(s, f)).midi))) list.push(f);
+    }
+    if (list.length === 0) return [];
+    candidates.push(list);
+  }
+
+  const complete = new Map<string, ChordShape>();
+  const rootless = new Map<string, ChordShape>();
+  const shell = new Map<string, ChordShape>();
+
+  const consider = (frets: number[]) => {
+    const midis = frets.map((f, s) => noteAt(tuning, fp(s, f)).midi);
+    for (let i = 0; i < n - 1; i++) if (midis[i] === midis[i + 1]) return;
+    const fretted = frets.filter((f) => f > 0);
+    const maxF = fretted.length ? Math.max(...fretted) : 0;
+    if (frets.some((f) => f === 0) && maxF > 3) return;
+    if (fretted.length && maxF - Math.min(...fretted) > maxSpan) return;
+    const playedPcs = new Set(midis.map((m) => midiPitchClass(m)));
+    const intervals = midis.map((m) => (((midiPitchClass(m) - root) % 12) + 12) % 12);
+    const pos = fretted.length ? Math.min(...fretted) : 0;
+    const chordArr = [...chordPcs];
+    const isComplete = chordArr.every((pc) => playedPcs.has(pc));
+    const isRootless = fourNote && !playedPcs.has(root) && chordArr.every((pc) => pc === root || playedPcs.has(pc));
+    const isShell = fourNote && hasP5 && playedPcs.has(root) && !playedPcs.has(fifth) &&
+      chordArr.every((pc) => pc === fifth || playedPcs.has(pc));
+    let bucket: Map<string, ChordShape>;
+    let kind: string;
+    if (isComplete) { bucket = complete; kind = "complete"; }
+    else if (isRootless) { bucket = rootless; kind = "rootless"; }
+    else if (isShell) { bucket = shell; kind = "shell"; }
+    else return;
+    const key = intervals.join(",");
+    const prev = bucket.get(key);
+    if (!prev || pos < prev.position) {
+      bucket.set(key, new ChordShape({ chordName: name, root, quality, frets: frets.slice(), tuning, templateName: kind }));
+    }
+  };
+
+  const idx = new Array<number>(n).fill(0);
+  for (;;) {
+    consider(candidates.map((c, s) => c[idx[s]]));
+    let i = n - 1;
+    for (; i >= 0; i--) {
+      idx[i]++;
+      if (idx[i] < candidates[i].length) break;
+      idx[i] = 0;
+    }
+    if (i < 0) break;
+  }
+  const byPos = (a: ChordShape, b: ChordShape) => a.position - b.position;
+  return [
+    ...[...complete.values()].sort(byPos),
+    ...[...rootless.values()].sort(byPos).slice(0, 3),
+    ...[...shell.values()].sort(byPos).slice(0, 2),
+  ];
+}
+
 // ---------- ChordShapeGenerator ----------
 
 export class ChordShapeGenerator {

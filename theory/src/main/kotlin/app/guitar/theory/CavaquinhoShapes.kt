@@ -201,6 +201,86 @@ fun cavaquinhoShapesFor(
     )
 }
 
+/**
+ * Comprehensive four-string cavaquinho voicing pool for voice-leading (the
+ * Progressions screen). Enumerates every grip that sounds all four strings
+ * within [maxSpan] frets and classifies it:
+ *
+ *  - COMPLETE  — all chord tones present.
+ *  - ROOTLESS  — root dropped (4-note chords only): an upper-structure triad on
+ *    the 3rd (for a dominant 7 that's diminished, e.g. G7 -> Bdim).
+ *  - SHELL     — the perfect 5th dropped (root + 3rd + 7th).
+ *
+ * Deduped by interval-per-string signature (lowest neck position kept), with
+ * [ChordShape.templateName] carrying the kind. Feeding these to
+ * [VoiceLeading.pickMinMovement] lets the least-motion rule choose the smooth
+ * rootless/shell voicings a player actually uses (e.g. the quadradinho), instead
+ * of only the full 1-3-5-(b7) grips the CAGED generator offers.
+ */
+fun cavaquinhoVoicingPool(
+    root: PitchClass,
+    quality: ChordQuality,
+    tuning: Tuning,
+    maxFret: Int = 15,
+    maxSpan: Int = 3,
+): List<ChordShape> {
+    val chordPcs = quality.notesFrom(root).toSet()
+    val fifth = PitchClass((root.value + 7) % 12)
+    val fourNote = chordPcs.size >= 4
+    val hasPerfectFifth = fifth in chordPcs
+    val name = "${NoteSpeller.spell(root)}${quality.symbol}"
+
+    val candidates: List<List<Int>> = (0 until tuning.stringCount).map { s ->
+        (0..maxFret).filter { f -> Fretboard.noteAt(tuning, FretPosition(s, f)).pitchClass in chordPcs }
+    }
+    if (candidates.any { it.isEmpty() }) return emptyList()
+
+    val complete = HashMap<List<Int>, ChordShape>()
+    val rootless = HashMap<List<Int>, ChordShape>()
+    val shell = HashMap<List<Int>, ChordShape>()
+
+    fun consider(frets: List<Int>) {
+        val notes = frets.mapIndexed { s, f -> Fretboard.noteAt(tuning, FretPosition(s, f)) }
+        for (i in 0 until notes.size - 1) if (notes[i].midi.value == notes[i + 1].midi.value) return
+        val fretted = frets.filter { it > 0 }
+        val maxF = fretted.maxOrNull() ?: 0
+        if (frets.any { it == 0 } && maxF > 3) return
+        if (fretted.isNotEmpty() && (maxF - fretted.min()) > maxSpan) return
+        val playedPcs = notes.map { it.pitchClass }.toSet()
+        val intervals = notes.map { ((it.pitchClass.value - root.value) % 12 + 12) % 12 }
+        val pos = fretted.minOrNull() ?: 0
+        val isComplete = playedPcs.containsAll(chordPcs)
+        val isRootless = fourNote && root !in playedPcs && playedPcs.containsAll(chordPcs - root)
+        val isShell = fourNote && hasPerfectFifth && root in playedPcs &&
+            fifth !in playedPcs && playedPcs.containsAll(chordPcs - fifth)
+        val (bucket, kind) = when {
+            isComplete -> complete to "complete"
+            isRootless -> rootless to "rootless"
+            isShell -> shell to "shell"
+            else -> return
+        }
+        val prev = bucket[intervals]
+        if (prev == null || pos < prev.position) {
+            bucket[intervals] = ChordShape(name, root, quality, frets, tuning, templateName = kind)
+        }
+    }
+
+    val idx = IntArray(tuning.stringCount)
+    val cur = IntArray(tuning.stringCount)
+    outer@ while (true) {
+        for (s in candidates.indices) cur[s] = candidates[s][idx[s]]
+        consider(cur.toList())
+        var i = candidates.size - 1
+        while (i >= 0) { idx[i]++; if (idx[i] < candidates[i].size) break; idx[i] = 0; i-- }
+        if (i < 0) break@outer
+    }
+
+    val completeOut = complete.values.sortedBy { it.position }
+    val rootlessOut = rootless.values.sortedBy { it.position }.take(3)
+    val shellOut = shell.values.sortedBy { it.position }.take(2)
+    return completeOut + rootlessOut + shellOut
+}
+
 private fun realizeCavaqVoicing(
     v: CavaqVoicing,
     root: PitchClass,
