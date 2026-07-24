@@ -99,6 +99,9 @@ def caption_lines(shape: dict, symbol: str) -> tuple[str, str]:
     pos = shape["position"]
     where = "open" if pos == 0 else f"fret {pos}"
     if kind == "complete":
+        # 6/9 (R 3 6 9) has no meaningful inversion numbering — label by bass tone.
+        if symbol == "69":
+            return f"{bass_word(shape, symbol)} in bass", where
         return INV_NAME.get(shape["inversion"], ""), f"{bass_word(shape, symbol)} in bass · {where}"
     if kind == "rootless":
         return "Rootless", f"= {shape['label']}"

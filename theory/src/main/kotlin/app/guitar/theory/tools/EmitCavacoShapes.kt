@@ -5,6 +5,7 @@ import app.guitar.theory.ChordLibrary
 import app.guitar.theory.ChordQuality
 import app.guitar.theory.FretPosition
 import app.guitar.theory.Fretboard
+import app.guitar.theory.Interval
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
 import app.guitar.theory.Tuning
@@ -74,12 +75,18 @@ fun main(args: Array<String>) {
         "G dim" to "dim",
         "G b5bb7 (full dim7)" to "dim7",
         "G half-dim7 (m7b5)" to "m7b5",
+        "G6/9" to "69",
     )
+
+    // 6/9 has five tones (R 3 5 6 9) — one too many for four strings, so the
+    // cavaquinho voicing drops the 5th: the chord is R 3 6 9. Built locally
+    // (not in ChordLibrary) to keep this a tool-only addition.
+    val sixNine = ChordQuality("69", listOf(Interval.P1, Interval.maj3, Interval.maj6, Interval.maj9))
 
     val sb = StringBuilder()
     sb.append("{\n  \"tuning\": \"DGBD\",\n  \"pages\": [\n")
     pages.forEachIndexed { pi, (header, symbol) ->
-        val quality = ChordLibrary.qualities.getValue(symbol)
+        val quality = if (symbol == "69") sixNine else ChordLibrary.qualities.getValue(symbol)
         val shapes = shapesFor(rootG, quality, symbol, tuning)
         val by = shapes.groupingBy { it.kind }.eachCount()
         System.err.println("$header: ${by["complete"] ?: 0} complete, ${by["rootless"] ?: 0} rootless, ${by["shell"] ?: 0} shell")

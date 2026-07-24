@@ -99,6 +99,16 @@
         {"frets": [11,10,8,8], "intervals": [6,10,0,3], "bass": 6, "position": 8, "inversion": 2, "kind": "complete", "label": ""},
         {"frets": [3,3,2,5], "intervals": [10,3,6,0], "bass": 10, "position": 2, "inversion": 3, "kind": "complete", "label": ""}
       ]
+    },
+    {
+      "header": "G6/9",
+      "symbol": "69",
+      "shapes": [
+        {"frets": [5,4,5,7], "intervals": [0,4,9,2], "bass": 0, "position": 4, "inversion": 0, "kind": "complete", "label": ""},
+        {"frets": [7,4,5,5], "intervals": [2,4,9,0], "bass": 2, "position": 4, "inversion": 1, "kind": "complete", "label": ""},
+        {"frets": [7,9,8,9], "intervals": [2,9,0,4], "bass": 2, "position": 7, "inversion": 1, "kind": "complete", "label": ""},
+        {"frets": [9,9,8,7], "intervals": [4,9,0,2], "bass": 4, "position": 7, "inversion": 2, "kind": "complete", "label": ""}
+      ]
     }
   ]
 }
