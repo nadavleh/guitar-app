@@ -6,7 +6,6 @@
       "symbol": "",
       "shapes": [
         {"frets": [5,4,3,5], "intervals": [0,4,7,0], "bass": 0, "position": 3, "inversion": 0, "kind": "complete", "label": ""},
-        {"frets": [5,7,8,9], "intervals": [0,7,0,4], "bass": 0, "position": 5, "inversion": 0, "kind": "complete", "label": ""},
         {"frets": [9,7,8,9], "intervals": [4,7,0,4], "bass": 4, "position": 7, "inversion": 1, "kind": "complete", "label": ""},
         {"frets": [9,12,12,12], "intervals": [4,0,4,7], "bass": 4, "position": 9, "inversion": 1, "kind": "complete", "label": ""},
         {"frets": [0,0,0,0], "intervals": [7,0,4,7], "bass": 7, "position": 0, "inversion": 2, "kind": "complete", "label": ""}
@@ -19,7 +18,6 @@
         {"frets": [5,3,3,5], "intervals": [0,3,7,0], "bass": 0, "position": 3, "inversion": 0, "kind": "complete", "label": ""},
         {"frets": [5,7,8,8], "intervals": [0,7,0,3], "bass": 0, "position": 5, "inversion": 0, "kind": "complete", "label": ""},
         {"frets": [8,7,8,8], "intervals": [3,7,0,3], "bass": 3, "position": 7, "inversion": 1, "kind": "complete", "label": ""},
-        {"frets": [8,12,11,12], "intervals": [3,0,3,7], "bass": 3, "position": 8, "inversion": 1, "kind": "complete", "label": ""},
         {"frets": [12,12,11,12], "intervals": [7,0,3,7], "bass": 7, "position": 11, "inversion": 2, "kind": "complete", "label": ""}
       ]
     },
@@ -28,11 +26,7 @@
       "symbol": "7",
       "shapes": [
         {"frets": [5,4,3,3], "intervals": [0,4,7,10], "bass": 0, "position": 3, "inversion": 0, "kind": "complete", "label": ""},
-        {"frets": [5,7,6,9], "intervals": [0,7,10,4], "bass": 0, "position": 5, "inversion": 0, "kind": "complete", "label": ""},
-        {"frets": [9,7,6,5], "intervals": [4,7,10,0], "bass": 4, "position": 5, "inversion": 1, "kind": "complete", "label": ""},
-        {"frets": [9,10,8,12], "intervals": [4,10,0,7], "bass": 4, "position": 8, "inversion": 1, "kind": "complete", "label": ""},
         {"frets": [0,0,0,3], "intervals": [7,0,4,10], "bass": 7, "position": 3, "inversion": 2, "kind": "complete", "label": ""},
-        {"frets": [12,10,8,9], "intervals": [7,10,0,4], "bass": 7, "position": 8, "inversion": 2, "kind": "complete", "label": ""},
         {"frets": [3,4,3,5], "intervals": [10,4,7,0], "bass": 10, "position": 3, "inversion": 3, "kind": "complete", "label": ""},
         {"frets": [3,0,0,0], "intervals": [10,0,4,7], "bass": 10, "position": 3, "inversion": 3, "kind": "complete", "label": ""},
         {"frets": [3,4,3,3], "intervals": [10,4,7,10], "bass": 10, "position": 3, "inversion": 3, "kind": "rootless", "label": "Bdim"},
@@ -49,11 +43,7 @@
         {"frets": [5,3,3,3], "intervals": [0,3,7,10], "bass": 0, "position": 3, "inversion": 0, "kind": "complete", "label": ""},
         {"frets": [5,7,6,8], "intervals": [0,7,10,3], "bass": 0, "position": 5, "inversion": 0, "kind": "complete", "label": ""},
         {"frets": [8,7,6,5], "intervals": [3,7,10,0], "bass": 3, "position": 5, "inversion": 1, "kind": "complete", "label": ""},
-        {"frets": [8,10,8,12], "intervals": [3,10,0,7], "bass": 3, "position": 8, "inversion": 1, "kind": "complete", "label": ""},
-        {"frets": [12,10,8,8], "intervals": [7,10,0,3], "bass": 7, "position": 8, "inversion": 2, "kind": "complete", "label": ""},
-        {"frets": [12,12,11,15], "intervals": [7,0,3,10], "bass": 7, "position": 11, "inversion": 2, "kind": "complete", "label": ""},
         {"frets": [3,3,3,5], "intervals": [10,3,7,0], "bass": 10, "position": 3, "inversion": 3, "kind": "complete", "label": ""},
-        {"frets": [15,12,11,12], "intervals": [10,0,3,7], "bass": 10, "position": 11, "inversion": 3, "kind": "complete", "label": ""},
         {"frets": [0,3,3,3], "intervals": [7,3,7,10], "bass": 7, "position": 3, "inversion": 2, "kind": "rootless", "label": "Bb"},
         {"frets": [3,3,3,3], "intervals": [10,3,7,10], "bass": 10, "position": 3, "inversion": 3, "kind": "rootless", "label": "Bb"},
         {"frets": [8,7,6,8], "intervals": [3,7,10,3], "bass": 3, "position": 6, "inversion": 1, "kind": "rootless", "label": "Bb"},
@@ -66,16 +56,12 @@
       "symbol": "maj7",
       "shapes": [
         {"frets": [5,4,3,4], "intervals": [0,4,7,11], "bass": 0, "position": 3, "inversion": 0, "kind": "complete", "label": ""},
-        {"frets": [5,7,7,9], "intervals": [0,7,11,4], "bass": 0, "position": 5, "inversion": 0, "kind": "complete", "label": ""},
-        {"frets": [9,7,7,5], "intervals": [4,7,11,0], "bass": 4, "position": 5, "inversion": 1, "kind": "complete", "label": ""},
-        {"frets": [9,11,8,12], "intervals": [4,11,0,7], "bass": 4, "position": 8, "inversion": 1, "kind": "complete", "label": ""},
-        {"frets": [12,11,8,9], "intervals": [7,11,0,4], "bass": 7, "position": 8, "inversion": 2, "kind": "complete", "label": ""},
         {"frets": [4,4,3,5], "intervals": [11,4,7,0], "bass": 11, "position": 3, "inversion": 3, "kind": "complete", "label": ""},
         {"frets": [4,4,3,4], "intervals": [11,4,7,11], "bass": 11, "position": 3, "inversion": 3, "kind": "rootless", "label": "Bm"},
         {"frets": [9,7,7,9], "intervals": [4,7,11,4], "bass": 4, "position": 7, "inversion": 1, "kind": "rootless", "label": "Bm"},
         {"frets": [9,11,12,12], "intervals": [4,11,4,7], "bass": 4, "position": 9, "inversion": 1, "kind": "rootless", "label": "Bm"},
         {"frets": [5,4,7,5], "intervals": [0,4,11,0], "bass": 0, "position": 4, "inversion": 0, "kind": "shell", "label": ""},
-        {"frets": [5,4,8,4], "intervals": [0,4,0,11], "bass": 0, "position": 4, "inversion": 0, "kind": "shell", "label": ""}
+        {"frets": [9,11,8,9], "intervals": [4,11,0,4], "bass": 4, "position": 8, "inversion": 1, "kind": "shell", "label": ""}
       ]
     },
     {
@@ -85,7 +71,6 @@
         {"frets": [5,3,2,5], "intervals": [0,3,6,0], "bass": 0, "position": 2, "inversion": 0, "kind": "complete", "label": ""},
         {"frets": [5,6,8,8], "intervals": [0,6,0,3], "bass": 0, "position": 5, "inversion": 0, "kind": "complete", "label": ""},
         {"frets": [8,6,8,8], "intervals": [3,6,0,3], "bass": 3, "position": 6, "inversion": 1, "kind": "complete", "label": ""},
-        {"frets": [8,12,11,11], "intervals": [3,0,3,6], "bass": 3, "position": 8, "inversion": 1, "kind": "complete", "label": ""},
         {"frets": [11,12,11,11], "intervals": [6,0,3,6], "bass": 6, "position": 11, "inversion": 2, "kind": "complete", "label": ""}
       ]
     },
@@ -112,9 +97,7 @@
         {"frets": [8,6,6,5], "intervals": [3,6,10,0], "bass": 3, "position": 5, "inversion": 1, "kind": "complete", "label": ""},
         {"frets": [8,10,8,11], "intervals": [3,10,0,6], "bass": 3, "position": 8, "inversion": 1, "kind": "complete", "label": ""},
         {"frets": [11,10,8,8], "intervals": [6,10,0,3], "bass": 6, "position": 8, "inversion": 2, "kind": "complete", "label": ""},
-        {"frets": [11,12,11,15], "intervals": [6,0,3,10], "bass": 6, "position": 11, "inversion": 2, "kind": "complete", "label": ""},
-        {"frets": [3,3,2,5], "intervals": [10,3,6,0], "bass": 10, "position": 2, "inversion": 3, "kind": "complete", "label": ""},
-        {"frets": [15,12,11,11], "intervals": [10,0,3,6], "bass": 10, "position": 11, "inversion": 3, "kind": "complete", "label": ""}
+        {"frets": [3,3,2,5], "intervals": [10,3,6,0], "bass": 10, "position": 2, "inversion": 3, "kind": "complete", "label": ""}
       ]
     }
   ]
