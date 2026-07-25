@@ -11,7 +11,7 @@ import {
   CagedBox, CagedMode, ScaleSubset, resolveBox, rootOf,
 } from "../theory";
 
-const NUM_FRETS = 17;
+const NUM_FRETS = 22;
 const STRING_NAMES = ["6 (low E)", "5 (A)", "4 (D)", "3 (G)", "2 (B)", "1 (high E)"];
 const BOX_LABEL: Record<CagedBox, string> = {
   [CagedBox.POS1]: "Box 1", [CagedBox.POS2]: "Box 2", [CagedBox.POS3]: "Box 3",

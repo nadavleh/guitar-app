@@ -44,11 +44,13 @@ export function rootOf(tonic: PitchClass, _mode: CagedMode): PitchClass {
   return tonic;   // same root for major and parallel minor
 }
 
-function anchorFret(tonic: PitchClass, box: CagedBox, tuning: Tuning): number {
+// Tonic's lowest fret on the low-E string (0..11). Boxes run up the neck from
+// there; a below-nut POS1 note is clipped at fret 0. Do NOT shift the whole set
+// up an octave — that pushes POS4/POS5 off the neck and drops notes (the neck
+// must simply be long enough — see the 22-fret default).
+function anchorFret(tonic: PitchClass, _box: CagedBox, tuning: Tuning): number {
   const lowEpc = midiPitchClass(tuning.openStrings[0].midi);
-  let t = (((tonic - lowEpc) % 12) + 12) % 12;
-  while (t + BOX_OFFSETS[box][0] < 0) t += 12;
-  return t;
+  return (((tonic - lowEpc) % 12) + 12) % 12;
 }
 
 export function boxWindow(tonic: PitchClass, box: CagedBox, tuning: Tuning): [number, number] {
@@ -62,7 +64,7 @@ export function resolveBox(
   mode: CagedMode,
   subset: ScaleSubset,
   tuning: Tuning,
-  numFrets = 17,
+  numFrets = 22,
 ): CagedNote[] {
   const [lo, hi] = boxWindow(tonic, box, tuning);
   const pcs = subsetPcs(tonic, mode, subset);
@@ -98,7 +100,7 @@ export function triadInversions(
   keyTonic: PitchClass,
   quality: "maj" | "min",
   tuning: Tuning,
-  numFrets = 15,
+  numFrets = 22,
 ): TriadShape[] {
   const rootPc = keyTonic;
   const thirdPc = (((rootPc + (quality === "maj" ? 4 : 3)) % 12) + 12) % 12;

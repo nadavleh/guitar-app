@@ -75,12 +75,14 @@ object CagedScales {
         mode: CagedMode,
         subset: ScaleSubset,
         tuning: Tuning,
-        numFrets: Int = 17,
+        numFrets: Int = 22,
     ): List<CagedNote> {
         val lowEpc = tuning.openStrings[0].pitchClass.value
-        // T = tonic fret on the low-E string, lowest octave keeping the window >= 0.
-        var t = ((tonic.value - lowEpc) % 12 + 12) % 12
-        while (t + box.loOffset < 0) t += 12
+        // T = tonic's lowest fret on the low-E string (0..11). The boxes then run
+        // up the neck from there; a below-nut POS1 note is just clipped at fret 0.
+        // (Do NOT shift the whole set up an octave — that pushes POS4/POS5 off the
+        // neck and drops notes; the neck must simply be long enough, hence 22.)
+        val t = ((tonic.value - lowEpc) % 12 + 12) % 12
         val lo = t + box.loOffset
         val hi = t + box.hiOffset
         val pcs = subsetPcs(tonic, mode, subset)
@@ -101,8 +103,7 @@ object CagedScales {
     /** The window [firstFret, lastFret] a box occupies for [tonic] on [tuning]. */
     fun window(tonic: PitchClass, box: CagedBox, tuning: Tuning): IntRange {
         val lowEpc = tuning.openStrings[0].pitchClass.value
-        var t = ((tonic.value - lowEpc) % 12 + 12) % 12
-        while (t + box.loOffset < 0) t += 12
+        val t = ((tonic.value - lowEpc) % 12 + 12) % 12
         return (t + box.loOffset)..(t + box.hiOffset)
     }
 }

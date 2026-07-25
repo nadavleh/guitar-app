@@ -624,18 +624,18 @@ export const PRESET_TRACKS: PresetTrack[] = [
   { label: "Tamborim — Teleco-teco", instrument: Tamborim,
     template: [3002, 0, 3002, 0, 2001, 3002, 0, 3002, 0, 3002, 0, 3002, 0, 2001, 3002, 0] },
   { label: "Tamborim — Telecoteco Var 1", instrument: Tamborim,
-    template: [2001, 0, 2001, 0, 3002, 2001, 0, 2001, 0, 0, 0, 0, 0, 3002, 2001, 0] },
+    template: [3002, 0, 3002, 0, 3002, 2001, 0, 3002, 0, 0, 0, 0, 0, 3002, 2001, 0] },
   { label: "Tamborim — Telecoteco Var 2", instrument: Tamborim,
-    template: [2001, 0, 2001, 0, 3002, 2001, 0, 3002, 2001, 0, 0, 0, 0, 3002, 2001, 0] },
+    template: [3002, 0, 3002, 0, 3002, 2001, 0, 3002, 2001, 0, 0, 0, 0, 3002, 2001, 0] },
   { label: "Tamborim — Telecoteco Var 3", instrument: Tamborim,
-    template: [2001, 0, 2001, 0, 3002, 2001, 0, 3002, 2001, 0, 3002, 2001, 0, 3002, 2001, 0] },
+    template: [3002, 0, 3002, 0, 3002, 2001, 0, 3002, 2001, 0, 3002, 2001, 0, 3002, 2001, 0] },
   // Corrected per Nadav's export: each beat = ACCENTED clack, muted clack at
   // 75 % (dyn level 1), tap, clack — with a light 10 % swing.
   { label: "Tamborim — Levada Reta", instrument: Tamborim,
-    template: [100, 1001, 2, 0, 100, 1001, 2, 0, 100, 1001, 2, 0, 100, 1001, 2, 0],
+    template: [100, 3002, 2001, 0, 100, 3002, 2001, 0, 100, 3002, 2001, 0, 100, 3002, 2001, 0],
     swing: 10 },
   { label: "Tamborim — Chamada", instrument: Tamborim,
-    template: [2001, 0, 2001, 0, 0, 0, 2001, 0, 0, 0, 2001, 0, 0, 0, 2001, 0],
+    template: [3002, 0, 3002, 0, 0, 0, 3002, 0, 0, 0, 3002, 0, 0, 0, 3002, 0],
     swing: 20, note: "Played with ~20% swing." },
   // From Nadav's export: accented clacks, taps, and 50 %-dyn clacks (2000s).
   { label: "Tamborim — Palmas", instrument: Tamborim,

@@ -2,7 +2,7 @@
 // Tuner, Options). Persistence uses localStorage in place of Android DataStore.
 //
 // State is a plain observable: mutating methods change fields then call notify(),
-// and the UI subscribes via subscribe() to re-render. (No framework â€” the Kotlin
+// and the UI subscribes via subscribe() to re-render. (No framework Ã¢â‚¬â€ the Kotlin
 // app's Compose recomposition is replaced by an explicit render pass.)
 
 import {
@@ -15,7 +15,7 @@ import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../au
 
 export const DISPLAY_FRETS = 14;
 /** App version shown beside the header wordmark. Keep in sync with package.json on release. */
-export const APP_VERSION = "2.38.1";
+export const APP_VERSION = "2.38.2";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 
@@ -43,7 +43,7 @@ export enum ChordScaleView { AllNotes = "AllNotes", Positions = "Positions" }
  *  not shipped yet, so those fetches currently fail and fall back to Synth). */
 export type SoundName = "Synth" | "Acoustic" | "Nylon" | "Electric";
 
-/** One EQ band's runtime gain, in dB (Â±12 typical range). */
+/** One EQ band's runtime gain, in dB (Ã‚Â±12 typical range). */
 export type EqBand = "bass" | "mid" | "treble";
 
 /** Per-sound runtime EQ applied on the modern chain's biquad EQ (bass =
@@ -93,7 +93,7 @@ function isThemeMode(v: unknown): v is ThemeMode {
   return typeof v === "string" && (ALL_THEME_MODES as readonly string[]).includes(v);
 }
 
-/** One user-configurable tab destination â€” names mirror Android's `TabDest`
+/** One user-configurable tab destination Ã¢â‚¬â€ names mirror Android's `TabDest`
  *  enum (Shell.kt) EXACTLY, so a tab-order value round-trips identically on
  *  both platforms. "More" is not a TabDest; it's the fixed 5th nav item. */
 export type TabDestName = "Neck" | "Ear" | "Rhythm" | "Loop" | "Tuner" | "Decompose" | "CavaqProgressions" | "RhythmUnits" | "Metronome" | "ScalesTriads";
@@ -144,7 +144,7 @@ export class AppState {
   selectedPosition: FretPosition | null = null;
   leftHanded = false;
   /** UI theme; dark is the original look. Dead now that `themeMode` drives the
-   *  UI (Settings' Theme segmented) â€” kept only as the migration fallback's
+   *  UI (Settings' Theme segmented) Ã¢â‚¬â€ kept only as the migration fallback's
    *  source (see `load()`), mirroring Android's AppState.darkTheme. */
   darkTheme = true;
   /** UI theme mode (Settings' Personalize section): Dark/Light/Auto. "Auto"
@@ -172,7 +172,7 @@ export class AppState {
   /** Play-mode quick-chord slots (chord symbols), applied via applyChordSlot. Persisted. */
   chordSlots: string[] = [...DEFAULT_CHORD_SLOTS];
   /** Index of the slot whose grip is currently on the board (highlights its chip);
-   *  âˆ’1 once the grip is hand-edited or cleared. */
+   *  Ã¢Ë†â€™1 once the grip is hand-edited or cleared. */
   activeChordSlot = -1;
 
   voicingStyle = VoicingStyle.Standard;
@@ -197,13 +197,13 @@ export class AppState {
 
   customTunings = new Map<string, Tuning>();
   challengeScores: ChallengeScore[] = [];
-  /** Saved drum beats: name â†’ encoded PercussionPattern string (insertion order). */
+  /** Saved drum beats: name Ã¢â€ â€™ encoded PercussionPattern string (insertion order). */
   drumPatterns = new Map<string, string>();
   /** Saved drum BLOCKS (phrase sequences), name -> DrumBlock.encode(). */
   drumBlocks = new Map<string, string>();
   /** USER-DEFINED phrases (custom track presets), label -> encodePresetTrack(). */
   drumTrackPresets = new Map<string, string>();
-  /** Drum mixer volumes: "<instId>" (global) or "<instId>:<voice>" â†’ 0..1. */
+  /** Drum mixer volumes: "<instId>" (global) or "<instId>:<voice>" Ã¢â€ â€™ 0..1. */
   drumVolumes = new Map<string, number>();
 
   private listeners = new Set<() => void>();
@@ -488,7 +488,7 @@ export class AppState {
   }
   /** Persist the user's chosen tab set/order (Settings' "Tabs & order"
    *  editor). Invalid input (wrong count, dupes, unknown names) resets to
-   *  the default 4 â€” mirrors Android's AppState.setTabOrder guard. */
+   *  the default 4 Ã¢â‚¬â€ mirrors Android's AppState.setTabOrder guard. */
   setTabOrder(order: readonly string[]): void {
     const valid = order.filter(isTabDestName);
     const unique = [...new Set(valid)];
@@ -510,8 +510,8 @@ export class AppState {
   }
 
   /** Apply `s` to the audio engine: clear the bank for Synth, otherwise fetch
-   *  (or reuse a cached) sampled bank. If the fetch fails â€” expected until the
-   *  sample assets ship â€” the engine falls back to synth voices. Also pushes
+   *  (or reuse a cached) sampled bank. If the fetch fails Ã¢â‚¬â€ expected until the
+   *  sample assets ship Ã¢â‚¬â€ the engine falls back to synth voices. Also pushes
    *  `s`'s EQ settings, independent of whether the bank fetch succeeds. */
   private applySound(s: SoundName): void {
     const e = this.eq[s];
@@ -554,8 +554,8 @@ export class AppState {
     return this.eq[sound];
   }
 
-  /** Update one EQ band for `sound`, persist, and â€” if `sound` is the active
-   *  sound â€” push the new settings to the audio engine immediately. */
+  /** Update one EQ band for `sound`, persist, and Ã¢â‚¬â€ if `sound` is the active
+   *  sound Ã¢â‚¬â€ push the new settings to the audio engine immediately. */
   setEqBand(sound: SoundName, band: EqBand, db: number): void {
     const clamped = Math.min(Math.max(Math.round(db), -12), 12);
     const next: EqSettings = { ...this.eq[sound] };
@@ -580,7 +580,7 @@ export class AppState {
     return this.reverb[sound];
   }
 
-  /** Update `sound`'s reverb amount, persist, and â€” if active â€” push to the engine. */
+  /** Update `sound`'s reverb amount, persist, and Ã¢â‚¬â€ if active Ã¢â‚¬â€ push to the engine. */
   setReverb(sound: SoundName, amount: number): void {
     const clamped = Math.max(0, Math.min(1, amount));
     this.commit(() => { this.reverb[sound] = clamped; });
@@ -641,7 +641,7 @@ export class AppState {
       const key = fpKey(pos);
       if (this.pickedPositions.has(key)) this.pickedPositions.delete(key);
       else this.pickedPositions.add(key);
-      this.activeChordSlot = -1;   // hand-edited grip â€” no slot owns it anymore
+      this.activeChordSlot = -1;   // hand-edited grip Ã¢â‚¬â€ no slot owns it anymore
     });
   }
 
@@ -666,7 +666,7 @@ export class AppState {
 
   // ---------- play mode: sweep-to-strum + quick chord slots ----------
 
-  /** Sweep-to-strum: pluck [stringIdx] with the current grip â€” the highest picked
+  /** Sweep-to-strum: pluck [stringIdx] with the current grip Ã¢â‚¬â€ the highest picked
    *  fret on that string, or the open string when nothing is picked (like a real
    *  guitar with a partial grip). Returns the fret that sounded, or null when the
    *  string is muted / out of range (silence). */
@@ -684,7 +684,7 @@ export class AppState {
   }
 
   /** Apply quick-chord slot [index]: set the chord's first voicing on the board as
-   *  the picked grip (+ muted âœ• on unplayed strings), ready to strum. */
+   *  the picked grip (+ muted Ã¢Å“â€¢ on unplayed strings), ready to strum. */
   applyChordSlot(index: number): void {
     const symbol = this.chordSlots[index];
     if (symbol === undefined) return;
@@ -710,8 +710,8 @@ export class AppState {
     });
   }
 
-  /** Strum the current picked grip. `up` = up-strum (high string first, highâ†’low
-   *  pitch); default down-strum (lowâ†’high). Muted strings excluded. */
+  /** Strum the current picked grip. `up` = up-strum (high string first, highÃ¢â€ â€™low
+   *  pitch); default down-strum (lowÃ¢â€ â€™high). Muted strings excluded. */
   strumPicked(up = false, arpeggio = false): void {
     const positions = [...this.pickedPositions]
       .map((k) => fp(parseInt(k.split(",")[0], 10), parseInt(k.split(",")[1], 10)))

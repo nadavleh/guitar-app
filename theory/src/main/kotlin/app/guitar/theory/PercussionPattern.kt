@@ -512,26 +512,26 @@ object PercussionBuiltins {
         ),
         PresetTrack(
             "Tamborim — Telecoteco Var 1", PercussionCatalog.Tamborim,
-            listOf(2001, 0, 2001, 0, 3002, 2001, 0, 2001, 0, 0, 0, 0, 0, 3002, 2001, 0),
+            listOf(3002, 0, 3002, 0, 3002, 2001, 0, 3002, 0, 0, 0, 0, 0, 3002, 2001, 0),
         ),
         PresetTrack(
             "Tamborim — Telecoteco Var 2", PercussionCatalog.Tamborim,
-            listOf(2001, 0, 2001, 0, 3002, 2001, 0, 3002, 2001, 0, 0, 0, 0, 3002, 2001, 0),
+            listOf(3002, 0, 3002, 0, 3002, 2001, 0, 3002, 2001, 0, 0, 0, 0, 3002, 2001, 0),
         ),
         PresetTrack(
             "Tamborim — Telecoteco Var 3", PercussionCatalog.Tamborim,
-            listOf(2001, 0, 2001, 0, 3002, 2001, 0, 3002, 2001, 0, 3002, 2001, 0, 3002, 2001, 0),
+            listOf(3002, 0, 3002, 0, 3002, 2001, 0, 3002, 2001, 0, 3002, 2001, 0, 3002, 2001, 0),
         ),
-        // Corrected per Nadav's export: each beat = ACCENTED clack, muted clack at
-        // 75 % (dyn level 1), tap, clack — with a light 10 % swing.
+        // Per Nadav: accented open clack, then tap (25%) + muted clack (50%) — the
+        // teleco-teco attenuation, articulations swapped from the old reta.
         PresetTrack(
             "Tamborim — Levada Reta", PercussionCatalog.Tamborim,
-            listOf(100, 1001, 2, 0, 100, 1001, 2, 0, 100, 1001, 2, 0, 100, 1001, 2, 0),
+            listOf(100, 3002, 2001, 0, 100, 3002, 2001, 0, 100, 3002, 2001, 0, 100, 3002, 2001, 0),
             swing = 10,
         ),
         PresetTrack(
             "Tamborim — Chamada", PercussionCatalog.Tamborim,
-            listOf(2001, 0, 2001, 0, 0, 0, 2001, 0, 0, 0, 2001, 0, 0, 0, 2001, 0),
+            listOf(3002, 0, 3002, 0, 0, 0, 3002, 0, 0, 0, 3002, 0, 0, 0, 3002, 0),
             swing = 20,
             note = "Played with ~20% swing.",
         ),
