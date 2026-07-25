@@ -45,6 +45,22 @@ class CagedScalesTest {
         assertEquals(expected, union)
     }
 
+    @Test fun `triad inversions yield 12 per quality across the 4 string groups`() {
+        val maj = CagedScales.triadInversions(G, "maj", std)
+        assertEquals(12, maj.size)
+        assertEquals(CagedScales.TRIAD_GROUPS, maj.map { it.strings }.distinct())
+        for (t in maj) t.strings.indices.forEach { i ->
+            val pc = Fretboard.noteAt(std, FretPosition(t.strings[i], t.frets[i])).pitchClass
+            assertTrue(pc in setOf(PitchClass.G, PitchClass(11), PitchClass.D), "G major triad tone")
+        }
+        val min = CagedScales.triadInversions(G, "min", std)
+        assertEquals(12, min.size)
+        for (t in min) t.strings.indices.forEach { i ->
+            val pc = Fretboard.noteAt(std, FretPosition(t.strings[i], t.frets[i])).pitchClass
+            assertTrue(pc in setOf(PitchClass.G, PitchClass(10), PitchClass.D), "G minor triad tone")
+        }
+    }
+
     @Test fun `major pentatonic drops the 4th and 7th`() {
         val pcs = CagedScales.resolve(G, CagedBox.POS1, CagedMode.Major, ScaleSubset.Pentatonic, std)
             .map { Fretboard.noteAt(std, it.position).pitchClass }.toSet()
