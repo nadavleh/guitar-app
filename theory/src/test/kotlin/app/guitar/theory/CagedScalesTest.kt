@@ -60,14 +60,18 @@ class CagedScalesTest {
         assertTrue(notes.any { it.isRoot } && notes.filter { it.isRoot }.all { Fretboard.noteAt(std, it.position).pitchClass == PitchClass.G })
     }
 
-    @Test fun `minor mode is the PARALLEL minor in the same position`() {
+    @Test fun `minor mode is the PARALLEL minor, root-anchored (no note below the root fret)`() {
         // Same root as major (G), NOT the relative minor.
         assertEquals(G, CagedScales.rootOf(G, CagedMode.Minor))
+        // Minor POS1 is ROOT-ANCHORED: window [3,7] (root at fret 3, nothing below).
+        assertEquals(3..7, CagedScales.window(G, CagedBox.POS1, std, CagedMode.Minor))
+        val minNotes = CagedScales.resolve(G, CagedBox.POS1, CagedMode.Minor, ScaleSubset.FullScale, std)
+        assertTrue(minNotes.all { it.position.fret >= 3 }, "no note below the root fret (3)")
         // G minor triad = G B♭ D.
         val triad = CagedScales.resolve(G, CagedBox.POS1, CagedMode.Minor, ScaleSubset.Triad, std)
             .map { Fretboard.noteAt(std, it.position).pitchClass }.toSet()
         assertEquals(setOf(PitchClass.G, PitchClass(10), PitchClass.D), triad)   // G Bb D
-        // Same neck position as major, but the full-scale notes differ (natural minor ♭3/♭6/♭7).
+        // Major POS1 differs (window [2,5]); the full-scale notes differ too (natural minor ♭3/♭6/♭7).
         val majPcs = CagedScales.resolve(G, CagedBox.POS1, CagedMode.Major, ScaleSubset.FullScale, std)
             .map { Fretboard.noteAt(std, it.position).pitchClass }.toSet()
         val minPcs = CagedScales.resolve(G, CagedBox.POS1, CagedMode.Minor, ScaleSubset.FullScale, std)

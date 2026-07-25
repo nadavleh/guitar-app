@@ -3,7 +3,7 @@
 // gentle high-shelf lift to brighten. Applied once per buffer and cached.
 // RBJ biquad cookbook coefficients, direct-form-I.
 
-const HP_HZ = 280;      // high-pass corner — below the pandeiro body, above the surdo
+const HP_HZ = 160;      // high-pass corner — keeps more pandeiro bass, still above the surdo's fundamental
 const HP_Q = 0.707;     // Butterworth (no resonant bump at the corner)
 const SHELF_HZ = 3000;  // brighten everything above ~3 kHz
 const SHELF_DB = 4;     // gentle high lift

@@ -11,13 +11,25 @@ import { PitchClass, Interval, Tuning, FretPosition, fp, noteAt, midiPitchClass,
 
 export enum CagedBox { POS1 = "POS1", POS2 = "POS2", POS3 = "POS3", POS4 = "POS4", POS5 = "POS5" }
 
-const BOX_OFFSETS: Record<CagedBox, [number, number]> = {
+// MAJOR windows match the standard "5 major scale patterns" diagram; MINOR uses
+// separate ROOT-ANCHORED windows (root = lowest note, no reach back below it).
+const BOX_OFFSETS_MAJ: Record<CagedBox, [number, number]> = {
   [CagedBox.POS1]: [-1, 2],
   [CagedBox.POS2]: [1, 5],
   [CagedBox.POS3]: [4, 7],
   [CagedBox.POS4]: [6, 10],
   [CagedBox.POS5]: [8, 12],
 };
+const BOX_OFFSETS_MIN: Record<CagedBox, [number, number]> = {
+  [CagedBox.POS1]: [0, 4],
+  [CagedBox.POS2]: [2, 6],
+  [CagedBox.POS3]: [4, 8],
+  [CagedBox.POS4]: [7, 11],
+  [CagedBox.POS5]: [9, 13],
+};
+function boxOffsets(box: CagedBox, mode: CagedMode): [number, number] {
+  return mode === CagedMode.Major ? BOX_OFFSETS_MAJ[box] : BOX_OFFSETS_MIN[box];
+}
 
 export const CAGED_BOXES: CagedBox[] = [CagedBox.POS1, CagedBox.POS2, CagedBox.POS3, CagedBox.POS4, CagedBox.POS5];
 
@@ -53,9 +65,10 @@ function anchorFret(tonic: PitchClass, _box: CagedBox, tuning: Tuning): number {
   return (((tonic - lowEpc) % 12) + 12) % 12;
 }
 
-export function boxWindow(tonic: PitchClass, box: CagedBox, tuning: Tuning): [number, number] {
+export function boxWindow(tonic: PitchClass, box: CagedBox, tuning: Tuning, mode: CagedMode = CagedMode.Major): [number, number] {
   const t = anchorFret(tonic, box, tuning);
-  return [t + BOX_OFFSETS[box][0], t + BOX_OFFSETS[box][1]];
+  const [lo, hi] = boxOffsets(box, mode);
+  return [t + lo, t + hi];
 }
 
 export function resolveBox(
@@ -66,7 +79,7 @@ export function resolveBox(
   tuning: Tuning,
   numFrets = 22,
 ): CagedNote[] {
-  const [lo, hi] = boxWindow(tonic, box, tuning);
+  const [lo, hi] = boxWindow(tonic, box, tuning, mode);
   const pcs = subsetPcs(tonic, mode, subset);
   const root = rootOf(tonic, mode);
   const out: CagedNote[] = [];

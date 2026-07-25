@@ -234,6 +234,10 @@ export class SambaLooperState {
   private synthCache = new Map<string, Float32Array>();
   private loadedSamples = new Map<string, Float32Array>();
   private requestedSampleKits = new Set<string>();
+  /** Voice keys whose WAV is still decoding — played as silence, not the synth. */
+  private pendingSamples = new Set<string>();
+  /** Empty buffer = silence (playSamples no-ops on length 0). */
+  private static readonly SILENCE = new Float32Array(0);
 
   constructor(private deps: SambaDeps) {
     // Load the persisted mix so it survives reloads / closing the tab.
@@ -268,6 +272,9 @@ export class SambaLooperState {
   private buffer(instrument: PercussionInstrument, voiceIndex: number): Float32Array {
     const k = this.key(instrument, voiceIndex);
     let raw = this.loadedSamples.get(k);
+    // A sampled voice whose WAV is still decoding: play silence, not the synth
+    // (adding a track mid-loop used to play the synth as "weird clicks" until stop/play).
+    if (!raw && this.pendingSamples.has(k)) return SambaLooperState.SILENCE;
     if (!raw) {
       raw = this.synthCache.get(k);
       if (!raw) { raw = this.synth.synthesize(instrument, voiceIndex); this.synthCache.set(k, raw); }
@@ -297,8 +304,12 @@ export class SambaLooperState {
     if (this.requestedSampleKits.has(inst.id)) return;
     this.requestedSampleKits.add(inst.id);
     for (let v = 0; v < voiceCount(inst); v++) {
+      const k = this.key(inst, v);
+      this.pendingSamples.add(k);   // silent (not the clicky synth) until its WAV decodes
       void this.deps.loadSample(inst, v).then((buf) => {
-        if (buf) { this.loadedSamples.set(this.key(inst, v), buf); this.notify(); }
+        this.pendingSamples.delete(k);
+        if (buf) this.loadedSamples.set(k, buf);
+        this.notify();
       });
     }
   }

@@ -12,12 +12,24 @@ package app.guitar.theory
  * positional window, no backward reach" fingering convention. Offsets were read
  * off the standard "5 connected positions" diagram and verified in G major.
  */
-enum class CagedBox(val loOffset: Int, val hiOffset: Int) {
-    POS1(-1, 2),
-    POS2(1, 5),
-    POS3(4, 7),
-    POS4(6, 10),
-    POS5(8, 12);
+/**
+ * Fret-window offsets (from the tonic's low-E fret) for each of the 5 positions.
+ * MAJOR windows match the standard "5 major scale patterns" diagram. MINOR uses
+ * separate, ROOT-ANCHORED windows (the root is the lowest note — no reach back
+ * below it), per Nadav's fingering rule; audited complete for every key.
+ */
+enum class CagedBox(
+    val loOffset: Int, val hiOffset: Int,
+    val minLoOffset: Int, val minHiOffset: Int,
+) {
+    POS1(-1, 2, 0, 4),
+    POS2(1, 5, 2, 6),
+    POS3(4, 7, 4, 8),
+    POS4(6, 10, 7, 11),
+    POS5(8, 12, 9, 13);
+
+    fun lo(mode: CagedMode): Int = if (mode == CagedMode.Major) loOffset else minLoOffset
+    fun hi(mode: CagedMode): Int = if (mode == CagedMode.Major) hiOffset else minHiOffset
 }
 
 /** Which note-subset of the box to show/play. */
@@ -83,8 +95,8 @@ object CagedScales {
         // (Do NOT shift the whole set up an octave — that pushes POS4/POS5 off the
         // neck and drops notes; the neck must simply be long enough, hence 22.)
         val t = ((tonic.value - lowEpc) % 12 + 12) % 12
-        val lo = t + box.loOffset
-        val hi = t + box.hiOffset
+        val lo = t + box.lo(mode)
+        val hi = t + box.hi(mode)
         val pcs = subsetPcs(tonic, mode, subset)
         val root = rootOf(tonic, mode)
         val out = ArrayList<CagedNote>()
@@ -101,9 +113,9 @@ object CagedScales {
     }
 
     /** The window [firstFret, lastFret] a box occupies for [tonic] on [tuning]. */
-    fun window(tonic: PitchClass, box: CagedBox, tuning: Tuning): IntRange {
+    fun window(tonic: PitchClass, box: CagedBox, tuning: Tuning, mode: CagedMode = CagedMode.Major): IntRange {
         val lowEpc = tuning.openStrings[0].pitchClass.value
         val t = ((tonic.value - lowEpc) % 12 + 12) % 12
-        return (t + box.loOffset)..(t + box.hiOffset)
+        return (t + box.lo(mode))..(t + box.hi(mode))
     }
 }
