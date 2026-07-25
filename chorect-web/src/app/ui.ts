@@ -21,6 +21,8 @@ import { LoopState } from "./loopState";
 import { LoopUI } from "./loopUI";
 import { CavaqProgState } from "./cavaqProgState";
 import { CavaqProgUI } from "./cavaqProgUI";
+import { CagedTrainerState } from "./cagedTrainerState";
+import { CagedTrainerUI } from "./cagedTrainerUI";
 import { RhythmUnitState } from "./rhythmUnitState";
 import { RhythmPhraseState } from "./rhythmPhraseState";
 import { RhythmUnitsUI } from "./rhythmUnitsUI";
@@ -57,12 +59,13 @@ const TAB_SHEET: Record<TabDestName, Sheet> = {
   CavaqProgressions: Sheet.CavaqProgressions,
   RhythmUnits: Sheet.RhythmUnits,
   Metronome: Sheet.Metronome,
+  ScalesTriads: Sheet.ScalesTriads,
 };
 const TAB_ICON: Record<TabDestName, IconName> = {
-  Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose", CavaqProgressions: "note", RhythmUnits: "rhythmNotes", Metronome: "timer",
+  Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose", CavaqProgressions: "note", RhythmUnits: "rhythmNotes", Metronome: "timer", ScalesTriads: "neck",
 };
 const TAB_LABEL: Record<TabDestName, string> = {
-  Neck: "Fretboard", Ear: "Ear", Rhythm: "DrumLoop", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose", CavaqProgressions: "Progressions", RhythmUnits: "Rhythm", Metronome: "Metronome",
+  Neck: "Fretboard", Ear: "Ear", Rhythm: "DrumLoop", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose", CavaqProgressions: "Progressions", RhythmUnits: "Rhythm", Metronome: "Metronome", ScalesTriads: "Scales",
 };
 /** One-line description shown under each destination's title in the More sheet. */
 const TAB_SUBTITLE: Record<TabDestName, string> = {
@@ -75,6 +78,7 @@ const TAB_SUBTITLE: Record<TabDestName, string> = {
   CavaqProgressions: "Cavaquinho functional sequences — looper + neck",
   RhythmUnits: "Learn & train basic rhythmic units",
   Metronome: "Click track with selectable time signatures",
+  ScalesTriads: "Guitar CAGED scales & triad practice",
 };
 
 /** Whether a tab destination is available for the current instrument. The
@@ -82,6 +86,7 @@ const TAB_SUBTITLE: Record<TabDestName, string> = {
  *  Android's TabDest.availableFor). */
 function availableFor(dest: TabDestName, instrument: Instrument): boolean {
   if (dest === "CavaqProgressions") return instrument === Instrument.Cavaquinho;
+  if (dest === "ScalesTriads") return instrument === Instrument.Guitar;
   return true;
 }
 
@@ -162,6 +167,8 @@ export class App {
   private loopUI: LoopUI;
   private cavaq: CavaqProgState;
   private cavaqUI: CavaqProgUI;
+  private caged: CagedTrainerState;
+  private cagedUI: CagedTrainerUI;
   private rhythmUnits: RhythmUnitState;
   private rhythmPhrase: RhythmPhraseState;
   private rhythmUnitsUI: RhythmUnitsUI;
@@ -228,6 +235,8 @@ export class App {
       onChange: () => this.scheduleRender(),
     });
     this.cavaqUI = new CavaqProgUI(state, this.cavaq);
+    this.caged = new CagedTrainerState(state.audio, () => this.scheduleRender());
+    this.cagedUI = new CagedTrainerUI(state, this.caged);
     this.rhythmUnits = new RhythmUnitState({ audio: state.audio, onChange: () => this.scheduleRender() });
     this.rhythmPhrase = new RhythmPhraseState({ audio: state.audio, onChange: () => this.scheduleRender() });
     this.rhythmUnitsUI = new RhythmUnitsUI(this.rhythmUnits, this.rhythmPhrase, () => state.closeSheet(), () => this.scheduleRender());
@@ -446,6 +455,7 @@ export class App {
         else if (sheet === Sheet.CavaqProgressions) { e.preventDefault(); this.cavaq.toggle(); }
         else if (sheet === Sheet.RhythmUnits) { e.preventDefault(); this.rhythmUnits.toggle(); }
         else if (sheet === Sheet.Metronome) { e.preventDefault(); this.metronome.toggle(); }
+        else if (sheet === Sheet.ScalesTriads) { e.preventDefault(); if (this.caged.tab === "challenge") this.caged.nextChallenge(); else this.caged.toggle(); }
         return;
       }
 
@@ -562,6 +572,7 @@ export class App {
     if (route !== Sheet.RhythmUnits && this.rhythmUnits.isPlaying) this.rhythmUnits.stop();
     if (route !== Sheet.RhythmUnits && this.rhythmPhrase.isPlaying) this.rhythmPhrase.stop();
     if (route !== Sheet.Metronome && this.metronome.isPlaying) this.metronome.stop();
+    if (route !== Sheet.ScalesTriads && this.caged.isPlaying) this.caged.stop();
 
     this.renderNav();
     // Preserve the scroll position of any long scrollable pane across full rebuilds.
@@ -576,6 +587,7 @@ export class App {
     else if (route === Sheet.CavaqProgressions) this.cavaqUI.render(this.contentEl);
     else if (route === Sheet.RhythmUnits) this.rhythmUnitsUI.render(this.contentEl);
     else if (route === Sheet.Metronome) this.metronomeUI.render(this.contentEl);
+    else if (route === Sheet.ScalesTriads) this.cagedUI.render(this.contentEl);
     else this.renderFretboardView();
 
     const newScroll = this.contentEl.querySelector(".et-scroll");
@@ -1413,6 +1425,7 @@ export class App {
       case Sheet.CavaqProgressions: return "Progressions";
       case Sheet.RhythmUnits: return "Rhythm";
       case Sheet.Metronome: return "Metronome";
+      case Sheet.ScalesTriads: return "Scales & Triads";
     }
   }
 }
