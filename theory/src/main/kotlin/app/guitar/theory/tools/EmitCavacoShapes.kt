@@ -44,7 +44,7 @@ import java.io.File
 private const val MAX_FRET = 15
 private const val MAX_SPAN = 3              // max highest-minus-lowest fretted distance; 3 = fits a 4-fret window (drops any 5-fret-or-wider stretch)
 private const val MAX_PER_INVERSION = 2     // complete voicings kept per inversion
-private const val MAX_ROOTLESS = 3          // rootless voicings kept per quality
+private const val MAX_ROOTLESS = 8          // rootless voicings kept per quality (all distinct signatures; ~4 exist)
 private const val MAX_SHELLS = 2            // no-5th shells kept per quality
 
 // Qualities that get rootless + shell extras (4-note chords with a real root to drop / 5th to drop).

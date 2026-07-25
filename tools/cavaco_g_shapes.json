@@ -32,6 +32,7 @@
         {"frets": [3,4,3,3], "intervals": [10,4,7,10], "bass": 10, "position": 3, "inversion": 3, "kind": "rootless", "label": "Bdim"},
         {"frets": [9,7,6,9], "intervals": [4,7,10,4], "bass": 4, "position": 6, "inversion": 1, "kind": "rootless", "label": "Bdim"},
         {"frets": [9,10,12,12], "intervals": [4,10,4,7], "bass": 4, "position": 9, "inversion": 1, "kind": "rootless", "label": "Bdim"},
+        {"frets": [12,10,12,12], "intervals": [7,10,4,7], "bass": 7, "position": 10, "inversion": 2, "kind": "rootless", "label": "Bdim"},
         {"frets": [5,4,6,5], "intervals": [0,4,10,0], "bass": 0, "position": 4, "inversion": 0, "kind": "shell", "label": ""},
         {"frets": [9,10,8,9], "intervals": [4,10,0,4], "bass": 4, "position": 8, "inversion": 1, "kind": "shell", "label": ""}
       ]
@@ -47,6 +48,7 @@
         {"frets": [0,3,3,3], "intervals": [7,3,7,10], "bass": 7, "position": 3, "inversion": 2, "kind": "rootless", "label": "Bb"},
         {"frets": [3,3,3,3], "intervals": [10,3,7,10], "bass": 10, "position": 3, "inversion": 3, "kind": "rootless", "label": "Bb"},
         {"frets": [8,7,6,8], "intervals": [3,7,10,3], "bass": 3, "position": 6, "inversion": 1, "kind": "rootless", "label": "Bb"},
+        {"frets": [12,10,11,12], "intervals": [7,10,3,7], "bass": 7, "position": 10, "inversion": 2, "kind": "rootless", "label": "Bb"},
         {"frets": [5,3,6,5], "intervals": [0,3,10,0], "bass": 0, "position": 3, "inversion": 0, "kind": "shell", "label": ""},
         {"frets": [8,10,8,8], "intervals": [3,10,0,3], "bass": 3, "position": 8, "inversion": 1, "kind": "shell", "label": ""}
       ]
@@ -60,6 +62,7 @@
         {"frets": [4,4,3,4], "intervals": [11,4,7,11], "bass": 11, "position": 3, "inversion": 3, "kind": "rootless", "label": "Bm"},
         {"frets": [9,7,7,9], "intervals": [4,7,11,4], "bass": 4, "position": 7, "inversion": 1, "kind": "rootless", "label": "Bm"},
         {"frets": [9,11,12,12], "intervals": [4,11,4,7], "bass": 4, "position": 9, "inversion": 1, "kind": "rootless", "label": "Bm"},
+        {"frets": [12,11,12,12], "intervals": [7,11,4,7], "bass": 7, "position": 11, "inversion": 2, "kind": "rootless", "label": "Bm"},
         {"frets": [5,4,7,5], "intervals": [0,4,11,0], "bass": 0, "position": 4, "inversion": 0, "kind": "shell", "label": ""},
         {"frets": [9,11,8,9], "intervals": [4,11,0,4], "bass": 4, "position": 8, "inversion": 1, "kind": "shell", "label": ""}
       ]
