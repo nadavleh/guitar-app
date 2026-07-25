@@ -587,7 +587,11 @@ object PercussionBuiltins {
         ),
         PresetTrack(
             "Pandeiro — Partido Alto Dec 1", PercussionCatalog.Pandeiro,
-            listOf(null, 2, null, 2, 0, null, 0, null, 1, null, 2, null, 4, 0, null, 1),
+            listOf(null, 102, null, 2, 0, null, 0, null, 1, null, 102, null, 2004, 0, null, 1),
+        ),
+        PresetTrack(
+            "Pandeiro — Partido Alto Dec 2", PercussionCatalog.Pandeiro,
+            listOf(null, 102, null, 2, 0, 2004, 0, 2004, 1, null, 102, null, 2002, 0, 2004, 1),
         ),
         PresetTrack(
             "Pandeiro — Partido Alto Dec 3", PercussionCatalog.Pandeiro,

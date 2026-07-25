@@ -668,7 +668,9 @@ export const PRESET_TRACKS: PresetTrack[] = [
   { label: "Pandeiro — Partido Alto", instrument: Pandeiro,
     template: [null, 2, null, null, 0, null, 0, null, 0, null, 2, null, null, 0, null, 0] },
   { label: "Pandeiro — Partido Alto Dec 1", instrument: Pandeiro,
-    template: [null, 2, null, 2, 0, null, 0, null, 1, null, 2, null, 4, 0, null, 1] },
+    template: [null, 102, null, 2, 0, null, 0, null, 1, null, 102, null, 2004, 0, null, 1] },
+  { label: "Pandeiro — Partido Alto Dec 2", instrument: Pandeiro,
+    template: [null, 102, null, 2, 0, 2004, 0, 2004, 1, null, 102, null, 2002, 0, 2004, 1] },
   { label: "Pandeiro — Partido Alto Dec 3", instrument: Pandeiro,
     template: [2005, 102, 2007, 2, 0, 2004, 0, 2004, 0, 2005, 102, 7, 1002, 0, 2004, 0] },
   // Samba 1's agogô bells (low ▼ / high ▲) — usually mixed quiet (track volume).
