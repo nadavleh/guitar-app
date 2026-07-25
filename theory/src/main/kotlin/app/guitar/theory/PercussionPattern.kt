@@ -398,7 +398,7 @@ object PercussionBuiltins {
         "M:2,2,4,16;" +
             "pandeiro@33=101,2005,2007,2,0,2004,2006,4,101,2005,2007,2,0,4,6,4" + "|" +
             "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
-            "tamborim=2001,0,2001,0,2001,2002,0,2001,0,2001,0,2001,0,2001,2002,0" + "|" +
+            "tamborim=1,0,1,0,2,1,0,1,0,1,0,1,0,2,1,0" + "|" +
             "tamborim#2@10=100,1001,2,0,100,1001,2,0,100,1001,2,0,100,1001,2,0" + "|" +
             "tamborim#3=100,2,2000,100,2,2000,100,2,100,2,2000,100,2,2000,100,2",
     )
@@ -508,19 +508,19 @@ object PercussionBuiltins {
         ),
         PresetTrack(
             "Tamborim — Teleco-teco", PercussionCatalog.Tamborim,
-            listOf(2001, 0, 2001, 0, 2001, 2002, 0, 2001, 0, 2001, 0, 2001, 0, 2001, 2002, 0),
+            listOf(1, 0, 1, 0, 2, 1, 0, 1, 0, 1, 0, 1, 0, 2, 1, 0),
         ),
         PresetTrack(
             "Tamborim — Telecoteco Var 1", PercussionCatalog.Tamborim,
-            listOf(2001, 0, 2001, 0, 2001, 2002, 0, 2001, 0, 0, 0, 0, 0, 2001, 2002, 0),
+            listOf(1, 0, 1, 0, 2, 1, 0, 1, 0, 0, 0, 0, 0, 2, 1, 0),
         ),
         PresetTrack(
             "Tamborim — Telecoteco Var 2", PercussionCatalog.Tamborim,
-            listOf(2001, 0, 2001, 0, 2001, 2002, 0, 2001, 2002, 0, 0, 0, 0, 2001, 2002, 0),
+            listOf(1, 0, 1, 0, 2, 1, 0, 2, 1, 0, 0, 0, 0, 2, 1, 0),
         ),
         PresetTrack(
             "Tamborim — Telecoteco Var 3", PercussionCatalog.Tamborim,
-            listOf(2001, 0, 2001, 0, 2001, 2002, 0, 2001, 2002, 0, 2001, 2002, 0, 2001, 2002, 0),
+            listOf(1, 0, 1, 0, 2, 1, 0, 2, 1, 0, 2, 1, 0, 2, 1, 0),
         ),
         // Corrected per Nadav's export: each beat = ACCENTED clack, muted clack at
         // 75 % (dyn level 1), tap, clack — with a light 10 % swing.
@@ -531,7 +531,7 @@ object PercussionBuiltins {
         ),
         PresetTrack(
             "Tamborim — Chamada", PercussionCatalog.Tamborim,
-            listOf(2001, 0, 2001, 0, 0, 0, 2001, 0, 0, 0, 2001, 0, 0, 0, 2001, 0),
+            listOf(1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0),
             swing = 20,
             note = "Played with ~20% swing.",
         ),
@@ -542,11 +542,11 @@ object PercussionBuiltins {
         ),
         PresetTrack(
             "Tamborim — Entrada 1", PercussionCatalog.Tamborim,
-            listOf(0, 2002, 2001, 0, 2001, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 2001, 0),
+            listOf(0, 2, 1, 0, 1, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0),
         ),
         PresetTrack(
             "Tamborim — Entrada 2", PercussionCatalog.Tamborim,
-            listOf(0, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 2001, 0),
+            listOf(0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0),
         ),
         PresetTrack(
             "Bongo — Partido Alto", PercussionCatalog.Bongo,

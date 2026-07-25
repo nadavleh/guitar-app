@@ -576,7 +576,7 @@ export const TRES_TAMBORINS = builtin(
   "M:2,2,4,16;" +
   "pandeiro@33=101,2005,2007,2,0,2004,2006,4,101,2005,2007,2,0,4,6,4" + "|" +
   "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
-  "tamborim=2001,0,2001,0,2001,2002,0,2001,0,2001,0,2001,0,2001,2002,0" + "|" +
+  "tamborim=1,0,1,0,2,1,0,1,0,1,0,1,0,2,1,0" + "|" +
   "tamborim#2@10=100,1001,2,0,100,1001,2,0,100,1001,2,0,100,1001,2,0" + "|" +
   "tamborim#3=100,2,2000,100,2,2000,100,2,100,2,2000,100,2,2000,100,2",
 );
@@ -622,28 +622,28 @@ export const PRESET_TRACKS: PresetTrack[] = [
   { label: "Surdo — Marcação", instrument: Surdo,
     template: [1, null, null, 2, 0, null, null, 2, 1, null, null, 2, 0, null, null, 2] },
   { label: "Tamborim — Teleco-teco", instrument: Tamborim,
-    template: [2001, 0, 2001, 0, 2001, 2002, 0, 2001, 0, 2001, 0, 2001, 0, 2001, 2002, 0] },
+    template: [1, 0, 1, 0, 2, 1, 0, 1, 0, 1, 0, 1, 0, 2, 1, 0] },
   { label: "Tamborim — Telecoteco Var 1", instrument: Tamborim,
-    template: [2001, 0, 2001, 0, 2001, 2002, 0, 2001, 0, 0, 0, 0, 0, 2001, 2002, 0] },
+    template: [1, 0, 1, 0, 2, 1, 0, 1, 0, 0, 0, 0, 0, 2, 1, 0] },
   { label: "Tamborim — Telecoteco Var 2", instrument: Tamborim,
-    template: [2001, 0, 2001, 0, 2001, 2002, 0, 2001, 2002, 0, 0, 0, 0, 2001, 2002, 0] },
+    template: [1, 0, 1, 0, 2, 1, 0, 2, 1, 0, 0, 0, 0, 2, 1, 0] },
   { label: "Tamborim — Telecoteco Var 3", instrument: Tamborim,
-    template: [2001, 0, 2001, 0, 2001, 2002, 0, 2001, 2002, 0, 2001, 2002, 0, 2001, 2002, 0] },
+    template: [1, 0, 1, 0, 2, 1, 0, 2, 1, 0, 2, 1, 0, 2, 1, 0] },
   // Corrected per Nadav's export: each beat = ACCENTED clack, muted clack at
   // 75 % (dyn level 1), tap, clack — with a light 10 % swing.
   { label: "Tamborim — Levada Reta", instrument: Tamborim,
     template: [100, 1001, 2, 0, 100, 1001, 2, 0, 100, 1001, 2, 0, 100, 1001, 2, 0],
     swing: 10 },
   { label: "Tamborim — Chamada", instrument: Tamborim,
-    template: [2001, 0, 2001, 0, 0, 0, 2001, 0, 0, 0, 2001, 0, 0, 0, 2001, 0],
+    template: [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
     swing: 20, note: "Played with ~20% swing." },
   // From Nadav's export: accented clacks, taps, and 50 %-dyn clacks (2000s).
   { label: "Tamborim — Palmas", instrument: Tamborim,
     template: [100, 2, 2000, 100, 2, 2000, 100, 2, 100, 2, 2000, 100, 2, 2000, 100, 2] },
   { label: "Tamborim — Entrada 1", instrument: Tamborim,
-    template: [0, 2002, 2001, 0, 2001, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 2001, 0] },
+    template: [0, 2, 1, 0, 1, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0] },
   { label: "Tamborim — Entrada 2", instrument: Tamborim,
-    template: [0, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 0, 2002, 2001, 0] },
+    template: [0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 0] },
   { label: "Bongo — Partido Alto", instrument: Bongo,
     template: [null, 0, null, null, 1, null, 1, null, 1, null, 0, null, null, 1, null, 1] },
   { label: "Bongo — Partido Alto Var 1", instrument: Bongo,
