@@ -1,6 +1,6 @@
 {
   "name": "chorect-web",
-  "version": "2.37.0",
+  "version": "2.38.0",
   "description": "Web port of Chorect â€” an interactive guitar/cavaquinho fretboard companion",
   "type": "module",
   "scripts": {
