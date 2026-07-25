@@ -415,6 +415,11 @@ export class WebAudioEngine {
     return this.ensure().currentTime;
   }
 
+  /** The AudioContext sample rate (Hz) — for offline DSP like the pandeiro EQ. */
+  get sampleRate(): number {
+    return this.ensure().sampleRate;
+  }
+
   /** Play a pre-rendered one-shot buffer (e.g. a percussion voice), scaled by [gain].
    *  [when] (AudioContext seconds, from [now]) schedules the start sample-accurately;
    *  omitted/past values start immediately. Always dry (no panner/reverb send) in

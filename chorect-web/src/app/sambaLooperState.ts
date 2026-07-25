@@ -9,6 +9,7 @@ import {
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
 import { synthClick, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
+import { pandeiroEq } from "./pandeiroEq";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -258,14 +259,25 @@ export class SambaLooperState {
     return `${instrument.id}:${voiceIndex}`;
   }
 
-  /** Prefer a loaded one-shot sample; otherwise the synthesized voice (cached). */
+  /** raw pandeiro buffer -> EQ'd version (high-pass + high-shelf), cached by identity. */
+  private pandeiroEqCache = new Map<Float32Array, Float32Array>();
+
+  /** Prefer a loaded one-shot sample; otherwise the synthesized voice (cached).
+   *  Pandeiro voices are high-passed + brightened so they clear the surdo's low
+   *  band (see pandeiroEq). */
   private buffer(instrument: PercussionInstrument, voiceIndex: number): Float32Array {
     const k = this.key(instrument, voiceIndex);
-    const loaded = this.loadedSamples.get(k);
-    if (loaded) return loaded;
-    let buf = this.synthCache.get(k);
-    if (!buf) { buf = this.synth.synthesize(instrument, voiceIndex); this.synthCache.set(k, buf); }
-    return buf;
+    let raw = this.loadedSamples.get(k);
+    if (!raw) {
+      raw = this.synthCache.get(k);
+      if (!raw) { raw = this.synth.synthesize(instrument, voiceIndex); this.synthCache.set(k, raw); }
+    }
+    if (basePercussionId(instrument.id) === "pandeiro") {
+      let eq = this.pandeiroEqCache.get(raw);
+      if (!eq) { eq = pandeiroEq(raw, this.deps.audio.sampleRate); this.pandeiroEqCache.set(raw, eq); }
+      return eq;
+    }
+    return raw;
   }
 
   /** True once a real sample file has been loaded for this voice (else it's the synth). */
