@@ -56,13 +56,14 @@ Consecutive windows overlap; POS5's top = POS1 + 12 (octave), so they cycle. A
 fixed window IS the "no backward reach / +4" rule — a box never contains a note a
 fret behind on an adjacent string outside the window.
 
-**Mode = the box's two roots.** For a chosen (major) key K the boxes are K's; the
-"minor" pass uses the **relative minor** (root = K's 6th degree = K+9). Subsets:
-- FullScale — all 7 major pcs (same notes for both modes; minor = natural minor).
-- Pentatonic — the SAME 5 pcs for both (major pent of K = minor pent of K+9);
-  only the highlighted root differs.
-- Triad — Major: {K, K+4, K+7}; Minor: {K+9, K, K+4} (the relative-minor / vi triad).
-Interval labels + `isRoot` are computed relative to the active mode's root.
+**Mode = major vs PARALLEL minor, SAME root and SAME position.** For a chosen key
+K, both passes are rooted on K in the same box window; the minor pass is K natural
+minor (parallel), NOT the relative minor — so you stay in one neck position and
+just change the notes. Subsets (degrees above K):
+- Major — FullScale {0,2,4,5,7,9,11}, Pentatonic {0,2,4,7,9}, Triad {0,4,7}.
+- Minor — FullScale (natural minor) {0,2,3,5,7,8,10}, Pentatonic {0,3,5,7,10},
+  Triad {0,3,7}.
+Interval labels + `isRoot` are computed relative to K.
 
 ## Tab 1 — Practice (guided)
 

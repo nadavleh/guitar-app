@@ -41,25 +41,28 @@ object CagedScales {
         listOf(Interval.P1, Interval.maj2, Interval.maj3, Interval.P4, Interval.P5, Interval.maj6, Interval.maj7),
     )
 
-    /** Pitch classes of the subset, for a parent-major [tonic] and [mode].
-     *  Full scale + pentatonic are mode-independent note sets (only the root
-     *  differs); triad is the I triad (major) or the vi / relative-minor triad. */
+    /** Pitch classes of the subset. Minor is the PARALLEL minor of [tonic] (same
+     *  root, natural minor) — NOT the relative minor — so the box stays in the
+     *  same neck position and only the notes change. */
     private fun subsetPcs(tonic: PitchClass, mode: CagedMode, subset: ScaleSubset): Set<PitchClass> {
         fun pc(semis: Int) = PitchClass((tonic.value + semis) % 12)
-        return when (subset) {
-            ScaleSubset.FullScale -> setOf(0, 2, 4, 5, 7, 9, 11).map { pc(it) }.toSet()
-            // Major pentatonic of the tonic == minor pentatonic of the relative minor.
-            ScaleSubset.Pentatonic -> setOf(0, 2, 4, 7, 9).map { pc(it) }.toSet()
-            ScaleSubset.Triad -> when (mode) {
-                CagedMode.Major -> setOf(0, 4, 7).map { pc(it) }.toSet()
-                CagedMode.Minor -> setOf(9, 0, 4).map { pc(it) }.toSet()   // relative-minor triad
+        val degrees = when (mode) {
+            CagedMode.Major -> when (subset) {
+                ScaleSubset.FullScale -> listOf(0, 2, 4, 5, 7, 9, 11)
+                ScaleSubset.Pentatonic -> listOf(0, 2, 4, 7, 9)         // major pentatonic
+                ScaleSubset.Triad -> listOf(0, 4, 7)                    // major triad
+            }
+            CagedMode.Minor -> when (subset) {
+                ScaleSubset.FullScale -> listOf(0, 2, 3, 5, 7, 8, 10)   // natural minor
+                ScaleSubset.Pentatonic -> listOf(0, 3, 5, 7, 10)        // minor pentatonic
+                ScaleSubset.Triad -> listOf(0, 3, 7)                    // minor triad
             }
         }
+        return degrees.map { pc(it) }.toSet()
     }
 
-    /** Root pitch class for the active mode of a box in parent-major key [tonic]. */
-    fun rootOf(tonic: PitchClass, mode: CagedMode): PitchClass =
-        if (mode == CagedMode.Major) tonic else PitchClass((tonic.value + 9) % 12)
+    /** Root of the active mode: the SAME [tonic] for both major and parallel minor. */
+    fun rootOf(tonic: PitchClass, mode: CagedMode): PitchClass = tonic
 
     /**
      * Resolve [box] of the CAGED system for parent-major key [tonic] on [tuning]

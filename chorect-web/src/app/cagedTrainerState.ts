@@ -99,6 +99,20 @@ export class CagedTrainerState {
 
   private resetPlayback() { this.activeKey = null; this.activeTriad = -1; }
 
+  /** Manually step to a triad (Triads tab scroller): stops any loop, selects it,
+   *  and plucks it once. */
+  setTriad(i: number) {
+    if (this.isPlaying) this.stop();
+    const seq = this.triadSequence();
+    if (seq.length === 0) return;
+    this.activeTriad = ((i % seq.length) + seq.length) % seq.length;
+    const { shape } = seq[this.activeTriad];
+    const midis = shape.strings.map((s, k) => noteAt(this.tuning, { stringIndex: s, fret: shape.frets[k] }).midi);
+    this.audio.playChord(midis, 18, 800);
+    this.notify();
+  }
+  nudgeTriad(d: number) { this.setTriad((this.activeTriad < 0 ? 0 : this.activeTriad) + d); }
+
   toggle() { if (this.isPlaying) this.stop(); else this.play(); }
 
   stop() {

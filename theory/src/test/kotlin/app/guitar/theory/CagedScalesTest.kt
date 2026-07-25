@@ -60,14 +60,19 @@ class CagedScalesTest {
         assertTrue(notes.any { it.isRoot } && notes.filter { it.isRoot }.all { Fretboard.noteAt(std, it.position).pitchClass == PitchClass.G })
     }
 
-    @Test fun `minor mode roots on the relative minor and its triad is the vi chord`() {
-        assertEquals(PitchClass(4), CagedScales.rootOf(G, CagedMode.Minor))   // E = relative minor of G
-        val pcs = CagedScales.resolve(G, CagedBox.POS3, CagedMode.Minor, ScaleSubset.Triad, std)
+    @Test fun `minor mode is the PARALLEL minor in the same position`() {
+        // Same root as major (G), NOT the relative minor.
+        assertEquals(G, CagedScales.rootOf(G, CagedMode.Minor))
+        // G minor triad = G B♭ D.
+        val triad = CagedScales.resolve(G, CagedBox.POS1, CagedMode.Minor, ScaleSubset.Triad, std)
             .map { Fretboard.noteAt(std, it.position).pitchClass }.toSet()
-        assertTrue(pcs.all { it in setOf(PitchClass(4), PitchClass.G, PitchClass(11)) })  // E G B
-        // The full scale is identical notes to the major mode (natural minor = relative major).
-        val maj = CagedScales.resolve(G, CagedBox.POS3, CagedMode.Major, ScaleSubset.FullScale, std).map { it.position }.toSet()
-        val min = CagedScales.resolve(G, CagedBox.POS3, CagedMode.Minor, ScaleSubset.FullScale, std).map { it.position }.toSet()
-        assertEquals(maj, min)
+        assertEquals(setOf(PitchClass.G, PitchClass(10), PitchClass.D), triad)   // G Bb D
+        // Same neck position as major, but the full-scale notes differ (natural minor ♭3/♭6/♭7).
+        val majPcs = CagedScales.resolve(G, CagedBox.POS1, CagedMode.Major, ScaleSubset.FullScale, std)
+            .map { Fretboard.noteAt(std, it.position).pitchClass }.toSet()
+        val minPcs = CagedScales.resolve(G, CagedBox.POS1, CagedMode.Minor, ScaleSubset.FullScale, std)
+            .map { Fretboard.noteAt(std, it.position).pitchClass }.toSet()
+        assertTrue(PitchClass(10) in minPcs && PitchClass(10) !in majPcs)   // Bb (♭3) only in minor
+        assertTrue(PitchClass(11) in majPcs && PitchClass(11) !in minPcs)   // B (natural 3) only in major
     }
 }

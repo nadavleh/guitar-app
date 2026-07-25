@@ -119,18 +119,25 @@ export class CagedTrainerUI {
   private renderTriads(screen: HTMLElement): void {
     const t = this.t;
     const seq = t.triadSequence();
-    const cur = t.activeTriad >= 0 ? seq[t.activeTriad] : null;
+    const idx = t.activeTriad >= 0 ? t.activeTriad : 0;
+    const cur = seq[idx];
     screen.appendChild(el("div", { class: "row", style: "margin-top:10px;align-items:center;gap:8px" }, [
       btn(t.isPlaying ? "Stop ■" : "Play ▶", () => t.toggle(), "btn primary"),
       el("span", { style: "flex:1" }),
-      el("span", { class: "mono" }, [t.activeTriad >= 0 ? `${t.activeTriad + 1}/24` : "24 triads"]),
+      labelSm("Triad"),
+      this.navBtn("◀", () => t.nudgeTriad(-1), false),
+      el("span", { class: "mono" }, [`${idx + 1}/${seq.length}`]),
+      this.navBtn("▶", () => t.nudgeTriad(+1), false),
     ]));
     const groupNames = ["strings 6-5-4", "strings 5-4-3", "strings 4-3-2", "strings 3-2-1"];
     const invNames = ["root position", "1st inversion", "2nd inversion"];
     const label = cur
-      ? `${spellPc(t.key)}${cur.quality === "min" ? "m" : ""} · ${groupNames[Math.floor(t.activeTriad % 12 / 3)]} · ${invNames[cur.shape.inversion]}`
-      : "All major triads (4 string-groups × 3 inversions), then all minor — one per beat.";
+      ? `${spellPc(t.key)}${cur.quality === "min" ? "m" : ""} · ${groupNames[Math.floor((idx % 12) / 3)]} · ${invNames[cur.shape.inversion]}`
+      : "All major triads (4 string-groups × 3 inversions), then all minor.";
     screen.appendChild(el("div", { style: "margin-top:8px;font-weight:700" }, [label]));
+    screen.appendChild(el("div", { style: "margin-top:2px" }, [
+      labelSm("◀ ▶ to step through all 24 (12 major, then 12 minor); Play runs them one per beat."),
+    ]));
   }
 
   // ---- Fretboard painting ----

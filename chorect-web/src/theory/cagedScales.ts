@@ -30,22 +30,18 @@ export interface CagedNote {
   isRoot: boolean;
 }
 
-const MAJOR_SCALE_PCS = [0, 2, 4, 5, 7, 9, 11];
-
+// Minor is the PARALLEL minor of tonic (same root, natural minor) — NOT the
+// relative minor — so the box stays in the same position; only the notes change.
 function subsetPcs(tonic: PitchClass, mode: CagedMode, subset: ScaleSubset): Set<PitchClass> {
   const pc = (semis: number): PitchClass => (((tonic + semis) % 12) + 12) % 12;
-  switch (subset) {
-    case ScaleSubset.FullScale:
-      return new Set(MAJOR_SCALE_PCS.map(pc));
-    case ScaleSubset.Pentatonic: // major pent of tonic == minor pent of relative minor
-      return new Set([0, 2, 4, 7, 9].map(pc));
-    case ScaleSubset.Triad:
-      return new Set((mode === CagedMode.Major ? [0, 4, 7] : [9, 0, 4]).map(pc));
-  }
+  const degrees = mode === CagedMode.Major
+    ? { [ScaleSubset.FullScale]: [0, 2, 4, 5, 7, 9, 11], [ScaleSubset.Pentatonic]: [0, 2, 4, 7, 9], [ScaleSubset.Triad]: [0, 4, 7] }
+    : { [ScaleSubset.FullScale]: [0, 2, 3, 5, 7, 8, 10], [ScaleSubset.Pentatonic]: [0, 3, 5, 7, 10], [ScaleSubset.Triad]: [0, 3, 7] };
+  return new Set(degrees[subset].map(pc));
 }
 
-export function rootOf(tonic: PitchClass, mode: CagedMode): PitchClass {
-  return mode === CagedMode.Major ? tonic : (((tonic + 9) % 12) + 12) % 12;
+export function rootOf(tonic: PitchClass, _mode: CagedMode): PitchClass {
+  return tonic;   // same root for major and parallel minor
 }
 
 function anchorFret(tonic: PitchClass, box: CagedBox, tuning: Tuning): number {
