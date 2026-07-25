@@ -298,6 +298,8 @@ fun App(audio: AudioEngine) {
             DecomposeScreen(state, onBack = { state.closeSheet() })
         } else if (state.currentSheet == Sheet.CavaqProgressions) {
             CavaqProgressionsScreen(state, onBack = { state.closeSheet() })
+        } else if (state.currentSheet == Sheet.ScalesTriads) {
+            ScalesTriadsScreen(state, onBack = { state.closeSheet() })
         } else if (state.currentSheet == Sheet.RhythmUnits) {
             RhythmUnitsScreen(state, onBack = { state.closeSheet() })
         } else if (state.currentSheet == Sheet.Metronome) {
@@ -404,6 +406,7 @@ private fun sheetLabel(s: Sheet): String = when (s) {
     Sheet.Loop -> "Loop"
     Sheet.Options -> "Settings"
     Sheet.CavaqProgressions -> "Progressions"
+    Sheet.ScalesTriads -> "Scales & Triads"
     Sheet.Tuner -> "Tuner"
     Sheet.EarTraining -> "Ear Training"
     Sheet.SambaLooper -> "Drums"

@@ -291,7 +291,10 @@ class SambaLooperState(
     private fun buffer(instrument: PercussionInstrument, voiceIndex: Int): FloatArray =
         cache.getOrPut(instrument to voiceIndex) {
             // Prefer a bundled sample; fall back to the on-device synth if absent.
-            sampleLoader(instrument, voiceIndex) ?: synth.synthesize(instrument, voiceIndex)
+            val raw = sampleLoader(instrument, voiceIndex) ?: synth.synthesize(instrument, voiceIndex)
+            // Pandeiro voices are high-passed + brightened so they clear the surdo's
+            // low band (mirror of the web pandeiroEq). Applied once, then cached.
+            if (PercussionCatalog.baseId(instrument.id) == "pandeiro") pandeiroEq(raw) else raw
         }
 
     /** Cycle a cell's voice and, if it became audible, preview the new voice. */

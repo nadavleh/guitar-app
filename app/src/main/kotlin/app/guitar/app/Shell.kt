@@ -242,6 +242,8 @@ enum class TabDest(val sheet: Sheet, val label: String, val icon: ImageVector) {
     Decompose(Sheet.Decompose, "Decompose", Icons.Outlined.Extension),
     RhythmUnits(Sheet.RhythmUnits, "Rhythm", ShellIcons.RhythmNotes),
     Metronome(Sheet.Metronome, "Metronome", ShellIcons.Clock),
+    // Guitar-only.
+    ScalesTriads(Sheet.ScalesTriads, "Scales", Icons.Outlined.GridView),
     // Cavaquinho-only (filtered in the tab editor + More by instrument).
     CavaqProgressions(Sheet.CavaqProgressions, "Progressions", Icons.Outlined.QueueMusic),
 }
@@ -250,6 +252,7 @@ enum class TabDest(val sheet: Sheet, val label: String, val icon: ImageVector) {
  *  editor and the More overlay unless that instrument is active. */
 fun TabDest.availableFor(state: AppState): Boolean = when (this) {
     TabDest.CavaqProgressions -> state.instrument == Instrument.Cavaquinho
+    TabDest.ScalesTriads -> state.instrument == Instrument.Guitar
     else -> true
 }
 
@@ -392,6 +395,7 @@ private fun destSubtitle(dest: TabDest): String = when (dest) {
     TabDest.Decompose -> "Chord-tone breakdown reference"
     TabDest.RhythmUnits -> "Learn & train basic rhythmic units"
     TabDest.Metronome -> "Click track with selectable time signatures"
+    TabDest.ScalesTriads -> "Guitar CAGED scales & triad practice"
 }
 
 /**
