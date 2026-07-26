@@ -5,8 +5,8 @@
 
 import {
   PitchClass, fpKey, noteAt, standard,
-  CagedBox, CAGED_BOXES, CagedMode, ScaleSubset, resolveBox, CagedNote,
-  triadInversions, TriadShape,
+  CagedBox, CAGED_BOXES, CagedMode, ScaleSubset, CagedNote,
+  triadInversions, TriadShape, practiceRegions, notesInWindow,
 } from "../theory";
 import { WebAudioEngine } from "../audio";
 
@@ -45,13 +45,19 @@ export class CagedTrainerState {
 
   private notify() { this.onChange(); }
 
-  // ---- Practice derivations ----
-  get boxIndex(): number { return Math.floor(this.stepIndex / 6); }
+  // ---- Practice derivations (over the 7 major-scale POSITIONS, like Fretboard mode) ----
+  /** Fret windows of the key's positions (7 for a diatonic key), low→high. */
+  regions(): [number, number][] {
+    const r = practiceRegions(this.key, this.tuning);
+    return r.length ? r : [[0, 4]];
+  }
+  get regionCount(): number { return this.regions().length; }
+  get stepCount(): number { return this.regionCount * 6; }
+  get boxIndex(): number { return Math.min(Math.floor(this.stepIndex / 6), this.regionCount - 1); }
   get drillIndex(): number { return this.stepIndex % 6; }
-  get box(): CagedBox { return CAGED_BOXES[this.boxIndex]; }
 
-  /** The 6 drill steps for the current box: [triad,scale,pent] of the leading
-   *  mode then the other; the leading mode alternates each box. */
+  /** The 6 drill steps for the current position: [triad,scale,pent] of the
+   *  leading mode then the other; the leading mode alternates each position. */
   drillSteps(boxIndex: number): DrillStep[] {
     const lead = boxIndex % 2 === 0 ? CagedMode.Major : CagedMode.Minor;
     const other = lead === CagedMode.Major ? CagedMode.Minor : CagedMode.Major;
@@ -65,7 +71,8 @@ export class CagedTrainerState {
 
   practiceNotes(): CagedNote[] {
     const st = this.step;
-    return resolveBox(this.key, this.box, st.mode, st.subset, this.tuning);
+    const [lo, hi] = this.regions()[this.boxIndex] ?? [0, 4];
+    return notesInWindow(this.key, lo, hi, st.mode, st.subset, this.tuning);
   }
 
   triadSequence(): { quality: "maj" | "min"; shape: TriadShape }[] {
@@ -82,7 +89,7 @@ export class CagedTrainerState {
   setBpm(v: number) { this.bpm = Math.min(Math.max(Math.round(v), 30), 240); this.notify(); }
   toggleAudioDemo() { this.audioDemo = !this.audioDemo; this.notify(); }
   toggleReveal() { this.reveal = !this.reveal; this.notify(); }
-  setStep(i: number) { this.stepIndex = Math.min(Math.max(i, 0), 29); this.resetPlayback(); this.notify(); }
+  setStep(i: number) { this.stepIndex = Math.min(Math.max(i, 0), this.stepCount - 1); this.resetPlayback(); this.notify(); }
   nudgeStep(d: number) { this.setStep(this.stepIndex + d); }
 
   nextChallenge() {
@@ -167,7 +174,7 @@ export class CagedTrainerState {
             }
           }
           if (!this.isPlaying || myToken !== this.token) return;
-          if (this.stepIndex >= 29) { this.stop(); return; }
+          if (this.stepIndex >= this.stepCount - 1) { this.stop(); return; }
           this.stepIndex += 1;
           this.activeKey = null;
           this.notify();

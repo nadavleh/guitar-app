@@ -78,11 +78,11 @@ export class CagedTrainerUI {
       el("span", { style: "flex:1" }),
       labelSm("Step"),
       this.navBtn("◀", () => t.nudgeStep(-1), t.stepIndex <= 0),
-      el("span", { class: "mono" }, [`${t.stepIndex + 1}/30`]),
-      this.navBtn("▶", () => t.nudgeStep(+1), t.stepIndex >= 29),
+      el("span", { class: "mono" }, [`${t.stepIndex + 1}/${t.stepCount}`]),
+      this.navBtn("▶", () => t.nudgeStep(+1), t.stepIndex >= t.stepCount - 1),
     ]));
     screen.appendChild(el("div", { style: "margin-top:8px;font-weight:700" }, [
-      `${BOX_LABEL[t.box]} · ${t.step.mode === CagedMode.Major ? "Major" : "Minor"} ${SUBSET_LABEL[st.subset]}`,
+      `Position ${t.boxIndex + 1}/${t.regionCount} · ${t.step.mode === CagedMode.Major ? "Major" : "Minor"} ${SUBSET_LABEL[st.subset]}`,
     ]));
     screen.appendChild(el("div", { style: "margin-top:2px" }, [
       labelSm("Run box 1→5; each box: triad · scale · pentatonic for the leading mode, then the other (leading mode alternates per box). Roots are ringed."),

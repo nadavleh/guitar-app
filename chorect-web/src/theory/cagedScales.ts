@@ -8,6 +8,7 @@
 // the "clean position, no backward reach" fingering convention.
 
 import { PitchClass, Interval, Tuning, FretPosition, fp, noteAt, midiPitchClass, stringCount } from "./core";
+import { SCALES, scalePositionsFor, Scale } from "./scales";
 
 export enum CagedBox { POS1 = "POS1", POS2 = "POS2", POS3 = "POS3", POS4 = "POS4", POS5 = "POS5" }
 
@@ -93,6 +94,42 @@ export function resolveBox(
   }
   return out;
 }
+
+// ---------- 7-position practice (mirrors the Fretboard "scales by position") ----------
+
+const MAJOR = SCALES.get("major")!;
+const NATURAL_MINOR = SCALES.get("natural minor")!;
+
+/** Practice regions = the fret windows of the key's MAJOR-scale positions (the
+ *  same engine the Fretboard "scales by position" uses — 7 for a diatonic key).
+ *  Both the major and the parallel-minor drills are played inside these windows. */
+export function practiceRegions(tonic: PitchClass, tuning: Tuning, numFrets = 22): [number, number][] {
+  return scalePositionsFor(tonic, MAJOR, tuning, numFrets).map((p) => [p.firstFret, p.lastFret]);
+}
+
+/** The [subset] notes of [mode] (parallel: minor = natural minor of the SAME
+ *  tonic) that fall inside the window [lo,hi], labelled vs the tonic. */
+export function notesInWindow(
+  tonic: PitchClass, lo: number, hi: number, mode: CagedMode, subset: ScaleSubset, tuning: Tuning, numFrets = 22,
+): CagedNote[] {
+  const pcs = subsetPcs(tonic, mode, subset);
+  const out: CagedNote[] = [];
+  for (let s = 0; s < stringCount(tuning); s++) {
+    for (let f = Math.max(lo, 0); f <= Math.min(hi, numFrets); f++) {
+      const pc = midiPitchClass(noteAt(tuning, fp(s, f)).midi);
+      if (pcs.has(pc)) out.push({ position: fp(s, f), interval: (((pc - tonic) % 12) + 12) % 12, isRoot: pc === tonic });
+    }
+  }
+  return out;
+}
+
+/** Positions of an arbitrary scale for the Explore tab's position scroller. */
+export function explorePositions(root: PitchClass, scale: Scale, tuning: Tuning, numFrets = 22) {
+  return scalePositionsFor(root, scale, tuning, numFrets);
+}
+export const EXPLORE_MAJOR = MAJOR;
+export const EXPLORE_MINOR = NATURAL_MINOR;
+export const EXPLORE_PENTATONIC = SCALES.get("minor pentatonic")!;
 
 // ---------- Triads: 4 adjacent 3-string groups × 3 inversions × {maj,min} ----------
 
