@@ -139,6 +139,8 @@ class CagedTrainerState(
                         }
                     }
                     TrainerTab.Practice -> {
+                        // Play the current drill (up+down once), then advance to the next
+                        // drill step — arp → scale → pentatonic across every box — stop after the last.
                         if (audioDemo) {
                             val notes = practiceNotes().sortedBy { Fretboard.noteAt(tuning, it.position).midi.value }
                             val sweep = notes + notes.dropLast(1).reversed()
@@ -155,6 +157,10 @@ class CagedTrainerState(
                                 delay(beat)
                             }
                         }
+                        if (!isPlaying) break
+                        if (stepIndex >= 29) { stop(); break }
+                        stepIndex += 1
+                        activeNote = null
                     }
                     TrainerTab.Challenge -> { isPlaying = false }
                 }

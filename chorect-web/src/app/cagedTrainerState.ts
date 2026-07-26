@@ -144,6 +144,8 @@ export class CagedTrainerState {
             await sleep(beat);
           }
         } else if (this.tab === "practice") {
+          // Play the CURRENT drill (up + down once), then advance to the next drill
+          // step — arp → scale → pentatonic across every box — and stop after the last.
           if (this.audioDemo) {
             const notes = this.practiceNotes().slice().sort((a, b) =>
               noteAt(this.tuning, a.position).midi - noteAt(this.tuning, b.position).midi);
@@ -164,6 +166,11 @@ export class CagedTrainerState {
               await sleep(beat);
             }
           }
+          if (!this.isPlaying || myToken !== this.token) return;
+          if (this.stepIndex >= 29) { this.stop(); return; }
+          this.stepIndex += 1;
+          this.activeKey = null;
+          this.notify();
         } else {
           return;
         }
