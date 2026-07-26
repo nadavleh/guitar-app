@@ -2,7 +2,7 @@
 // / Triads tabs sharing one fretboard. Mirror to Android later.
 
 import { AppState } from "./appState";
-import { CagedTrainerState, TrainerTab } from "./cagedTrainerState";
+import { CagedTrainerState, TrainerTab, ExploreScale } from "./cagedTrainerState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { FretMark, MarkKind, intervalName } from "./marks";
 import { el, btn, valueSlider, labelSm } from "./dom";
@@ -39,6 +39,7 @@ export class CagedTrainerUI {
     tabs.appendChild(tabBtn("practice", "Practice"));
     tabs.appendChild(tabBtn("challenge", "Challenge"));
     tabs.appendChild(tabBtn("triads", "Triads"));
+    tabs.appendChild(tabBtn("explore", "Explore"));
     screen.appendChild(tabs);
 
     // Key + tempo (shared)
@@ -54,7 +55,8 @@ export class CagedTrainerUI {
 
     if (t.tab === "practice") this.renderPractice(screen);
     else if (t.tab === "challenge") this.renderChallenge(screen);
-    else this.renderTriads(screen);
+    else if (t.tab === "triads") this.renderTriads(screen);
+    else this.renderExplore(screen);
 
     // Shared fretboard
     if (!this.fbCanvasEl) {
@@ -140,6 +142,27 @@ export class CagedTrainerUI {
     ]));
   }
 
+  // ---- Explore (scroll scale positions, like Fretboard mode) ----
+  private renderExplore(screen: HTMLElement): void {
+    const t = this.t;
+    const scales: [ExploreScale, string][] = [["major", "Major"], ["minor", "Minor"], ["pentatonic", "Pentatonic"]];
+    const row = el("div", { class: "row", style: "margin-top:10px;gap:6px" });
+    for (const [id, lbl] of scales) {
+      row.appendChild(btn(lbl, () => t.setExploreScale(id), t.exploreScale === id ? "btn primary" : "btn"));
+    }
+    screen.appendChild(row);
+    const positions = t.explorePositionsList();
+    screen.appendChild(el("div", { class: "row", style: "margin-top:10px;align-items:center;gap:8px" }, [
+      labelSm("Position"),
+      this.navBtn("◀", () => t.nudgeExplorePos(-1), false),
+      el("span", { class: "mono" }, [`${positions.length ? t.explorePos + 1 : 0}/${positions.length}`]),
+      this.navBtn("▶", () => t.nudgeExplorePos(+1), false),
+    ]));
+    screen.appendChild(el("div", { style: "margin-top:2px" }, [
+      labelSm("Scroll the scale's positions across the neck (like Fretboard mode). Tap a note to hear it."),
+    ]));
+  }
+
   // ---- Fretboard painting ----
   private paintFretboard(): void {
     const t = this.t;
@@ -152,7 +175,7 @@ export class CagedTrainerUI {
     } else if (t.tab === "challenge") {
       const c = t.challenge;
       if (c && t.reveal) marks = this.notesToMarks(resolveBox(c.key, c.box, c.mode, c.subset, t.tuning));
-    } else {
+    } else if (t.tab === "triads") {
       const seq = t.triadSequence();
       const cur = t.activeTriad >= 0 ? seq[t.activeTriad] : seq[0];
       if (cur) {
@@ -162,6 +185,16 @@ export class CagedTrainerUI {
           const pc = midiPitchClass(noteAt(t.tuning, pos).midi);
           marks.set(fpKey(pos), { label: intervalName(((pc - root) % 12 + 12) % 12), isRoot: pc === root, kind: MarkKind.Chord });
         });
+      }
+    } else {
+      // explore: the current position of the selected scale
+      const pos = t.explorePositionsList()[t.explorePos];
+      if (pos) {
+        const root = t.key;
+        for (const p of pos.positions) {
+          const pc = midiPitchClass(noteAt(t.tuning, p).midi);
+          marks.set(fpKey(p), { label: intervalName(((pc - root) % 12 + 12) % 12), isRoot: pc === root, kind: MarkKind.Scale });
+        }
       }
     }
 

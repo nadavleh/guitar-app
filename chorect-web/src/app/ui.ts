@@ -455,7 +455,7 @@ export class App {
         else if (sheet === Sheet.CavaqProgressions) { e.preventDefault(); this.cavaq.toggle(); }
         else if (sheet === Sheet.RhythmUnits) { e.preventDefault(); this.rhythmUnits.toggle(); }
         else if (sheet === Sheet.Metronome) { e.preventDefault(); this.metronome.toggle(); }
-        else if (sheet === Sheet.ScalesTriads) { e.preventDefault(); if (this.caged.tab === "challenge") this.caged.nextChallenge(); else this.caged.toggle(); }
+        else if (sheet === Sheet.ScalesTriads) { e.preventDefault(); if (this.caged.tab === "challenge") this.caged.nextChallenge(); else if (this.caged.tab !== "explore") this.caged.toggle(); }
         return;
       }
 

@@ -7,10 +7,13 @@ import {
   PitchClass, fpKey, noteAt, standard,
   CagedBox, CAGED_BOXES, CagedMode, ScaleSubset, CagedNote,
   triadInversions, TriadShape, practiceRegions, notesInWindow,
+  explorePositions, EXPLORE_MAJOR, EXPLORE_MINOR, EXPLORE_PENTATONIC,
+  ScalePosition,
 } from "../theory";
 import { WebAudioEngine } from "../audio";
 
-export type TrainerTab = "practice" | "challenge" | "triads";
+export type TrainerTab = "practice" | "challenge" | "triads" | "explore";
+export type ExploreScale = "major" | "minor" | "pentatonic";
 
 export interface DrillStep { mode: CagedMode; subset: ScaleSubset; }
 
@@ -37,6 +40,9 @@ export class CagedTrainerState {
   activeKey: string | null = null;
   /** Index 0..23 of the triad currently sounding, or -1. */
   activeTriad = -1;
+  /** Explore tab: which scale + which position is shown. */
+  exploreScale: ExploreScale = "major";
+  explorePos = 0;
 
   readonly tuning = standard;
   private token = 0;
@@ -119,6 +125,21 @@ export class CagedTrainerState {
     this.notify();
   }
   nudgeTriad(d: number) { this.setTriad((this.activeTriad < 0 ? 0 : this.activeTriad) + d); }
+
+  // ---- Explore (scroll positions like Fretboard mode) ----
+  private exploreScaleObj() {
+    return this.exploreScale === "major" ? EXPLORE_MAJOR : this.exploreScale === "minor" ? EXPLORE_MINOR : EXPLORE_PENTATONIC;
+  }
+  explorePositionsList(): ScalePosition[] {
+    return explorePositions(this.key, this.exploreScaleObj(), this.tuning);
+  }
+  setExploreScale(s: ExploreScale) { this.exploreScale = s; this.explorePos = 0; this.notify(); }
+  setExplorePos(i: number) {
+    const n = this.explorePositionsList().length;
+    this.explorePos = n ? (((i % n) + n) % n) : 0;
+    this.notify();
+  }
+  nudgeExplorePos(d: number) { this.setExplorePos(this.explorePos + d); }
 
   toggle() { if (this.isPlaying) this.stop(); else this.play(); }
 
