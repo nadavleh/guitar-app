@@ -6,7 +6,7 @@ import { AppState, ChallengeScore, CHALLENGE_SCORE_ORDER } from "./appState";
 import { EarTrainingState, EarSubMode, EarMode } from "./earTrainingState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { shapeMarks } from "./marks";
-import { el, btn, segmented, switchRow, labelSm, songLinkRow } from "./dom";
+import { el, btn, segmented, switchRow, labelSm, songLinkRow, slider } from "./dom";
 import { transportDock, toneSheet } from "./transport";
 import { icon } from "./icons";
 import { renderChallengeStatsOverlay } from "./statsOverlay";
@@ -16,7 +16,7 @@ import {
   parseChord, ChordShapeGenerator, CagedShape, notesFrom, midiPitchClass, fp, fpKey,
   IntervalDirection, INTERVAL_CHOICES, intervalChoiceFor,
   MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, MINOR_HARMONIC_PROGRESSIONS, ADVANCED_PROGRESSIONS, ADVANCED2_PROGRESSIONS,
-  SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor,
+  SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor, progressionFromKey,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow,
   ResolvedChord, ChordShape, resolveProgression, resolveNamed, resolveCircleWindow,
 } from "../theory";
@@ -137,6 +137,7 @@ export class EarTrainingUI {
     [EarSubMode.Inversions]: "Inversions",
     [EarSubMode.AugDim]: "Aug / Dim",
     [EarSubMode.Intervals]: "Intervals",
+    [EarSubMode.Drill]: "Drill",
   };
 
   /** Sub-mode chip row (Signal move — replaces the sub-mode <select>):
@@ -148,7 +149,7 @@ export class EarTrainingUI {
     const ear = this.ear;
     const label = (s: EarSubMode) => EarTrainingUI.SUBMODE_LABEL[s];
     const primary = [EarSubMode.Progression, EarSubMode.Intervals, EarSubMode.Note2Chord];
-    const overflow = [EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim];
+    const overflow = [EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim, EarSubMode.Drill];
     const row = el("div", { class: "chip-row" });
     for (const s of primary) row.appendChild(chip(label(s), ear.progSubMode === s, () => ear.switchTab(s)));
 
@@ -466,14 +467,17 @@ export class EarTrainingUI {
     screen.appendChild(el("div", { class: "tool-topbar" }, topbarChildren));
 
     // Practice/Challenge segmented control (Signal move — replaces the mode
-    // <select>) + sub-mode chip row (replaces the sub-mode <select>).
-    screen.appendChild(el("div", { style: "margin-top:8px" }, [
-      segmented(
-        [{ value: EarMode.Practice, label: "Practice" }, { value: EarMode.Challenge, label: "Challenge" }],
-        ear.earMode,
-        (v) => ear.setEarMode(v),
-      ),
-    ]));
+    // <select>) + sub-mode chip row (replaces the sub-mode <select>). Drill has
+    // no practice/challenge split, so its segmented control is hidden.
+    if (ear.progSubMode !== EarSubMode.Drill) {
+      screen.appendChild(el("div", { style: "margin-top:8px" }, [
+        segmented(
+          [{ value: EarMode.Practice, label: "Practice" }, { value: EarMode.Challenge, label: "Challenge" }],
+          ear.earMode,
+          (v) => ear.setEarMode(v),
+        ),
+      ]));
+    }
     screen.appendChild(el("div", { style: "margin:8px 0" }, [this.subModeChipRow()]));
 
     const body = el("div", { class: "et-scroll" });
@@ -498,6 +502,9 @@ export class EarTrainingUI {
         break;
       case EarSubMode.Intervals:   // challenge-only (#6)
         this.intervalsView(body);
+        break;
+      case EarSubMode.Drill:
+        this.drillView(body);
         break;
     }
 
@@ -1580,5 +1587,78 @@ export class EarTrainingUI {
       parent.appendChild(btn(ear.intervalChIndex === ear.intervalChallengeTotal - 1 ? "See score →" : "Next →",
         () => ear.advanceIntervalChallenge(), "btn primary"));
     }
+  }
+
+  // ---------- Drill (mistake repetition) ----------
+
+  private drillView(parent: HTMLElement): void {
+    const ear = this.ear;
+    const entries = Object.entries(this.state.progressionMistakes)
+      .map(([key, count]) => ({ key, count, prog: progressionFromKey(key) }))
+      .filter((e) => e.prog !== null)
+      .sort((a, b) => b.count - a.count);
+
+    parent.appendChild(el("div", { class: "et-muted", style: "margin-bottom:8px" }, [
+      "Progressions you've missed in the Progression Challenge, most-missed first. Loop one to drill it by ear — adjust each chord's voicing to isolate the sound you keep missing.",
+    ]));
+
+    if (entries.length === 0) {
+      parent.appendChild(el("div", { class: "et-card" }, [
+        el("div", { style: "font-weight:700" }, ["No mistakes tracked yet."]),
+        el("div", { class: "et-muted", style: "margin-top:4px" }, ["Finish a Progression Challenge; any progression you get wrong lands here to drill."]),
+      ]));
+      return;
+    }
+
+    for (const e of entries) {
+      const drilling = ear.isDrilling && ear.drillKey === e.key;
+      const modeName = e.prog!.mode === TrainingMode.Major ? "Major" : "Minor";
+      const row = el("div", { class: "et-card", style: "margin-bottom:8px" });
+      row.appendChild(el("div", { style: "display:flex;align-items:center;gap:8px" }, [
+        el("div", { style: "flex:1" }, [
+          el("div", { style: "font-weight:700" }, [romanLineFor(e.prog!)]),
+          el("div", { class: "et-muted", style: "font-size:12px" }, [`${modeName} · missed ${e.count}×`]),
+        ]),
+        btn(drilling ? "■ Stop" : "▶ Loop", () => { if (drilling) ear.stopDrill(); else ear.startDrill(e.key); this.rerender(); }, drilling ? "btn primary" : "btn"),
+        btn("✕", () => { if (drilling) ear.stopDrill(); this.state.clearProgressionMistake(e.key); this.rerender(); }, "btn text"),
+      ]));
+      if (drilling) row.appendChild(this.drillControls());
+      parent.appendChild(row);
+    }
+  }
+
+  /** The voicing + tempo panel shown under the row currently being drilled. */
+  private drillControls(): HTMLElement {
+    const ear = this.ear;
+    const wrap = el("div", { style: "margin-top:10px;border-top:1px solid var(--surface2);padding-top:10px" });
+
+    const bpmVal = el("span", { class: "et-muted", style: "min-width:56px" }, [`${ear.progBpm} BPM`]);
+    wrap.appendChild(el("div", { style: "display:flex;align-items:center;gap:8px;margin-bottom:8px" }, [
+      labelSm("Tempo"),
+      slider(40, 220, ear.progBpm, (v) => { ear.progBpm = Math.round(v); }, 1, (v) => { bpmVal.textContent = `${Math.round(v)} BPM`; }),
+      bpmVal,
+    ]));
+
+    wrap.appendChild(labelSm("Voicing per chord (tap to cycle)"));
+    wrap.appendChild(chipsRow(ear.drillInversions.map((inv, i) =>
+      chip(this.drillBarLabel(i, inv), ear.drillBar === i, () => { ear.cycleDrillInversion(i); this.rerender(); }))));
+
+    wrap.appendChild(chipsRow([
+      btn("5th in bass (all)", () => { ear.setAllDrillInversions(2); this.rerender(); }, "btn"),
+      btn("Root (all)", () => { ear.setAllDrillInversions(0); this.rerender(); }, "btn"),
+      btn("Auto (voice-led shell)", () => { ear.setAllDrillInversions(null); this.rerender(); }, "btn"),
+    ]));
+    wrap.appendChild(el("div", { class: "et-muted", style: "font-size:12px;margin-top:6px" }, [
+      "Auto uses the app's voice-led shell voicing. Forcing an inversion plays a full close voicing, so the 5th is present and you control whether it sits above or below the root.",
+    ]));
+    return wrap;
+  }
+
+  private drillBarLabel(i: number, inv: number | null): string {
+    const ear = this.ear;
+    const parts = ear.drillProg ? romanLineFor(ear.drillProg).split("  –  ") : [];
+    const roman = parts[i] ?? String(i + 1);
+    const invText = inv == null ? "auto" : inv === 0 ? "root" : inv === 1 ? "3rd bass" : inv === 2 ? "5th bass" : "7th bass";
+    return `${roman} · ${invText}`;
   }
 }

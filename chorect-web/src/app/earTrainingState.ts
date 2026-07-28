@@ -10,7 +10,7 @@ import {
   TrainingMode, ChordTypeLevel, Progression, ResolvedChord, NamedProgression,
   EarTrainingDegrees, degreeRoot, resolve as resolveDegree, resolveProgression,
   randomProgression, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
-  MINOR_DOMINANT,
+  MINOR_DOMINANT, progressionKey, progressionFromKey,
   majorRelativeDegree, degreeFromMajorRelative,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow, importedSongsForDiatonic, CIRCLE_WINDOWS, namedRomanLine,
   N2cChallenge, randomN2c, n2cAnswerLabel, n2cChordSymbol, n2cTestNote, n2cLabel,
@@ -29,7 +29,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 // tapering to none at the top, so chords sit on a fuller low end.
 const EAR_BASS_BOOST = 0.4;
 
-export enum EarSubMode { Progression = "Progression", Note2Chord = "Note2Chord", Flavor = "Flavor", Inversions = "Inversions", AugDim = "AugDim", Intervals = "Intervals" }
+export enum EarSubMode { Progression = "Progression", Note2Chord = "Note2Chord", Flavor = "Flavor", Inversions = "Inversions", AugDim = "AugDim", Intervals = "Intervals", Drill = "Drill" }
 export enum EarMode { Practice = "Practice", Challenge = "Challenge" }
 
 export interface EarDeps {
@@ -41,6 +41,8 @@ export interface EarDeps {
   onProgressionChallengeComplete: (score: number, total: number, durationMs: number) => void;
   /** Fires when any OTHER challenge completes (kind = inversions/augdim/flavor/intervals/note2chord). */
   onChallengeComplete?: (kind: string, score: number, total: number, durationMs: number) => void;
+  /** Fires once per wrongly-answered progression when a Progression Challenge ends. */
+  onProgressionMistake?: (progKey: string) => void;
 }
 
 /** One challenge question: the generated progression + the user's saved guesses. */
@@ -133,6 +135,7 @@ export class EarTrainingState {
     this.progSubMode = sub;
     this.earMode = EarMode.Practice;
     this.stopLoop();
+    this.stopDrill();
     this.notify();
   }
 
@@ -467,6 +470,125 @@ export class EarTrainingState {
     this.playEarChord(this.earMidis(shape), root, sustain);
   }
 
+  // ---------- Mistake Drill ----------
+  // A self-contained looper (never touches the quiz looper) that repeats ONE
+  // missed progression with per-bar voicing control. Default per bar is the
+  // voice-led SHELL shape (identical to the quiz loop); an override forces a
+  // close-voiced inversion so the 5th's position (above/below the root) can be
+  // controlled — shell drops the 5th, so the override switches to a fuller voicing.
+
+  /** progressionKey of the progression currently drilling, or null. */
+  drillKey: string | null = null;
+  drillProg: Progression | null = null;
+  private drillResolved: ResolvedChord[] = [];
+  /** Per-bar inversion override: null = auto (voice-led shell), 0..n-1 = forced. */
+  drillInversions: (number | null)[] = [];
+  /** Precomputed per-bar MIDI voicings, rebuilt on any voicing change. */
+  private drillMidis: number[][] = [];
+  drillBar = -1;
+  private drillToken = 0;
+
+  get isDrilling(): boolean { return this.drillKey !== null; }
+
+  /** Record one miss per wrongly-answered progression when a challenge ends. */
+  private recordProgressionMistakes() {
+    if (this.specialProgMode) return;
+    const cb = this.deps.onProgressionMistake;
+    if (!cb) return;
+    for (let i = 0; i < this.challengeTotal && i < this.challengeLog.length; i++) {
+      if (this.challengeAnswers[i] === false) cb(progressionKey(this.challengeLog[i].prog));
+    }
+  }
+
+  /** Start (or restart) looping the missed progression identified by [progKey]. */
+  startDrill(progKey: string) {
+    const prog = progressionFromKey(progKey);
+    if (!prog) return;
+    this.stopLoop();
+    this.stopDrill();
+    const tonic: PitchClass = (prog.mode === TrainingMode.Major ? 0 : 9) as PitchClass;
+    this.drillKey = progKey;
+    this.drillProg = prog;
+    this.drillResolved = resolveProgression(prog, tonic, this.chordTypeLevel, this.rng);
+    this.drillInversions = this.drillResolved.map(() => null);
+    this.rebuildDrillVoicing();
+    this.drillBar = 0;
+    this.drillToken++;
+    const token = this.drillToken;
+    this.notify();
+    void (async () => {
+      while (this.drillKey === progKey && token === this.drillToken) {
+        for (let i = 0; i < this.drillResolved.length; i++) {
+          if (this.drillKey !== progKey || token !== this.drillToken) break;
+          const barMs = (60000 / Math.max(this.progBpm, 10)) * 4;   // read live so BPM edits apply next bar
+          const sustain = Math.max(Math.floor(barMs * 0.9), 200);
+          this.drillBar = i;
+          this.deps.audio.cutReverb();
+          const rc = this.drillResolved[i];
+          const parsed = rc ? parseChord(rc.symbol) : null;
+          const midis = this.drillMidis[i] ?? [];
+          if (midis.length) this.playEarChord(midis, parsed ? parsed[0] : 0, sustain);
+          this.notify();
+          await sleep(barMs);
+        }
+      }
+    })();
+  }
+
+  stopDrill() {
+    if (this.drillKey === null) return;
+    this.drillKey = null;
+    this.drillBar = -1;
+    this.drillToken++;
+    this.deps.audio.stop();
+    this.notify();
+  }
+
+  /** Number of inversions of bar [i]'s chord (root..n-1); 0 if unresolvable. */
+  drillInversionCount(i: number): number {
+    const rc = this.drillResolved[i];
+    const parsed = rc ? parseChord(rc.symbol) : null;
+    return parsed ? inversionCount(parsed[1]) : 0;
+  }
+
+  /** Cycle bar [i]'s override: auto → root → 1st → … → last → auto. */
+  cycleDrillInversion(i: number) {
+    if (i < 0 || i >= this.drillInversions.length) return;
+    const n = this.drillInversionCount(i);
+    const cur = this.drillInversions[i];
+    this.drillInversions[i] = cur === null ? 0 : (cur + 1 >= n ? null : cur + 1);
+    this.rebuildDrillVoicing();
+    this.notify();
+  }
+
+  /** Force every bar to the same inversion (2 = 5th in bass), or null = auto. */
+  setAllDrillInversions(inv: number | null) {
+    this.drillInversions = this.drillInversions.map((_, i) =>
+      inv === null ? null : Math.min(inv, Math.max(this.drillInversionCount(i) - 1, 0)));
+    this.rebuildDrillVoicing();
+    this.notify();
+  }
+
+  private rebuildDrillVoicing() {
+    const style = this.earStyle();
+    const tuning = this.deps.tuningProvider();
+    let prev: ChordShape | null = null;
+    this.drillMidis = this.drillResolved.map((rc, i) => {
+      const parsed = parseChord(rc.symbol);
+      if (!parsed) return [];
+      const [root, q] = parsed;
+      const inv = this.drillInversions[i];
+      if (inv != null) return inversionMidis(48 + root, q, inv);   // forced close voicing (5th present)
+      const shapes = this.earShapes(this.gen(style).shapesFor(root, q, tuning, DISPLAY_FRETS));
+      if (shapes.length === 0) { const rm = 52 + root; return q.intervals.map((iv) => rm + iv); }
+      const shape = prev == null
+        ? (shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0])
+        : shapes[pickMinMovement(prev, shapes)];
+      prev = shape;
+      return this.earMidis(shape);
+    });
+  }
+
   // ---------- Note2Chord ----------
 
   n2cChallenge: N2cChallenge | null = null;
@@ -643,6 +765,7 @@ export class EarTrainingState {
       this.challengeIndex = this.challengeTotal;
       this.challengeDurationMs = Date.now() - this.challengeStartMs;
       this.stopLoop();
+      this.recordProgressionMistakes();
       this.deps.onProgressionChallengeComplete(this.challengeBarScore(), this.challengeBarTotal(), this.challengeDurationMs);
       this.notify();
       return;
@@ -1535,6 +1658,7 @@ export class EarTrainingState {
   release() {
     this.stopLoop();
     this.libraryStop();
+    this.stopDrill();
     this.cadenceToken++; this.flavorToken++; this.n2cToken++; this.invToken++; this.adToken++;
     this.intervalToken++;
   }

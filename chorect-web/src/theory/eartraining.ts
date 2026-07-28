@@ -451,6 +451,27 @@ export function romanLineFor(prog: Progression): string {
   ).join("  –  ");
 }
 
+/** Canonical id for a diatonic progression: "maj:1,5,6,4" or "min:1,4,5,1@2"
+ *  (mode prefix + degrees, optional @-joined dominantBars to distinguish
+ *  natural-minor from harmonic-minor variants that share degrees). Used to track
+ *  which progressions the user misses and to reconstruct them in the drill tab. */
+export function progressionKey(prog: Progression): string {
+  const prefix = prog.mode === TrainingMode.Major ? "maj" : "min";
+  const dom = (prog.dominantBars ?? []).slice().sort((a, b) => a - b);
+  return `${prefix}:${prog.degrees.join(",")}` + (dom.length ? `@${dom.join(",")}` : "");
+}
+
+/** Inverse of [progressionKey]; null if [key] is not a valid diatonic key. */
+export function progressionFromKey(key: string): Progression | null {
+  const m = /^(maj|min):(\d+(?:,\d+)*)(?:@(\d+(?:,\d+)*))?$/.exec(key);
+  if (!m) return null;
+  const mode = m[1] === "maj" ? TrainingMode.Major : TrainingMode.Minor;
+  const degrees = m[2].split(",").map((s) => parseInt(s, 10));
+  if (degrees.length !== 4 || degrees.some((d) => d < 1 || d > 7)) return null;
+  const dominantBars = m[3] ? m[3].split(",").map((s) => parseInt(s, 10)) : undefined;
+  return { mode, degrees, dominantBars };
+}
+
 // ---- Interval-identification trainer (#6) ----
 
 export enum IntervalDirection { Ascending = "Ascending", Descending = "Descending", Mixed = "Mixed" }

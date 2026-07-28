@@ -188,6 +188,7 @@ export class App {
       onChange: () => this.scheduleRender(),
       onProgressionChallengeComplete: (s, t, d) => state.recordChallengeScore(s, t, d),
       onChallengeComplete: (kind, s, t, d) => state.recordChallengeScore(s, t, d, kind),
+      onProgressionMistake: (k) => state.recordProgressionMistake(k),
     });
     this.loop = new LoopState({
       audio: state.audio,

@@ -15,7 +15,7 @@ import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../au
 
 export const DISPLAY_FRETS = 14;
 /** App version shown beside the header wordmark. Keep in sync with package.json on release. */
-export const APP_VERSION = "2.39.0";
+export const APP_VERSION = "2.40.0";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 
@@ -123,6 +123,7 @@ interface Persisted {
   reverb: Record<SoundName, number>;
   customTunings: Record<string, number[]>;
   challengeScores: ChallengeScore[];
+  progressionMistakes: Record<string, number>;
   drumPatterns: Record<string, string>;
   drumBlocks: Record<string, string>;
   drumTrackPresets: Record<string, string>;
@@ -197,6 +198,8 @@ export class AppState {
 
   customTunings = new Map<string, Tuning>();
   challengeScores: ChallengeScore[] = [];
+  /** Progression mistake-drill counts: progressionKey → number of times missed. */
+  progressionMistakes: Record<string, number> = {};
   /** Saved drum beats: name Ã¢â€ â€™ encoded PercussionPattern string (insertion order). */
   drumPatterns = new Map<string, string>();
   /** Saved drum BLOCKS (phrase sequences), name -> DrumBlock.encode(). */
@@ -285,6 +288,9 @@ export class AppState {
         }
       }
       if (Array.isArray(p.challengeScores)) this.challengeScores = p.challengeScores.slice();
+      if (p.progressionMistakes && typeof p.progressionMistakes === "object") {
+        for (const [k, v] of Object.entries(p.progressionMistakes)) if (typeof v === "number" && v > 0) this.progressionMistakes[k] = v;
+      }
       if (p.drumPatterns) for (const [name, enc] of Object.entries(p.drumPatterns)) this.drumPatterns.set(name, enc);
       if (p.drumBlocks) for (const [name, enc] of Object.entries(p.drumBlocks)) this.drumBlocks.set(name, enc);
       if (p.drumTrackPresets) for (const [name, enc] of Object.entries(p.drumTrackPresets)) this.drumTrackPresets.set(name, enc);
@@ -327,6 +333,7 @@ export class AppState {
       reverb: this.reverb,
       customTunings,
       challengeScores: this.challengeScores,
+      progressionMistakes: this.progressionMistakes,
       drumPatterns: Object.fromEntries(this.drumPatterns),
       drumBlocks: Object.fromEntries(this.drumBlocks),
       drumTrackPresets: Object.fromEntries(this.drumTrackPresets),
@@ -361,6 +368,19 @@ export class AppState {
   }
   clearChallengeScoresOfKind(kind: string): void {
     this.commit(() => { this.challengeScores = this.challengeScores.filter((s) => (s.kind ?? "progression") !== kind); });
+  }
+
+  /** Increment the mistake count for a progression (its progressionKey). */
+  recordProgressionMistake(key: string): void {
+    this.commit(() => { this.progressionMistakes = { ...this.progressionMistakes, [key]: (this.progressionMistakes[key] ?? 0) + 1 }; });
+  }
+  /** Drop one progression from the drill list (resets its count). */
+  clearProgressionMistake(key: string): void {
+    this.commit(() => { const m = { ...this.progressionMistakes }; delete m[key]; this.progressionMistakes = m; });
+  }
+  /** Reset every progression mistake count. */
+  clearProgressionMistakes(): void {
+    this.commit(() => { this.progressionMistakes = {}; });
   }
 
   saveDrumTrackPreset(name: string, encoded: string): void {
