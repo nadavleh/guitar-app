@@ -90,11 +90,25 @@ import app.guitar.theory.PercussionVoices
 fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
     val samba = state.sambaLooper
     val blocks = state.drumBlocks
+    val activity = LocalContext.current.findActivity()
+    // The drum machine does NOT auto-rotate (too easy to flip by accident while
+    // playing on a stand). Orientation is driven ONLY by the manual rotate button.
+    var landscape by remember { mutableStateOf(false) }
+    fun applyOrientation() {
+        activity?.requestedOrientation =
+            if (landscape) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    }
+    // Lock to portrait on entry (no auto-rotate); the rotate button drives it after.
+    DisposableEffect(Unit) { applyOrientation(); onDispose { } }
     // Guard on currentSheet so a rotation (which disposes+recreates this composable
     // when the portrait/landscape layout swaps) doesn't stop playback — only a real
-    // navigation away does.
+    // navigation away does. Also hand orientation control back to the system on exit.
     DisposableEffect(Unit) {
-        onDispose { if (state.currentSheet != Sheet.SambaLooper) { samba.stop(); blocks.stop() } }
+        onDispose {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            if (state.currentSheet != Sheet.SambaLooper) { samba.stop(); blocks.stop() }
+        }
     }
 
     // [Beat | Blocks]: the step-grid editor vs. the phrase sequencer.
@@ -144,7 +158,17 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
                 maxLines = 1,
                 modifier = Modifier.weight(1f),
             )
-            OutlinedButton(onClick = { samba.stop(); blocks.stop(); onBack() }) { Text("Back") }
+            // Manual rotate (no auto-rotate on this screen): toggle portrait ⇄ landscape.
+            OutlinedButton(
+                onClick = { landscape = !landscape; applyOrientation() },
+                contentPadding = STEP_PAD,
+            ) {
+                Icon(ShellIcons.Rotate, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(if (landscape) "Portrait" else "Rotate")
+            }
+            Spacer(Modifier.width(6.dp))
+            OutlinedButton(onClick = { samba.stop(); blocks.stop(); onBack() }, contentPadding = STEP_PAD) { Text("Back") }
         }
 
         Spacer(Modifier.height(8.dp))
@@ -274,6 +298,12 @@ private fun PatternSection(
     var saveDialog by remember { mutableStateOf(false) }
     var saveName by remember { mutableStateOf("") }
     var notesOpen by remember { mutableStateOf(false) }
+    // Redesign: keep the toolbar to a single compact row so the GRID gets the space.
+    // Secondary actions live behind a "⋯" overflow; loop-setup + the gesture legend
+    // are collapsed by default (they used to permanently push the grid off-screen).
+    var legendShown by remember { mutableStateOf(false) }
+    var loopOpen by remember { mutableStateOf(false) }
+    var moreMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     // Export the current beat to a JSON file (Storage Access Framework "create
@@ -384,55 +414,29 @@ private fun PatternSection(
         Spacer(Modifier.height(8.dp))
     }
 
+    // ----- Compact single-row toolbar -----
+    // Left: the three cell-editing tools (Erase/Accent/Dyn) as small toggles.
+    // Right: the two things you reach for constantly — Load and + Add — then a "⋯"
+    // overflow holding everything else (Save/Clear/Undo/Notes/Export/Import/Help).
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        // Eraser: when on, tapping a cell clears it (no need to cycle every voice).
-        if (eraseMode) {
-            Button(onClick = { onEraseMode(false) }) { Text("Erase ✓") }
-        } else {
-            OutlinedButton(onClick = { onEraseMode(true); onAccentMode(false); onDynMode(false) }) { Text("Erase") }
-        }
-        // Accent: when on, tapping a hit toggles its accent (played louder).
-        if (accentMode) {
-            Button(onClick = { onAccentMode(false) }) { Text("Accent ✓") }
-        } else {
-            OutlinedButton(onClick = { onAccentMode(true); onEraseMode(false); onDynMode(false) }) { Text("Accent") }
-        }
-        // Dyn: tap a hit to cycle its per-slot volume 100 → 75 → 50 → 25 %.
-        if (dynMode) {
-            Button(onClick = { onDynMode(false) }) { Text("Dyn ✓") }
-        } else {
-            OutlinedButton(onClick = { onDynMode(true); onEraseMode(false); onAccentMode(false) }) { Text("Dyn") }
-        }
-        OutlinedButton(onClick = { saveName = samba.loadedName ?: ""; saveDialog = true }) { Text("Save…") }
+        ToolToggle("Erase", eraseMode) { onEraseMode(!eraseMode); onAccentMode(false); onDynMode(false) }
+        ToolToggle("Accent", accentMode) { onAccentMode(!accentMode); onEraseMode(false); onDynMode(false) }
+        ToolToggle("Dyn", dynMode) { onDynMode(!dynMode); onEraseMode(false); onAccentMode(false) }
+
         LoadBeatsControl(samba, blocks, onExportPhrase = { p ->
             phraseToExport = p
             phraseExportLauncher.launch(p.label.replace(Regex("[^\\w-]+"), "_") + ".chorect-phrase.json")
         })
-        OutlinedButton(onClick = { samba.clearAll() }) { Text("Clear all") }
-        // Remove ALL tracks (clean slate; Undo restores them).
-        OutlinedButton(onClick = { samba.removeAllTracks() }) { Text("✕ Tracks") }
-        OutlinedButton(onClick = { samba.undo() }, enabled = samba.canUndo) { Text("↶ Undo") }
-        // Notes toggle (the editor shows under the beat header).
-        if (samba.beatNotes.isNotEmpty() || notesOpen) {
-            Button(onClick = { notesOpen = !notesOpen }) { Text("📝 Notes") }
-        } else {
-            OutlinedButton(onClick = { notesOpen = true }) { Text("📝 Notes") }
-        }
-        OutlinedButton(onClick = {
-            exportLauncher.launch("${(samba.loadedName ?: "beat").replace(Regex("[^\\w-]+"), "_")}.chorect.json")
-        }) { Text("Export") }
-        OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }) { Text("Import") }
 
-        // Add an instrument to the kit, sourced from the catalog.
+        // Add an instrument / preset track to the kit.
         var addMenu by remember { mutableStateOf(false) }
         Box {
-            Button(onClick = { addMenu = true }) { Text("+ Add ▾") }
+            Button(onClick = { addMenu = true }, contentPadding = STEP_PAD) { Text("＋ Add ▾") }
             DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
-                // One-press preset tracks first (instrument + a filled row in one go).
                 DropdownMenuItem(text = { Text("Track presets",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant) }, enabled = false, onClick = {})
@@ -445,10 +449,7 @@ private fun PatternSection(
                 HorizontalDivider()
                 val toAdd = samba.instrumentsToAdd()
                 if (toAdd.isEmpty()) {
-                    DropdownMenuItem(
-                        text = { Text("(all instruments added)") },
-                        enabled = false, onClick = {},
-                    )
+                    DropdownMenuItem(text = { Text("(all instruments added)") }, enabled = false, onClick = {})
                 }
                 for (inst in toAdd) {
                     DropdownMenuItem(
@@ -456,6 +457,36 @@ private fun PatternSection(
                         onClick = { samba.addInstrument(inst); addMenu = false },
                     )
                 }
+            }
+        }
+
+        // Overflow: everything secondary, so the toolbar stays one line.
+        Box {
+            OutlinedButton(onClick = { moreMenu = true }, contentPadding = STEP_PAD) { Text("⋯ More") }
+            DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                DropdownMenuItem(text = { Text("💾 Save beat…") },
+                    onClick = { saveName = samba.loadedName ?: ""; saveDialog = true; moreMenu = false })
+                DropdownMenuItem(text = { Text(if (samba.beatNotes.isNotEmpty() || notesOpen) "📝 Hide notes" else "📝 Notes") },
+                    onClick = { notesOpen = !notesOpen; moreMenu = false })
+                DropdownMenuItem(text = { Text(if (loopOpen) "⚙ Hide loop settings" else "⚙ Loop settings") },
+                    onClick = { loopOpen = !loopOpen; moreMenu = false })
+                DropdownMenuItem(text = { Text(if (legendShown) "Hide gesture help" else "Show gesture help") },
+                    onClick = { legendShown = !legendShown; moreMenu = false })
+                HorizontalDivider()
+                DropdownMenuItem(text = { Text("↶ Undo") }, enabled = samba.canUndo,
+                    onClick = { samba.undo(); moreMenu = false })
+                DropdownMenuItem(text = { Text("Clear all cells") },
+                    onClick = { samba.clearAll(); moreMenu = false })
+                DropdownMenuItem(text = { Text("✕ Remove all tracks") },
+                    onClick = { samba.removeAllTracks(); moreMenu = false })
+                HorizontalDivider()
+                DropdownMenuItem(text = { Text("⤓ Export beat…") },
+                    onClick = {
+                        exportLauncher.launch("${(samba.loadedName ?: "beat").replace(Regex("[^\\w-]+"), "_")}.chorect.json")
+                        moreMenu = false
+                    })
+                DropdownMenuItem(text = { Text("⤒ Import…") },
+                    onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")); moreMenu = false })
             }
         }
     }
@@ -482,11 +513,9 @@ private fun PatternSection(
         )
     }
 
-    Spacer(Modifier.height(8.dp))
-
-    // ----- Gesture legend banner (dismiss kept in-memory only, per spec) -----
-    var legendDismissed by remember { mutableStateOf(false) }
-    if (!legendDismissed) {
+    // ----- Gesture legend (hidden by default — "Show gesture help" in ⋯ More) -----
+    if (legendShown) {
+        Spacer(Modifier.height(8.dp))
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -512,7 +541,7 @@ private fun PatternSection(
                     legendLine("Dyn tool:  ", "turn it on, then tap a hit → its volume cycles 100 → 75 → 50 → 25 % (faded)")
                     legendLine("Erase tool:  ", "turn it on, then tap any cell → cleared")
                 }
-                IconButton(onClick = { legendDismissed = true }) {
+                IconButton(onClick = { legendShown = false }) {
                     Icon(Icons.Rounded.Close, contentDescription = "Dismiss", modifier = Modifier.size(18.dp))
                 }
             }
@@ -520,8 +549,12 @@ private fun PatternSection(
         Spacer(Modifier.height(8.dp))
     }
 
-    // ----- Loop setup: bars / time signature / division + translate (#1, #2) -----
-    LoopSetupControls(samba)
+    // ----- Loop setup: bars / time signature / division + translate — collapsed by
+    // default (toggle via "⚙ Loop settings" in ⋯ More) so the grid gets the space. -----
+    if (loopOpen) {
+        Spacer(Modifier.height(8.dp))
+        LoopSetupControls(samba)
+    }
 
     Spacer(Modifier.height(8.dp))
     HorizontalDivider()
@@ -761,6 +794,21 @@ private const val OPENING_DIVIDER_DP = 30  // bold rule + LOOP label between sec
 private const val LONG_PRESS_CLEAR_MS = 1500L  // hold this long on a cell to clear it
 
 private val STEP_PAD = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+
+/** Walk the ContextWrapper chain to the hosting Activity (Compose's LocalContext is
+ *  usually a themed wrapper, so a plain `as? Activity` cast returns null). */
+private tailrec fun android.content.Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+/** Compact filled(on)/outlined(off) toggle for the Erase / Accent / Dyn cell tools. */
+@Composable
+private fun ToolToggle(label: String, on: Boolean, onToggle: () -> Unit) {
+    if (on) Button(onClick = onToggle, contentPadding = STEP_PAD) { Text("$label ✓") }
+    else OutlinedButton(onClick = onToggle, contentPadding = STEP_PAD) { Text(label) }
+}
 
 /** Bars / time-signature / division pickers plus the loop-translate control. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -1421,11 +1469,18 @@ private fun InstrumentRow(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
+                        .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent)
                         .pointerInput(instrument) { detectTapGestures(onTap = { samba.editOpening(inOpening); samba.selectTrack(instrument.id) }) }
                         .padding(vertical = 2.dp),
                 ) {
+                    // Fixed-width check slot: selecting shows a ✓ WITHOUT changing the
+                    // label width, so the grid to the right never shifts (was: appending
+                    // " ✓" to the text, which reflowed the row).
+                    Box(Modifier.width(13.dp), contentAlignment = Alignment.Center) {
+                        if (selected) Text("✓", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    }
                     Text(
-                        instrument.displayName + (if (selected) " ✓" else ""),
+                        instrument.displayName,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                         maxLines = 1,

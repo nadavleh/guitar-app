@@ -2644,7 +2644,7 @@ private fun DrillControls(ear: EarTrainingState) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         OutlinedButton(onClick = { ear.setAllDrillInversions(2) }) { Text("5th in bass (all)") }
         OutlinedButton(onClick = { ear.setAllDrillInversions(0) }) { Text("Root (all)") }
-        OutlinedButton(onClick = { ear.setAllDrillInversions(null) }) { Text("Auto") }
+        OutlinedButton(onClick = { ear.setAllDrillInversions(null) }) { Text("Auto (voice-led shell)") }
     }
     Text("Auto uses the app's voice-led shell voicing. Forcing an inversion plays a full close " +
         "voicing so the 5th is present and you control whether it sits above or below the root.",

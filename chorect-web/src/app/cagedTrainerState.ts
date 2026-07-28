@@ -1,7 +1,8 @@
 // State + play loop for the guitar "Scales & Triads" CAGED trainer (web).
-// Three tabs: Practice (guided box/drill run), Challenge (random unscored
-// prompts), Triads (24 triad inversions). Standard tuning, guitar only.
-// Android version to follow. Spec: docs/superpowers/specs/2026-07-25-*.
+// Four tabs: Practice (7-position guided run), Challenge (random unscored
+// prompts), Triads (24 triad inversions), Explore (scroll scale positions).
+// Mirrored on Android (CagedTrainerState.kt). Standard tuning, guitar only.
+// Spec: docs/superpowers/specs/2026-07-25-*.
 
 import {
   PitchClass, fpKey, noteAt, standard,

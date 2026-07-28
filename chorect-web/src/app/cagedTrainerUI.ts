@@ -1,5 +1,6 @@
 // "Scales & Triads" CAGED trainer screen (web, guitar only). Practice / Challenge
-// / Triads tabs sharing one fretboard. Mirror to Android later.
+// / Triads / Explore tabs sharing one fretboard. Mirrored on Android
+// (ScalesTriadsScreen.kt).
 
 import { AppState } from "./appState";
 import { CagedTrainerState, TrainerTab, ExploreScale } from "./cagedTrainerState";

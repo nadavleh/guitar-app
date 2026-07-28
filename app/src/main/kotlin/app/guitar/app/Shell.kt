@@ -214,6 +214,27 @@ object ShellIcons {
             }
         }
     }
+
+    /** Two curved arrows chasing round a circle (tail-to-head) — the manual
+     *  "rotate screen" toggle on the drum machine. */
+    val Rotate: ImageVector by lazy {
+        outlined("ShellRotate") {
+            // Upper arc: 9 o'clock over the top to ~1:30, with an arrowhead into the right gap.
+            path(stroke = stroke, strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(5f, 12f)
+                arcTo(7f, 7f, 0f, isMoreThanHalf = false, isPositiveArc = false, 16.95f, 7.05f)
+                moveTo(16.95f, 7.05f); lineTo(13.9f, 6.7f)
+                moveTo(16.95f, 7.05f); lineTo(17.6f, 10.1f)
+            }
+            // Lower arc: 3 o'clock under the bottom to ~7:30, arrowhead into the left gap.
+            path(stroke = stroke, strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(19f, 12f)
+                arcTo(7f, 7f, 0f, isMoreThanHalf = false, isPositiveArc = false, 7.05f, 16.95f)
+                moveTo(7.05f, 16.95f); lineTo(10.1f, 17.3f)
+                moveTo(7.05f, 16.95f); lineTo(6.4f, 13.9f)
+            }
+        }
+    }
 }
 
 /**
