@@ -277,6 +277,31 @@ class TuningRepository(private val context: Context) {
         }
     }
 
+    /** Delete every recorded challenge result. */
+    suspend fun clearChallengeScores() {
+        context.tuningDataStore.edit { prefs -> prefs[keyChallengeScores] = "" }
+    }
+
+    /** Delete every result of one [kind]. */
+    suspend fun clearChallengeScoresOfKind(kind: String) {
+        context.tuningDataStore.edit { prefs ->
+            val kept = decodeScores(prefs[keyChallengeScores] ?: "").filter { it.kind != kind }
+            prefs[keyChallengeScores] = encodeScores(kept)
+        }
+    }
+
+    /** Delete one result matching [entry] on all fields (removes a single row). */
+    suspend fun deleteChallengeScore(entry: ChallengeScore) {
+        context.tuningDataStore.edit { prefs ->
+            val current = decodeScores(prefs[keyChallengeScores] ?: "")
+            var removed = false
+            val kept = current.filter {
+                if (!removed && it == entry) { removed = true; false } else true
+            }
+            prefs[keyChallengeScores] = encodeScores(kept)
+        }
+    }
+
     /** Serialize as "score,total,durationMs,dateMillis,kind" rows joined by ';'
      *  (kind added later — 4-field legacy rows decode as "progression"). */
     private fun encodeScores(list: List<ChallengeScore>): String =

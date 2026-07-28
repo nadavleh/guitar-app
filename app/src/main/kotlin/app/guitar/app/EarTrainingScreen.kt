@@ -2590,12 +2590,15 @@ internal fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        dismissButton = {
+            if (scores.isNotEmpty()) TextButton(onClick = { state.clearChallengeScores() }) { Text("Clear all") }
+        },
         title = { Text("Challenge stats") },
         text = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 420.dp)
+                    .heightIn(max = 460.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
                 if (scores.isEmpty()) {
@@ -2609,17 +2612,31 @@ internal fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
                 for ((kind, rows) in scores.groupBy { it.kind }) {
                     val best = rows.first()   // repo stores rows best-first per kind
                     val avg = rows.sumOf { it.score * 100.0 / it.total } / rows.size
-                    val last = rows.maxByOrNull { it.dateMillis }
-                    Text(statsKindLabel(kind), style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(statsKindLabel(kind), style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f))
+                        TextButton(onClick = { state.clearChallengeScoresOfKind(kind) }) { Text("Clear") }
+                    }
                     Text(
                         "best ${best.score}/${best.total}  ·  avg ${avg.toInt()}%  ·  " +
-                            "${rows.size} run${if (rows.size == 1) "" else "s"}" +
-                            (last?.let { "  ·  last ${fmt.format(java.util.Date(it.dateMillis))}" } ?: ""),
+                            "${rows.size} run${if (rows.size == 1) "" else "s"}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    for (r in rows) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            val pct = (r.score * 100.0 / r.total).toInt()
+                            Text(
+                                "${r.score}/${r.total} ($pct%)  ·  ${"%.1f".format(r.durationMs / 1000.0)}s  ·  " +
+                                    fmt.format(java.util.Date(r.dateMillis)),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { state.deleteChallengeScore(r) }) { Text("✕") }
+                        }
+                    }
                     Spacer(Modifier.height(8.dp))
                 }
             }

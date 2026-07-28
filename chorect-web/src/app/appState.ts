@@ -15,7 +15,7 @@ import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../au
 
 export const DISPLAY_FRETS = 14;
 /** App version shown beside the header wordmark. Keep in sync with package.json on release. */
-export const APP_VERSION = "2.38.9";
+export const APP_VERSION = "2.39.0";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 
@@ -348,6 +348,19 @@ export class AppState {
       }
       this.challengeScores = [...byKind.values()].flatMap((rows) => rows.sort(CHALLENGE_SCORE_ORDER).slice(0, 10));
     });
+  }
+
+  /** Delete every recorded challenge result (undoable). */
+  clearChallengeScores(): void {
+    this.commit(() => { this.challengeScores = []; });
+  }
+
+  /** Delete one recorded result by identity, or every result of one kind (undoable). */
+  deleteChallengeScore(entry: ChallengeScore): void {
+    this.commit(() => { this.challengeScores = this.challengeScores.filter((s) => s !== entry); });
+  }
+  clearChallengeScoresOfKind(kind: string): void {
+    this.commit(() => { this.challengeScores = this.challengeScores.filter((s) => (s.kind ?? "progression") !== kind); });
   }
 
   saveDrumTrackPreset(name: string, encoded: string): void {

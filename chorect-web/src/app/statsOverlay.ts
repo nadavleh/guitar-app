@@ -6,7 +6,7 @@
 // onDismiss) composable (EarTrainingScreen.kt), which likewise takes only
 // AppState — no dependency on the Ear Training screen's own runtime state.
 
-import { AppState } from "./appState";
+import { AppState, ChallengeScore } from "./appState";
 import { el, btn } from "./dom";
 
 const KIND_LABEL: Record<string, string> = {
@@ -18,33 +18,61 @@ const KIND_LABEL: Record<string, string> = {
   intervals: "Intervals",
 };
 
-/** Full-screen scrim + card listing best/avg/run-count per challenge kind. */
+/** Full-screen scrim + card listing per-kind runs; each run is deletable, and
+ *  the whole log can be cleared. The list rebuilds in place after every edit. */
 export function renderChallengeStatsOverlay(state: AppState, onClose: () => void): HTMLElement {
-  const body = el("div", { class: "et-card", style: "max-width:460px;max-height:75vh;overflow:auto;margin:auto" }, [
-    el("div", { style: "font-weight:700;font-size:16px;margin-bottom:6px" }, ["Challenge stats"]),
-  ]);
-  const scores = state.challengeScores;
-  if (!scores.length) {
-    body.appendChild(el("div", { class: "et-muted" }, ["No completed challenges yet — finish any 10-question challenge and it lands here."]));
-  } else {
-    const byKind = new Map<string, typeof scores>();
-    for (const s of scores) {
-      const k = s.kind ?? "progression";
-      if (!byKind.has(k)) byKind.set(k, []);
-      byKind.get(k)!.push(s);
-    }
-    for (const [kind, rows] of byKind) {
-      const best = rows[0]; // stored best-first per kind
-      const avg = Math.round(rows.reduce((a, r) => a + (r.score * 100) / r.total, 0) / rows.length);
-      const last = rows.reduce((a, r) => Math.max(a, r.dateMillis), 0);
-      body.appendChild(el("div", { style: `font-weight:700;color:var(--act);margin-top:6px` }, [KIND_LABEL[kind] ?? kind]));
-      body.appendChild(el("div", { class: "et-muted" }, [
-        `best ${best.score}/${best.total}  ·  avg ${avg}%  ·  ${rows.length} run${rows.length === 1 ? "" : "s"}  ·  last ${new Date(last).toLocaleDateString()}`,
-      ]));
-    }
-  }
-  body.appendChild(el("div", { style: "margin-top:10px;text-align:right" }, [btn("Close", onClose, "btn primary")]));
+  const body = el("div", { class: "et-card", style: "max-width:460px;max-height:80vh;overflow:auto;margin:auto" });
   body.addEventListener("click", (e) => e.stopPropagation());
+
+  const rebuild = () => {
+    body.replaceChildren();
+    const header = el("div", { style: "display:flex;align-items:center;gap:8px;margin-bottom:6px" }, [
+      el("div", { style: "font-weight:700;font-size:16px;flex:1" }, ["Challenge stats"]),
+    ]);
+    const scores = state.challengeScores;
+    if (scores.length) {
+      header.appendChild(btn("Clear all", () => {
+        if (confirm("Delete ALL recorded challenge stats? (Undo still works afterwards.)")) { state.clearChallengeScores(); rebuild(); }
+      }, "btn text"));
+    }
+    body.appendChild(header);
+
+    if (!scores.length) {
+      body.appendChild(el("div", { class: "et-muted" }, ["No completed challenges yet — finish any 10-question challenge and it lands here."]));
+    } else {
+      const byKind = new Map<string, ChallengeScore[]>();
+      for (const s of scores) {
+        const k = s.kind ?? "progression";
+        if (!byKind.has(k)) byKind.set(k, []);
+        byKind.get(k)!.push(s);
+      }
+      for (const [kind, rows] of byKind) {
+        const best = rows[0]; // stored best-first per kind
+        const avg = Math.round(rows.reduce((a, r) => a + (r.score * 100) / r.total, 0) / rows.length);
+        const kindRow = el("div", { style: "display:flex;align-items:center;gap:8px;margin-top:10px" }, [
+          el("div", { style: "font-weight:700;color:var(--act);flex:1" }, [KIND_LABEL[kind] ?? kind]),
+          btn("Clear", () => { state.clearChallengeScoresOfKind(kind); rebuild(); }, "btn text"),
+        ]);
+        body.appendChild(kindRow);
+        body.appendChild(el("div", { class: "et-muted", style: "margin-bottom:4px" }, [
+          `best ${best.score}/${best.total}  ·  avg ${avg}%  ·  ${rows.length} run${rows.length === 1 ? "" : "s"}`,
+        ]));
+        for (const r of rows) {
+          const pct = Math.round((r.score * 100) / r.total);
+          const secs = (r.durationMs / 1000).toFixed(1);
+          body.appendChild(el("div", { style: "display:flex;align-items:center;gap:8px;padding:2px 0" }, [
+            el("div", { style: "flex:1;font-size:13px" }, [
+              `${r.score}/${r.total} (${pct}%)  ·  ${secs}s  ·  ${new Date(r.dateMillis).toLocaleDateString()}`,
+            ]),
+            btn("✕", () => { state.deleteChallengeScore(r); rebuild(); }, "btn text"),
+          ]));
+        }
+      }
+    }
+    body.appendChild(el("div", { style: "margin-top:12px;text-align:right" }, [btn("Close", onClose, "btn primary")]));
+  };
+
+  rebuild();
   const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:50" }, [body]);
   scrim.addEventListener("click", onClose);
   return scrim;

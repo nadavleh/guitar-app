@@ -185,4 +185,32 @@ object CagedScales {
         val t = ((tonic.value - lowEpc) % 12 + 12) % 12
         return (t + box.lo(mode))..(t + box.hi(mode))
     }
+
+    // ---- 7-position practice (mirrors the Fretboard "scales by position") ----
+
+    val EXPLORE_MAJOR = MAJOR_SCALE
+    val EXPLORE_MINOR = Scale("natural minor", listOf(Interval.P1, Interval.maj2, Interval.min3, Interval.P4, Interval.P5, Interval.min6, Interval.min7))
+    val EXPLORE_PENTATONIC = Scale("minor pentatonic", listOf(Interval.P1, Interval.min3, Interval.P4, Interval.P5, Interval.min7))
+
+    /** Fret windows of the key's MAJOR-scale positions (7 for a diatonic key),
+     *  the same engine as the Fretboard "scales by position". */
+    fun practiceRegions(tonic: PitchClass, tuning: Tuning, numFrets: Int = 22): List<IntRange> =
+        ScalePositions.forScale(tonic, MAJOR_SCALE, tuning, numFrets).map { it.firstFret..it.lastFret }
+
+    /** [subset] notes of [mode] (parallel minor = same [tonic]) inside window [lo,hi]. */
+    fun notesInWindow(tonic: PitchClass, lo: Int, hi: Int, mode: CagedMode, subset: ScaleSubset, tuning: Tuning, numFrets: Int = 22): List<CagedNote> {
+        val pcs = subsetPcs(tonic, mode, subset)
+        val out = ArrayList<CagedNote>()
+        for (s in 0 until tuning.stringCount) {
+            for (f in maxOf(lo, 0)..minOf(hi, numFrets)) {
+                val pc = Fretboard.noteAt(tuning, FretPosition(s, f)).pitchClass
+                if (pc in pcs) out.add(CagedNote(FretPosition(s, f), Interval(((pc.value - tonic.value) % 12 + 12) % 12), pc == tonic))
+            }
+        }
+        return out
+    }
+
+    /** Positions of an arbitrary scale for the Explore tab's scroller. */
+    fun explorePositions(root: PitchClass, scale: Scale, tuning: Tuning, numFrets: Int = 22): List<ScalePosition> =
+        ScalePositions.forScale(root, scale, tuning, numFrets)
 }

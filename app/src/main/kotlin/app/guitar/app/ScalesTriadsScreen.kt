@@ -57,6 +57,7 @@ fun ScalesTriadsScreen(state: AppState, onBack: () -> Unit) {
             TabButton("Practice", t.tab == TrainerTab.Practice) { t.selectTab(TrainerTab.Practice) }
             TabButton("Challenge", t.tab == TrainerTab.Challenge) { t.selectTab(TrainerTab.Challenge) }
             TabButton("Triads", t.tab == TrainerTab.Triads) { t.selectTab(TrainerTab.Triads) }
+            TabButton("Explore", t.tab == TrainerTab.Explore) { t.selectTab(TrainerTab.Explore) }
         }
 
         // Key + tempo (shared)
@@ -75,6 +76,7 @@ fun ScalesTriadsScreen(state: AppState, onBack: () -> Unit) {
             TrainerTab.Practice -> PracticeControls(t)
             TrainerTab.Challenge -> ChallengeControls(t)
             TrainerTab.Triads -> TriadControls(t)
+            TrainerTab.Explore -> ExploreControls(t)
         }
 
         // Shared fretboard
@@ -106,15 +108,15 @@ private fun PracticeControls(t: CagedTrainerState) {
         Spacer(Modifier.weight(1f))
         OutlinedButton(onClick = { t.nudgeStep(-1) }, enabled = t.stepIndex > 0) { Text("◀") }
         Spacer(Modifier.width(6.dp))
-        Text("${t.stepIndex + 1}/30")
+        Text("${t.stepIndex + 1}/${t.stepCount}")
         Spacer(Modifier.width(6.dp))
-        OutlinedButton(onClick = { t.nudgeStep(1) }, enabled = t.stepIndex < 29) { Text("▶") }
+        OutlinedButton(onClick = { t.nudgeStep(1) }, enabled = t.stepIndex < t.stepCount - 1) { Text("▶") }
     }
     val modeName = if (t.step.mode == CagedMode.Major) "Major" else "Minor"
     val subName = when (t.step.subset) {
         ScaleSubset.Triad -> "triad"; ScaleSubset.FullScale -> "scale"; ScaleSubset.Pentatonic -> "pentatonic"
     }
-    Text("Box ${t.boxIndex + 1} · $modeName $subName", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+    Text("Position ${t.boxIndex + 1}/${t.regionCount} · $modeName $subName", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
     Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Switch(checked = t.audioDemo, onCheckedChange = { t.toggleAudioDemo() })
         Spacer(Modifier.width(8.dp))
@@ -169,6 +171,28 @@ private fun TriadControls(t: CagedTrainerState) {
     Text("◀ ▶ to step all 24; Play runs them one per beat.", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 2.dp))
 }
 
+@Composable
+private fun ExploreControls(t: CagedTrainerState) {
+    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        TabButton("Major", t.exploreScale == ExploreScale.Major) { t.selectExploreScale(ExploreScale.Major) }
+        TabButton("Minor", t.exploreScale == ExploreScale.Minor) { t.selectExploreScale(ExploreScale.Minor) }
+        TabButton("Pentatonic", t.exploreScale == ExploreScale.Pentatonic) { t.selectExploreScale(ExploreScale.Pentatonic) }
+    }
+    val positions = t.explorePositionsList()
+    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("Position", modifier = Modifier.width(76.dp))
+        OutlinedButton(onClick = { t.nudgeExplorePos(-1) }, enabled = positions.size > 1) { Text("◀") }
+        Spacer(Modifier.width(6.dp))
+        Text("${if (positions.isNotEmpty()) t.explorePos + 1 else 0}/${positions.size}")
+        Spacer(Modifier.width(6.dp))
+        OutlinedButton(onClick = { t.nudgeExplorePos(1) }, enabled = positions.size > 1) { Text("▶") }
+    }
+    Text(
+        "Scroll the scale's positions across the neck (like Fretboard mode). Tap a note to hear it.",
+        style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 4.dp),
+    )
+}
+
 /** Marks for the current tab. */
 private fun trainerMarks(state: AppState): Map<FretPosition, FretMark> {
     val t = state.cagedTrainer
@@ -178,6 +202,16 @@ private fun trainerMarks(state: AppState): Map<FretPosition, FretMark> {
             val c = t.challenge
             if (c != null && t.reveal) notesToMarks(CagedScales.resolve(c.key, c.box, c.mode, c.subset, t.tuning))
             else emptyMap()
+        }
+        TrainerTab.Explore -> {
+            val pos = t.explorePositionsList().getOrNull(t.explorePos) ?: return emptyMap()
+            val root = t.key.value
+            val out = HashMap<FretPosition, FretMark>()
+            for (p in pos.positions) {
+                val pc = Fretboard.noteAt(t.tuning, p).pitchClass
+                out[p] = FretMark(intervalName(Interval(((pc.value - root) % 12 + 12) % 12)), pc.value == root, MarkKind.Scale)
+            }
+            out
         }
         TrainerTab.Triads -> {
             val seq = t.triadSequence()

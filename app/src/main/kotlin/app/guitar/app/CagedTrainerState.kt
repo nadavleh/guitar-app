@@ -12,6 +12,8 @@ import app.guitar.theory.CagedScales
 import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
 import app.guitar.theory.PitchClass
+import app.guitar.theory.Scale
+import app.guitar.theory.ScalePosition
 import app.guitar.theory.ScaleSubset
 import app.guitar.theory.TriadShape
 import app.guitar.theory.Tunings
@@ -27,7 +29,8 @@ import kotlin.random.Random
  * (guided box/drill run), Challenge (random unscored prompts), Triads (24 triad
  * inversions). Standard tuning, guitar only.
  */
-enum class TrainerTab { Practice, Challenge, Triads }
+enum class TrainerTab { Practice, Challenge, Triads, Explore }
+enum class ExploreScale { Major, Minor, Pentatonic }
 
 data class DrillStep(val mode: CagedMode, val subset: ScaleSubset)
 data class ChallengePrompt(val key: PitchClass, val box: CagedBox, val mode: CagedMode, val subset: ScaleSubset)
@@ -51,17 +54,27 @@ class CagedTrainerState(
     var activeNote by mutableStateOf<FretPosition?>(null); private set
     /** Index 0..23 of the triad currently selected/sounding, or -1. */
     var activeTriad by mutableStateOf(-1); private set
+    /** Explore tab: which scale + which position is shown. */
+    var exploreScale by mutableStateOf(ExploreScale.Major); private set
+    var explorePos by mutableStateOf(0); private set
 
     private var job: Job? = null
 
     private val subsetOrder = listOf(ScaleSubset.Triad, ScaleSubset.FullScale, ScaleSubset.Pentatonic)
 
-    val boxIndex: Int get() = stepIndex / 6
+    // ---- Practice derivations (over the 7 major-scale POSITIONS, like Fretboard mode) ----
+    /** Fret windows of the key's positions (7 for a diatonic key), low→high. */
+    fun regions(): List<IntRange> {
+        val r = CagedScales.practiceRegions(key, tuning)
+        return r.ifEmpty { listOf(0..4) }
+    }
+    val regionCount: Int get() = regions().size
+    val stepCount: Int get() = regionCount * 6
+    val boxIndex: Int get() = minOf(stepIndex / 6, regionCount - 1)
     val drillIndex: Int get() = stepIndex % 6
-    val box: CagedBox get() = CagedBox.entries[boxIndex]
 
     /** 6 drill steps: [triad,scale,pentatonic] of the leading mode then the other;
-     *  the leading mode alternates each box. */
+     *  the leading mode alternates each position. */
     fun drillSteps(boxIndex: Int): List<DrillStep> {
         val lead = if (boxIndex % 2 == 0) CagedMode.Major else CagedMode.Minor
         val other = if (lead == CagedMode.Major) CagedMode.Minor else CagedMode.Major
@@ -70,8 +83,10 @@ class CagedTrainerState(
 
     val step: DrillStep get() = drillSteps(boxIndex)[drillIndex]
 
-    fun practiceNotes(): List<CagedNote> =
-        CagedScales.resolve(key, box, step.mode, step.subset, tuning)
+    fun practiceNotes(): List<CagedNote> {
+        val w = regions()[boxIndex]
+        return CagedScales.notesInWindow(key, w.first, w.last, step.mode, step.subset, tuning)
+    }
 
     fun triadSequence(): List<Pair<String, TriadShape>> =
         CagedScales.triadInversions(key, "maj", tuning).map { "maj" to it } +
@@ -83,7 +98,7 @@ class CagedTrainerState(
     fun changeBpm(v: Int) { bpm = v.coerceIn(30, 240) }
     fun toggleAudioDemo() { audioDemo = !audioDemo }
     fun toggleReveal() { reveal = !reveal }
-    fun setStep(i: Int) { stepIndex = i.coerceIn(0, 29); resetPlayback() }
+    fun setStep(i: Int) { stepIndex = i.coerceIn(0, stepCount - 1); resetPlayback() }
     fun nudgeStep(d: Int) = setStep(stepIndex + d)
 
     fun nextChallenge() {
@@ -107,6 +122,21 @@ class CagedTrainerState(
         pluckTriad(seq[activeTriad].second)
     }
     fun nudgeTriad(d: Int) = setTriad((if (activeTriad < 0) 0 else activeTriad) + d)
+
+    // ---- Explore (scroll positions like Fretboard mode) ----
+    private fun exploreScaleObj(): Scale = when (exploreScale) {
+        ExploreScale.Major -> CagedScales.EXPLORE_MAJOR
+        ExploreScale.Minor -> CagedScales.EXPLORE_MINOR
+        ExploreScale.Pentatonic -> CagedScales.EXPLORE_PENTATONIC
+    }
+    fun explorePositionsList(): List<ScalePosition> =
+        CagedScales.explorePositions(key, exploreScaleObj(), tuning)
+    fun selectExploreScale(s: ExploreScale) { exploreScale = s; explorePos = 0 }
+    fun setExploreIndex(i: Int) {
+        val n = explorePositionsList().size
+        explorePos = if (n > 0) ((i % n) + n) % n else 0
+    }
+    fun nudgeExplorePos(d: Int) = setExploreIndex(explorePos + d)
 
     private fun pluckTriad(shape: TriadShape) {
         val midis = shape.strings.mapIndexed { k, s -> Fretboard.noteAt(tuning, FretPosition(s, shape.frets[k])).midi.value }
@@ -158,11 +188,12 @@ class CagedTrainerState(
                             }
                         }
                         if (!isPlaying) break
-                        if (stepIndex >= 29) { stop(); break }
+                        if (stepIndex >= stepCount - 1) { stop(); break }
                         stepIndex += 1
                         activeNote = null
                     }
                     TrainerTab.Challenge -> { isPlaying = false }
+                    TrainerTab.Explore -> { isPlaying = false }
                 }
             }
         }

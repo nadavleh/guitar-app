@@ -442,6 +442,13 @@ class AppState(
         }
     }
 
+    /** Delete every recorded challenge result. */
+    fun clearChallengeScores() { scope.launch { repo.clearChallengeScores() } }
+    /** Delete every result of one [kind]. */
+    fun clearChallengeScoresOfKind(kind: String) { scope.launch { repo.clearChallengeScoresOfKind(kind) } }
+    /** Delete a single recorded result. */
+    fun deleteChallengeScore(entry: ChallengeScore) { scope.launch { repo.deleteChallengeScore(entry) } }
+
     /** App-lifetime samba percussion looper (drum-machine tab). Lazily created so
      *  the pattern you build persists across leaving and returning to the screen. */
     val sambaLooper: SambaLooperState by lazy {
