@@ -45,6 +45,21 @@ export function transportDock(opts: TransportDockOpts): HTMLElement {
 
   if (opts.bpm !== undefined && opts.onBpm) {
     const bpm = opts.bpm, onBpm = opts.onBpm;
+    // Compact circular −/+ tempo stepper (1-BPM nudge; finer than dragging).
+    const bpmStep = (input: HTMLInputElement, label: HTMLElement, sym: string, delta: number) => {
+      const b = el("button", {
+        class: "bpm-step",
+        "aria-label": delta < 0 ? "slower" : "faster",
+        style: "min-width:30px;height:30px;border-radius:999px;border:1px solid var(--outline);background:transparent;color:var(--act);font-weight:700;font-size:17px;line-height:1;cursor:pointer;flex:0 0 auto",
+      }, [sym]);
+      b.addEventListener("click", () => {
+        const v = Math.min(Math.max(Math.round(parseFloat(input.value)) + delta, 10), 300);
+        input.value = String(v);
+        label.textContent = String(v);
+        onBpm(v);
+      });
+      return b;
+    };
     if (opts.inlineBpm) {
       // Always-visible readout + slider, no popover (drum machine). The readout
       // updates live during the drag; double-click it to type a tempo.
@@ -55,7 +70,7 @@ export function transportDock(opts: TransportDockOpts): HTMLElement {
         el("span", { class: "transport-bpm-unit" }, ["BPM"]),
       ]);
       vs.input.classList.add("transport-bpm-slider");
-      children.push(readout, vs.input);
+      children.push(readout, bpmStep(vs.input, vs.label, "−", -1), vs.input, bpmStep(vs.input, vs.label, "+", +1));
     } else {
       // Both the summary readout and the popover label follow the drag live;
       // double-click either to type a tempo.
@@ -82,7 +97,21 @@ export function transportDock(opts: TransportDockOpts): HTMLElement {
         val,
         el("span", { class: "transport-bpm-unit" }, ["BPM"]),
       ]);
-      const pop = el("div", { class: "transport-bpm-pop" }, [lab, s]);
+      const popStep = (sym: string, delta: number) => {
+        const b = el("button", {
+          class: "bpm-step",
+          "aria-label": delta < 0 ? "slower" : "faster",
+          style: "min-width:30px;height:30px;border-radius:999px;border:1px solid var(--outline);background:transparent;color:var(--act);font-weight:700;font-size:17px;line-height:1;cursor:pointer;flex:0 0 auto",
+        }, [sym]);
+        b.addEventListener("click", () => {
+          const v = Math.min(Math.max(Math.round(parseFloat(s.value)) + delta, 10), 300);
+          s.value = String(v); val.textContent = String(v); lab.textContent = `Tempo: ${v} BPM`; onBpm(v);
+        });
+        return b;
+      };
+      s.style.flex = "1";
+      const sliderRow = el("div", { style: "display:flex;align-items:center;gap:8px;margin-top:6px" }, [popStep("−", -1), s, popStep("+", +1)]);
+      const pop = el("div", { class: "transport-bpm-pop" }, [lab, sliderRow]);
       const details = el("details", { class: "transport-bpm-wrap" }, [summary, pop]);
       details.open = bpmExpanded;
       details.addEventListener("toggle", () => { bpmExpanded = details.open; });

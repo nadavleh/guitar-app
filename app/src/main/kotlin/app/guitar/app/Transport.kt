@@ -113,22 +113,25 @@ fun TransportDock(
         if (bpm != null && onBpm != null) {
             Spacer(Modifier.width(14.dp))
             if (inlineBpm) {
-                // Always-visible readout + inline slider; double-tap the number to type.
+                // Always-visible readout + inline slider with −/+ fine steppers;
+                // double-tap the number to type an exact tempo.
                 NumericValueText(
                     "$bpm", value = bpm.toFloat(), min = 10f, max = 300f,
                     onSet = { onBpm(it.toInt()) },
                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
                 )
-                Spacer(Modifier.width(3.dp))
+                Spacer(Modifier.width(2.dp))
                 Text("BPM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(6.dp))
+                BpmStep("−") { onBpm((bpm - 1).coerceAtLeast(10)) }
                 Slider(
                     value = bpm.toFloat(),
                     onValueChange = { onBpm(it.toInt()) },
                     valueRange = 10f..300f,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                 )
-                Spacer(Modifier.width(10.dp))
+                BpmStep("+") { onBpm((bpm + 1).coerceAtMost(300)) }
+                Spacer(Modifier.width(6.dp))
             } else {
                 var open by remember { mutableStateOf(false) }
                 Box {
@@ -152,18 +155,23 @@ fun TransportDock(
                         )
                     }
                     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                        Column(modifier = Modifier.width(260.dp).padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        Column(modifier = Modifier.width(280.dp).padding(horizontal = 16.dp, vertical = 8.dp)) {
                             // Double-tap the label to type an exact tempo.
                             NumericValueText(
                                 "Tempo: $bpm BPM", value = bpm.toFloat(), min = 10f, max = 300f,
                                 onSet = { onBpm(it.toInt()) },
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                            Slider(
-                                value = bpm.toFloat(),
-                                onValueChange = { onBpm(it.toInt()) },
-                                valueRange = 10f..300f,
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                BpmStep("−") { onBpm((bpm - 1).coerceAtLeast(10)) }
+                                Slider(
+                                    value = bpm.toFloat(),
+                                    onValueChange = { onBpm(it.toInt()) },
+                                    valueRange = 10f..300f,
+                                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                                )
+                                BpmStep("+") { onBpm((bpm + 1).coerceAtMost(300)) }
+                            }
                         }
                     }
                 }
@@ -192,6 +200,23 @@ fun TransportDock(
 }
 
 // ---------- Shared small helpers ----------
+
+/** Compact circular −/+ tempo stepper: a 30dp tap target with a subtle outline,
+ *  for one-BPM nudges beside the tempo slider (finer than dragging). */
+@Composable
+private fun BpmStep(symbol: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .clip(CircleShape)
+            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary)
+    }
+}
 
 /** Small-caps section label used above a group of controls in sheets. */
 @Composable
