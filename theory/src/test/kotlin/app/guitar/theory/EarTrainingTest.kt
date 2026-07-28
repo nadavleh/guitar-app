@@ -277,4 +277,35 @@ class EarTrainingTest {
         assertEquals("M3", IntervalTrainer.choiceFor(4).shortName)
         assertEquals("TT", IntervalTrainer.choiceFor(6).shortName)
     }
+
+    // ---- Mistake-drill progression keys (#drill) ----
+
+    @Test fun `progressionKey round-trips major minor and harmonic-minor`() {
+        val cases = listOf(
+            Progression(TrainingMode.Major, listOf(1, 5, 6, 4)),
+            Progression(TrainingMode.Minor, listOf(1, 6, 3, 7)),
+            Progression(TrainingMode.Minor, listOf(1, 4, 5, 1), dominantBars = setOf(2)),
+        )
+        for (p in cases) {
+            val key = EarTraining.progressionKey(p)
+            val back = EarTraining.progressionFromKey(key)
+            assertEquals(p.mode, back?.mode)
+            assertEquals(p.degrees, back?.degrees)
+            assertEquals(p.dominantBars, back?.dominantBars)
+        }
+        assertEquals("maj:1,5,6,4", EarTraining.progressionKey(cases[0]))
+        assertEquals("min:1,4,5,1@2", EarTraining.progressionKey(cases[2]))
+    }
+
+    @Test fun `natural and harmonic minor with same degrees get distinct keys`() {
+        val natural = Progression(TrainingMode.Minor, listOf(1, 4, 5, 1))
+        val harmonic = Progression(TrainingMode.Minor, listOf(1, 4, 5, 1), dominantBars = setOf(2))
+        assertTrue(EarTraining.progressionKey(natural) != EarTraining.progressionKey(harmonic))
+    }
+
+    @Test fun `progressionFromKey rejects malformed keys`() {
+        assertEquals(null, EarTraining.progressionFromKey("maj:1,5,6"))     // only 3 degrees
+        assertEquals(null, EarTraining.progressionFromKey("maj:1,5,6,8"))   // degree out of range
+        assertEquals(null, EarTraining.progressionFromKey("xyz:1,5,6,4"))   // bad prefix
+    }
 }

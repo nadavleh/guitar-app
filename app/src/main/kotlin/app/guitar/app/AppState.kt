@@ -427,6 +427,7 @@ class AppState(
             onChallengeComplete = { kind, score, total, durationMs ->
                 recordChallengeScore(score, total, durationMs, kind)
             },
+            onProgressionMistake = { progKey -> recordProgressionMistake(progKey) },
         )
     }
 
@@ -448,6 +449,12 @@ class AppState(
     fun clearChallengeScoresOfKind(kind: String) { scope.launch { repo.clearChallengeScoresOfKind(kind) } }
     /** Delete a single recorded result. */
     fun deleteChallengeScore(entry: ChallengeScore) { scope.launch { repo.deleteChallengeScore(entry) } }
+
+    /** Progression mistake-drill counts: progressionKey → times missed. */
+    val progressionMistakes get() = repo.progressionMistakes
+    fun recordProgressionMistake(key: String) { scope.launch { repo.recordProgressionMistake(key) } }
+    fun clearProgressionMistake(key: String) { scope.launch { repo.clearProgressionMistake(key) } }
+    fun clearProgressionMistakes() { scope.launch { repo.clearProgressionMistakes() } }
 
     /** App-lifetime samba percussion looper (drum-machine tab). Lazily created so
      *  the pattern you build persists across leaving and returning to the screen. */

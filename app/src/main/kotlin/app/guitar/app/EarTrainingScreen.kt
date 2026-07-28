@@ -45,6 +45,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -155,13 +156,16 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
         // the compact ModeDropdown) and the sub-modes as a chip row with a "More ▾"
         // overflow (replaces SubModeDropdown). ear.switchTab / ear.earMode calls
         // are identical to before — only the picker chrome changed.
-        SegmentedRow(
-            options = EarMode.entries,
-            selected = ear.earMode,
-            onSelect = { ear.earMode = it },
-            label = { if (it == EarMode.Practice) "Practice" else "Challenge" },
-        )
-        Spacer(Modifier.height(8.dp))
+        // Drill has no Practice/Challenge split, so its segmented control is hidden.
+        if (ear.progSubMode != EarSubMode.Drill) {
+            SegmentedRow(
+                options = EarMode.entries,
+                selected = ear.earMode,
+                onSelect = { ear.earMode = it },
+                label = { if (it == EarMode.Practice) "Practice" else "Challenge" },
+            )
+            Spacer(Modifier.height(8.dp))
+        }
         SubModeChipRow(ear)
 
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -188,6 +192,7 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                     else AugDimView(state, ear)
                 // Intervals is challenge-only (#6) — same view in either mode.
                 EarSubMode.Intervals -> IntervalsView(ear)
+                EarSubMode.Drill -> DrillView(state, ear)
             }
         }
 
@@ -220,6 +225,7 @@ private fun subModeLabel(s: EarSubMode): String = when (s) {
     EarSubMode.Inversions  -> "Inversions"
     EarSubMode.AugDim      -> "Aug / Dim"
     EarSubMode.Intervals   -> "Intervals"
+    EarSubMode.Drill       -> "Drill"
 }
 
 /** Sub-mode chip row (Signal move — replaces the SubModeDropdown): Progressions,
@@ -230,7 +236,7 @@ private fun subModeLabel(s: EarSubMode): String = when (s) {
 @Composable
 private fun SubModeChipRow(ear: EarTrainingState) {
     val primaryChips = listOf(EarSubMode.Progression, EarSubMode.Intervals, EarSubMode.Note2Chord)
-    val overflowChips = listOf(EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim)
+    val overflowChips = listOf(EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim, EarSubMode.Drill)
     var moreOpen by remember { mutableStateOf(false) }
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -2566,6 +2572,90 @@ private fun IntervalsView(ear: EarTrainingState) {
         }
         Spacer(Modifier.height(20.dp))
     }
+}
+
+// ======================================================================================
+// Drill — repeat progressions the user misses most, with voicing control
+// ======================================================================================
+
+@Composable
+private fun DrillView(state: AppState, ear: EarTrainingState) {
+    val mistakes by state.progressionMistakes.collectAsState(initial = emptyMap())
+    val entries = mistakes.entries
+        .mapNotNull { e -> app.guitar.theory.EarTraining.progressionFromKey(e.key)?.let { Triple(e.key, e.value, it) } }
+        .sortedByDescending { it.second }
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Text("Progressions you've missed in the Progression Challenge, most-missed first. Loop one to " +
+            "drill it by ear — adjust each chord's voicing to isolate the sound you keep missing.",
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(10.dp))
+        if (entries.isEmpty()) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("No mistakes tracked yet.", fontWeight = FontWeight.Bold)
+                    Text("Finish a Progression Challenge; any progression you get wrong lands here to drill.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            return@Column
+        }
+        for ((key, count, prog) in entries) {
+            val drilling = ear.isDrilling && ear.drillKey == key
+            Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Column(Modifier.padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(app.guitar.theory.EarTraining.romanLineFor(prog), fontWeight = FontWeight.Bold)
+                            Text("${if (prog.mode == app.guitar.theory.TrainingMode.Major) "Major" else "Minor"} · missed ${count}×",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (drilling) Button(onClick = { ear.stopDrill() }) { Text("■ Stop") }
+                        else OutlinedButton(onClick = { ear.startDrill(key) }) { Text("▶ Loop") }
+                        TextButton(onClick = { if (drilling) ear.stopDrill(); state.clearProgressionMistake(key) }) { Text("✕") }
+                    }
+                    if (drilling) DrillControls(ear)
+                }
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+/** Voicing + tempo panel shown under the row currently being drilled. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DrillControls(ear: EarTrainingState) {
+    Spacer(Modifier.height(10.dp))
+    Text("Tempo: ${ear.progBpm} BPM", style = MaterialTheme.typography.labelMedium)
+    Slider(value = ear.progBpm.toFloat(), onValueChange = { ear.progBpm = it.toInt() }, valueRange = 40f..220f)
+    Spacer(Modifier.height(4.dp))
+    Text("Voicing per chord (tap to cycle)", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        ear.drillInversions.forEachIndexed { i, inv ->
+            FilterChip(
+                selected = ear.drillBar == i,
+                onClick = { ear.cycleDrillInversion(i) },
+                label = { Text(drillBarLabel(ear, i, inv)) },
+            )
+        }
+    }
+    Spacer(Modifier.height(6.dp))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedButton(onClick = { ear.setAllDrillInversions(2) }) { Text("5th in bass (all)") }
+        OutlinedButton(onClick = { ear.setAllDrillInversions(0) }) { Text("Root (all)") }
+        OutlinedButton(onClick = { ear.setAllDrillInversions(null) }) { Text("Auto") }
+    }
+    Text("Auto uses the app's voice-led shell voicing. Forcing an inversion plays a full close " +
+        "voicing so the 5th is present and you control whether it sits above or below the root.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+private fun drillBarLabel(ear: EarTrainingState, i: Int, inv: Int?): String {
+    val parts = ear.drillProg?.let { app.guitar.theory.EarTraining.romanLineFor(it).split("  –  ") } ?: emptyList()
+    val roman = parts.getOrNull(i) ?: (i + 1).toString()
+    val invText = when (inv) { null -> "auto"; 0 -> "root"; 1 -> "3rd bass"; 2 -> "5th bass"; else -> "7th bass" }
+    return "$roman · $invText"
 }
 
 // ======================================================================================

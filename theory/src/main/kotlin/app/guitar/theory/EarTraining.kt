@@ -597,6 +597,26 @@ object EarTraining {
             else map[d]?.roman ?: d.toString()
         }.joinToString("  –  ")
     }
+
+    /** Canonical id for a diatonic progression: "maj:1,5,6,4" or "min:1,4,5,1@2"
+     *  (mode prefix + degrees, optional @-joined dominantBars to distinguish
+     *  natural-minor from harmonic-minor variants that share degrees). Used to track
+     *  which progressions the user misses and to reconstruct them in the drill tab. */
+    fun progressionKey(prog: Progression): String {
+        val prefix = if (prog.mode == TrainingMode.Major) "maj" else "min"
+        val dom = prog.dominantBars.sorted()
+        return "$prefix:${prog.degrees.joinToString(",")}" + if (dom.isNotEmpty()) "@${dom.joinToString(",")}" else ""
+    }
+
+    /** Inverse of [progressionKey]; null if [key] is not a valid diatonic key. */
+    fun progressionFromKey(key: String): Progression? {
+        val m = Regex("^(maj|min):(\\d+(?:,\\d+)*)(?:@(\\d+(?:,\\d+)*))?$").matchEntire(key) ?: return null
+        val mode = if (m.groupValues[1] == "maj") TrainingMode.Major else TrainingMode.Minor
+        val degrees = m.groupValues[2].split(",").mapNotNull { it.toIntOrNull() }
+        if (degrees.size != 4 || degrees.any { it < 1 || it > 7 }) return null
+        val dom = m.groupValues[3].takeIf { it.isNotEmpty() }?.split(",")?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+        return runCatching { Progression(mode, degrees, dom) }.getOrNull()
+    }
 }
 
 /** Direction an interval is played in the interval-ID trainer. */

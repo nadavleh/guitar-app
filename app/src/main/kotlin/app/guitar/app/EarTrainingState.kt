@@ -56,6 +56,8 @@ class EarTrainingState(
      *  "flavor" / "intervals" / "note2chord") — feeds the per-kind stats. */
     private val onChallengeComplete: (kind: String, score: Int, total: Int, durationMs: Long) -> Unit =
         { _, _, _, _ -> },
+    /** Called once per wrongly-answered progression when a Progression Challenge ends. */
+    private val onProgressionMistake: (progKey: String) -> Unit = { },
 ) {
     /** Per-kind challenge start time, for duration in the recorded stats. */
     private val kindChallengeStart = HashMap<String, Long>()
@@ -94,6 +96,7 @@ class EarTrainingState(
         progSubMode = sub
         earMode = EarMode.Practice
         stopLoop()
+        stopDrill()
     }
 
     /** Whether the user wants Major mode in the rotation. */
@@ -535,6 +538,116 @@ class EarTrainingState(
         playBarOnce(idx)
     }
 
+    // ---------- Mistake Drill ----------
+    // A self-contained looper (never touches the quiz looper) repeating ONE missed
+    // progression with per-bar voicing control. Default per bar is the voice-led
+    // SHELL shape (identical to the quiz loop); an override forces a close-voiced
+    // inversion so the 5th's position (above/below the root) is controllable —
+    // shell drops the 5th, so the override switches to a fuller voicing.
+
+    var drillKey by mutableStateOf<String?>(null)
+        private set
+    var drillProg by mutableStateOf<Progression?>(null)
+        private set
+    private var drillResolved: List<ResolvedChord> = emptyList()
+    /** Per-bar inversion override: null = auto (voice-led shell), 0..n-1 = forced. */
+    var drillInversions by mutableStateOf<List<Int?>>(emptyList())
+        private set
+    private var drillMidis: List<List<Int>> = emptyList()
+    var drillBar by mutableStateOf(-1)
+        private set
+    private var drillJob: Job? = null
+
+    val isDrilling: Boolean get() = drillKey != null
+
+    /** Record one miss per wrongly-answered progression when a challenge ends. */
+    private fun recordProgressionMistakes() {
+        if (specialProgMode) return
+        for (i in 0 until minOf(challengeTotal, challengeLog.size)) {
+            if (challengeAnswers.getOrNull(i) == false) onProgressionMistake(EarTraining.progressionKey(challengeLog[i].prog))
+        }
+    }
+
+    /** Start (or restart) looping the missed progression identified by [progKey]. */
+    fun startDrill(progKey: String) {
+        val prog = EarTraining.progressionFromKey(progKey) ?: return
+        stopLoop()
+        stopDrill()
+        val tonic = if (prog.mode == TrainingMode.Major) PitchClass.of(0) else PitchClass.of(9)
+        drillKey = progKey
+        drillProg = prog
+        drillResolved = EarTraining.resolveProgression(prog, tonic, chordTypeLevel, rng)
+        drillInversions = drillResolved.map { null }
+        rebuildDrillVoicing()
+        drillBar = 0
+        drillJob = scope.launch {
+            while (isDrilling && drillKey == progKey) {
+                for (i in drillResolved.indices) {
+                    if (!isDrilling || drillKey != progKey) break
+                    val barMs = (60_000L / progBpm.coerceAtLeast(10)) * 4   // read live so BPM edits apply next bar
+                    val sustain = (barMs * 0.9).toInt().coerceAtLeast(200)
+                    drillBar = i
+                    audio.cutReverb()
+                    val rootPc = ChordLibrary.parse(drillResolved[i].symbol)?.first?.value ?: 0
+                    val midis = drillMidis.getOrNull(i) ?: emptyList()
+                    if (midis.isNotEmpty()) playEarChord(midis, rootPc, sustain)
+                    delay(barMs)
+                }
+            }
+        }
+    }
+
+    fun stopDrill() {
+        if (drillKey == null) return
+        drillKey = null
+        drillBar = -1
+        drillJob?.cancel()
+        drillJob = null
+        audio.stop()
+    }
+
+    /** Number of inversions of bar [i]'s chord (root..n-1); 0 if unresolvable. */
+    fun drillInversionCount(i: Int): Int {
+        val rc = drillResolved.getOrNull(i) ?: return 0
+        return ChordLibrary.parse(rc.symbol)?.let { app.guitar.theory.Inversions.count(it.second) } ?: 0
+    }
+
+    /** Cycle bar [i]'s override: auto → root → 1st → … → last → auto. */
+    fun cycleDrillInversion(i: Int) {
+        if (i !in drillInversions.indices) return
+        val n = drillInversionCount(i)
+        val cur = drillInversions[i]
+        val next = if (cur == null) 0 else if (cur + 1 >= n) null else cur + 1
+        drillInversions = drillInversions.toMutableList().also { it[i] = next }
+        rebuildDrillVoicing()
+    }
+
+    /** Force every bar to the same inversion (2 = 5th in bass), or null = auto. */
+    fun setAllDrillInversions(inv: Int?) {
+        drillInversions = drillInversions.indices.map { i ->
+            if (inv == null) null else minOf(inv, maxOf(drillInversionCount(i) - 1, 0))
+        }
+        rebuildDrillVoicing()
+    }
+
+    private fun rebuildDrillVoicing() {
+        val style = earStyle()
+        val tuning = tuningProvider()
+        var prev: app.guitar.theory.ChordShape? = null
+        drillMidis = drillResolved.mapIndexed { i, rc ->
+            val parsed = ChordLibrary.parse(rc.symbol) ?: return@mapIndexed emptyList()
+            val (root, q) = parsed
+            val inv = drillInversions.getOrNull(i)
+            if (inv != null) return@mapIndexed app.guitar.theory.Inversions.midis(48 + root.value, q, inv)
+            val shapes = earShapes(ChordShapeGenerator(style = style).shapesFor(root, q, tuning, frets = DISPLAY_FRETS))
+            if (shapes.isEmpty()) { val rm = 52 + root.value; return@mapIndexed q.intervals.map { rm + it.semitones } }
+            val shape = if (prev == null) shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.first()
+                        else shapes[app.guitar.theory.VoiceLeading.pickMinMovement(prev!!, shapes)]
+            prev = shape
+            earMidis(shape)
+        }
+    }
+
     // ---------- Note2Chord trainer ----------
 
     var n2cChallenge by mutableStateOf<app.guitar.theory.N2cChallenge?>(null)
@@ -756,6 +869,7 @@ class EarTrainingState(
             challengeIndex = challengeTotal
             challengeDurationMs = System.currentTimeMillis() - challengeStartMs
             stopLoop()
+            recordProgressionMistakes()
             onProgressionChallengeComplete(challengeBarScore, challengeBarTotal, challengeDurationMs)
             return
         }
@@ -1883,6 +1997,7 @@ class EarTrainingState(
 
     fun release() {
         stopLoop()
+        stopDrill()
         n2cJob?.cancel()
         n2cJob = null
         flavorJob?.cancel()
@@ -1898,7 +2013,7 @@ class EarTrainingState(
     }
 }
 
-enum class EarSubMode { Progression, Note2Chord, Flavor, Inversions, AugDim, Intervals }
+enum class EarSubMode { Progression, Note2Chord, Flavor, Inversions, AugDim, Intervals, Drill }
 
 /** Within any tab: free Practice or scored Challenge rounds. */
 enum class EarMode { Practice, Challenge }

@@ -318,6 +318,44 @@ class TuningRepository(private val context: Context) {
             ChallengeScore(s, t, d, dt, p.getOrNull(4) ?: "progression")
         }.sortedWith(CHALLENGE_SCORE_ORDER)
 
+    // ---------- Progression mistake-drill counts ----------
+
+    private val keyProgMistakes = stringPreferencesKey("progression_mistakes")
+
+    /** progressionKey → number of times the user missed it in a Progression Challenge. */
+    val progressionMistakes: Flow<Map<String, Int>> =
+        context.tuningDataStore.data.map { prefs -> decodeMistakes(prefs[keyProgMistakes] ?: "") }
+
+    suspend fun recordProgressionMistake(key: String) {
+        if (key.isEmpty() || key.any { it in "=;" }) return
+        context.tuningDataStore.edit { prefs ->
+            val m = decodeMistakes(prefs[keyProgMistakes] ?: "").toMutableMap()
+            m[key] = (m[key] ?: 0) + 1
+            prefs[keyProgMistakes] = encodeMistakes(m)
+        }
+    }
+    suspend fun clearProgressionMistake(key: String) {
+        context.tuningDataStore.edit { prefs ->
+            val m = decodeMistakes(prefs[keyProgMistakes] ?: "").toMutableMap()
+            m.remove(key)
+            prefs[keyProgMistakes] = encodeMistakes(m)
+        }
+    }
+    suspend fun clearProgressionMistakes() {
+        context.tuningDataStore.edit { prefs -> prefs[keyProgMistakes] = "" }
+    }
+
+    private fun encodeMistakes(m: Map<String, Int>): String =
+        m.entries.filter { it.value > 0 }.joinToString(";") { "${it.key}=${it.value}" }
+    private fun decodeMistakes(raw: String): Map<String, Int> =
+        raw.split(";").mapNotNull { row ->
+            if (row.isBlank()) return@mapNotNull null
+            val idx = row.lastIndexOf('=')
+            if (idx <= 0) return@mapNotNull null
+            val v = row.substring(idx + 1).toIntOrNull() ?: return@mapNotNull null
+            if (v > 0) row.substring(0, idx) to v else null
+        }.toMap()
+
     // ---------- Drum-machine mixer volumes ----------
 
     private val keyDrumVolumes = stringPreferencesKey("drum_volumes")
