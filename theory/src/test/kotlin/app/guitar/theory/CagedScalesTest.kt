@@ -95,4 +95,15 @@ class CagedScalesTest {
         assertTrue(PitchClass(10) in minPcs && PitchClass(10) !in majPcs)   // Bb (♭3) only in minor
         assertTrue(PitchClass(11) in majPcs && PitchClass(11) !in minPcs)   // B (natural 3) only in major
     }
+
+    @Test fun `practice first box reaches down to the 3rd on the next string`() {
+        val regions = CagedScales.practiceRegions(G, std)
+        // G root on low E = fret 3, so the first box starts at fret 2: the major 3rd
+        // (B) then sits on the A string at fret 2 — one string up, per the user's rule.
+        assertEquals(2, regions.first().first)
+        // The root-anchored [3,7] box is now the SECOND box.
+        assertEquals(3..7, regions[1])
+        // No duplicate windows after the prepend/dedupe.
+        assertEquals(regions.size, regions.distinct().size)
+    }
 }

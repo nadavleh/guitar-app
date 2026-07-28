@@ -582,7 +582,7 @@ export const TRES_TAMBORINS = builtin(
 
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */
 export const BUILTIN_PATTERNS: BuiltinPattern[] = [
-  { name: "3 Tamborims, Pandeiro & Surdo", pattern: TRES_TAMBORINS, bpm: 80 },
+  { name: "2 Tamborims, Pandeiro & Surdo", pattern: TRES_TAMBORINS, bpm: 80 },
   { name: "Partido Alto Groove (Official)", pattern: PARTIDO_ALTO_OFFICIAL, bpm: 70 },
   { name: "Partido Alto Groove (Dec)", pattern: PARTIDO_ALTO_DEC, bpm: 70 },
   { name: "Platinelas Pandeiro — Partido Alto Groove", pattern: PARTIDO_ALTO_PLATINELAS, bpm: 70 },

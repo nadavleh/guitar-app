@@ -624,7 +624,7 @@ object PercussionBuiltins {
 
     /** Grooves offered in the Load… menu (before the user's saved beats). */
     val ALL: List<BuiltinPattern> = listOf(
-        BuiltinPattern("3 Tamborims, Pandeiro & Surdo", TRES_TAMBORINS, bpm = 80),
+        BuiltinPattern("2 Tamborims, Pandeiro & Surdo", TRES_TAMBORINS, bpm = 80),
         BuiltinPattern("Partido Alto Groove (Official)", PARTIDO_ALTO_OFFICIAL, bpm = 70),
         BuiltinPattern("Partido Alto Groove (Dec)", PARTIDO_ALTO_DEC, bpm = 70),
         BuiltinPattern("Platinelas Pandeiro — Partido Alto Groove", PARTIDO_ALTO_PLATINELAS, bpm = 70),

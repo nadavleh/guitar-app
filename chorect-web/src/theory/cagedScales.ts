@@ -101,10 +101,20 @@ const MAJOR = SCALES.get("major")!;
 const NATURAL_MINOR = SCALES.get("natural minor")!;
 
 /** Practice regions = the fret windows of the key's MAJOR-scale positions (the
- *  same engine the Fretboard "scales by position" uses — 7 for a diatonic key).
- *  Both the major and the parallel-minor drills are played inside these windows. */
+ *  same engine the Fretboard "scales by position" uses — 7 for a diatonic key),
+ *  but STARTING one box lower than the root position: the first box reaches down
+ *  so the major 3rd sits on the next-higher string (e.g. G major: B on the A
+ *  string, fret 2). That box's scale is drilled first, then the root-anchored box,
+ *  then the rest up the neck. Both major and parallel-minor drills use these windows. */
 export function practiceRegions(tonic: PitchClass, tuning: Tuning, numFrets = 22): [number, number][] {
-  return scalePositionsFor(tonic, MAJOR, tuning, numFrets).map((p) => [p.firstFret, p.lastFret]);
+  const base = scalePositionsFor(tonic, MAJOR, tuning, numFrets).map((p) => [p.firstFret, p.lastFret] as [number, number]);
+  if (base.length === 0) return base;
+  const lowEpc = midiPitchClass(tuning.openStrings[0].midi);
+  const rootFret = (((tonic - lowEpc) % 12) + 12) % 12;
+  const lo = Math.max(rootFret - 1, 0);
+  const first: [number, number] = [lo, Math.min(lo + 4, numFrets)];
+  // Prepend the 3rd-reaching box; drop any existing window identical to it (dedupe).
+  return [first, ...base.filter(([a, b]) => !(a === first[0] && b === first[1]))];
 }
 
 /** The [subset] notes of [mode] (parallel: minor = natural minor of the SAME

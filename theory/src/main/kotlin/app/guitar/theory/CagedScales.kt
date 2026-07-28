@@ -192,10 +192,21 @@ object CagedScales {
     val EXPLORE_MINOR = Scale("natural minor", listOf(Interval.P1, Interval.maj2, Interval.min3, Interval.P4, Interval.P5, Interval.min6, Interval.min7))
     val EXPLORE_PENTATONIC = Scale("minor pentatonic", listOf(Interval.P1, Interval.min3, Interval.P4, Interval.P5, Interval.min7))
 
-    /** Fret windows of the key's MAJOR-scale positions (7 for a diatonic key),
-     *  the same engine as the Fretboard "scales by position". */
-    fun practiceRegions(tonic: PitchClass, tuning: Tuning, numFrets: Int = 22): List<IntRange> =
-        ScalePositions.forScale(tonic, MAJOR_SCALE, tuning, numFrets).map { it.firstFret..it.lastFret }
+    /** Fret windows of the key's MAJOR-scale positions (the same engine as the
+     *  Fretboard "scales by position"), but STARTING one box lower than the root
+     *  position: the first box reaches down so the major 3rd sits on the next-higher
+     *  string (e.g. G major: B on the A string, fret 2). That box's scale is drilled
+     *  first, then the root-anchored box, then the rest up the neck. */
+    fun practiceRegions(tonic: PitchClass, tuning: Tuning, numFrets: Int = 22): List<IntRange> {
+        val base = ScalePositions.forScale(tonic, MAJOR_SCALE, tuning, numFrets).map { it.firstFret..it.lastFret }
+        if (base.isEmpty()) return base
+        val lowEpc = tuning.openStrings[0].pitchClass.value
+        val rootFret = ((tonic.value - lowEpc) % 12 + 12) % 12
+        val lo = (rootFret - 1).coerceAtLeast(0)
+        val firstBox = lo..(lo + ScalePositions.DEFAULT_MAX_FRET_SPAN).coerceAtMost(numFrets)
+        // Prepend the 3rd-reaching box; drop any existing window identical to it (dedupe).
+        return listOf(firstBox) + base.filter { it != firstBox }
+    }
 
     /** [subset] notes of [mode] (parallel minor = same [tonic]) inside window [lo,hi]. */
     fun notesInWindow(tonic: PitchClass, lo: Int, hi: Int, mode: CagedMode, subset: ScaleSubset, tuning: Tuning, numFrets: Int = 22): List<CagedNote> {
