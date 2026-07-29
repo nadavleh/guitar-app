@@ -74,7 +74,7 @@ export class SambaLooperUI {
   private blockMergeOpen = false;
   private blockAddOpen = false;
   /** Blocks: render each cell's phrase as a mini 16-step grid (Grid toggle). */
-  private blockMiniGrid = false;
+  private blockMiniGrid = true;   // show the big beat-grid-style phrase preview by default
   /** Dyn tool (per-slot dynamics): tap a hit to cycle 100→75→50→25 %. */
   private dynMode = false;
 
@@ -1121,13 +1121,16 @@ export class SambaLooperUI {
     const g = el("div", { class: "mini-grid" });
     p.template.forEach((raw, i) => {
       const on = raw !== null && raw !== undefined;
-      const acc = on && Math.floor((raw as number) / 100) % 10 === 1;
-      const dyn = on ? Math.floor((raw as number) / 1000) : 0;
+      const v = on ? ((raw as number) % 100) : -1;                       // voice index
+      const acc = on && Math.floor((raw as number) / 100) % 10 === 1;    // accent flag
+      const dyn = on ? Math.floor((raw as number) / 1000) : 0;           // dyn level 0..3
+      // Same per-voice palette as the beat grid (voice 0/1/other).
+      const fill = !on ? "" : v === 0 ? Colors.primary : v === 1 ? Colors.scaleTone : Colors.chordTone;
+      const glyph = on ? voiceOf(p.instrument, v).glyph : "";
       const c = el("div", {
-        class: "mini-cell" + (on ? " on" : "") + (acc ? " acc" : "")
-          + (i % 4 === 0 && i > 0 ? " beat" : "") + (i === ph ? " ph" : ""),
-      });
-      if (on && dyn > 0) c.style.opacity = String(1 - 0.25 * dyn);
+        class: "mini-cell" + (acc ? " acc" : "") + (i % 4 === 0 && i > 0 ? " beat" : "") + (i === ph ? " ph" : ""),
+        style: on ? `background:${fill}` + (dyn > 0 ? `;opacity:${(1 - 0.25 * dyn).toFixed(2)}` : "") : "",
+      }, [glyph]);
       g.appendChild(c);
     });
     return g;
