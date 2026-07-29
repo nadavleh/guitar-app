@@ -68,6 +68,10 @@ class BlocksState(
     var metronomeOn by mutableStateOf(false)
         private set
     fun toggleMetronome() { metronomeOn = !metronomeOn }
+    /** Play a 2-beat count-in (16th ticks, downbeats accented) before the loop starts. */
+    var countIn by mutableStateOf(false)
+        private set
+    fun toggleCountIn() { countIn = !countIn }
     private val mClick: FloatArray by lazy { synthWood(2000.0, 45) }
     private val mAccent: FloatArray by lazy { synthWood(2800.0, 45) }
     private fun synthWood(freqHz: Double, ms: Int, sr: Int = 44100): FloatArray {
@@ -221,6 +225,17 @@ class BlocksState(
             val sr = 44100
             val meter = PercussionMeter.DEFAULT   // phrases are 16 slots of 2/4 in 16ths
             var colStartNanos = System.nanoTime() + 60_000_000L
+            // Count-in: two beats of 16th ticks (each beat's downbeat accented) before the loop.
+            if (countIn) {
+                val stepMs = PercussionTiming.slotMs(bpm, meter.division)
+                val ticks = 2 * meter.slotsPerBeat
+                for (i in 0 until ticks) {
+                    val accent = i % meter.slotsPerBeat == 0
+                    val delayMs = ((colStartNanos - System.nanoTime()) / 1_000_000 + i.toLong() * stepMs).coerceAtLeast(0)
+                    audio.playSamplesAt(if (accent) mAccent else mClick, if (accent) 0.9f else 0.55f, (delayMs * sr / 1000).toInt())
+                }
+                colStartNanos += ticks.toLong() * stepMs * 1_000_000
+            }
             var colIndex = 0
             while (isPlaying) {
                 val snapshot = block            // re-read each column so edits apply next column

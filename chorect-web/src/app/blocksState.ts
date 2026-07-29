@@ -54,9 +54,12 @@ export class BlocksState {
 
   /** Overlay a wood-click metronome (higher click on each bar's "1"). */
   metronomeOn = false;
+  /** Play a 2-beat count-in (16th ticks, downbeats accented) before the loop starts. */
+  countIn = false;
   private readonly mClick = synthClick(BEAT_CLICK_HZ, 45);
   private readonly mAccent = synthClick(ACCENT_CLICK_HZ, 45);
   toggleMetronome() { this.metronomeOn = !this.metronomeOn; this.notify(); }
+  toggleCountIn() { this.countIn = !this.countIn; this.notify(); }
 
   private token = 0;
   private synth = new PercussionSynth();
@@ -265,6 +268,17 @@ export class BlocksState {
     this.notify();
     void (async () => {
       let colStart = this.deps.audio.now() + 0.06;
+      // Count-in: two beats of 16th ticks (each beat's downbeat accented) before
+      // the first column, then the loop begins right after.
+      if (this.countIn) {
+        const stepSec = slotMs(this.bpm, PHRASE_METER.division) / 1000;
+        const ticks = 2 * PHRASE_METER.slotsPerBeat;
+        for (let i = 0; i < ticks; i++) {
+          const accent = i % PHRASE_METER.slotsPerBeat === 0;
+          this.deps.audio.playSamples(accent ? this.mAccent : this.mClick, accent ? 0.9 : 0.55, colStart + i * stepSec);
+        }
+        colStart += ticks * stepSec;
+      }
       let colIndex = 0;
       while (this.isPlaying && token === this.token) {
         const snapshot = this.block;             // re-read each column so edits apply next column

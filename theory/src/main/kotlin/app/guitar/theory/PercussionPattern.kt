@@ -396,10 +396,10 @@ object PercussionBuiltins {
      *  "Samba 1" groove.) */
     val TRES_TAMBORINS: PercussionPattern = builtin(
         "M:2,2,4,16;" +
-            "pandeiro@33=101,2005,2007,2,0,2004,2006,4,101,2005,2007,2,0,4,6,4" + "|" +
+            "pandeiro@50=101,2005,2007,2,0,2004,2006,4,101,2005,2007,2,0,4,6,4" + "|" +
             "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
             "tamborim=3002,0,3002,0,2001,3002,0,3002,0,3002,0,3002,0,2001,3002,0" + "|" +
-            "tamborim#2@10=100,1001,2,0,100,1001,2,0,100,1001,2,0,100,1001,2,0",
+            "tamborim#2@50=100,1001,2,0,100,1001,2,0,100,1001,2,0,100,1001,2,0",
     )
 
     /** Batida do cavaco 1 — the default samba groove for the new default kit

@@ -283,6 +283,14 @@ export class SambaLooperUI {
 
   private rerender(): void { (this.samba as unknown as { deps: { onChange: () => void } }).deps.onChange(); }
 
+  /** Toggle play/stop for the ACTIVE view (blocks vs beat) — used by the spacebar
+   *  shortcut so it never starts the beat looper while the Blocks view is showing. */
+  togglePlay(): void {
+    if (this.viewMode === "blocks") this.blocks.toggle();
+    else if (this.samba.isPlaying) this.samba.stop();
+    else this.samba.start();
+  }
+
   /** Per-tick playhead repaint: toggle ONLY the `.playhead` class on the existing
    *  grid cells — no DOM rebuild — so mouse-wheel / touch scrolling stays smooth
    *  while the loop plays. Structural changes still go through a full rerender(). */
@@ -781,6 +789,9 @@ export class SambaLooperUI {
       addWrap.appendChild(pop);
     }
     const metro = btn(b.metronomeOn ? "Metronome ✓" : "Metronome", () => { b.toggleMetronome(); this.rerender(); }, b.metronomeOn ? "btn primary" : "btn");
+    const countIn = btn(b.countIn ? "Count-in ✓" : "Count-in",
+      () => { b.toggleCountIn(); this.rerender(); }, b.countIn ? "btn primary" : "btn",
+      "play a 2-beat count (16th ticks) before the loop starts");
     const gridToggle = btn(this.blockMiniGrid ? "Grid ✓" : "Grid",
       () => { this.blockMiniGrid = !this.blockMiniGrid; this.rerender(); },
       this.blockMiniGrid ? "btn primary" : "btn",
@@ -788,7 +799,7 @@ export class SambaLooperUI {
     wrap.appendChild(el("div", { class: "et-row-gap" }, [
       btn("Save block", () => b.saveCurrent()), loadWrap, mergeWrap,
       btn("Export", () => this.exportBlock()), btn("Import", () => this.importBeat()),
-      btn("Clear", () => b.clear()), metro, gridToggle, addWrap,
+      btn("Clear", () => b.clear()), metro, countIn, gridToggle, addWrap,
     ]));
 
     if (blk.tracks.length === 0) {

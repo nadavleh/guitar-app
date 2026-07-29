@@ -1038,6 +1038,12 @@ private fun BlocksSection(blocks: BlocksState) {
         } else {
             OutlinedButton(onClick = { blocks.toggleMetronome() }) { Text("Metronome") }
         }
+        // Count-in: 2-beat 16th-tick count before the loop starts.
+        if (blocks.countIn) {
+            Button(onClick = { blocks.toggleCountIn() }) { Text("Count-in ✓") }
+        } else {
+            OutlinedButton(onClick = { blocks.toggleCountIn() }) { Text("Count-in") }
+        }
         // Grid: show each phrase as a mini 16-step strip inside its cell.
         if (miniGrid) {
             Button(onClick = { miniGrid = false }) { Text("Grid ✓") }

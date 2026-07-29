@@ -453,7 +453,7 @@ export class App {
       }
 
       if (e.code === "Space") {
-        if (sheet === Sheet.SambaLooper) { e.preventDefault(); if (this.samba.isPlaying) this.samba.stop(); else this.samba.start(); }
+        if (sheet === Sheet.SambaLooper) { e.preventDefault(); this.sambaUI.togglePlay(); }
         else if (sheet === Sheet.Loop) { e.preventDefault(); if (this.loop.isLooping) this.loop.stopLoop(); else this.loop.startLoop(); }
         else if (sheet === Sheet.EarTraining && this.ear.progSubMode === EarSubMode.Progression) { e.preventDefault(); if (this.ear.isLooping) this.ear.stopLoop(); else this.ear.startLoop(); }
         else if (sheet === Sheet.CavaqProgressions) { e.preventDefault(); this.cavaq.toggle(); }
