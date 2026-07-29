@@ -30,9 +30,8 @@ strictly increasing at every p.
 ```
 [ q·(1/3−1/4)/2,  1/4 + q·(1/3−1/4),  1/2,  3/4 − q·(3/4−2/3)/2 ]
 ```
-(The 1st-16th term is implemented as `q·(1/3−1/4)/2` — half the 2nd's shift,
-mirroring the 4th — matching "delayed by half this amount". If a literal `q/2`
-was intended instead, change `swingOffset` pos 0 accordingly.)
+(The 1st-16th term is `q·(1/3−1/4)/2` — half the 2nd's shift, mirroring the 4th.
+Confirmed by Nadav 2026-07-29: this is the intended value, NOT a literal `q/2`.)
 
 **V3** — V1's 2nd delay, plus the 3rd anticipated by half that amount:
 ```
