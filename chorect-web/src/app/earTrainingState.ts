@@ -490,13 +490,23 @@ export class EarTrainingState {
 
   get isDrilling(): boolean { return this.drillKey !== null; }
 
-  /** Record one miss per wrongly-answered progression when a challenge ends. */
-  private recordProgressionMistakes() {
+  /** Question indices already counted as a mistake this challenge (dedupe so
+   *  stepping back/forward can't re-count the same progression). */
+  private challengeMistakesRecorded = new Set<number>();
+
+  /** Count the CURRENT question as a miss the moment the user advances past it
+   *  (press Next), if any bar was wrong — once per question. Fires incrementally
+   *  through the challenge instead of all-at-the-end, so the drill list accumulates
+   *  correctly (and early exits still count what was answered). */
+  private recordCurrentMistakeIfWrong() {
     if (this.specialProgMode) return;
-    const cb = this.deps.onProgressionMistake;
-    if (!cb) return;
-    for (let i = 0; i < this.challengeTotal && i < this.challengeLog.length; i++) {
-      if (this.challengeAnswers[i] === false) cb(progressionKey(this.challengeLog[i].prog));
+    const i = this.challengeIndex;
+    if (i < 0 || i >= this.challengeTotal) return;
+    if (this.challengeMistakesRecorded.has(i)) return;
+    if (this.challengeAnswers[i] === false) {
+      this.challengeMistakesRecorded.add(i);
+      const q = this.challengeLog[i];
+      if (q) this.deps.onProgressionMistake?.(progressionKey(q.prog));
     }
   }
 
@@ -738,6 +748,7 @@ export class EarTrainingState {
     this.challengeActive = true;
     this.challengeStartMs = Date.now();
     this.challengeDurationMs = 0;
+    this.challengeMistakesRecorded.clear();
     // Fresh question history; generate the first question honoring current settings.
     this.challengeLog = [];
     const q = this.freshChallengeQuestion();
@@ -761,11 +772,11 @@ export class EarTrainingState {
     if (!this.challengeActive) return;
     this.saveChallengeGuesses();
     this.finalizeCurrentQuestion();
+    this.recordCurrentMistakeIfWrong();   // count THIS progression now (on Next)
     if (this.challengeIndex >= this.challengeTotal - 1) {
       this.challengeIndex = this.challengeTotal;
       this.challengeDurationMs = Date.now() - this.challengeStartMs;
       this.stopLoop();
-      this.recordProgressionMistakes();
       this.deps.onProgressionChallengeComplete(this.challengeBarScore(), this.challengeBarTotal(), this.challengeDurationMs);
       this.notify();
       return;

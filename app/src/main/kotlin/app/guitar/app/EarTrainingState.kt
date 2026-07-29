@@ -560,11 +560,21 @@ class EarTrainingState(
 
     val isDrilling: Boolean get() = drillKey != null
 
-    /** Record one miss per wrongly-answered progression when a challenge ends. */
-    private fun recordProgressionMistakes() {
+    /** Question indices already counted as a mistake this challenge (dedupe so
+     *  stepping back/forward can't re-count the same progression). */
+    private val challengeMistakesRecorded = HashSet<Int>()
+
+    /** Count the CURRENT question as a miss the moment the user advances past it
+     *  (press Next), if any bar was wrong — once per question. Accumulates through
+     *  the challenge instead of all-at-the-end (early exits still count answered). */
+    private fun recordCurrentMistakeIfWrong() {
         if (specialProgMode) return
-        for (i in 0 until minOf(challengeTotal, challengeLog.size)) {
-            if (challengeAnswers.getOrNull(i) == false) onProgressionMistake(EarTraining.progressionKey(challengeLog[i].prog))
+        val i = challengeIndex
+        if (i < 0 || i >= challengeTotal) return
+        if (i in challengeMistakesRecorded) return
+        if (challengeAnswers.getOrNull(i) == false) {
+            challengeMistakesRecorded.add(i)
+            challengeLog.getOrNull(i)?.let { onProgressionMistake(EarTraining.progressionKey(it.prog)) }
         }
     }
 
@@ -828,6 +838,7 @@ class EarTrainingState(
         challengeActive = true
         challengeStartMs = System.currentTimeMillis()
         challengeDurationMs = 0L
+        challengeMistakesRecorded.clear()
         // Fresh question history; generate the first question honoring current settings.
         challengeLog.clear()
         val q = freshChallengeQuestion()
@@ -864,12 +875,12 @@ class EarTrainingState(
         if (!challengeActive) return
         saveChallengeGuesses()
         finalizeCurrentQuestion()
+        recordCurrentMistakeIfWrong()   // count THIS progression now (on Next)
         if (challengeIndex >= challengeTotal - 1) {
             // Stay on `challengeActive = true` but `challengeIndex == total` signals "done".
             challengeIndex = challengeTotal
             challengeDurationMs = System.currentTimeMillis() - challengeStartMs
             stopLoop()
-            recordProgressionMistakes()
             onProgressionChallengeComplete(challengeBarScore, challengeBarTotal, challengeDurationMs)
             return
         }

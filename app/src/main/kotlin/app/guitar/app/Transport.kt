@@ -23,7 +23,6 @@ import androidx.compose.material.icons.outlined.Equalizer
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.MusicNote
-import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Waves
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -447,14 +446,8 @@ fun ToneSheet(state: AppState, onDismiss: () -> Unit) {
                 onCheck = { state.earTraining.earBoostTonic = it },
             )
 
-            HorizontalDivider()
-            SwitchRow(
-                icon = Icons.Outlined.Science,
-                label = "New audio engine",
-                sub = "compare with the legacy engine",
-                checked = state.useModernAudio,
-                onCheck = { state.setUseModernAudio(it) },
-            )
+            // The audio engine is always the modern chain now (A/B toggle removed);
+            // the Synth SOUND option remains in the Sound picker above.
 
             Spacer(Modifier.height(20.dp))
         }

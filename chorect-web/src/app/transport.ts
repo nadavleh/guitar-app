@@ -264,12 +264,8 @@ export function toneSheet(state: AppState, ear: EarTrainingState, onClose: () =>
     "Boost root note", "Play each chord's root louder so it cuts through",
     ear.earBoostTonic, (v) => { ear.earBoostTonic = v; },
   )]));
-
-  sheet.appendChild(el("div", { class: "divider-line" }));
-  sheet.appendChild(toneRow("flask", [switchRow(
-    "New audio engine", "compare with the legacy engine",
-    state.audio.useModern, (v) => state.audio.setUseModern(v),
-  )]));
+  // The audio engine is always the modern chain now (toggle removed); the Synth
+  // SOUND option remains in the sound picker.
 
   const scrim = el("div", { class: "sheet-scrim" }, [sheet]);
   scrim.addEventListener("click", (e) => { if (e.target === scrim) onClose(); });

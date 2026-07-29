@@ -188,7 +188,12 @@ fun FretboardView(
             }
         }
         if (playOnTouchDown) {
-            detectTapGestures(onPress = { off -> handler(off) })
+            // Fire on the DOWN itself — awaitFirstDown is reliable for "play on
+            // touch-down"; detectTapGestures(onPress=…) could defer/cancel.
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                handler(down.position)
+            }
         } else {
             detectTapGestures(onTap = handler)
         }
