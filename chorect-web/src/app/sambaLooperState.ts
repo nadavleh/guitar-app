@@ -85,7 +85,7 @@ export class SambaLooperState {
   bpm = 80;
   swing = 0;
   /** Which 16th-note swing feel the beat looper uses (a test toggle; not persisted). */
-  swingModel: SwingModel = SwingModel.V1;
+  swingModel: SwingModel = SwingModel.Default;
   isPlaying = false;
   currentSlot = -1;
   /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
@@ -647,7 +647,7 @@ export class SambaLooperState {
   /** Per-track swing MODEL (a track's own swing uses this; default V2). Runtime
    *  toggle keyed by track id, like the global [swingModel]. */
   trackSwingModel = new Map<string, SwingModel>();
-  effectiveTrackSwingModel(id: string): SwingModel { return this.trackSwingModel.get(id) ?? SwingModel.V2; }
+  effectiveTrackSwingModel(id: string): SwingModel { return this.trackSwingModel.get(id) ?? SwingModel.Default; }
   setTrackSwingModel(id: string, m: SwingModel) { this.trackSwingModel.set(id, m); this.notify(); }
 
   /** The swing a track actually plays with: global overrides when nonzero. */

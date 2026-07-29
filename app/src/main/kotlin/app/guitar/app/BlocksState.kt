@@ -87,6 +87,8 @@ class BlocksState(
     init {
         scope.launch { repo.drumTrackPresets.collect { customPresets = it } }
         scope.launch { repo.drumBlockLines.collect { savedBlockLines = it } }
+        // Open the Blocks view on the built-in Tamborim Block by default.
+        builtinBlocks.firstOrNull()?.let { block = it }
     }
 
     /** Library lookup: a user phrase with a built-in's label REPLACES it. */

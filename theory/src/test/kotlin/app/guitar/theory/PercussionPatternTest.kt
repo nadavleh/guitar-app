@@ -171,8 +171,8 @@ class PercussionPatternTest {
         val reta = PercussionBuiltins.PRESET_TRACKS.first { it.label == "Pandeiro — Reta" }
         var p = PercussionPattern.empty(listOf(PercussionCatalog.Tamborim))
             .withPresetTrack(reta.instrument, reta.template, reta.swing)
-        assertEquals(33, p.trackSwing["pandeiro"])          // the preset's swing landed on the TRACK
-        assertTrue(p.encode().contains("pandeiro@33="))     // encoded as an id suffix
+        assertEquals(50, p.trackSwing["pandeiro"])          // the preset's swing landed on the TRACK
+        assertTrue(p.encode().contains("pandeiro@50="))     // encoded as an id suffix
         assertEquals(p, PercussionPattern.decode(p.encode()))
         // Explicit set/clear; clearing removes the map entry (and the suffix).
         p = p.withTrackSwing("tamborim", 50)
@@ -181,7 +181,7 @@ class PercussionPatternTest {
         assertTrue(!p.encode().contains("tamborim@"))
         // Duplicating a swung track copies its swing; removing the track drops it.
         val dup = p.duplicatedTrack(PercussionCatalog.Pandeiro)
-        assertEquals(33, dup.trackSwing["pandeiro#2"])
+        assertEquals(50, dup.trackSwing["pandeiro#2"])
         assertEquals(dup, PercussionPattern.decode(dup.encode()))
         val removed = p.removeInstrument(PercussionCatalog.Pandeiro)
         assertTrue(removed.trackSwing.isEmpty())
@@ -380,23 +380,25 @@ class PercussionPatternTest {
         }
     }
 
-    @Test fun `full V1 swing delays the 2nd and anticipates the 4th toward hemiola`() {
+    @Test fun `full Hemiola swing delays the 2nd and anticipates the 4th toward hemiola`() {
+        val m = SwingModel.Hemiola
         val base = PercussionTiming.slotMs(120)
-        val d0 = PercussionTiming.swungSlotMs(0, 120, 100, swingMeter)  // 1st → 2nd
-        val d1 = PercussionTiming.swungSlotMs(1, 120, 100, swingMeter)  // 2nd → 3rd
-        val d2 = PercussionTiming.swungSlotMs(2, 120, 100, swingMeter)  // 3rd → 4th
-        val d3 = PercussionTiming.swungSlotMs(3, 120, 100, swingMeter)  // 4th → next beat
+        val d0 = PercussionTiming.swungSlotMs(0, 120, 100, swingMeter, m)  // 1st → 2nd
+        val d1 = PercussionTiming.swungSlotMs(1, 120, 100, swingMeter, m)  // 2nd → 3rd
+        val d2 = PercussionTiming.swungSlotMs(2, 120, 100, swingMeter, m)  // 3rd → 4th
+        val d3 = PercussionTiming.swungSlotMs(3, 120, 100, swingMeter, m)  // 4th → next beat
         assertTrue(d0 > base, "1st→2nd gap $d0 should stretch (2nd delayed toward 1/3)")
         assertTrue(d1 < base, "2nd→3rd gap $d1 should shrink")
         assertTrue(d3 > base, "4th→beat gap $d3 should stretch (4th pulled to 2/3)")
         assertEquals(d0 + d1 + d2 + d3, base * 4)  // beat length intact
     }
 
-    @Test fun `full V1 swing onsets sit at the hemiola positions`() {
-        // V1 default at 100 %: the four 16ths sit at [0, 1/3, 1/2, 2/3] of the beat,
+    @Test fun `full Hemiola swing onsets sit at the hemiola positions`() {
+        // Hemiola at 100 %: the four 16ths sit at [0, 1/3, 1/2, 2/3] of the beat,
         // i.e. slot-unit positions [0, 4/3, 2, 8/3].
+        val m = SwingModel.Hemiola
         val base = PercussionTiming.slotMs(120)   // 125 ms
-        fun onset(slot: Int) = (0 until slot).sumOf { PercussionTiming.swungSlotMs(it, 120, 100, swingMeter) }
+        fun onset(slot: Int) = (0 until slot).sumOf { PercussionTiming.swungSlotMs(it, 120, 100, swingMeter, m) }
         assertEquals(0L, onset(0))                                 // 1st at the beat
         assertEquals(Math.round((4.0 / 3.0) * base), onset(1))      // 2nd at 1/3
         assertEquals(2 * base, onset(2))                            // 3rd stays at 1/2
@@ -428,24 +430,19 @@ class PercussionPatternTest {
         assertEquals(PercussionTiming.slotMs(120, 32), PercussionTiming.swungSlotMs(1, 120, 100, thirtyseconds))
     }
 
-    @Test fun `swing offsets match each hemiola model's definition at full swing`() {
+    @Test fun `swing offsets match each model's definition at full swing`() {
         val s = 1.0
         val d = 1.0 / 3.0   // 2nd-16th shift toward the hemiola third (1/12 beat = 1/3 slot)
-        // V1 (hemiola): 2nd +d, 4th -d, 1st/3rd fixed.
-        assertEquals(0.0, PercussionTiming.swingOffset(0, s, SwingModel.V1))
-        assertEquals(d, PercussionTiming.swingOffset(1, s, SwingModel.V1), 1e-9)
-        assertEquals(0.0, PercussionTiming.swingOffset(2, s, SwingModel.V1))
-        assertEquals(-d, PercussionTiming.swingOffset(3, s, SwingModel.V1), 1e-9)
-        // V2: 1st +d/2, 2nd +d, 3rd fixed, 4th -d/2.
-        assertEquals(d / 2, PercussionTiming.swingOffset(0, s, SwingModel.V2), 1e-9)
-        assertEquals(d, PercussionTiming.swingOffset(1, s, SwingModel.V2), 1e-9)
-        assertEquals(0.0, PercussionTiming.swingOffset(2, s, SwingModel.V2))
-        assertEquals(-d / 2, PercussionTiming.swingOffset(3, s, SwingModel.V2), 1e-9)
-        // V3: 2nd +d, 3rd -d/2, 1st/4th fixed.
-        assertEquals(0.0, PercussionTiming.swingOffset(0, s, SwingModel.V3))
-        assertEquals(d, PercussionTiming.swingOffset(1, s, SwingModel.V3), 1e-9)
-        assertEquals(-d / 2, PercussionTiming.swingOffset(2, s, SwingModel.V3), 1e-9)
-        assertEquals(0.0, PercussionTiming.swingOffset(3, s, SwingModel.V3))
+        // Hemiola: 2nd +d, 4th -d, 1st/3rd fixed.
+        assertEquals(0.0, PercussionTiming.swingOffset(0, s, SwingModel.Hemiola))
+        assertEquals(d, PercussionTiming.swingOffset(1, s, SwingModel.Hemiola), 1e-9)
+        assertEquals(0.0, PercussionTiming.swingOffset(2, s, SwingModel.Hemiola))
+        assertEquals(-d, PercussionTiming.swingOffset(3, s, SwingModel.Hemiola), 1e-9)
+        // Default: 1st +d/2, 2nd +d, 3rd fixed, 4th -d/2.
+        assertEquals(d / 2, PercussionTiming.swingOffset(0, s, SwingModel.Default), 1e-9)
+        assertEquals(d, PercussionTiming.swingOffset(1, s, SwingModel.Default), 1e-9)
+        assertEquals(0.0, PercussionTiming.swingOffset(2, s, SwingModel.Default))
+        assertEquals(-d / 2, PercussionTiming.swingOffset(3, s, SwingModel.Default), 1e-9)
     }
 
     @Test fun `every swing model keeps slot durations strictly positive (monotonic onsets)`() {

@@ -197,7 +197,7 @@ class SambaLooperState(
     /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
     var swing by mutableStateOf(0)
     /** Which 16th-note swing feel the looper uses (a test toggle; not persisted). */
-    var swingModel by mutableStateOf(app.guitar.theory.SwingModel.V1)
+    var swingModel by mutableStateOf(app.guitar.theory.SwingModel.Default)
     var isPlaying by mutableStateOf(false)
         private set
 
@@ -380,7 +380,7 @@ class SambaLooperState(
      *  toggle keyed by track id, like the global [swingModel]. */
     val trackSwingModel = androidx.compose.runtime.mutableStateMapOf<String, app.guitar.theory.SwingModel>()
     fun effectiveTrackSwingModel(id: String): app.guitar.theory.SwingModel =
-        trackSwingModel[id] ?: app.guitar.theory.SwingModel.V2
+        trackSwingModel[id] ?: app.guitar.theory.SwingModel.Default
     fun setTrackSwingModel(id: String, m: app.guitar.theory.SwingModel) { trackSwingModel[id] = m }
 
     /** The swing a track actually plays with: global overrides when nonzero. */

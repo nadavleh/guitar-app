@@ -555,7 +555,7 @@ export interface BuiltinPattern { name: string; pattern: PercussionPattern; bpm?
 export const PARTIDO_ALTO_OFFICIAL = builtin(
   "M:2,2,4,16;" + SURDO_TELECO + "|" +
   "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
-  "bongo=-,0,-,-,1,-,1,-,1,-,0,-,-,1,-,1",
+  "pandeiro=-,2,-,-,0,-,0,-,0,-,2,-,-,0,-,0",   // "Pandeiro — Partido Alto" phrase
 );
 export const PARTIDO_ALTO_DEC = builtin(
   "M:2,2,4,16;" + SURDO_TELECO + "|" +
@@ -583,7 +583,7 @@ export const TRES_TAMBORINS = builtin(
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */
 export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "2 Tamborims, Pandeiro & Surdo", pattern: TRES_TAMBORINS, bpm: 80 },
-  { name: "Partido Alto Groove (Official)", pattern: PARTIDO_ALTO_OFFICIAL, bpm: 70 },
+  { name: "Partido Alto Groove", pattern: PARTIDO_ALTO_OFFICIAL, bpm: 70 },
   { name: "Partido Alto Groove (Dec)", pattern: PARTIDO_ALTO_DEC, bpm: 70 },
   { name: "Platinelas Pandeiro — Partido Alto Groove", pattern: PARTIDO_ALTO_PLATINELAS, bpm: 70 },
   { name: "Xote", pattern: XOTE, bpm: 90 },
@@ -632,10 +632,10 @@ export const PRESET_TRACKS: PresetTrack[] = [
   // 75 % (dyn level 1), tap, clack — with a light 10 % swing.
   { label: "Tamborim — Levada Reta", instrument: Tamborim,
     template: [100, 3002, 2001, 0, 100, 3002, 2001, 0, 100, 3002, 2001, 0, 100, 3002, 2001, 0],
-    swing: 10 },
+    swing: 50 },
   { label: "Tamborim — Chamada", instrument: Tamborim,
     template: [3002, 0, 3002, 0, 0, 0, 3002, 0, 0, 0, 3002, 0, 0, 0, 3002, 0],
-    swing: 20, note: "Played with ~20% swing." },
+    swing: 50, note: "Played with 50% swing." },
   // From Nadav's export: accented clacks, taps, and 50 %-dyn clacks (2000s).
   { label: "Tamborim — Palmas", instrument: Tamborim,
     template: [100, 2, 2000, 100, 2, 2000, 100, 2, 100, 2, 2000, 100, 2, 2000, 100, 2] },
@@ -661,8 +661,8 @@ export const PRESET_TRACKS: PresetTrack[] = [
   // bass open, finger open, heel open, finger open — bar 2's taps at full.
   { label: "Pandeiro — Reta", instrument: Pandeiro,
     template: [101, 2005, 2007, 2, 0, 2004, 2006, 4, 101, 2005, 2007, 2, 0, 4, 6, 4],
-    swing: 33,
-    note: "Nadav's reta — bass accented, closed taps at 50%. Also good straight or ~50% swing." },
+    swing: 50,
+    note: "Nadav's reta — bass accented, closed taps at 50%." },
   // Pandeiro partido-alto phrases from Nadav's exports.
   { label: "Pandeiro — Partido Alto", instrument: Pandeiro,
     template: [null, 2, null, null, 0, null, 0, null, 0, null, 2, null, null, 0, null, 0] },
@@ -775,21 +775,19 @@ export function loopMs(bpm: number): number {
  * PercussionTiming.swingOffset. Spec: docs/superpowers/specs/2026-07-29-swing-models.md.
  * Quarter-note beat = unit length; straight 16ths at [0,1/4,1/2,3/4]; full hemiola
  * (p=100 %) at [0,1/3,1/2,2/3]; q = swingPercent/100 interpolates linearly. Positions:
- *  • V1: [0, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)]
- *  • V2: [q·(1/3−1/4)/2, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)/2]
- *  • V3: [0, 1/4+q·(1/3−1/4), 1/2−q·(1/3−1/4)/2, 3/4]
+ *  • Default: [q·(1/3−1/4)/2, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)/2]
+ *  • Hemiola: [0, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)]
  * swingOffset returns SLOT-unit offsets; the 2nd-16th shift d = q/3 slot (1/12 beat).
- * Default = V1. (The app's retired prior feel was [0,1/4,1/2−q/16,3/4−q/10].)
+ * Default = Default.
  */
-export enum SwingModel { V1 = "v1", V2 = "v2", V3 = "v3" }
+export enum SwingModel { Default = "default", Hemiola = "hemiola" }
 
 /** Per-16th onset offset (slot units) added to nominal position [pos] (0..3), given s∈[0,1]. */
 export function swingOffset(pos: number, s: number, model: SwingModel): number {
   const d = s / 3;
   switch (model) {
-    case SwingModel.V2: return pos === 0 ? d / 2 : pos === 1 ? d : pos === 3 ? -d / 2 : 0;
-    case SwingModel.V3: return pos === 1 ? d : pos === 2 ? -d / 2 : 0;
-    default:            return pos === 1 ? d : pos === 3 ? -d : 0;   // V1 (hemiola)
+    case SwingModel.Hemiola: return pos === 1 ? d : pos === 3 ? -d : 0;
+    default:                 return pos === 0 ? d / 2 : pos === 1 ? d : pos === 3 ? -d / 2 : 0;   // Default
   }
 }
 
@@ -797,14 +795,13 @@ export function swingOffset(pos: number, s: number, model: SwingModel): number {
  *  read "what are the swing models" without inferring from code; kept in lock-step
  *  with [swingOffset] and docs/superpowers/specs/2026-07-29-swing-models.md. */
 export const SWING_MODEL_FORMULA: Record<SwingModel, string> = {
-  [SwingModel.V1]: "[0,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)]",
-  [SwingModel.V2]: "[p(⅓−¼)/2,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)/2]",
-  [SwingModel.V3]: "[0,  ¼+p(⅓−¼),  ½−p(⅓−¼)/2,  ¾]",
+  [SwingModel.Default]: "[p(⅓−¼)/2,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)/2]",
+  [SwingModel.Hemiola]: "[0,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)]",
 };
 
 export function swungSlotMs(
   slot: number, bpm: number, swingPercent: number, meter: PercussionMeter,
-  model: SwingModel = SwingModel.V1,
+  model: SwingModel = SwingModel.Default,
 ): number {
   const base = slotMs(bpm, meter.division);
   if (meter.beatUnit !== 4 || meter.division !== 16) return Math.max(base, 1);

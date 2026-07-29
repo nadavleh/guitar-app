@@ -64,7 +64,11 @@ export class BlocksState {
   private loadedSamples = new Map<string, Float32Array>();
   private requestedSampleKits = new Set<string>();
 
-  constructor(private deps: BlocksDeps) {}
+  constructor(private deps: BlocksDeps) {
+    // Open the Blocks view on the built-in Tamborim Block by default.
+    const first = this.builtinBlocks()[0];
+    if (first) this.block = first.block;
+  }
 
   private notify() { this.deps.onChange(); }
 

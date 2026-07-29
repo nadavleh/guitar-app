@@ -15,7 +15,7 @@ import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../au
 
 export const DISPLAY_FRETS = 14;
 /** App version shown beside the header wordmark. Keep in sync with package.json on release. */
-export const APP_VERSION = "2.48.0";
+export const APP_VERSION = "2.49.0";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 
@@ -161,7 +161,7 @@ export class AppState {
   tabOrder: TabDestName[] = [...DEFAULT_TAB_ORDER];
 
   displayMode = DisplayMode.None;
-  currentSheet: Sheet | null = null;
+  currentSheet: Sheet | null = Sheet.SambaLooper;   // app opens on the drum machine
   lastSheet: Sheet | null = null;
   chordView = ChordScaleView.AllNotes;
   scaleView = ChordScaleView.AllNotes;

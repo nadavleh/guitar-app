@@ -526,13 +526,13 @@ object PercussionBuiltins {
         PresetTrack(
             "Tamborim — Levada Reta", PercussionCatalog.Tamborim,
             listOf(100, 3002, 2001, 0, 100, 3002, 2001, 0, 100, 3002, 2001, 0, 100, 3002, 2001, 0),
-            swing = 10,
+            swing = 50,
         ),
         PresetTrack(
             "Tamborim — Chamada", PercussionCatalog.Tamborim,
             listOf(3002, 0, 3002, 0, 0, 0, 3002, 0, 0, 0, 3002, 0, 0, 0, 3002, 0),
-            swing = 20,
-            note = "Played with ~20% swing.",
+            swing = 50,
+            note = "Played with 50% swing.",
         ),
         // From Nadav's export: accented clacks, taps, and 50 %-dyn clacks (2000s).
         PresetTrack(
@@ -575,8 +575,8 @@ object PercussionBuiltins {
         PresetTrack(
             "Pandeiro — Reta", PercussionCatalog.Pandeiro,
             listOf(101, 2005, 2007, 2, 0, 2004, 2006, 4, 101, 2005, 2007, 2, 0, 4, 6, 4),
-            swing = 33,
-            note = "Nadav's reta — bass accented, closed taps at 50%. Also good straight or ~50% swing.",
+            swing = 50,
+            note = "Nadav's reta — bass accented, closed taps at 50%.",
         ),
         // Pandeiro partido-alto phrases from Nadav's exports (plain voices for now —
         // per-slot attenuation to be dialled in later).
@@ -609,7 +609,7 @@ object PercussionBuiltins {
     val PARTIDO_ALTO_OFFICIAL: PercussionPattern = builtin(
         "M:2,2,4,16;" + SURDO_TELECO + "|" +
             "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
-            "bongo=-,0,-,-,1,-,1,-,1,-,0,-,-,1,-,1",
+            "pandeiro=-,2,-,-,0,-,0,-,0,-,2,-,-,0,-,0",   // "Pandeiro — Partido Alto" phrase
     )
     val PARTIDO_ALTO_DEC: PercussionPattern = builtin(
         "M:2,2,4,16;" + SURDO_TELECO + "|" +
@@ -625,7 +625,7 @@ object PercussionBuiltins {
     /** Grooves offered in the Load… menu (before the user's saved beats). */
     val ALL: List<BuiltinPattern> = listOf(
         BuiltinPattern("2 Tamborims, Pandeiro & Surdo", TRES_TAMBORINS, bpm = 80),
-        BuiltinPattern("Partido Alto Groove (Official)", PARTIDO_ALTO_OFFICIAL, bpm = 70),
+        BuiltinPattern("Partido Alto Groove", PARTIDO_ALTO_OFFICIAL, bpm = 70),
         BuiltinPattern("Partido Alto Groove (Dec)", PARTIDO_ALTO_DEC, bpm = 70),
         BuiltinPattern("Platinelas Pandeiro — Partido Alto Groove", PARTIDO_ALTO_PLATINELAS, bpm = 70),
         BuiltinPattern("Xote", XOTE, bpm = 90),
@@ -877,32 +877,25 @@ private fun parseFlatJsonObject(text: String): Map<String, String>? {
 
 /**
  * 16th-note swing feel — HEMIOLA-BASED. Canonical spec (formulas + rationale):
- * docs/superpowers/specs/2026-07-29-swing-models.md. Let the quarter-note beat be
- * unit length; the four straight 16ths sit at [0, 1/4, 1/2, 3/4]. A full hemiola
- * (p = 100 %) puts them at [0, 1/3, 1/2, 2/3]; p interpolates linearly. With
- * q = swingPercent/100 the played 16th positions (beat-unit) are:
+ * docs/superpowers/specs/2026-07-29-swing-models.md. Quarter-note beat = unit
+ * length; straight 16ths at [0, 1/4, 1/2, 3/4]; full hemiola (p=100 %) at
+ * [0, 1/3, 1/2, 2/3]; q = swingPercent/100 interpolates linearly. Positions:
  *
- *  • [V1] Hemiola-based: [0, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)]
- *  • [V2]: [ q·(1/3−1/4)/2, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)/2 ]
- *  • [V3]: [0, 1/4+q·(1/3−1/4), 1/2−q·(1/3−1/4)/2, 3/4]
+ *  • [Default] (the app default): [ q·(1/3−1/4)/2, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)/2 ]
+ *  • [Hemiola]: [0, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)]
  *
  * (1/3−1/4 = 3/4−2/3 = 1/12 beat = 1/3 of a 16th slot.) [swingOffset] returns the
- * offset in SLOT units: the 2nd-16th shift is d = q/3 slots; halves are d/2.
- * All onsets stay strictly increasing for every model at every p (V3 needs the
- * 2nd/3rd shift < 2/3 slot; d ≤ 1/3 is well inside). Default = V1.
- *
- * NOTE: the app's PRIOR swing (retired from the toggle) was NOT any of these — it
- * kept the 1st & 2nd on-grid and anticipated the 3rd/4th: [0,1/4,1/2−q/16,3/4−q/10].
+ * offset in SLOT units: the 2nd-16th shift is d = q/3 slots; halves are d/2. All
+ * onsets stay strictly increasing at every p. Default = [Default].
  */
-enum class SwingModel { V1, V2, V3 }
+enum class SwingModel { Default, Hemiola }
 
 /** Human-readable per-16th position formulas (p = swing%/100). The one place to read
  *  "what are the swing models" without inferring from code; in lock-step with
  *  [PercussionTiming.swingOffset] and docs/superpowers/specs/2026-07-29-swing-models.md. */
 val SWING_MODEL_FORMULA: Map<SwingModel, String> = mapOf(
-    SwingModel.V1 to "[0,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)]",
-    SwingModel.V2 to "[p(⅓−¼)/2,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)/2]",
-    SwingModel.V3 to "[0,  ¼+p(⅓−¼),  ½−p(⅓−¼)/2,  ¾]",
+    SwingModel.Default to "[p(⅓−¼)/2,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)/2]",
+    SwingModel.Hemiola to "[0,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)]",
 )
 
 /** Loop timing helpers (kept pure so they're unit-testable on the JVM). */
@@ -913,9 +906,8 @@ object PercussionTiming {
     fun swingOffset(pos: Int, s: Double, model: SwingModel): Double {
         val d = s / 3.0
         return when (model) {
-            SwingModel.V1 -> when (pos) { 1 -> d; 3 -> -d; else -> 0.0 }
-            SwingModel.V2 -> when (pos) { 0 -> d / 2; 1 -> d; 3 -> -d / 2; else -> 0.0 }
-            SwingModel.V3 -> when (pos) { 1 -> d; 2 -> -d / 2; else -> 0.0 }
+            SwingModel.Hemiola -> when (pos) { 1 -> d; 3 -> -d; else -> 0.0 }
+            SwingModel.Default -> when (pos) { 0 -> d / 2; 1 -> d; 3 -> -d / 2; else -> 0.0 }
         }
     }
 
@@ -947,7 +939,7 @@ object PercussionTiming {
      */
     fun swungSlotMs(
         slot: Int, bpm: Int, swingPercent: Int, meter: PercussionMeter,
-        model: SwingModel = SwingModel.V1,
+        model: SwingModel = SwingModel.Default,
     ): Long {
         val base = slotMs(bpm, meter.division)
         // Swing is defined only for a quarter-note beat divided into four 16ths.

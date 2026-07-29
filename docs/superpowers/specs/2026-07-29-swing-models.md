@@ -21,42 +21,39 @@ strictly increasing at every p.
 
 ## Models (played 16th positions, in beat units)
 
-**V1 — Hemiola-based** (default):
-```
-[ 0,  1/4 + q·(1/3−1/4),  1/2,  3/4 − q·(3/4−2/3) ]
-```
+There are exactly two, shown with their live formula in the UI. (History: an
+earlier draft had V1/V2/V3; V3 was discarded, and V1→**Hemiola**, V2→**Default**.)
 
-**V2** — V1 plus the outer 16ths pulled half as far (1st delayed, 4th anticipated):
+**Default** (the app default = former V2) — Hemiola's 2nd/4th shift plus the outer
+16ths pulled half as far (1st delayed, 4th anticipated):
 ```
 [ q·(1/3−1/4)/2,  1/4 + q·(1/3−1/4),  1/2,  3/4 − q·(3/4−2/3)/2 ]
 ```
 (The 1st-16th term is `q·(1/3−1/4)/2` — half the 2nd's shift, mirroring the 4th.
-Confirmed by Nadav 2026-07-29: this is the intended value, NOT a literal `q/2`.)
+Confirmed by Nadav 2026-07-29: intended value, NOT a literal `q/2`.)
 
-**V3** — V1's 2nd delay, plus the 3rd anticipated by half that amount:
+**Hemiola** (former V1) — pure hemiola on the 2nd & 4th, 1st/3rd fixed:
 ```
-[ 0,  1/4 + q·(1/3−1/4),  1/2 − q·(1/3−1/4)/2,  3/4 ]
+[ 0,  1/4 + q·(1/3−1/4),  1/2,  3/4 − q·(3/4−2/3) ]
 ```
 
 ### As slot-unit offsets δ (what `swingOffset` returns), s = q
-| model | δ(0) | δ(1) | δ(2) | δ(3) |
-|-------|------|------|------|------|
-| V1    | 0        | +s/3 | 0     | −s/3 |
-| V2    | +s/6     | +s/3 | 0     | −s/6 |
-| V3    | 0        | +s/3 | −s/6  | 0    |
+| model   | δ(0) | δ(1) | δ(2) | δ(3) |
+|---------|------|------|------|------|
+| Default | +s/6 | +s/3 | 0    | −s/6 |
+| Hemiola | 0    | +s/3 | 0    | −s/3 |
 
 ### Onsets within the beat at p = 100 % (beat units)
-| model | 1st | 2nd | 3rd | 4th |
-|-------|-----|-----|-----|-----|
-| V1 | 0 | 1/3 | 1/2 | 2/3 |
-| V2 | 1/24 | 1/3 | 1/2 | 17/24 |
-| V3 | 0 | 1/3 | 5/12 | 3/4 |
+| model   | 1st  | 2nd | 3rd | 4th   |
+|---------|------|-----|-----|-------|
+| Default | 1/24 | 1/3 | 1/2 | 17/24 |
+| Hemiola | 0    | 1/3 | 1/2 | 2/3   |
 
-## Retired model (NOT in the toggle)
+## Retired feel (NOT in the toggle)
 
-The app's prior swing — never any of V1–V3 — kept the 1st & 2nd on-grid and
+The app's original swing — never either of these — kept the 1st & 2nd on-grid and
 anticipated the 3rd/4th (samba "push", ≈2× measured deviations):
 ```
 [ 0,  1/4,  1/2 − q·(1/16),  3/4 − q·(1/10) ]
 ```
-Documented here for reference; removed from the selector per the V1–V3 rename.
+Documented for reference; removed from the selector.

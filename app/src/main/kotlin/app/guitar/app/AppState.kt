@@ -364,7 +364,7 @@ class AppState(
     // fretboard on launch. Opening the Fretboard tool flips this to Chord (see
     // openSheet), so picking a chord/scale still lights the neck as before.
     var displayMode by mutableStateOf(DisplayMode.None)
-    var currentSheet by mutableStateOf<Sheet?>(null)
+    var currentSheet by mutableStateOf<Sheet?>(Sheet.SambaLooper)   // app opens on the drum machine
     /** The last sheet the user explicitly opened. Used by the bottom drag-up affordance
      *  so the user can re-open the same sheet without going through the menu again. */
     var lastSheet by mutableStateOf<Sheet?>(null)

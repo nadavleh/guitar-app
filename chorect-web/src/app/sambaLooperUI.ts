@@ -461,7 +461,7 @@ export class SambaLooperUI {
       swingChildren.push(
         el("div", { class: "label-sm", style: "margin-top:6px" }, ["Swing model  ·  p = swing%/100"]),
         el("div", { class: "row", style: "gap:6px;flex-wrap:wrap" }, [
-          modelChip("V1", SwingModel.V1), modelChip("V2", SwingModel.V2), modelChip("V3", SwingModel.V3),
+          modelChip("Default", SwingModel.Default), modelChip("Hemiola", SwingModel.Hemiola),
         ]),
         el("div", { class: "mono", style: "font-size:11px;opacity:0.85;margin-top:4px" }, [SWING_MODEL_FORMULA[s.swingModel]]),
       );
@@ -948,8 +948,8 @@ export class SambaLooperUI {
       (v) => `Track swing: ${Math.round(v)}%` + (s.swing > 0 ? " (overridden by global swing)" : ""),
       0, 100, tSwing, (v) => s.setTrackSwing(inst, v));
     // Per-track swing MODEL (default V2), toggled here; drives this track's own swing.
-    const tModelChip = (m: SwingModel) =>
-      btn(m.toUpperCase(), () => { s.setTrackSwingModel(inst.id, m); this.rerender(); },
+    const tModelChip = (label: string, m: SwingModel) =>
+      btn(label, () => { s.setTrackSwingModel(inst.id, m); this.rerender(); },
         s.effectiveTrackSwingModel(inst.id) === m ? "btn primary" : "btn");
     const pop = el("div", { class: "drum-voice-pop" }, [
       el("div", { style: "font-weight:600;font-size:13px" }, [volVS.label]),
@@ -959,7 +959,7 @@ export class SambaLooperUI {
       swingVS.input,
       el("div", { class: "ans-label", style: "margin-top:6px" }, ["Track swing model"]),
       el("div", { class: "row", style: "gap:6px;flex-wrap:wrap" }, [
-        tModelChip(SwingModel.V1), tModelChip(SwingModel.V2), tModelChip(SwingModel.V3),
+        tModelChip("Default", SwingModel.Default), tModelChip("Hemiola", SwingModel.Hemiola),
       ]),
       el("div", { class: "mono", style: "font-size:11px;opacity:0.85" }, [SWING_MODEL_FORMULA[s.effectiveTrackSwingModel(inst.id)]]),
       el("div", { class: "divider-line" }),
