@@ -45,7 +45,7 @@ export function transportDock(opts: TransportDockOpts): HTMLElement {
 
   if (opts.bpm !== undefined && opts.onBpm) {
     const bpm = opts.bpm, onBpm = opts.onBpm;
-    // Compact circular −/+ tempo stepper (1-BPM nudge; finer than dragging).
+    // Compact circular −/+ tempo stepper (±5 BPM per press).
     const bpmStep = (input: HTMLInputElement, label: HTMLElement, sym: string, delta: number) => {
       const b = el("button", {
         class: "bpm-step",
@@ -70,7 +70,8 @@ export function transportDock(opts: TransportDockOpts): HTMLElement {
         el("span", { class: "transport-bpm-unit" }, ["BPM"]),
       ]);
       vs.input.classList.add("transport-bpm-slider");
-      children.push(readout, bpmStep(vs.input, vs.label, "−", -1), vs.input, bpmStep(vs.input, vs.label, "+", +1));
+      // Both steppers sit next to the BPM caption; the slider follows.
+      children.push(readout, bpmStep(vs.input, vs.label, "−", -5), bpmStep(vs.input, vs.label, "+", +5), vs.input);
     } else {
       // Both the summary readout and the popover label follow the drag live;
       // double-click either to type a tempo.
@@ -110,8 +111,9 @@ export function transportDock(opts: TransportDockOpts): HTMLElement {
         return b;
       };
       s.style.flex = "1";
-      const sliderRow = el("div", { style: "display:flex;align-items:center;gap:8px;margin-top:6px" }, [popStep("−", -1), s, popStep("+", +1)]);
-      const pop = el("div", { class: "transport-bpm-pop" }, [lab, sliderRow]);
+      // Both steppers next to the tempo caption; the slider on its own row below.
+      const labRow = el("div", { style: "display:flex;align-items:center;gap:8px" }, [lab, popStep("−", -5), popStep("+", +5)]);
+      const pop = el("div", { class: "transport-bpm-pop" }, [labRow, el("div", { style: "margin-top:6px;display:flex" }, [s])]);
       const details = el("details", { class: "transport-bpm-wrap" }, [summary, pop]);
       details.open = bpmExpanded;
       details.addEventListener("toggle", () => { bpmExpanded = details.open; });

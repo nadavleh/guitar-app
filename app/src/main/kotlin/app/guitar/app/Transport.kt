@@ -122,15 +122,16 @@ fun TransportDock(
                 Spacer(Modifier.width(2.dp))
                 Text("BPM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.width(6.dp))
-                BpmStep("−") { onBpm((bpm - 1).coerceAtLeast(10)) }
+                // Both ±5 steppers next to the caption; the slider follows.
+                BpmStep("−") { onBpm((bpm - 5).coerceAtLeast(10)) }
+                Spacer(Modifier.width(4.dp))
+                BpmStep("+") { onBpm((bpm + 5).coerceAtMost(300)) }
                 Slider(
                     value = bpm.toFloat(),
                     onValueChange = { onBpm(it.toInt()) },
                     valueRange = 10f..300f,
-                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                    modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
                 )
-                BpmStep("+") { onBpm((bpm + 1).coerceAtMost(300)) }
-                Spacer(Modifier.width(6.dp))
             } else {
                 var open by remember { mutableStateOf(false) }
                 Box {
@@ -162,14 +163,15 @@ fun TransportDock(
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                BpmStep("−") { onBpm((bpm - 1).coerceAtLeast(10)) }
+                                BpmStep("−") { onBpm((bpm - 5).coerceAtLeast(10)) }
+                                Spacer(Modifier.width(6.dp))
+                                BpmStep("+") { onBpm((bpm + 5).coerceAtMost(300)) }
                                 Slider(
                                     value = bpm.toFloat(),
                                     onValueChange = { onBpm(it.toInt()) },
                                     valueRange = 10f..300f,
-                                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                                    modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
                                 )
-                                BpmStep("+") { onBpm((bpm + 1).coerceAtMost(300)) }
                             }
                         }
                     }

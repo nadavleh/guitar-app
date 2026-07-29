@@ -42,7 +42,7 @@ class SambaLooperState(
 ) {
     // Open on a CLEAN SLATE — no tracks at all. Build a beat with "+ Add" or by
     // loading a groove / track preset from the beats popup.
-    var pattern by mutableStateOf(PercussionPattern.empty(emptyList()))
+    var pattern by mutableStateOf(PercussionBuiltins.ALL[0].pattern)   // open on the first groove
         private set
 
     /** Optional one-shot "opening" (entrada) played once before the loop starts. */
@@ -99,7 +99,7 @@ class SambaLooperState(
     }
 
     /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
-    var loadedName by mutableStateOf<String?>(null)
+    var loadedName by mutableStateOf<String?>(PercussionBuiltins.ALL[0].name)
         private set
 
     /** Free-text notes attached to the current beat (saved + exported with it). */
@@ -193,7 +193,7 @@ class SambaLooperState(
 
     /** Reorder the kit: move the track at [from] to index [to]. */
     fun reorderInstrument(from: Int, to: Int) { commit(editPattern.movedInstrument(from, to)) }
-    var bpm by mutableStateOf(80)
+    var bpm by mutableStateOf(PercussionBuiltins.ALL[0].bpm ?: 80)
     /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
     var swing by mutableStateOf(0)
     /** Which 16th-note swing feel the looper uses (a test toggle; not persisted). */

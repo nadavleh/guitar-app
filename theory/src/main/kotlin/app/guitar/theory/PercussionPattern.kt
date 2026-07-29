@@ -506,8 +506,10 @@ object PercussionBuiltins {
             listOf(1, null, null, 2, 0, null, null, 2, 1, null, null, 2, 0, null, null, 2),
         ),
         PresetTrack(
+            // tap (3002) then muted clack (2001) at each syncopation — the clack/tap were
+            // switched at the "2"/"e" 16ths; corrected to match the Var phrases.
             "Tamborim — Teleco-teco", PercussionCatalog.Tamborim,
-            listOf(3002, 0, 3002, 0, 2001, 3002, 0, 3002, 0, 3002, 0, 3002, 0, 2001, 3002, 0),
+            listOf(3002, 0, 3002, 0, 3002, 2001, 0, 3002, 0, 3002, 0, 3002, 0, 3002, 2001, 0),
         ),
         PresetTrack(
             "Tamborim — Telecoteco Var 1", PercussionCatalog.Tamborim,
@@ -626,13 +628,12 @@ object PercussionBuiltins {
     val ALL: List<BuiltinPattern> = listOf(
         BuiltinPattern("2 Tamborims, Pandeiro & Surdo", TRES_TAMBORINS, bpm = 80),
         BuiltinPattern("Partido Alto Groove", PARTIDO_ALTO_OFFICIAL, bpm = 70),
-        BuiltinPattern("Partido Alto Groove (Dec)", PARTIDO_ALTO_DEC, bpm = 70),
         BuiltinPattern("Platinelas Pandeiro — Partido Alto Groove", PARTIDO_ALTO_PLATINELAS, bpm = 70),
-        BuiltinPattern("Xote", XOTE, bpm = 90),
-        BuiltinPattern("Baião", BAIAO, bpm = 90),
-        BuiltinPattern("Forró", FORRO, bpm = 95),
-        BuiltinPattern("Xaxado", XAXADO, bpm = 100),
-        BuiltinPattern("Arrasta-pé", ARRASTA_PE, bpm = 100),
+        BuiltinPattern("Xote (Bongo)", XOTE, bpm = 90),
+        BuiltinPattern("Baião (Bongo)", BAIAO, bpm = 90),
+        BuiltinPattern("Forró (Bongo)", FORRO, bpm = 95),
+        BuiltinPattern("Xaxado (Bongo)", XAXADO, bpm = 100),
+        BuiltinPattern("Arrasta-pé (Bongo)", ARRASTA_PE, bpm = 100),
     )
 }
 

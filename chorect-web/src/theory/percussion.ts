@@ -584,13 +584,12 @@ export const TRES_TAMBORINS = builtin(
 export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "2 Tamborims, Pandeiro & Surdo", pattern: TRES_TAMBORINS, bpm: 80 },
   { name: "Partido Alto Groove", pattern: PARTIDO_ALTO_OFFICIAL, bpm: 70 },
-  { name: "Partido Alto Groove (Dec)", pattern: PARTIDO_ALTO_DEC, bpm: 70 },
   { name: "Platinelas Pandeiro — Partido Alto Groove", pattern: PARTIDO_ALTO_PLATINELAS, bpm: 70 },
-  { name: "Xote", pattern: XOTE, bpm: 90 },
-  { name: "Baião", pattern: BAIAO, bpm: 90 },
-  { name: "Forró", pattern: FORRO, bpm: 95 },
-  { name: "Xaxado", pattern: XAXADO, bpm: 100 },
-  { name: "Arrasta-pé", pattern: ARRASTA_PE, bpm: 100 },
+  { name: "Xote (Bongo)", pattern: XOTE, bpm: 90 },
+  { name: "Baião (Bongo)", pattern: BAIAO, bpm: 90 },
+  { name: "Forró (Bongo)", pattern: FORRO, bpm: 95 },
+  { name: "Xaxado (Bongo)", pattern: XAXADO, bpm: 100 },
+  { name: "Arrasta-pé (Bongo)", pattern: ARRASTA_PE, bpm: 100 },
 ];
 
 /** A one-press preset TRACK ("+ Add ▾" → presets, also the phrase "chunks" the
@@ -621,7 +620,9 @@ export const PRESET_TRACKS: PresetTrack[] = [
   { label: "Surdo — Marcação", instrument: Surdo,
     template: [1, null, null, 2, 0, null, null, 2, 1, null, null, 2, 0, null, null, 2] },
   { label: "Tamborim — Teleco-teco", instrument: Tamborim,
-    template: [3002, 0, 3002, 0, 2001, 3002, 0, 3002, 0, 3002, 0, 3002, 0, 2001, 3002, 0] },
+    // tap (3002) then muted clack (2001) at each syncopation — the clack/tap were
+    // switched at the "2"/"e" 16ths; corrected to match the Var phrases.
+    template: [3002, 0, 3002, 0, 3002, 2001, 0, 3002, 0, 3002, 0, 3002, 0, 3002, 2001, 0] },
   { label: "Tamborim — Telecoteco Var 1", instrument: Tamborim,
     template: [3002, 0, 3002, 0, 3002, 2001, 0, 3002, 0, 0, 0, 0, 0, 3002, 2001, 0] },
   { label: "Tamborim — Telecoteco Var 2", instrument: Tamborim,

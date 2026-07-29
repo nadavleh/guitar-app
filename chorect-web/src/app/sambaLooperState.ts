@@ -4,7 +4,7 @@
 
 import {
   PercussionInstrument, PercussionCatalog, basePercussionId, PresetTrack,
-  PercussionMeter, PercussionPattern, swungSlotMs, SwingModel, voiceCount, presetByLabel,
+  PercussionMeter, PercussionPattern, swungSlotMs, SwingModel, voiceCount, BUILTIN_PATTERNS,
   BEAT_UNITS, DIVISIONS, PERCUSSION_DYN_FACTORS, PERCUSSION_ACCENT,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
@@ -69,27 +69,22 @@ export function decodeBeatPatterns(s: string): SavedBeatValue | null {
 
 export class SambaLooperState {
   // Web opens with a single "Pandeiro — Reta" track at 0 % TRACK swing, so the
-  // swing-model toggle can be A/B'd immediately: raise the global swing and switch
-  // V1/V2/V3 to hear each feel on a real reta. (Android still opens clean-slate.)
-  pattern: PercussionPattern = (() => {
-    const reta = presetByLabel("Pandeiro — Reta");
-    const base = PercussionPattern.empty([]);
-    return reta ? base.withPresetTrack(reta.instrument, reta.template, 0) : base;
-  })();
+  // Open with the FIRST built-in groove loaded (both platforms).
+  pattern: PercussionPattern = BUILTIN_PATTERNS[0].pattern;
   /** Optional one-shot "opening" (entrada) played once before the loop starts. */
   opening: PercussionPattern | null = null;
   /** Which pattern the grid is editing: the loop (false) or the opening (true). */
   editingOpening = false;
   /** True while the scheduler is sounding the opening pass (drives the playhead). */
   playingOpening = false;
-  bpm = 80;
+  bpm = BUILTIN_PATTERNS[0].bpm ?? 80;
   swing = 0;
   /** Which 16th-note swing feel the beat looper uses (a test toggle; not persisted). */
   swingModel: SwingModel = SwingModel.Default;
   isPlaying = false;
   currentSlot = -1;
   /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
-  loadedName: string | null = null;
+  loadedName: string | null = BUILTIN_PATTERNS[0].name;
   /** Free-text notes attached to the current beat (saved + exported with it). */
   beatNotes = "";
 
