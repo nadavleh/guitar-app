@@ -4,7 +4,7 @@
 
 import {
   PercussionInstrument, PercussionCatalog, basePercussionId, PresetTrack,
-  PercussionMeter, PercussionPattern, swungSlotMs, SwingModel, voiceCount,
+  PercussionMeter, PercussionPattern, swungSlotMs, SwingModel, voiceCount, presetByLabel,
   BEAT_UNITS, DIVISIONS, PERCUSSION_DYN_FACTORS, PERCUSSION_ACCENT,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
@@ -68,9 +68,14 @@ export function decodeBeatPatterns(s: string): SavedBeatValue | null {
 }
 
 export class SambaLooperState {
-  // Open on a CLEAN SLATE — no tracks at all. Build a beat with ＋ Add ▾ or by
-  // tapping a groove / track preset in the side panel.
-  pattern: PercussionPattern = PercussionPattern.empty([]);
+  // Web opens with a single "Pandeiro — Reta" track at 0 % TRACK swing, so the
+  // swing-model toggle can be A/B'd immediately: raise the global swing and switch
+  // V1/V2/V3 to hear each feel on a real reta. (Android still opens clean-slate.)
+  pattern: PercussionPattern = (() => {
+    const reta = presetByLabel("Pandeiro — Reta");
+    const base = PercussionPattern.empty([]);
+    return reta ? base.withPresetTrack(reta.instrument, reta.template, 0) : base;
+  })();
   /** Optional one-shot "opening" (entrada) played once before the loop starts. */
   opening: PercussionPattern | null = null;
   /** Which pattern the grid is editing: the loop (false) or the opening (true). */
@@ -80,7 +85,7 @@ export class SambaLooperState {
   bpm = 80;
   swing = 0;
   /** Which 16th-note swing feel the beat looper uses (a test toggle; not persisted). */
-  swingModel: SwingModel = SwingModel.Anticipate;
+  swingModel: SwingModel = SwingModel.V1;
   isPlaying = false;
   currentSlot = -1;
   /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */

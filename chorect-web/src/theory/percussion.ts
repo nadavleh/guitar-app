@@ -771,30 +771,40 @@ export function loopMs(bpm: number): number {
  * model, whose bunched mid-beat notes sounded lopsided at high percentages.)
  */
 /**
- * 16th-note swing feel — mirror of Kotlin's [SwingModel] / PercussionTiming.swingOffset.
- * The `swingPercent` knob maps to a per-16th onset offset (slot units) within each beat.
- *  • Anticipate (default): 1st/2nd on grid, 3rd −0.25·s, 4th −0.4·s early.
- *  • Classic: 2nd +p, 4th −p (1st/3rd fixed); p = 0.5·s.
- *  • Variant1: 1st +p/2, 2nd +p, 3rd fixed, 4th −p/2.
- *  • Variant2: 1st/4th fixed, 2nd +p, 3rd −p/2.
- * p capped at 0.5 slot so onsets stay strictly ordered for every model.
+ * 16th-note swing feel — HEMIOLA-BASED. Mirror of Kotlin SwingModel /
+ * PercussionTiming.swingOffset. Spec: docs/superpowers/specs/2026-07-29-swing-models.md.
+ * Quarter-note beat = unit length; straight 16ths at [0,1/4,1/2,3/4]; full hemiola
+ * (p=100 %) at [0,1/3,1/2,2/3]; q = swingPercent/100 interpolates linearly. Positions:
+ *  • V1: [0, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)]
+ *  • V2: [q·(1/3−1/4)/2, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)/2]
+ *  • V3: [0, 1/4+q·(1/3−1/4), 1/2−q·(1/3−1/4)/2, 3/4]
+ * swingOffset returns SLOT-unit offsets; the 2nd-16th shift d = q/3 slot (1/12 beat).
+ * Default = V1. (The app's retired prior feel was [0,1/4,1/2−q/16,3/4−q/10].)
  */
-export enum SwingModel { Anticipate = "anticipate", Classic = "classic", Variant1 = "variant1", Variant2 = "variant2" }
+export enum SwingModel { V1 = "v1", V2 = "v2", V3 = "v3" }
 
 /** Per-16th onset offset (slot units) added to nominal position [pos] (0..3), given s∈[0,1]. */
 export function swingOffset(pos: number, s: number, model: SwingModel): number {
-  const p = s * 0.5;
+  const d = s / 3;
   switch (model) {
-    case SwingModel.Classic:  return pos === 1 ? p : pos === 3 ? -p : 0;
-    case SwingModel.Variant1: return pos === 0 ? p / 2 : pos === 1 ? p : pos === 3 ? -p / 2 : 0;
-    case SwingModel.Variant2: return pos === 1 ? p : pos === 2 ? -p / 2 : 0;
-    default:                  return pos === 2 ? -s * 0.25 : pos === 3 ? -s * 0.4 : 0;
+    case SwingModel.V2: return pos === 0 ? d / 2 : pos === 1 ? d : pos === 3 ? -d / 2 : 0;
+    case SwingModel.V3: return pos === 1 ? d : pos === 2 ? -d / 2 : 0;
+    default:            return pos === 1 ? d : pos === 3 ? -d : 0;   // V1 (hemiola)
   }
 }
 
+/** Human-readable per-16th position formulas (p = swing%/100). The one place to
+ *  read "what are the swing models" without inferring from code; kept in lock-step
+ *  with [swingOffset] and docs/superpowers/specs/2026-07-29-swing-models.md. */
+export const SWING_MODEL_FORMULA: Record<SwingModel, string> = {
+  [SwingModel.V1]: "[0,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)]",
+  [SwingModel.V2]: "[p(⅓−¼)/2,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)/2]",
+  [SwingModel.V3]: "[0,  ¼+p(⅓−¼),  ½−p(⅓−¼)/2,  ¾]",
+};
+
 export function swungSlotMs(
   slot: number, bpm: number, swingPercent: number, meter: PercussionMeter,
-  model: SwingModel = SwingModel.Anticipate,
+  model: SwingModel = SwingModel.V1,
 ): number {
   const base = slotMs(bpm, meter.division);
   if (meter.beatUnit !== 4 || meter.division !== 16) return Math.max(base, 1);

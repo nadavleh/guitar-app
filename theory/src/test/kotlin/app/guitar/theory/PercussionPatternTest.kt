@@ -380,29 +380,27 @@ class PercussionPatternTest {
         }
     }
 
-    @Test fun `full swing anticipates the 3rd and 4th 16ths and keeps the beat length`() {
+    @Test fun `full V1 swing delays the 2nd and anticipates the 4th toward hemiola`() {
         val base = PercussionTiming.slotMs(120)
         val d0 = PercussionTiming.swungSlotMs(0, 120, 100, swingMeter)  // 1st → 2nd
         val d1 = PercussionTiming.swungSlotMs(1, 120, 100, swingMeter)  // 2nd → 3rd
         val d2 = PercussionTiming.swungSlotMs(2, 120, 100, swingMeter)  // 3rd → 4th
         val d3 = PercussionTiming.swungSlotMs(3, 120, 100, swingMeter)  // 4th → next beat
-        assertEquals(base, d0)            // 2nd 16th stays on the grid (samba doesn't delay it)
-        assertTrue(d1 < base, "2nd→3rd gap $d1 should shrink (3rd comes early)")
-        assertTrue(d3 > base, "4th→beat gap $d3 should stretch (4th comes early)")
+        assertTrue(d0 > base, "1st→2nd gap $d0 should stretch (2nd delayed toward 1/3)")
+        assertTrue(d1 < base, "2nd→3rd gap $d1 should shrink")
+        assertTrue(d3 > base, "4th→beat gap $d3 should stretch (4th pulled to 2/3)")
         assertEquals(d0 + d1 + d2 + d3, base * 4)  // beat length intact
     }
 
-    @Test fun `full swing onsets sit at the samba microtiming positions`() {
-        // Onsets are cumulative slot durations; slot-unit positions [0, 1, 1.75, 2.6]
-        // (3rd 16th −0.25 slot, 4th −0.4 slot at 100 %).
+    @Test fun `full V1 swing onsets sit at the hemiola positions`() {
+        // V1 default at 100 %: the four 16ths sit at [0, 1/3, 1/2, 2/3] of the beat,
+        // i.e. slot-unit positions [0, 4/3, 2, 8/3].
         val base = PercussionTiming.slotMs(120)   // 125 ms
         fun onset(slot: Int) = (0 until slot).sumOf { PercussionTiming.swungSlotMs(it, 120, 100, swingMeter) }
-        assertEquals(0L, onset(0))                              // 1st anchored at beat start
-        assertEquals(base, onset(1))                            // 2nd anchored at 1/4
-        assertEquals(Math.round(1.75 * base), onset(2))         // 3rd anticipated
-        assertEquals(Math.round(2.60 * base), onset(3))         // 4th anticipated more
-        // the anticipation must grow through the beat: 4th shifts earlier than the 3rd
-        assertTrue((2 * base - onset(2)) < (3 * base - onset(3)))
+        assertEquals(0L, onset(0))                                 // 1st at the beat
+        assertEquals(Math.round((4.0 / 3.0) * base), onset(1))      // 2nd at 1/3
+        assertEquals(2 * base, onset(2))                            // 3rd stays at 1/2
+        assertEquals(Math.round((8.0 / 3.0) * base), onset(3))      // 4th at 2/3
     }
 
     @Test fun `swing pattern repeats every beat`() {
@@ -430,26 +428,24 @@ class PercussionPatternTest {
         assertEquals(PercussionTiming.slotMs(120, 32), PercussionTiming.swungSlotMs(1, 120, 100, thirtyseconds))
     }
 
-    @Test fun `swing offsets match each model's definition at full swing`() {
+    @Test fun `swing offsets match each hemiola model's definition at full swing`() {
         val s = 1.0
-        // Anticipate (default): 1st/2nd on grid, 3rd -0.25, 4th -0.4.
-        assertEquals(0.0, PercussionTiming.swingOffset(0, s, SwingModel.Anticipate))
-        assertEquals(0.0, PercussionTiming.swingOffset(1, s, SwingModel.Anticipate))
-        assertEquals(-0.25, PercussionTiming.swingOffset(2, s, SwingModel.Anticipate))
-        assertEquals(-0.40, PercussionTiming.swingOffset(3, s, SwingModel.Anticipate), 1e-9)
-        // Classic: 2nd +0.5, 4th -0.5 (p = 0.5 at full swing).
-        assertEquals(0.5, PercussionTiming.swingOffset(1, s, SwingModel.Classic))
-        assertEquals(-0.5, PercussionTiming.swingOffset(3, s, SwingModel.Classic))
-        // Variant1: 1st +0.25, 2nd +0.5, 3rd 0, 4th -0.25.
-        assertEquals(0.25, PercussionTiming.swingOffset(0, s, SwingModel.Variant1))
-        assertEquals(0.5, PercussionTiming.swingOffset(1, s, SwingModel.Variant1))
-        assertEquals(0.0, PercussionTiming.swingOffset(2, s, SwingModel.Variant1))
-        assertEquals(-0.25, PercussionTiming.swingOffset(3, s, SwingModel.Variant1))
-        // Variant2: 2nd +0.5, 3rd -0.25, 1st/4th fixed.
-        assertEquals(0.0, PercussionTiming.swingOffset(0, s, SwingModel.Variant2))
-        assertEquals(0.5, PercussionTiming.swingOffset(1, s, SwingModel.Variant2))
-        assertEquals(-0.25, PercussionTiming.swingOffset(2, s, SwingModel.Variant2))
-        assertEquals(0.0, PercussionTiming.swingOffset(3, s, SwingModel.Variant2))
+        val d = 1.0 / 3.0   // 2nd-16th shift toward the hemiola third (1/12 beat = 1/3 slot)
+        // V1 (hemiola): 2nd +d, 4th -d, 1st/3rd fixed.
+        assertEquals(0.0, PercussionTiming.swingOffset(0, s, SwingModel.V1))
+        assertEquals(d, PercussionTiming.swingOffset(1, s, SwingModel.V1), 1e-9)
+        assertEquals(0.0, PercussionTiming.swingOffset(2, s, SwingModel.V1))
+        assertEquals(-d, PercussionTiming.swingOffset(3, s, SwingModel.V1), 1e-9)
+        // V2: 1st +d/2, 2nd +d, 3rd fixed, 4th -d/2.
+        assertEquals(d / 2, PercussionTiming.swingOffset(0, s, SwingModel.V2), 1e-9)
+        assertEquals(d, PercussionTiming.swingOffset(1, s, SwingModel.V2), 1e-9)
+        assertEquals(0.0, PercussionTiming.swingOffset(2, s, SwingModel.V2))
+        assertEquals(-d / 2, PercussionTiming.swingOffset(3, s, SwingModel.V2), 1e-9)
+        // V3: 2nd +d, 3rd -d/2, 1st/4th fixed.
+        assertEquals(0.0, PercussionTiming.swingOffset(0, s, SwingModel.V3))
+        assertEquals(d, PercussionTiming.swingOffset(1, s, SwingModel.V3), 1e-9)
+        assertEquals(-d / 2, PercussionTiming.swingOffset(2, s, SwingModel.V3), 1e-9)
+        assertEquals(0.0, PercussionTiming.swingOffset(3, s, SwingModel.V3))
     }
 
     @Test fun `every swing model keeps slot durations strictly positive (monotonic onsets)`() {

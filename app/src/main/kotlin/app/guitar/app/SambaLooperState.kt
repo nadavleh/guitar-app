@@ -197,7 +197,7 @@ class SambaLooperState(
     /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
     var swing by mutableStateOf(0)
     /** Which 16th-note swing feel the looper uses (a test toggle; not persisted). */
-    var swingModel by mutableStateOf(app.guitar.theory.SwingModel.Anticipate)
+    var swingModel by mutableStateOf(app.guitar.theory.SwingModel.V1)
     var isPlaying by mutableStateOf(false)
         private set
 

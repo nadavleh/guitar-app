@@ -19,7 +19,7 @@ import { AppState } from "./appState";
 import {
   PercussionInstrument, PercussionPattern, voicesFor, voiceOf, BUILTIN_PATTERNS, STUDY_PATTERNS,
   PresetTrack, DIVISIONS, encodeBeatFile, decodeBeatFile, BuiltinPattern,
-  encodePhraseFile, decodePhraseFile, SwingModel,
+  encodePhraseFile, decodePhraseFile, SwingModel, SWING_MODEL_FORMULA,
 } from "../theory";
 
 /** Time signatures offered in the Time dropdown (beatsPerBar / beatUnit). */
@@ -457,14 +457,13 @@ export class SambaLooperUI {
       swingVS.input,
     ];
     if (swingActive) {
+      // Hemiola-based swing models (p = swing%/100). Formula shown for the pick.
       swingChildren.push(
-        el("div", { class: "label-sm", style: "margin-top:6px" }, ["Swing model"]),
+        el("div", { class: "label-sm", style: "margin-top:6px" }, ["Swing model  ·  p = swing%/100"]),
         el("div", { class: "row", style: "gap:6px;flex-wrap:wrap" }, [
-          modelChip("Current", SwingModel.Anticipate),
-          modelChip("Classic", SwingModel.Classic),
-          modelChip("Var 1", SwingModel.Variant1),
-          modelChip("Var 2", SwingModel.Variant2),
+          modelChip("V1", SwingModel.V1), modelChip("V2", SwingModel.V2), modelChip("V3", SwingModel.V3),
         ]),
+        el("div", { class: "mono", style: "font-size:11px;opacity:0.85;margin-top:4px" }, [SWING_MODEL_FORMULA[s.swingModel]]),
       );
     }
     wrap.appendChild(el("div", { class: "et-card", style: `background:var(--surface2);margin-top:8px` }, swingChildren));

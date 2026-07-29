@@ -876,31 +876,46 @@ private fun parseFlatJsonObject(text: String): Map<String, String>? {
 }
 
 /**
- * 16th-note swing feel. The [swingPercent] knob (0..100) maps to a per-16th onset
- * offset (in slot units) within each quarter-note beat; positions are 0,1,2,3.
+ * 16th-note swing feel — HEMIOLA-BASED. Canonical spec (formulas + rationale):
+ * docs/superpowers/specs/2026-07-29-swing-models.md. Let the quarter-note beat be
+ * unit length; the four straight 16ths sit at [0, 1/4, 1/2, 3/4]. A full hemiola
+ * (p = 100 %) puts them at [0, 1/3, 1/2, 2/3]; p interpolates linearly. With
+ * q = swingPercent/100 the played 16th positions (beat-unit) are:
  *
- *  • [Anticipate] — the app's long-standing default: 1st & 2nd on-grid, 3rd −0.25·s,
- *    4th −0.4·s early (samba "push"; s = swingPercent/100).
- *  • [Classic]  — 2nd delayed +p, 4th anticipated −p (1st & 3rd fixed); p = 0.5·s.
- *  • [Variant1] — 3rd fixed; 2nd +p; 1st +p/2 (delayed half); 4th −p/2 (early half).
- *  • [Variant2] — 1st & 4th fixed; 2nd +p; 3rd −p/2 (early, half the 2nd's delay).
+ *  • [V1] Hemiola-based: [0, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)]
+ *  • [V2]: [ q·(1/3−1/4)/2, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)/2 ]
+ *  • [V3]: [0, 1/4+q·(1/3−1/4), 1/2−q·(1/3−1/4)/2, 3/4]
  *
- * p is capped at 0.5 slot (at swingPercent=100) so onsets stay strictly ordered for
- * every model (Variant2 needs p < 2/3 slot; 0.5 is comfortably inside).
+ * (1/3−1/4 = 3/4−2/3 = 1/12 beat = 1/3 of a 16th slot.) [swingOffset] returns the
+ * offset in SLOT units: the 2nd-16th shift is d = q/3 slots; halves are d/2.
+ * All onsets stay strictly increasing for every model at every p (V3 needs the
+ * 2nd/3rd shift < 2/3 slot; d ≤ 1/3 is well inside). Default = V1.
+ *
+ * NOTE: the app's PRIOR swing (retired from the toggle) was NOT any of these — it
+ * kept the 1st & 2nd on-grid and anticipated the 3rd/4th: [0,1/4,1/2−q/16,3/4−q/10].
  */
-enum class SwingModel { Anticipate, Classic, Variant1, Variant2 }
+enum class SwingModel { V1, V2, V3 }
+
+/** Human-readable per-16th position formulas (p = swing%/100). The one place to read
+ *  "what are the swing models" without inferring from code; in lock-step with
+ *  [PercussionTiming.swingOffset] and docs/superpowers/specs/2026-07-29-swing-models.md. */
+val SWING_MODEL_FORMULA: Map<SwingModel, String> = mapOf(
+    SwingModel.V1 to "[0,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)]",
+    SwingModel.V2 to "[p(⅓−¼)/2,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)/2]",
+    SwingModel.V3 to "[0,  ¼+p(⅓−¼),  ½−p(⅓−¼)/2,  ¾]",
+)
 
 /** Loop timing helpers (kept pure so they're unit-testable on the JVM). */
 object PercussionTiming {
     /** Per-16th onset offset (slot units) added to the nominal position [pos] (0..3),
-     *  given normalized swing [s]∈[0,1]. Shared by every consumer of the swing feel. */
+     *  given normalized swing [s]∈[0,1]. Shared by every consumer of the swing feel.
+     *  d = s/3 is the 2nd-16th shift toward the hemiola third (1/12 beat = 1/3 slot). */
     fun swingOffset(pos: Int, s: Double, model: SwingModel): Double {
-        val p = s * 0.5   // "full" delay/anticipation at swingPercent=100 (half a slot)
+        val d = s / 3.0
         return when (model) {
-            SwingModel.Anticipate -> when (pos) { 2 -> -s * 0.25; 3 -> -s * 0.4; else -> 0.0 }
-            SwingModel.Classic    -> when (pos) { 1 -> p; 3 -> -p; else -> 0.0 }
-            SwingModel.Variant1   -> when (pos) { 0 -> p / 2; 1 -> p; 3 -> -p / 2; else -> 0.0 }
-            SwingModel.Variant2   -> when (pos) { 1 -> p; 2 -> -p / 2; else -> 0.0 }
+            SwingModel.V1 -> when (pos) { 1 -> d; 3 -> -d; else -> 0.0 }
+            SwingModel.V2 -> when (pos) { 0 -> d / 2; 1 -> d; 3 -> -d / 2; else -> 0.0 }
+            SwingModel.V3 -> when (pos) { 1 -> d; 2 -> -d / 2; else -> 0.0 }
         }
     }
 
@@ -932,7 +947,7 @@ object PercussionTiming {
      */
     fun swungSlotMs(
         slot: Int, bpm: Int, swingPercent: Int, meter: PercussionMeter,
-        model: SwingModel = SwingModel.Anticipate,
+        model: SwingModel = SwingModel.V1,
     ): Long {
         val base = slotMs(bpm, meter.division)
         // Swing is defined only for a quarter-note beat divided into four 16ths.
