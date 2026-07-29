@@ -376,6 +376,13 @@ class SambaLooperState(
 
     // ---- Per-track swing (see PercussionPattern.trackSwing) ----
 
+    /** Per-track swing MODEL (a track's own swing uses this; default V2). Runtime
+     *  toggle keyed by track id, like the global [swingModel]. */
+    val trackSwingModel = androidx.compose.runtime.mutableStateMapOf<String, app.guitar.theory.SwingModel>()
+    fun effectiveTrackSwingModel(id: String): app.guitar.theory.SwingModel =
+        trackSwingModel[id] ?: app.guitar.theory.SwingModel.V2
+    fun setTrackSwingModel(id: String, m: app.guitar.theory.SwingModel) { trackSwingModel[id] = m }
+
     /** The swing a track actually plays with: global overrides when nonzero. */
     fun effectiveTrackSwing(snapshot: PercussionPattern, id: String): Int =
         if (swing > 0) swing else snapshot.trackSwing[id] ?: 0
@@ -386,13 +393,16 @@ class SambaLooperState(
         commit(editPattern.withTrackSwing(inst.id, v))
     }
 
-    /** Onset shift (ms, ≤ 0) of a track's slot vs the master clock's. */
+    /** Onset shift (ms, ≤ 0) of a track's slot vs the master clock's. The track term
+     *  uses the TRACK's model (default V2); the master term uses the global one (and
+     *  is straight whenever the global swing is 0, which is when this applies). */
     private fun trackOnsetDeltaMs(snapshot: PercussionPattern, id: String, slot: Int): Long {
         val s = effectiveTrackSwing(snapshot, id)
         if (s == swing) return 0
+        val tm = effectiveTrackSwingModel(id)
         var d = 0L
         for (k in 0 until slot) {
-            d += PercussionTiming.swungSlotMs(k, bpm, s, snapshot.meter, swingModel) -
+            d += PercussionTiming.swungSlotMs(k, bpm, s, snapshot.meter, tm) -
                 PercussionTiming.swungSlotMs(k, bpm, swing, snapshot.meter, swingModel)
         }
         return d

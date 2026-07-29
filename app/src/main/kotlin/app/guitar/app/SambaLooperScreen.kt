@@ -1559,6 +1559,24 @@ private fun InstrumentRow(
                             onValueChange = { samba.setTrackSwing(instrument, it.toInt()) },
                             valueRange = 0f..100f,
                         )
+                        // Per-track swing MODEL (default V2), drives this track's own swing.
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Model  ", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            for (m in app.guitar.theory.SwingModel.entries) {
+                                FilterChip(
+                                    selected = samba.effectiveTrackSwingModel(instrument.id) == m,
+                                    onClick = { samba.setTrackSwingModel(instrument.id, m) },
+                                    label = { Text(m.name) },
+                                    modifier = Modifier.padding(end = 4.dp),
+                                )
+                            }
+                        }
+                        Text(
+                            app.guitar.theory.SWING_MODEL_FORMULA[samba.effectiveTrackSwingModel(instrument.id)] ?: "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     HorizontalDivider()
                     Text(

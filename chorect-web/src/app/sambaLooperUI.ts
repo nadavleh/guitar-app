@@ -947,12 +947,21 @@ export class SambaLooperUI {
     const swingVS = valueSlider(
       (v) => `Track swing: ${Math.round(v)}%` + (s.swing > 0 ? " (overridden by global swing)" : ""),
       0, 100, tSwing, (v) => s.setTrackSwing(inst, v));
+    // Per-track swing MODEL (default V2), toggled here; drives this track's own swing.
+    const tModelChip = (m: SwingModel) =>
+      btn(m.toUpperCase(), () => { s.setTrackSwingModel(inst.id, m); this.rerender(); },
+        s.effectiveTrackSwingModel(inst.id) === m ? "btn primary" : "btn");
     const pop = el("div", { class: "drum-voice-pop" }, [
       el("div", { style: "font-weight:600;font-size:13px" }, [volVS.label]),
       volVS.input,
       el("div", { class: "divider-line" }),
       el("div", { style: "font-weight:600;font-size:13px" }, [swingVS.label]),
       swingVS.input,
+      el("div", { class: "ans-label", style: "margin-top:6px" }, ["Track swing model"]),
+      el("div", { class: "row", style: "gap:6px;flex-wrap:wrap" }, [
+        tModelChip(SwingModel.V1), tModelChip(SwingModel.V2), tModelChip(SwingModel.V3),
+      ]),
+      el("div", { class: "mono", style: "font-size:11px;opacity:0.85" }, [SWING_MODEL_FORMULA[s.effectiveTrackSwingModel(inst.id)]]),
       el("div", { class: "divider-line" }),
       el("div", { class: "ans-label" }, ["Per-voice volume (tap name to audition)"]),
     ]);

@@ -644,6 +644,12 @@ export class SambaLooperState {
 
   // ---- Per-track swing (see PercussionPattern.trackSwing) ----
 
+  /** Per-track swing MODEL (a track's own swing uses this; default V2). Runtime
+   *  toggle keyed by track id, like the global [swingModel]. */
+  trackSwingModel = new Map<string, SwingModel>();
+  effectiveTrackSwingModel(id: string): SwingModel { return this.trackSwingModel.get(id) ?? SwingModel.V2; }
+  setTrackSwingModel(id: string, m: SwingModel) { this.trackSwingModel.set(id, m); this.notify(); }
+
   /** The swing a track actually plays with: global overrides when nonzero. */
   effectiveTrackSwing(snapshot: PercussionPattern, id: string): number {
     return this.swing > 0 ? this.swing : snapshot.trackSwingOf(id);
@@ -655,13 +661,16 @@ export class SambaLooperState {
     this.commit(this.editPattern.withTrackSwing(inst.id, v));
   }
 
-  /** Onset shift (seconds, ≤ 0) of `id`'s slot vs the master clock's. */
+  /** Onset shift (seconds, ≤ 0) of `id`'s slot vs the master clock's. The track
+   *  term uses the TRACK's model (default V2); the master term uses the global one
+   *  (and is straight whenever the global swing is 0, which is when this applies). */
   private trackOnsetDeltaSec(snapshot: PercussionPattern, id: string, slot: number): number {
     const s = this.effectiveTrackSwing(snapshot, id);
     if (s === this.swing) return 0;
+    const tm = this.effectiveTrackSwingModel(id);
     let delta = 0;
     for (let k = 0; k < slot; k++) {
-      delta += swungSlotMs(k, this.bpm, s, snapshot.meter, this.swingModel) - swungSlotMs(k, this.bpm, this.swing, snapshot.meter, this.swingModel);
+      delta += swungSlotMs(k, this.bpm, s, snapshot.meter, tm) - swungSlotMs(k, this.bpm, this.swing, snapshot.meter, this.swingModel);
     }
     return delta / 1000;
   }
