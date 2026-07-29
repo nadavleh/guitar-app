@@ -208,6 +208,9 @@ export class App {
     this.samba = new SambaLooperState({
       audio: state.audio,
       onChange: () => this.scheduleRender(),
+      // Per-tick: just repaint the playhead classes — NO full DOM rebuild — so
+      // mouse-wheel / touch scrolling stays smooth while the loop plays.
+      onPlayhead: () => this.sambaUI?.paintPlayhead(),
       getSaved: () => state.drumPatterns,
       save: (name, enc) => state.saveDrumPattern(name, enc),
       del: (name) => state.deleteDrumPattern(name),

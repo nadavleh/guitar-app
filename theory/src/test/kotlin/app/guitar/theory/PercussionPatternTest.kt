@@ -429,4 +429,40 @@ class PercussionPatternTest {
         val thirtyseconds = PercussionMeter(division = 32)
         assertEquals(PercussionTiming.slotMs(120, 32), PercussionTiming.swungSlotMs(1, 120, 100, thirtyseconds))
     }
+
+    @Test fun `swing offsets match each model's definition at full swing`() {
+        val s = 1.0
+        // Anticipate (default): 1st/2nd on grid, 3rd -0.25, 4th -0.4.
+        assertEquals(0.0, PercussionTiming.swingOffset(0, s, SwingModel.Anticipate))
+        assertEquals(0.0, PercussionTiming.swingOffset(1, s, SwingModel.Anticipate))
+        assertEquals(-0.25, PercussionTiming.swingOffset(2, s, SwingModel.Anticipate))
+        assertEquals(-0.40, PercussionTiming.swingOffset(3, s, SwingModel.Anticipate), 1e-9)
+        // Classic: 2nd +0.5, 4th -0.5 (p = 0.5 at full swing).
+        assertEquals(0.5, PercussionTiming.swingOffset(1, s, SwingModel.Classic))
+        assertEquals(-0.5, PercussionTiming.swingOffset(3, s, SwingModel.Classic))
+        // Variant1: 1st +0.25, 2nd +0.5, 3rd 0, 4th -0.25.
+        assertEquals(0.25, PercussionTiming.swingOffset(0, s, SwingModel.Variant1))
+        assertEquals(0.5, PercussionTiming.swingOffset(1, s, SwingModel.Variant1))
+        assertEquals(0.0, PercussionTiming.swingOffset(2, s, SwingModel.Variant1))
+        assertEquals(-0.25, PercussionTiming.swingOffset(3, s, SwingModel.Variant1))
+        // Variant2: 2nd +0.5, 3rd -0.25, 1st/4th fixed.
+        assertEquals(0.0, PercussionTiming.swingOffset(0, s, SwingModel.Variant2))
+        assertEquals(0.5, PercussionTiming.swingOffset(1, s, SwingModel.Variant2))
+        assertEquals(-0.25, PercussionTiming.swingOffset(2, s, SwingModel.Variant2))
+        assertEquals(0.0, PercussionTiming.swingOffset(3, s, SwingModel.Variant2))
+    }
+
+    @Test fun `every swing model keeps slot durations strictly positive (monotonic onsets)`() {
+        val m = PercussionMeter(bars = 2, beatsPerBar = 2, beatUnit = 4, division = 16)
+        for (model in SwingModel.entries) {
+            for (pct in intArrayOf(0, 25, 50, 75, 100)) {
+                for (slot in 0 until 16) {
+                    assertTrue(
+                        PercussionTiming.swungSlotMs(slot, 120, pct, m, model) >= 1L,
+                        "non-positive slot for $model @$pct% slot $slot",
+                    )
+                }
+            }
+        }
+    }
 }

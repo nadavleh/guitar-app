@@ -4,7 +4,7 @@
 
 import {
   PercussionInstrument, PercussionCatalog, basePercussionId, PresetTrack,
-  PercussionMeter, PercussionPattern, swungSlotMs, voiceCount,
+  PercussionMeter, PercussionPattern, swungSlotMs, SwingModel, voiceCount,
   BEAT_UNITS, DIVISIONS, PERCUSSION_DYN_FACTORS, PERCUSSION_ACCENT,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
@@ -16,6 +16,9 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 export interface SambaDeps {
   audio: WebAudioEngine;
   onChange: () => void;
+  /** Lightweight per-tick playhead update (no full DOM rebuild) — keeps scrolling
+   *  smooth during playback. Falls back to onChange when absent. */
+  onPlayhead?: () => void;
   getSaved: () => Map<string, string>;       // name → encoded pattern
   save: (name: string, encoded: string) => void;
   del: (name: string) => void;
@@ -76,6 +79,8 @@ export class SambaLooperState {
   playingOpening = false;
   bpm = 80;
   swing = 0;
+  /** Which 16th-note swing feel the beat looper uses (a test toggle; not persisted). */
+  swingModel: SwingModel = SwingModel.Anticipate;
   isPlaying = false;
   currentSlot = -1;
   /** Name of the most recently loaded/saved beat (for the header caption); null = unnamed. */
@@ -258,6 +263,9 @@ export class SambaLooperState {
   }
 
   private notify() { this.deps.onChange(); }
+  /** Per-tick playhead refresh: a lightweight class-only DOM update when the host
+   *  provides [onPlayhead]; otherwise a full render. Keeps scrolling smooth. */
+  private playTick() { if (this.deps.onPlayhead) this.deps.onPlayhead(); else this.notify(); }
 
   private key(instrument: PercussionInstrument, voiceIndex: number): string {
     return `${instrument.id}:${voiceIndex}`;
@@ -575,7 +583,7 @@ export class SambaLooperState {
           if (!this.isPlaying || token !== this.token) break;
           this.currentSlot = slot;
           if (first) { scheduleSlot(op, slot, 0); first = false; }
-          const slotSec = swungSlotMs(slot, this.bpm, this.swing, op.meter) / 1000;
+          const slotSec = swungSlotMs(slot, this.bpm, this.swing, op.meter, this.swingModel) / 1000;
           nextOnset += slotSec;
           // Next up: the opening's next slot, or the loop's downbeat when it ends.
           if (slot + 1 < op.slots) {
@@ -585,7 +593,7 @@ export class SambaLooperState {
             scheduleSlot(this.pattern, 0, nextOnset);
             this.schedulePlayheads(this.pattern, 0, nextOnset, token);
           }
-          this.notify();
+          this.playTick();
           await sleep(Math.max((nextOnset - this.deps.audio.now()) * 1000, 0));
         }
         this.playingOpening = false;
@@ -597,7 +605,7 @@ export class SambaLooperState {
           if (!this.isPlaying || token !== this.token) break;
           this.currentSlot = slot;
           if (first) { scheduleSlot(snapshot, slot, 0); first = false; }
-          const slotSec = swungSlotMs(slot, this.bpm, this.swing, snapshot.meter) / 1000;
+          const slotSec = swungSlotMs(slot, this.bpm, this.swing, snapshot.meter, this.swingModel) / 1000;
           nextOnset += slotSec;
           const nextSlot = (slot + 1) % snapshot.slots;
           const nextSnapshot = nextSlot === 0 ? this.pattern : snapshot;
@@ -605,7 +613,7 @@ export class SambaLooperState {
             scheduleSlot(nextSnapshot, nextSlot, nextOnset);
             this.schedulePlayheads(nextSnapshot, nextSlot, nextOnset, token);
           }
-          this.notify();
+          this.playTick();
           // Sleep till the next onset (UI playhead only — audio is already queued).
           await sleep(Math.max((nextOnset - this.deps.audio.now()) * 1000, 0));
         }
@@ -627,6 +635,7 @@ export class SambaLooperState {
 
   setBpm(v: number) { this.bpm = Math.round(v); this.notify(); }
   setSwing(v: number) { this.swing = Math.round(v); this.notify(); }
+  setSwingModel(m: SwingModel) { this.swingModel = m; this.notify(); }
 
   // ---- Per-track swing (see PercussionPattern.trackSwing) ----
 
@@ -647,7 +656,7 @@ export class SambaLooperState {
     if (s === this.swing) return 0;
     let delta = 0;
     for (let k = 0; k < slot; k++) {
-      delta += swungSlotMs(k, this.bpm, s, snapshot.meter) - swungSlotMs(k, this.bpm, this.swing, snapshot.meter);
+      delta += swungSlotMs(k, this.bpm, s, snapshot.meter, this.swingModel) - swungSlotMs(k, this.bpm, this.swing, snapshot.meter, this.swingModel);
     }
     return delta / 1000;
   }
@@ -664,7 +673,7 @@ export class SambaLooperState {
 
   private schedulePlayheads(snapshot: PercussionPattern, slot: number, onset: number, token: number) {
     if (this.swing > 0) {
-      if (this.trackPlayhead.size) { this.trackPlayhead.clear(); this.notify(); }
+      if (this.trackPlayhead.size) { this.trackPlayhead.clear(); this.playTick(); }
       return;
     }
     const groups = new Map<number, string[]>();
@@ -681,7 +690,7 @@ export class SambaLooperState {
       setTimeout(() => {
         if (token !== this.token || !this.isPlaying) return;
         for (const id of ids) this.trackPlayhead.set(id, slot);
-        this.notify();
+        this.playTick();
       }, Math.max(fireIn, 0));
     }
   }

@@ -19,7 +19,7 @@ import { AppState } from "./appState";
 import {
   PercussionInstrument, PercussionPattern, voicesFor, voiceOf, BUILTIN_PATTERNS, STUDY_PATTERNS,
   PresetTrack, DIVISIONS, encodeBeatFile, decodeBeatFile, BuiltinPattern,
-  encodePhraseFile, decodePhraseFile,
+  encodePhraseFile, decodePhraseFile, SwingModel,
 } from "../theory";
 
 /** Time signatures offered in the Time dropdown (beatsPerBar / beatUnit). */
@@ -283,6 +283,23 @@ export class SambaLooperUI {
 
   private rerender(): void { (this.samba as unknown as { deps: { onChange: () => void } }).deps.onChange(); }
 
+  /** Per-tick playhead repaint: toggle ONLY the `.playhead` class on the existing
+   *  grid cells — no DOM rebuild — so mouse-wheel / touch scrolling stays smooth
+   *  while the loop plays. Structural changes still go through a full rerender(). */
+  paintPlayhead(): void {
+    const s = this.samba;
+    const cells = document.querySelectorAll<HTMLElement>(".drum-cell[data-slot]");
+    cells.forEach((c) => {
+      const inOpening = c.dataset.sect === "o";
+      const ti = parseInt(c.dataset.track ?? "-1", 10);
+      const slot = parseInt(c.dataset.slot ?? "-1", 10);
+      const pat = inOpening ? s.opening : s.pattern;
+      const inst = pat?.instruments[ti];
+      const on = !!inst && s.isPlaying && s.playingOpening === inOpening && s.playheadSlotFor(inst) === slot;
+      c.classList.toggle("playhead", on);
+    });
+  }
+
   // ---------- PATTERN section ----------
 
   private patternSection(): HTMLElement {
@@ -430,13 +447,27 @@ export class SambaLooperUI {
       0, 100, s.swing, (v) => s.setSwing(v));
     swingVS.input.disabled = !swingActive;
     const metroBtn = btn(s.metronomeOn ? "Metronome ✓" : "Metronome", () => { s.toggleMetronome(); this.rerender(); }, s.metronomeOn ? "btn primary" : "btn");
-    wrap.appendChild(el("div", { class: "et-card", style: `background:var(--surface2);margin-top:8px` }, [
+    const modelChip = (label: string, m: SwingModel) =>
+      btn(label, () => { s.setSwingModel(m); this.rerender(); }, s.swingModel === m ? "btn primary" : "btn");
+    const swingChildren = [
       el("div", { class: "row", style: "gap:8px" }, [
         btn("Tap tempo", () => s.tapTempo()), metroBtn,
       ]),
       el("div", { class: "label-sm" }, [swingVS.label]),
       swingVS.input,
-    ]));
+    ];
+    if (swingActive) {
+      swingChildren.push(
+        el("div", { class: "label-sm", style: "margin-top:6px" }, ["Swing model"]),
+        el("div", { class: "row", style: "gap:6px;flex-wrap:wrap" }, [
+          modelChip("Current", SwingModel.Anticipate),
+          modelChip("Classic", SwingModel.Classic),
+          modelChip("Var 1", SwingModel.Variant1),
+          modelChip("Var 2", SwingModel.Variant2),
+        ]),
+      );
+    }
+    wrap.appendChild(el("div", { class: "et-card", style: `background:var(--surface2);margin-top:8px` }, swingChildren));
 
     return wrap;
   }

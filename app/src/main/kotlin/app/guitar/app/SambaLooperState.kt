@@ -196,6 +196,8 @@ class SambaLooperState(
     var bpm by mutableStateOf(80)
     /** Brazilian 16th-note swing, 0..100 % (0 = straight). */
     var swing by mutableStateOf(0)
+    /** Which 16th-note swing feel the looper uses (a test toggle; not persisted). */
+    var swingModel by mutableStateOf(app.guitar.theory.SwingModel.Anticipate)
     var isPlaying by mutableStateOf(false)
         private set
 
@@ -390,8 +392,8 @@ class SambaLooperState(
         if (s == swing) return 0
         var d = 0L
         for (k in 0 until slot) {
-            d += PercussionTiming.swungSlotMs(k, bpm, s, snapshot.meter) -
-                PercussionTiming.swungSlotMs(k, bpm, swing, snapshot.meter)
+            d += PercussionTiming.swungSlotMs(k, bpm, s, snapshot.meter, swingModel) -
+                PercussionTiming.swungSlotMs(k, bpm, swing, snapshot.meter, swingModel)
         }
         return d
     }
@@ -587,7 +589,7 @@ class SambaLooperState(
                     if (!isPlaying) break
                     currentSlot = slot
                     if (first) { scheduleSlot(op, slot, 0); first = false }
-                    val slotMs = PercussionTiming.swungSlotMs(slot, bpm, swing, op.meter)
+                    val slotMs = PercussionTiming.swungSlotMs(slot, bpm, swing, op.meter, swingModel)
                     nextOnsetNanos += slotMs * 1_000_000
                     val delayMs = ((nextOnsetNanos - System.nanoTime()) / 1_000_000).coerceAtLeast(0)
                     // Next up: the opening's next slot, or the loop's downbeat when it ends.
@@ -609,7 +611,7 @@ class SambaLooperState(
                     if (!isPlaying) break
                     currentSlot = slot
                     if (first) { scheduleSlot(snapshot, slot, 0); first = false }
-                    val slotMs = PercussionTiming.swungSlotMs(slot, bpm, swing, snapshot.meter)
+                    val slotMs = PercussionTiming.swungSlotMs(slot, bpm, swing, snapshot.meter, swingModel)
                     nextOnsetNanos += slotMs * 1_000_000
                     val nextSlot = (slot + 1) % snapshot.slots
                     val nextSnapshot = if (nextSlot == 0) pattern else snapshot

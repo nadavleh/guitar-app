@@ -875,8 +875,35 @@ private fun parseFlatJsonObject(text: String): Map<String, String>? {
     return out
 }
 
+/**
+ * 16th-note swing feel. The [swingPercent] knob (0..100) maps to a per-16th onset
+ * offset (in slot units) within each quarter-note beat; positions are 0,1,2,3.
+ *
+ *  • [Anticipate] — the app's long-standing default: 1st & 2nd on-grid, 3rd −0.25·s,
+ *    4th −0.4·s early (samba "push"; s = swingPercent/100).
+ *  • [Classic]  — 2nd delayed +p, 4th anticipated −p (1st & 3rd fixed); p = 0.5·s.
+ *  • [Variant1] — 3rd fixed; 2nd +p; 1st +p/2 (delayed half); 4th −p/2 (early half).
+ *  • [Variant2] — 1st & 4th fixed; 2nd +p; 3rd −p/2 (early, half the 2nd's delay).
+ *
+ * p is capped at 0.5 slot (at swingPercent=100) so onsets stay strictly ordered for
+ * every model (Variant2 needs p < 2/3 slot; 0.5 is comfortably inside).
+ */
+enum class SwingModel { Anticipate, Classic, Variant1, Variant2 }
+
 /** Loop timing helpers (kept pure so they're unit-testable on the JVM). */
 object PercussionTiming {
+    /** Per-16th onset offset (slot units) added to the nominal position [pos] (0..3),
+     *  given normalized swing [s]∈[0,1]. Shared by every consumer of the swing feel. */
+    fun swingOffset(pos: Int, s: Double, model: SwingModel): Double {
+        val p = s * 0.5   // "full" delay/anticipation at swingPercent=100 (half a slot)
+        return when (model) {
+            SwingModel.Anticipate -> when (pos) { 2 -> -s * 0.25; 3 -> -s * 0.4; else -> 0.0 }
+            SwingModel.Classic    -> when (pos) { 1 -> p; 3 -> -p; else -> 0.0 }
+            SwingModel.Variant1   -> when (pos) { 0 -> p / 2; 1 -> p; 3 -> -p / 2; else -> 0.0 }
+            SwingModel.Variant2   -> when (pos) { 1 -> p; 2 -> -p / 2; else -> 0.0 }
+        }
+    }
+
     /** Milliseconds of one [division]-note slot at [bpm] (a quarter-note = 4 sixteenths,
      *  so a 1/[division] note = quarter × 4 / division). */
     fun slotMs(bpm: Int, division: Int = 16): Long = (60_000L / bpm.coerceAtLeast(10)) * 4 / division
@@ -903,7 +930,10 @@ object PercussionTiming {
      * while advancing the 4th — at high percentages the middle notes bunched together
      * and the groove sounded lopsided rather than swung.)
      */
-    fun swungSlotMs(slot: Int, bpm: Int, swingPercent: Int, meter: PercussionMeter): Long {
+    fun swungSlotMs(
+        slot: Int, bpm: Int, swingPercent: Int, meter: PercussionMeter,
+        model: SwingModel = SwingModel.Anticipate,
+    ): Long {
         val base = slotMs(bpm, meter.division)
         // Swing is defined only for a quarter-note beat divided into four 16ths.
         if (meter.beatUnit != 4 || meter.division != 16) return base.coerceAtLeast(1L)
@@ -912,12 +942,8 @@ object PercussionTiming {
         // anchors (beat start, quarter-beat, beat boundary) stay exactly on grid and
         // the rounding never accumulates. The slot's duration is the gap to the next onset.
         fun onsetMs(k: Int): Long {
-            val offsetSlots = when (k % 4) {
-                0 -> 0.0              // 1st 16th: anchored on the beat
-                1 -> 1.0              // 2nd: anchored on the grid
-                2 -> 2.0 - s * 0.25   // 3rd: anticipated (early)
-                else -> 3.0 - s * 0.4 // 4th: anticipated more
-            }
+            val pos = ((k % 4) + 4) % 4
+            val offsetSlots = pos.toDouble() + swingOffset(pos, s, model)
             return Math.round(((k / 4) * 4 + offsetSlots) * base)
         }
         return (onsetMs(slot + 1) - onsetMs(slot)).coerceAtLeast(1L)

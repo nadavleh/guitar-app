@@ -770,13 +770,38 @@ export function loopMs(bpm: number): number {
  * and the loop length is preserved. (Replaces the earlier delayed-2nd/advanced-4th
  * model, whose bunched mid-beat notes sounded lopsided at high percentages.)
  */
-export function swungSlotMs(slot: number, bpm: number, swingPercent: number, meter: PercussionMeter): number {
+/**
+ * 16th-note swing feel — mirror of Kotlin's [SwingModel] / PercussionTiming.swingOffset.
+ * The `swingPercent` knob maps to a per-16th onset offset (slot units) within each beat.
+ *  • Anticipate (default): 1st/2nd on grid, 3rd −0.25·s, 4th −0.4·s early.
+ *  • Classic: 2nd +p, 4th −p (1st/3rd fixed); p = 0.5·s.
+ *  • Variant1: 1st +p/2, 2nd +p, 3rd fixed, 4th −p/2.
+ *  • Variant2: 1st/4th fixed, 2nd +p, 3rd −p/2.
+ * p capped at 0.5 slot so onsets stay strictly ordered for every model.
+ */
+export enum SwingModel { Anticipate = "anticipate", Classic = "classic", Variant1 = "variant1", Variant2 = "variant2" }
+
+/** Per-16th onset offset (slot units) added to nominal position [pos] (0..3), given s∈[0,1]. */
+export function swingOffset(pos: number, s: number, model: SwingModel): number {
+  const p = s * 0.5;
+  switch (model) {
+    case SwingModel.Classic:  return pos === 1 ? p : pos === 3 ? -p : 0;
+    case SwingModel.Variant1: return pos === 0 ? p / 2 : pos === 1 ? p : pos === 3 ? -p / 2 : 0;
+    case SwingModel.Variant2: return pos === 1 ? p : pos === 2 ? -p / 2 : 0;
+    default:                  return pos === 2 ? -s * 0.25 : pos === 3 ? -s * 0.4 : 0;
+  }
+}
+
+export function swungSlotMs(
+  slot: number, bpm: number, swingPercent: number, meter: PercussionMeter,
+  model: SwingModel = SwingModel.Anticipate,
+): number {
   const base = slotMs(bpm, meter.division);
   if (meter.beatUnit !== 4 || meter.division !== 16) return Math.max(base, 1);
   const sw = Math.min(Math.max(swingPercent, 0), 100) / 100;
   const onsetMs = (k: number): number => {
-    const pos = k % 4;
-    const offsetSlots = pos === 0 ? 0 : pos === 1 ? 1 : pos === 2 ? 2 - sw * 0.25 : 3 - sw * 0.4;
+    const pos = ((k % 4) + 4) % 4;
+    const offsetSlots = pos + swingOffset(pos, sw, model);
     return Math.round((Math.floor(k / 4) * 4 + offsetSlots) * base);
   };
   return Math.max(onsetMs(slot + 1) - onsetMs(slot), 1);

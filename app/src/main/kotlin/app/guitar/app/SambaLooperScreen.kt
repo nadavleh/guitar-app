@@ -782,6 +782,27 @@ private fun PatternSection(
                     modifier = Modifier.weight(1f),
                 )
             }
+            // ----- Swing MODEL selector (test the timing feels) -----
+            if (swingActive) {
+                Spacer(Modifier.height(4.dp))
+                Text("Swing model", style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val models = listOf(
+                        "Current" to app.guitar.theory.SwingModel.Anticipate,
+                        "Classic" to app.guitar.theory.SwingModel.Classic,
+                        "Var 1" to app.guitar.theory.SwingModel.Variant1,
+                        "Var 2" to app.guitar.theory.SwingModel.Variant2,
+                    )
+                    for ((label, m) in models) {
+                        FilterChip(
+                            selected = samba.swingModel == m,
+                            onClick = { samba.swingModel = m },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+            }
         }
     }
 }
