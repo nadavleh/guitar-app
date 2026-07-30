@@ -461,6 +461,12 @@ export function progressionKey(prog: Progression): string {
   return `${prefix}:${prog.degrees.join(",")}` + (dom.length ? `@${dom.join(",")}` : "");
 }
 
+/** A progression with NO tonic (no I/i chord = scale-degree 1) is harder to place
+ *  by ear (nothing anchors the key), so the UI marks it as a difficult one. */
+export function progressionLacksTonic(p: Progression): boolean {
+  return !p.degrees.includes(1);
+}
+
 /** Inverse of [progressionKey]; null if [key] is not a valid diatonic key. */
 export function progressionFromKey(key: string): Progression | null {
   const m = /^(maj|min):(\d+(?:,\d+)*)(?:@(\d+(?:,\d+)*))?$/.exec(key);

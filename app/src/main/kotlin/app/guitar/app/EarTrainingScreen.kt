@@ -76,6 +76,7 @@ import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
+import app.guitar.theory.Progression
 import app.guitar.theory.ProgressionSongs
 import app.guitar.theory.ResolvedChord
 import app.guitar.theory.SongExample
@@ -1456,6 +1457,18 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         }
 
         Spacer(Modifier.height(8.dp))
+
+        // What the challenge draws from (library/mode/level) — visible AND changeable
+        // mid-challenge; a change applies from the next question on.
+        Text(
+            "Drawn from  (tap to change — applies to the next question)",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+        )
+        GeneratorSummaryCard(ear, onClick = { settingsOpen = true })
+
+        Spacer(Modifier.height(8.dp))
         // BPM + strum now live in the "Playback ▾" dropdown in the section header
         // (shared by all generators & modes — tasks #4/#10).
 
@@ -2606,7 +2619,7 @@ private fun DrillView(state: AppState, ear: EarTrainingState) {
                 Column(Modifier.padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(app.guitar.theory.EarTraining.romanLineFor(prog), fontWeight = FontWeight.Bold)
+                            Text(app.guitar.theory.EarTraining.romanLineFor(prog) + tonicMark(prog), fontWeight = FontWeight.Bold)
                             Text("${if (prog.mode == app.guitar.theory.TrainingMode.Major) "Major" else "Minor"} · missed ${count}×",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -2738,6 +2751,11 @@ internal fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
 // Progression library — the pools the trainer draws from (major / minor / advanced / circle)
 // ======================================================================================
 
+/** Marker appended to a progression's Roman line when it has no tonic (no I/i): nothing
+ *  anchors the key, so it's harder to place by ear — flagged as "difficult". */
+private fun tonicMark(p: Progression): String =
+    if (EarTraining.progressionLacksTonic(p)) "   ◆ no-tonic (hard)" else ""
+
 @Composable
 private fun ProgressionLibraryDialog(state: AppState, onDismiss: () -> Unit) {
     val ear = state.earTraining
@@ -2760,7 +2778,7 @@ private fun ProgressionLibraryDialog(state: AppState, onDismiss: () -> Unit) {
             ) {
                 LibrarySection("Major (diatonic)", "Tap a progression for songs + to hear it (fixed key C major).") {
                     EarTraining.MAJOR_PROGRESSIONS.forEach { p ->
-                        LibraryRow(state, "maj:${p.degrees}", EarTraining.romanLineFor(p),
+                        LibraryRow(state, "maj:${p.degrees}", EarTraining.romanLineFor(p) + tonicMark(p),
                             ProgressionSongs.forDiatonic(p),
                             EarTraining.resolveProgression(p, PitchClass.C, ChordTypeLevel.Triads),
                             expandedKey, toggle)
@@ -2768,7 +2786,7 @@ private fun ProgressionLibraryDialog(state: AppState, onDismiss: () -> Unit) {
                 }
                 LibrarySection("Minor (diatonic)", "Fixed key A minor.") {
                     EarTraining.MINOR_PROGRESSIONS.forEach { p ->
-                        LibraryRow(state, "min:${p.degrees}", EarTraining.romanLineFor(p),
+                        LibraryRow(state, "min:${p.degrees}", EarTraining.romanLineFor(p) + tonicMark(p),
                             ProgressionSongs.forDiatonic(p),
                             EarTraining.resolveProgression(p, PitchClass.A, ChordTypeLevel.Triads),
                             expandedKey, toggle)
@@ -2778,7 +2796,7 @@ private fun ProgressionLibraryDialog(state: AppState, onDismiss: () -> Unit) {
                     LibrarySection("Minor — harmonic (V7 → i)",
                         "Major-V cadences (raised leading tone). Toggle off in the generator settings.") {
                         EarTraining.MINOR_HARMONIC_PROGRESSIONS.forEach { p ->
-                            LibraryRow(state, "minH:${p.degrees}${p.dominantBars}", EarTraining.romanLineFor(p),
+                            LibraryRow(state, "minH:${p.degrees}${p.dominantBars}", EarTraining.romanLineFor(p) + tonicMark(p),
                                 ProgressionSongs.forHarmonicMinor(p),
                                 EarTraining.resolveProgression(p, PitchClass.A, ChordTypeLevel.Triads),
                                 expandedKey, toggle)

@@ -617,6 +617,11 @@ object EarTraining {
         val dom = m.groupValues[3].takeIf { it.isNotEmpty() }?.split(",")?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
         return runCatching { Progression(mode, degrees, dom) }.getOrNull()
     }
+
+    /** A progression with no tonic (no I/i chord = scale-degree 1) has nothing
+     *  anchoring the key, so it's harder to place by ear — the UI marks these as
+     *  "difficult" in the library, the drill list and on reveal. */
+    fun progressionLacksTonic(prog: Progression): Boolean = 1 !in prog.degrees
 }
 
 /** Direction an interval is played in the interval-ID trainer. */

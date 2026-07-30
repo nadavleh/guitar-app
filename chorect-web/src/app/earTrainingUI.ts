@@ -15,8 +15,9 @@ import {
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
   parseChord, ChordShapeGenerator, CagedShape, notesFrom, midiPitchClass, fp, fpKey,
   IntervalDirection, INTERVAL_CHOICES, intervalChoiceFor,
+  Progression,
   MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, MINOR_HARMONIC_PROGRESSIONS, ADVANCED_PROGRESSIONS, ADVANCED2_PROGRESSIONS,
-  SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor, progressionFromKey,
+  SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor, progressionFromKey, progressionLacksTonic,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow,
   ResolvedChord, ChordShape, resolveProgression, resolveNamed, resolveCircleWindow,
 } from "../theory";
@@ -570,6 +571,9 @@ export class EarTrainingUI {
     ]);
     const close = () => { this.libScrollTop = 0; ear.libraryStop(); this.libraryOpen = false; this.rerender(); };
     const saveScroll = () => { this.libScrollTop = body.scrollTop; };
+    // A progression with no tonic (no I/i) has nothing anchoring the key, so it's
+    // harder to place by ear — append a marker to its row label.
+    const tonicMark = (p: Progression): string => progressionLacksTonic(p) ? "   ◆ no-tonic (hard)" : "";
 
     // Expanded detail: play/stop, fretboard toggle + follow-along board, then songs.
     const detail = (key: string, songs: SongExample[], chords: ResolvedChord[]): HTMLElement => {
@@ -623,15 +627,15 @@ export class EarTrainingUI {
       ]);
 
     body.appendChild(section("Major (diatonic)", "Tap a progression for songs + to hear it (fixed key C major).",
-      MAJOR_PROGRESSIONS.map((p) => row(`maj:${p.degrees.join(",")}`, romanLineFor(p), songsForDiatonic(p),
+      MAJOR_PROGRESSIONS.map((p) => row(`maj:${p.degrees.join(",")}`, romanLineFor(p) + tonicMark(p), songsForDiatonic(p),
         resolveProgression(p, 0, ChordTypeLevel.Triads)))));
     body.appendChild(section("Minor (diatonic)", "Fixed key A minor.",
-      MINOR_PROGRESSIONS.map((p) => row(`min:${p.degrees.join(",")}`, romanLineFor(p), songsForDiatonic(p),
+      MINOR_PROGRESSIONS.map((p) => row(`min:${p.degrees.join(",")}`, romanLineFor(p) + tonicMark(p), songsForDiatonic(p),
         resolveProgression(p, 9, ChordTypeLevel.Triads)))));
     if (ear.earHarmonicMinor) {
       body.appendChild(section("Minor — harmonic (V7 → i)", "Major-V cadences (raised leading tone). Toggle off in the generator settings.",
         MINOR_HARMONIC_PROGRESSIONS.map((p) => row(`minH:${p.degrees.join(",")}:${(p.dominantBars ?? []).join("")}`,
-          romanLineFor(p), songsForHarmonicMinor(p), resolveProgression(p, 9, ChordTypeLevel.Triads)))));
+          romanLineFor(p) + tonicMark(p), songsForHarmonicMinor(p), resolveProgression(p, 9, ChordTypeLevel.Triads)))));
     }
     body.appendChild(section("Advanced (non-diatonic)", "Characteristic examples — the signature harmonic move, not always note-for-note.",
       ADVANCED_PROGRESSIONS.map((p) => row(`adv:${p.name}`, `${p.name}:  ${namedRomanLine(p)}`, songsForAdvanced(p.name),
@@ -1003,6 +1007,10 @@ export class EarTrainingUI {
       btn("Re-roll", () => ear.rerollChallengeQuestion()),
       this.songsButton(),
     ]));
+    // What the challenge draws from (library/mode/level) — visible AND changeable
+    // mid-challenge; a change applies from the next question on.
+    parent.appendChild(labelSm("Drawn from  (tap to change — applies to the next question)"));
+    parent.appendChild(this.generatorSummaryCard(() => this.openSettingsSheet()));
     // Transpose shifts the key/chords but not the degrees, so it's safe in the challenge.
     parent.appendChild(this.transposeRow());
     parent.appendChild(this.revealCard("Key & Mode (hint)", !ear.keyRevealed,
@@ -1616,7 +1624,7 @@ export class EarTrainingUI {
       const row = el("div", { class: "et-card", style: "margin-bottom:8px" });
       row.appendChild(el("div", { style: "display:flex;align-items:center;gap:8px" }, [
         el("div", { style: "flex:1" }, [
-          el("div", { style: "font-weight:700" }, [romanLineFor(e.prog!)]),
+          el("div", { style: "font-weight:700" }, [romanLineFor(e.prog!) + (progressionLacksTonic(e.prog!) ? "   ◆ no-tonic (hard)" : "")]),
           el("div", { class: "et-muted", style: "font-size:12px" }, [`${modeName} · missed ${e.count}×`]),
         ]),
         btn(drilling ? "■ Stop" : "▶ Loop", () => { if (drilling) ear.stopDrill(); else ear.startDrill(e.key); this.rerender(); }, drilling ? "btn primary" : "btn"),
