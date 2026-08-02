@@ -566,7 +566,7 @@ object PercussionBuiltins {
         ),
         PresetTrack(
             "Pandeiro — Partido Alto Dec 1", PercussionCatalog.Pandeiro,
-            listOf(null, 102, null, 2, 0, null, 0, null, 1, null, 102, null, 2004, 0, null, 1),
+            listOf(null, 102, null, 2, 0, null, 0, null, 0, null, 102, null, 2004, 0, null, 0),
         ),
         PresetTrack(
             "Pandeiro — Partido Alto Dec 2", PercussionCatalog.Pandeiro,
@@ -591,6 +591,7 @@ object PercussionBuiltins {
         PresetTrack(
             "Pandeiro — Partido Alto Var 1", PercussionCatalog.Pandeiro,
             listOf(null, 102, null, 2, 0, 0, null, 0, 0, 0, null, 0, 0, 0, null, 0),
+            swing = 50,
             note = "RULE: whatever phrase FOLLOWS this one in a block gets an open bass " +
                 "note on beat 1 — the return to the regular partido alto. Applies to that " +
                 "instance only; the following phrase is otherwise unchanged.",

@@ -70,6 +70,8 @@ export class SambaLooperUI {
   private viewMode: "beat" | "blocks" = "beat";
   /** Blocks: cell whose phrase palette is open (tap a block cell to pick). */
   private blockPick: { track: number; col: number } | null = null;
+  /** In-flight drag of a block phrase cell (drag to reorder within its track). */
+  private blockDrag: { track: number; col: number } | null = null;
   private blockLoadOpen = false;
   private blockMergeOpen = false;
   private blockAddOpen = false;
@@ -970,14 +972,44 @@ export class SambaLooperUI {
       const content: (HTMLElement | string)[] = phrase && this.blockMiniGrid
         ? [el("div", { class: "mini-name" }, [text]), this.miniPhraseGrid(phrase, active ? b.currentSlot : -1)]
         : [text];
+      const dragging = this.blockDrag?.track === ti && this.blockDrag?.col === c;
       const cell = el("button", {
-        class: cls,
-        title: isOpening ? "Opening: plays instead of phrase 1 on the first pass only" : phrase?.note ?? "",
+        class: cls + (dragging ? " dragging" : ""),
+        title: isOpening ? "Opening: plays instead of phrase 1 on the first pass only"
+          : phrase ? (phrase.note ? phrase.note + " · " : "") + "drag to reorder" : "",
       }, content);
       cell.addEventListener("click", () => {
         this.blockPick = picking ? null : { track: ti, col: c };
         this.rerender();
       });
+      // Drag to reorder a phrase within its OWN track (columns are per instrument).
+      // The opening row (c === -1) and empty cells are not draggable; drop targets
+      // are the phrase rows of the SAME track, inserting between two others.
+      if (!isOpening && phrase) {
+        cell.draggable = true;
+        cell.addEventListener("dragstart", (e) => {
+          this.blockDrag = { track: ti, col: c };
+          e.dataTransfer?.setData("text/plain", `${ti}:${c}`);
+          if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+        });
+        cell.addEventListener("dragend", () => { this.blockDrag = null; this.rerender(); });
+      }
+      if (!isOpening) {
+        cell.addEventListener("dragover", (e) => {
+          if (this.blockDrag && this.blockDrag.track === ti && this.blockDrag.col !== c) {
+            e.preventDefault();
+            cell.classList.add("drop-into");
+          }
+        });
+        cell.addEventListener("dragleave", () => cell.classList.remove("drop-into"));
+        cell.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const d = this.blockDrag;
+          this.blockDrag = null;
+          if (d && d.track === ti && d.col !== c) { b.moveCell(ti, d.col, c); this.blockPick = null; }
+          this.rerender();
+        });
+      }
       return cell;
     };
     const headRow = el("div", { class: "block-grid-row" }, [el("div", { class: "block-rowlabel" }, [""])]);

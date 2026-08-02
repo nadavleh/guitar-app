@@ -972,6 +972,11 @@ select.et-select {
 .mini-cell.ph { box-shadow: 0 0 0 2px var(--feedback); }
 .block-cell.picking { border-color: var(--primary); border-width: 2px; }
 .block-cell.playing { border-color: var(--feedback); border-width: 2px; background: color-mix(in srgb, var(--feedback) 16%, var(--surface2)); }
+/* Drag-to-reorder a phrase within its track: the grabbed cell fades, the cell it
+   will drop into shows a heavy accent border. */
+.block-cell[draggable="true"] { cursor: grab; }
+.block-cell.dragging { opacity: 0.4; }
+.block-cell.drop-into { border-color: var(--primary); border-width: 2px; border-style: dashed; }
 
 /* Per-beat notes editor. */
 .drum-notes {

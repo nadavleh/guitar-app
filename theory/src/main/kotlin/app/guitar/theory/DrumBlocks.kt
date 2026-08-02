@@ -61,6 +61,19 @@ data class DrumBlock(
         return copy(tracks = tracks.toMutableList().also { it[track] = t.copy(cells = cells) })
     }
 
+    /** Move one track's phrase from column [fromCol] to [toCol], shifting the cells
+     *  in between (list move — reorders that track's sequence, length preserved).
+     *  Only that track is touched; the others keep their columns. */
+    fun movedCell(track: Int, fromCol: Int, toCol: Int): DrumBlock {
+        if (track !in tracks.indices) return this
+        if (fromCol == toCol || fromCol !in 0 until phraseCount || toCol !in 0 until phraseCount) return this
+        val t = tracks[track]
+        val cells = t.cells.toMutableList()
+        val ph = cells.removeAt(fromCol)
+        cells.add(toCol, ph)
+        return copy(tracks = tracks.toMutableList().also { it[track] = t.copy(cells = cells) })
+    }
+
     /** Merge with [other]: union of the two blocks' tracks. Only blocks with the
      *  same phrase count merge (all phrases share the 16-slot length); null otherwise. */
     fun mergedWith(other: DrumBlock, newName: String = "$name + ${other.name}"): DrumBlock? =

@@ -1215,6 +1215,18 @@ private fun BlocksSection(blocks: BlocksState) {
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
                 )
+                // Reorder this phrase within its track (the touch equivalent of the
+                // web's drag-to-reorder): ▲/▼ move it one step, shifting the others.
+                if (c != -1) {
+                    TextButton(
+                        onClick = { if (c > 0) { blocks.moveCell(ti, c, c - 1); pick = ti to (c - 1) } },
+                        enabled = c > 0, contentPadding = STEP_PAD,
+                    ) { Text("▲") }
+                    TextButton(
+                        onClick = { if (c < blk.phraseCount - 1) { blocks.moveCell(ti, c, c + 1); pick = ti to (c + 1) } },
+                        enabled = c < blk.phraseCount - 1, contentPadding = STEP_PAD,
+                    ) { Text("▼") }
+                }
                 TextButton(onClick = { pick = null }, contentPadding = STEP_PAD) { Text("✕") }
             }
             Spacer(Modifier.height(4.dp))

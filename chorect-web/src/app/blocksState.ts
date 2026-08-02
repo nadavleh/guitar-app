@@ -95,6 +95,12 @@ export class BlocksState {
     if (!phrase) return;
     this.setCell(track, col, { ...phrase, swing: Math.min(Math.max(Math.round(swing), 0), 100) });
   }
+  /** Drag-reorder: move a track's phrase from column `fromCol` to `toCol`. */
+  moveCell(track: number, fromCol: number, toCol: number) {
+    this.block = this.block.movedCell(track, fromCol, toCol);
+    this.notify();
+  }
+
   setPhraseCount(n: number) { this.block = this.block.withPhraseCount(n); this.notify(); }
   clear() { this.block = DrumBlock.empty(this.block.name, this.block.phraseCount); this.notify(); }
 

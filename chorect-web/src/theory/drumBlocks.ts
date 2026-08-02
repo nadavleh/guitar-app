@@ -75,6 +75,22 @@ export class DrumBlock {
     return new DrumBlock(this.name, tracks, this.phraseCount);
   }
 
+  /** Move one track's phrase from column `fromCol` to `toCol`, shifting the cells
+   *  in between (array move — reorders that track's sequence, length preserved).
+   *  Only that track is touched; the others keep their columns. */
+  movedCell(track: number, fromCol: number, toCol: number): DrumBlock {
+    if (track < 0 || track >= this.tracks.length) return this;
+    if (fromCol === toCol || fromCol < 0 || toCol < 0 || fromCol >= this.phraseCount || toCol >= this.phraseCount) return this;
+    const tracks = this.tracks.map((t, i) => {
+      if (i !== track) return t;
+      const cells = t.cells.slice();
+      const [ph] = cells.splice(fromCol, 1);
+      cells.splice(toCol, 0, ph);
+      return { ...t, cells };
+    });
+    return new DrumBlock(this.name, tracks, this.phraseCount);
+  }
+
   withName(name: string): DrumBlock { return new DrumBlock(name, this.tracks, this.phraseCount); }
 
   /** Merge with `other`: union of the two blocks' tracks. Only blocks with the

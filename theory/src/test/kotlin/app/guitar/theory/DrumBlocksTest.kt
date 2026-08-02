@@ -104,6 +104,21 @@ class DrumBlocksTest {
         assertTrue(tb.tracks[0].cells.all { it != null })   // every phrase label resolved
     }
 
+    @Test fun `movedCell reorders one track's phrases with insert semantics`() {
+        var b = DrumBlock.empty("Move", 4).withTrack(PercussionCatalog.Pandeiro).withTrack(PercussionCatalog.Tamborim)
+        // Track 0 = [teleco, pa, paVar1, null]; track 1 untouched marker at col 0.
+        b = b.withCell(0, 0, teleco).withCell(0, 1, pa).withCell(0, 2, paVar1).withCell(1, 0, teleco)
+        // Move col 2 (paVar1) to col 0 → [paVar1, teleco, pa, null].
+        val m = b.movedCell(0, 2, 0)
+        assertEquals(listOf(paVar1, teleco, pa, null), m.tracks[0].cells)
+        // The OTHER track is untouched (per-cell move, not a whole-row move).
+        assertEquals(b.tracks[1].cells, m.tracks[1].cells)
+        // No-ops: same col, out-of-range col, bad track.
+        assertEquals(b, b.movedCell(0, 1, 1))
+        assertEquals(b, b.movedCell(0, 0, 9))
+        assertEquals(b, b.movedCell(5, 0, 1))
+    }
+
     @Test fun `blocks merge only when phrase counts match`() {
         val a = DrumBlock.empty("A", 4).withTrack(PercussionCatalog.Tamborim).withCell(0, 0, teleco)
         val c = DrumBlock.empty("C", 4).withTrack(PercussionCatalog.Bongo).withCell(0, 0, pa)

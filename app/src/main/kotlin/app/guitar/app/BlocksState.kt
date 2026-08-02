@@ -148,6 +148,8 @@ class BlocksState(
         setCell(track, col, phrase.copy(swing = swing.coerceIn(0, 100)))
     }
     fun setPhraseCount(n: Int) { block = block.withPhraseCount(n) }
+    /** Drag-reorder: move a track's phrase from [fromCol] to [toCol]. */
+    fun moveCell(track: Int, fromCol: Int, toCol: Int) { block = block.movedCell(track, fromCol, toCol) }
     fun clear() { block = DrumBlock.empty(block.name, block.phraseCount) }
 
     /** Phrases available for a track's instrument (block cells are per-instrument). */
