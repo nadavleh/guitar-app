@@ -858,6 +858,25 @@ select.et-select {
   border: 1px solid var(--feedback);
   background: color-mix(in srgb, var(--feedback) 18%, transparent);
 }
+/* A selected cell being dragged shows the "grab" cursor to hint it can be moved. */
+.drum-cell.sel { cursor: grab; }
+/* Right-click context menus (Copy/Cut/Paste over a selection; Delete on a track
+   name). A transparent full-screen backdrop swallows the next click to dismiss. */
+.ctx-backdrop { position: fixed; inset: 0; z-index: 120; }
+.ctx-menu {
+  position: fixed; min-width: 120px; padding: 4px;
+  background: var(--surface2); border: 1px solid var(--outline);
+  border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.ctx-item {
+  padding: 7px 12px; border-radius: 6px; font-size: 14px; cursor: pointer;
+  color: var(--text-primary); white-space: nowrap;
+}
+.ctx-item:hover { background: var(--primary-container); color: var(--primary); }
+.ctx-item.danger { color: var(--error, #e5484d); }
+.ctx-item.danger:hover { background: color-mix(in srgb, var(--error, #e5484d) 18%, transparent); color: var(--error, #e5484d); }
+.ctx-item.disabled { opacity: 0.4; cursor: default; }
+.ctx-item.disabled:hover { background: transparent; color: var(--text-primary); }
 .drum-cell.accent { border-color: var(--feedback); font-weight: 700; font-size: 18px; }
 .drum-cells.dim { opacity: 0.4; }
 /* Quarter-note division rule between each group of four 16th cells; heavier at

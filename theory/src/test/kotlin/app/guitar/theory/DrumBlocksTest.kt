@@ -8,13 +8,15 @@ import kotlin.test.assertTrue
 class DrumBlocksTest {
 
     private val teleco = PercussionBuiltins.presetByLabel("Tamborim — Teleco-teco")!!
-    private val paVar1 = PercussionBuiltins.presetByLabel("Bongo — Partido Alto Var 1")!!
-    private val pa = PercussionBuiltins.presetByLabel("Bongo — Partido Alto")!!
+    // Two real library phrases used as generic block-cell fixtures (the bongo
+    // partido-alto phrases were removed; the return-rule test below builds its own).
+    private val paVar1 = PercussionBuiltins.presetByLabel("Pandeiro — Partido Alto Dec 1")!!
+    private val pa = PercussionBuiltins.presetByLabel("Pandeiro — Partido Alto")!!
 
     @Test fun `block edits, encode and decode round-trip`() {
         var b = DrumBlock.empty("My block", 4)
             .withTrack(PercussionCatalog.Tamborim)
-            .withTrack(PercussionCatalog.Bongo)
+            .withTrack(PercussionCatalog.Pandeiro)
         b = b.withCell(0, 0, teleco).withCell(1, 1, paVar1).withCell(1, 2, pa)
         assertEquals(2, b.tracks.size)
         assertEquals(teleco, b.tracks[0].cells[0])
@@ -55,7 +57,7 @@ class DrumBlocksTest {
     @Test fun `opening cell encodes with a caret prefix and round-trips`() {
         var b = DrumBlock.empty("Entrada block", 2)
             .withTrack(PercussionCatalog.Tamborim)
-            .withTrack(PercussionCatalog.Bongo)
+            .withTrack(PercussionCatalog.Pandeiro)
         b = b.withCell(0, 0, teleco).withCell(0, 1, teleco).withCell(1, 0, pa)
             .withOpeningCell(0, paVar1)
         assertEquals(paVar1, b.tracks[0].opening)
@@ -113,8 +115,18 @@ class DrumBlocksTest {
     }
 
     @Test fun `return rule adds an accented measure-2 stroke on beat 1`() {
-        // Partido alto's slot 0 is empty and slot 8 (measure-2 downbeat) is voice 1;
-        // following variation 1 it gains an ACCENTED voice-1 hit on slot 0.
+        // Self-contained partido-alto bongo fixtures: `pa` has slot 0 empty and slot 8
+        // (measure-2 downbeat) = voice 1; `paVar1` sets addsReturnDownbeat, so the
+        // following `pa` gains an ACCENTED voice-1 hit on slot 0.
+        val paVar1 = PercussionBuiltins.PresetTrack(
+            "PA Var 1", PercussionCatalog.Bongo,
+            listOf(null, 0, null, 0, 1, null, 1, 1, 1, null, 1, 1, 1, null, 1, 1),
+            addsReturnDownbeat = true,
+        )
+        val pa = PercussionBuiltins.PresetTrack(
+            "PA", PercussionCatalog.Bongo,
+            listOf(null, 0, null, null, 1, null, 1, null, 1, null, 0, null, null, 1, null, 1),
+        )
         val mat = materializedTemplate(pa, prev = paVar1)!!
         assertEquals(1 + PERCUSSION_ACCENT, mat[0])
         assertEquals(pa.template.drop(1), mat.drop(1))

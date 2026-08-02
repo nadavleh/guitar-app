@@ -407,7 +407,7 @@ export class App {
       marquee?.remove();
       marquee = null;
       if (dragging) suppressMenu = true;
-      else if (startedOnCell && this.sambaUI.rightClickCell(startedOnCell)) suppressMenu = true;
+      else if (startedOnCell && this.sambaUI.rightClickCellOrMenu(startedOnCell, e.clientX, e.clientY)) suppressMenu = true;
       startedOnCell = null;
     }, true);
 
@@ -416,6 +416,13 @@ export class App {
     document.addEventListener("contextmenu", (e) => {
       if (suppressMenu) { e.preventDefault(); suppressMenu = false; }
     }, true);
+
+    // Safety net: a left-drag of a cell selection (item 2) that is released off
+    // the grid never hits a cell's pointerup — finalize it here (bubble phase, so
+    // a release over a cell is handled by that cell first and this is a no-op).
+    document.addEventListener("pointerup", (e) => {
+      if (e.button === 0) this.sambaUI.finishMoveDrag();
+    });
   }
 
   /** Physical-keyboard shortcuts (web). Space toggles play/stop; arrows/number keys
@@ -450,6 +457,10 @@ export class App {
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v" && sheet === Sheet.SambaLooper) {
         if (this.sambaUI.pasteAtHover()) { e.preventDefault(); return; }
+      }
+      // Ctrl/Cmd-X cuts the selection (copy + blank the region).
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "x" && sheet === Sheet.SambaLooper) {
+        if (this.sambaUI.cutSelection()) { e.preventDefault(); return; }
       }
 
       if (e.code === "Space") {

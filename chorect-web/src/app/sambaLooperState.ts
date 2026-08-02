@@ -392,6 +392,55 @@ export class SambaLooperState {
     }
     this.commit(pat);
   }
+  /** Blank every cell of the rectangle [t0..t1] × [s0..s1] (used by Cut). */
+  clearRegion(inOpening: boolean, t0: number, t1: number, s0: number, s1: number) {
+    this.editOpening(inOpening);
+    let pat = this.editPattern;
+    for (let ti = t0; ti <= Math.min(t1, pat.instruments.length - 1); ti++) {
+      const inst = pat.instruments[ti];
+      for (let s = s0; s <= Math.min(s1, pat.slots - 1); s++) pat = pat.withCell(inst, s, null);
+    }
+    this.commit(pat);
+  }
+
+  /** Pure helper: `base` with the sub-rectangle [t0..t1]×[s0..s1] shifted by
+   *  `delta` slots — vacated source cells cleared, results clipped at the edges.
+   *  (Patterns are immutable, so `base` itself is untouched.) */
+  private movedPattern(base: PercussionPattern, rect: { t0: number; t1: number; s0: number; s1: number }, delta: number): PercussionPattern {
+    let pat = base;
+    const slots = base.slots;
+    for (let ti = rect.t0; ti <= Math.min(rect.t1, base.instruments.length - 1); ti++) {
+      const inst = base.instruments[ti];
+      const orig = base.grid.get(inst.id)!;
+      for (let s = rect.s0; s <= Math.min(rect.s1, slots - 1); s++) pat = pat.withCell(inst, s, null);
+      for (let s = rect.s0; s <= Math.min(rect.s1, slots - 1); s++) {
+        const ns = s + delta;
+        if (ns < 0 || ns >= slots) continue;
+        pat = pat.withCell(inst, ns, orig[s] ?? null);
+      }
+    }
+    return pat;
+  }
+
+  /** Live (un-committed) preview of the interactive selection drag: replace the
+   *  edited grid with `base` shifted by `delta`. No undo entry is pushed — call
+   *  [commitSelectionMove] once, on release, to record a single undo step. */
+  previewSelectionMove(inOpening: boolean, base: PercussionPattern, rect: { t0: number; t1: number; s0: number; s1: number }, delta: number) {
+    this.editOpening(inOpening);
+    const next = this.movedPattern(base, rect, delta);
+    if (this.editingOpening && this.opening) this.opening = next; else this.pattern = next;
+    this.loadedName = null;
+    this.notify();
+  }
+
+  /** Finalize the drag-move with ONE undo entry restoring the pre-drag grid. */
+  commitSelectionMove(inOpening: boolean, base: PercussionPattern, rect: { t0: number; t1: number; s0: number; s1: number }, delta: number) {
+    this.editOpening(inOpening);
+    // Reset to base so commit() records the pre-move state, then apply the move.
+    if (this.editingOpening && this.opening) this.opening = base; else this.pattern = base;
+    this.commit(this.movedPattern(base, rect, delta));
+  }
+
   clearCell(instrument: PercussionInstrument, slot: number) { this.commit(this.editPattern.withCell(instrument, slot, null)); }
   clearRow(instrument: PercussionInstrument) { this.commit(this.editPattern.clearedRow(instrument)); }
   clearAll() { this.commit(PercussionPattern.empty(this.editPattern.instruments, this.editPattern.meter)); }

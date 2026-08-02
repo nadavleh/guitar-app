@@ -89,6 +89,36 @@ export class SambaLooperUI {
   private hoverCell: { track: number; slot: number; inOpening: boolean } | null = null;
   /** Copied region (rows × slots of raw cell values). */
   private cellClipboard: (number | null)[][] | null = null;
+  /** In-flight left-drag of the current selection (item 2). `base` is the grid
+   *  snapshot at drag start; `delta` is the current horizontal shift in slots. */
+  private moveDrag: { base: PercussionPattern; rect: { inOpening: boolean; t0: number; t1: number; s0: number; s1: number }; startSlot: number; delta: number; moved: boolean } | null = null;
+  /** Right-click context menu over the selection (Copy/Cut/Paste), or null. */
+  private cellMenu: { x: number; y: number; track: number; slot: number; inOpening: boolean } | null = null;
+  /** Right-click menu on a track name (Delete track), or null. */
+  private trackMenu: { x: number; y: number; instId: string; inOpening: boolean } | null = null;
+
+  /** True if (track, slot) lies inside the current selection rectangle. */
+  private cellInSelection(track: number, slot: number, inOpening: boolean): boolean {
+    const r = this.selRect;
+    return r !== null && r.inOpening === inOpening &&
+      track >= r.t0 && track <= r.t1 && slot >= r.s0 && slot <= r.s1;
+  }
+  /** Finalize an in-flight selection drag: commit the horizontal move, or (when
+   *  it never moved — a plain click on the selection) just deselect. Called by the
+   *  cell's own pointerup and, as a safety net, by a document-level pointerup in
+   *  ui.ts for drags that end off the grid. */
+  finishMoveDrag(): void {
+    const md = this.moveDrag;
+    if (!md) return;
+    this.moveDrag = null;
+    if (md.moved && md.delta !== 0) {
+      this.samba.commitSelectionMove(md.rect.inOpening, md.base, md.rect, md.delta);
+      this.selRect = { inOpening: md.rect.inOpening, t0: md.rect.t0, t1: md.rect.t1, s0: md.rect.s0 + md.delta, s1: md.rect.s1 + md.delta };
+    } else {
+      this.selRect = null;   // a plain click on the selection deselects it (item 3)
+    }
+    this.rerender();
+  }
 
   /** Live marquee update from ui.ts: select the grid cells intersecting the
    *  viewport rect. If the rect spans both grids, the section holding most of
@@ -149,6 +179,16 @@ export class SambaLooperUI {
     return rows.length > 0;
   }
 
+  /** Ctrl+X: copy the selection, then blank it. False = nothing selected. */
+  cutSelection(): boolean {
+    const r = this.selRect;
+    if (!this.copySelection()) return false;
+    if (r) this.samba.clearRegion(r.inOpening, r.t0, r.t1, r.s0, r.s1);
+    this.selRect = null;
+    this.rerender();
+    return true;
+  }
+
   /** Ctrl+V: paste the copied region anchored at the hovered cell. */
   pasteAtHover(): boolean {
     const h = this.hoverCell, cb = this.cellClipboard;
@@ -156,6 +196,68 @@ export class SambaLooperUI {
     this.samba.editOpening(h.inOpening);
     this.samba.pasteCells(h.track, h.slot, cb);
     return true;
+  }
+
+  /** Right-click on a grid cell (no drag): if it's inside the selection, open the
+   *  Copy/Cut/Paste menu at the cursor; otherwise clear that single cell (classic).
+   *  Returns true when it handled the click (suppress the native menu). */
+  rightClickCellOrMenu(elm: HTMLElement, x: number, y: number): boolean {
+    const { sect, track, slot } = elm.dataset;
+    if (sect === undefined || track === undefined || slot === undefined) return false;
+    const inOpening = sect === "o";
+    if (this.cellInSelection(Number(track), Number(slot), inOpening)) {
+      this.cellMenu = { x, y, track: Number(track), slot: Number(slot), inOpening };
+      this.trackMenu = null;
+      this.rerender();
+      return true;
+    }
+    return this.rightClickCell(elm);
+  }
+
+  /** A floating menu at (x, y) with a full-screen backdrop that dismisses it. */
+  private floatingMenu(x: number, y: number, items: { label: string; danger?: boolean; disabled?: boolean; onClick: () => void }[]): HTMLElement {
+    const backdrop = el("div", { class: "ctx-backdrop" });
+    const menu = el("div", { class: "ctx-menu", style: `left:${x}px;top:${y}px` });
+    for (const it of items) {
+      const item = el("div", { class: "ctx-item" + (it.danger ? " danger" : "") + (it.disabled ? " disabled" : "") }, [it.label]);
+      if (!it.disabled) item.addEventListener("click", (e) => { e.stopPropagation(); it.onClick(); });
+      menu.appendChild(item);
+    }
+    const dismiss = () => { this.cellMenu = null; this.trackMenu = null; this.rerender(); };
+    backdrop.addEventListener("pointerdown", dismiss);
+    backdrop.addEventListener("contextmenu", (e) => { e.preventDefault(); dismiss(); });
+    backdrop.appendChild(menu);
+    return backdrop;
+  }
+
+  /** Copy / Cut / Paste menu shown when right-clicking inside a cell selection. */
+  private buildCellMenu(): HTMLElement {
+    const m = this.cellMenu!;
+    return this.floatingMenu(m.x, m.y, [
+      { label: "Copy", onClick: () => { this.copySelection(); this.cellMenu = null; this.rerender(); } },
+      { label: "Cut", onClick: () => { this.cellMenu = null; this.cutSelection(); } },
+      { label: "Paste", disabled: this.cellClipboard === null, onClick: () => {
+          this.hoverCell = { track: m.track, slot: m.slot, inOpening: m.inOpening };
+          this.pasteAtHover();
+          this.cellMenu = null;
+          this.rerender();
+        } },
+    ]);
+  }
+
+  /** Track-name menu (item 6): Delete track, without deleting on the click itself. */
+  private buildTrackMenu(): HTMLElement {
+    const m = this.trackMenu!;
+    return this.floatingMenu(m.x, m.y, [
+      { label: "Delete track", danger: true, onClick: () => {
+          const s = this.samba;
+          s.editOpening(m.inOpening);
+          const inst = s.editPattern.instruments.find((i) => i.id === m.instId);
+          if (inst) s.removeInstrument(inst);
+          this.trackMenu = null;
+          this.rerender();
+        } },
+    ]);
   }
 
   constructor(
@@ -235,6 +337,8 @@ export class SambaLooperUI {
 
     container.appendChild(screen);
     if (this.toneSheetOpen) container.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.rerender(); }));
+    if (this.cellMenu) container.appendChild(this.buildCellMenu());
+    if (this.trackMenu) container.appendChild(this.buildTrackMenu());
 
     // Restore the side panel's scroll position (rebuilt fresh on every rerender).
     const side = screen.querySelector<HTMLElement>(".drum-side");
@@ -572,7 +676,7 @@ export class SambaLooperUI {
     // overrides it — global > 0 wins).
     const tSwing = pat.trackSwingOf(inst.id);
     const swingBadge = tSwing > 0 ? ` ~${tSwing}%` : "";
-    const name = el("span", { class: selected ? "name track-sel" : "name", title: "tap to select · drag to reorder · right-click to remove" },
+    const name = el("span", { class: selected ? "name track-sel" : "name", title: "tap to select · drag to reorder · right-click for options" },
       [inst.displayName + (selected ? " ✓" : "")]);
     if (swingBadge) {
       name.appendChild(el("span", {
@@ -582,8 +686,15 @@ export class SambaLooperUI {
     }
     // Tap the name to select the track — opens the voice palette at the bottom.
     name.addEventListener("click", () => { this.openVoiceMenu = null; s.editOpening(inOpening); s.selectTrack(inst.id); });
-    // Right-click the track name to remove it.
-    name.addEventListener("contextmenu", (e) => { e.preventDefault(); this.openVoiceMenu = null; s.editOpening(inOpening); s.removeInstrument(inst); this.rerender(); });
+    // Right-click the track name opens a small menu (Delete track) instead of
+    // deleting it outright (item 6).
+    name.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      this.openVoiceMenu = null;
+      this.cellMenu = null;
+      this.trackMenu = { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY, instId: inst.id, inOpening };
+      this.rerender();
+    });
     const labelInner = el("div", {}, [name]);
     if (this.openVoiceMenu === inst.id && s.editingOpening === inOpening) labelInner.appendChild(this.voicePopup(inst));
 
@@ -679,13 +790,21 @@ export class SambaLooperUI {
     }, [voice !== null ? voiceOf(inst, voice).glyph : ""]);
 
     // tap = cycle/erase/accent; long-press = clear. The RIGHT button is handled
-    // app-wide (ui.ts setupMarquee): drag = rectangle selection, plain click on
-    // a cell = clear. Any edit first targets this cell's section.
+    // app-wide (ui.ts setupMarquee): drag = rectangle selection, plain click on a
+    // cell = clear or (inside a selection) the Copy/Cut/Paste menu. LEFT button:
+    // pressing INSIDE a selection starts a drag-move (item 2); a plain left click
+    // otherwise dismisses the selection (item 3) and paints as usual.
     let longPressed = false;
     let timer: number | undefined;
     c.addEventListener("pointerdown", (e) => {
       if ((e as PointerEvent).button !== 0) return;
-      // A left-click anywhere dismisses an existing selection.
+      // Grab-and-slide the selection: press on a selected cell begins a move.
+      if (this.cellInSelection(trackIndex, slot, inOpening)) {
+        s.editOpening(inOpening);
+        this.moveDrag = { base: s.editPattern, rect: { ...this.selRect! }, startSlot: slot, delta: 0, moved: false };
+        return;
+      }
+      // A left-click outside the selection dismisses it (then paints normally).
       if (this.selRect) { this.selRect = null; this.rerender(); }
       longPressed = false;
       timer = window.setTimeout(() => { longPressed = true; s.editOpening(inOpening); s.clearCell(inst, slot); }, LONG_PRESS_MS);
@@ -693,9 +812,25 @@ export class SambaLooperUI {
     const cancel = () => { if (timer) { clearTimeout(timer); timer = undefined; } };
     c.addEventListener("pointerenter", () => {
       this.hoverCell = { track: trackIndex, slot, inOpening };
+      // While dragging a selection, slide it to follow the cursor (clamped so the
+      // whole block stays on the grid).
+      const md = this.moveDrag;
+      if (md) {
+        const maxRight = s.editPattern.slots - 1 - md.rect.s1;
+        const d = Math.max(-md.rect.s0, Math.min(maxRight, slot - md.startSlot));
+        if (d !== md.delta) {
+          md.delta = d;
+          md.moved = true;
+          s.previewSelectionMove(md.rect.inOpening, md.base, md.rect, d);
+          this.selRect = { inOpening: md.rect.inOpening, t0: md.rect.t0, t1: md.rect.t1, s0: md.rect.s0 + d, s1: md.rect.s1 + d };
+          this.rerender();
+        }
+      }
     });
     c.addEventListener("pointerup", (e) => {
       if ((e as PointerEvent).button !== 0) return;
+      // Finish a selection drag: commit the move, or (no movement) deselect.
+      if (this.moveDrag) { this.finishMoveDrag(); return; }
       cancel();
       if (longPressed) return;
       s.editOpening(inOpening);
@@ -707,7 +842,16 @@ export class SambaLooperUI {
       else s.toggleSlot(inst, slot);
     });
     c.addEventListener("pointerleave", cancel);
-    c.addEventListener("pointercancel", cancel);
+    c.addEventListener("pointercancel", () => {
+      cancel();
+      const md = this.moveDrag;
+      if (md) {
+        this.moveDrag = null;
+        s.previewSelectionMove(md.rect.inOpening, md.base, md.rect, 0);   // revert live preview
+        this.selRect = { ...md.rect };
+        this.rerender();
+      }
+    });
     return c;
   }
 

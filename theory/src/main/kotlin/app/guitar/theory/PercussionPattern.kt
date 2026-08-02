@@ -549,28 +549,6 @@ object PercussionBuiltins {
             "Tamborim — Entrada 2", PercussionCatalog.Tamborim,
             listOf(0, 3002, 0, 3002, 0, 3002, 0, 3002, 0, 3002, 0, 3002, 0, 3002, 2001, 0),
         ),
-        PresetTrack(
-            "Bongo — Partido Alto", PercussionCatalog.Bongo,
-            listOf(null, 0, null, null, 1, null, 1, null, 1, null, 0, null, null, 1, null, 1),
-        ),
-        PresetTrack(
-            "Bongo — Partido Alto Var 1", PercussionCatalog.Bongo,
-            listOf(null, 0, null, 0, 1, null, 1, 1, 1, null, 1, 1, 1, null, 1, 1),
-            note = "RULE: when returning to the regular partido alto after this variation, " +
-                "the partido alto gets a strong beat on beat 1 of measure 1 — the same stroke " +
-                "as its measure-2 downbeat (doesn't occur normally).",
-            addsReturnDownbeat = true,
-        ),
-        PresetTrack(
-            "Bongo — Partido Alto Var 2", PercussionCatalog.Bongo,
-            listOf(null, 0, null, 0, 1, null, 0, null, 2, 1, null, 1, null, 1, null, 1),
-        ),
-        PresetTrack(
-            "Bongo — Partido Alto Opening", PercussionCatalog.Bongo,
-            listOf(null, null, 0, null, 1, null, 1, null, 1, null, 0, null, 3, 1, null, 1),
-            note = "One-shot entrada into the partido alto — use as an opening (▶¹) " +
-                "before the groove.",
-        ),
         // From Nadav's own recording + his authored dynamics (pandeiro.chorect.json):
         // bass closed (accented), finger closed @50%, heel closed @50%, slap |
         // bass open, finger open, heel open, finger open — bar 2's taps at full.
@@ -594,9 +572,38 @@ object PercussionBuiltins {
             "Pandeiro — Partido Alto Dec 2", PercussionCatalog.Pandeiro,
             listOf(null, 102, null, 2, 0, 2004, 0, 2004, 1, null, 102, null, 2002, 0, 2004, 1),
         ),
+        // From Nadav's export pandeiro_partido_alto_2_4.
         PresetTrack(
             "Pandeiro — Partido Alto Dec 3", PercussionCatalog.Pandeiro,
+            listOf(null, 102, 7, 2, 0, null, 0, null, 1, null, 102, 7, 2004, 0, null, 1),
+        ),
+        // From Nadav's export pandeiro_partido_alto_2_5.
+        PresetTrack(
+            "Pandeiro — Partido Alto Dec 4", PercussionCatalog.Pandeiro,
+            listOf(null, 102, 2007, 2, 0, 2004, 0, 2004, 0, null, 102, 7, 1002, 0, 2004, 0),
+        ),
+        // Was "Dec 3" — the fully-decorated variant with opening bass strokes (renumbered).
+        PresetTrack(
+            "Pandeiro — Partido Alto Dec 5", PercussionCatalog.Pandeiro,
             listOf(2005, 102, 2007, 2, 0, 2004, 0, 2004, 0, 2005, 102, 7, 1002, 0, 2004, 0),
+        ),
+        // From Nadav's export pandeiro_partido_alto_var_1.
+        PresetTrack(
+            "Pandeiro — Partido Alto Var 1", PercussionCatalog.Pandeiro,
+            listOf(null, 102, null, 2, 0, 0, null, 0, 0, 0, null, 0, 0, 0, null, 0),
+        ),
+        // From Nadav's export pandeiro_partido_alto_var_2.
+        PresetTrack(
+            "Pandeiro — Partido Alto Var 2", PercussionCatalog.Pandeiro,
+            listOf(null, 102, null, 2, 0, null, 2, null, 4, 0, null, 0, null, 0, null, 0),
+        ),
+        // A copy of the regular "Pandeiro — Partido Alto" with the first slap moved
+        // one 16th right — from the "e of 1" (slot 1) to the "& of 1" (slot 2) — as
+        // an entrada/opening figure.
+        PresetTrack(
+            "Pandeiro — Partido Alto Entrada", PercussionCatalog.Pandeiro,
+            listOf(null, null, 2, null, 0, null, 0, null, 0, null, 2, null, null, 0, null, 0),
+            note = "Opening figure — the regular partido alto with the first slap on the & of 1.",
         ),
         // Samba 1's agogô bells (low ▼ / high ▲) — usually mixed quiet (track volume).
         PresetTrack(
