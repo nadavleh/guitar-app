@@ -10,7 +10,7 @@
 // column c+1 on the straight clock.
 
 import {
-  PercussionInstrument, PercussionCatalog, PERCUSSION_ACCENT, PRESET_TRACKS,
+  PercussionInstrument, PercussionCatalog, PRESET_TRACKS,
   PresetTrack, presetByLabel, basePercussionId,
 } from "./percussion";
 
@@ -240,18 +240,20 @@ export function mergedPresets(custom: Iterable<PresetTrack>): PresetTrack[] {
   return [...byLabel.values()];
 }
 
+/** The stroke the return rule writes on beat 1: an open bass note (voice 0). */
+const RETURN_DOWNBEAT_VOICE = 0;
+
 /**
  * The 16-slot template a block cell actually plays: applies the RETURN RULE —
- * when the PREVIOUS column's phrase (wrapping around the loop) declares
- * `addsReturnDownbeat` and this phrase's slot 0 is empty, slot 0 gains this
- * phrase's measure-2 downbeat stroke (slot 8), accented.
+ * when the PREVIOUS column's phrase in this track (wrapping around the loop)
+ * declares `addsReturnDownbeat`, slot 0 (beat 1) is forced to an OPEN BASS note
+ * (voice 0) for THIS instance only, no matter which phrase follows. The library
+ * phrase is never mutated — play it after any other phrase and it's unaltered.
  */
 export function materializedTemplate(phrase: PresetTrack | null, prev: PresetTrack | null): (number | null)[] | null {
   if (!phrase) return null;
-  if (!prev?.addsReturnDownbeat || phrase.template[0] != null) return phrase.template;
-  const m2 = phrase.template[8];
-  if (m2 == null) return phrase.template;
+  if (!prev?.addsReturnDownbeat) return phrase.template;
   const out = phrase.template.slice();
-  out[0] = (m2 % PERCUSSION_ACCENT) + PERCUSSION_ACCENT;
+  out[0] = RETURN_DOWNBEAT_VOICE;
   return out;
 }

@@ -114,26 +114,25 @@ class DrumBlocksTest {
         assertNull(a.mergedWith(DrumBlock.empty("D", 3)))
     }
 
-    @Test fun `return rule adds an accented measure-2 stroke on beat 1`() {
-        // Self-contained partido-alto bongo fixtures: `pa` has slot 0 empty and slot 8
-        // (measure-2 downbeat) = voice 1; `paVar1` sets addsReturnDownbeat, so the
-        // following `pa` gains an ACCENTED voice-1 hit on slot 0.
-        val paVar1 = PercussionBuiltins.PresetTrack(
-            "PA Var 1", PercussionCatalog.Bongo,
-            listOf(null, 0, null, 0, 1, null, 1, 1, 1, null, 1, 1, 1, null, 1, 1),
+    @Test fun `return rule forces an open bass on beat 1 of the following phrase`() {
+        // A phrase flagged addsReturnDownbeat rewrites slot 0 (beat 1) of WHATEVER
+        // phrase follows it to an open bass note (voice 0) — for that instance only.
+        val flagged = PercussionBuiltins.PresetTrack(
+            "PA Var 1", PercussionCatalog.Pandeiro,
+            listOf(null, 102, null, 2, 0, 0, null, 0, 0, 0, null, 0, 0, 0, null, 0),
             addsReturnDownbeat = true,
         )
-        val pa = PercussionBuiltins.PresetTrack(
-            "PA", PercussionCatalog.Bongo,
-            listOf(null, 0, null, null, 1, null, 1, null, 1, null, 0, null, null, 1, null, 1),
+        // A follower whose slot 0 is OCCUPIED — the rule overwrites it (unconditional).
+        val follower = PercussionBuiltins.PresetTrack(
+            "Follower", PercussionCatalog.Pandeiro,
+            listOf(2005, 102, 2007, 2, 0, 2004, 0, 2004, 0, 2005, 102, 7, 1002, 0, 2004, 0),
         )
-        val mat = materializedTemplate(pa, prev = paVar1)!!
-        assertEquals(1 + PERCUSSION_ACCENT, mat[0])
-        assertEquals(pa.template.drop(1), mat.drop(1))
-        // No rule → template unchanged; rule but occupied slot 0 → unchanged.
-        assertEquals(pa.template, materializedTemplate(pa, prev = teleco))
-        assertEquals(teleco.template, materializedTemplate(teleco, prev = paVar1))
-        assertNull(materializedTemplate(null, prev = paVar1))
+        val mat = materializedTemplate(follower, prev = flagged)!!
+        assertEquals(0, mat[0])                                // open bass (voice 0)
+        assertEquals(follower.template.drop(1), mat.drop(1))   // everything else untouched
+        // No flag on prev → the phrase is returned unaltered (library never mutated).
+        assertEquals(follower.template, materializedTemplate(follower, prev = teleco))
+        assertNull(materializedTemplate(null, prev = flagged))
     }
 
     @Test fun `per-slot dynamics cycle, survive voice cycling, and round-trip`() {

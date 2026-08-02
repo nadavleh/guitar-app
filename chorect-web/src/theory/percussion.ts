@@ -669,7 +669,11 @@ export const PRESET_TRACKS: PresetTrack[] = [
     template: [2005, 102, 2007, 2, 0, 2004, 0, 2004, 0, 2005, 102, 7, 1002, 0, 2004, 0] },
   // From Nadav's export pandeiro_partido_alto_var_1.
   { label: "Pandeiro — Partido Alto Var 1", instrument: Pandeiro,
-    template: [null, 102, null, 2, 0, 0, null, 0, 0, 0, null, 0, 0, 0, null, 0] },
+    template: [null, 102, null, 2, 0, 0, null, 0, 0, 0, null, 0, 0, 0, null, 0],
+    note: "RULE: whatever phrase FOLLOWS this one in a block gets an open bass note on " +
+      "beat 1 — the return to the regular partido alto. Applies to that instance only; " +
+      "the following phrase is otherwise unchanged.",
+    addsReturnDownbeat: true },
   // From Nadav's export pandeiro_partido_alto_var_2.
   { label: "Pandeiro — Partido Alto Var 2", instrument: Pandeiro,
     template: [null, 102, null, 2, 0, null, 2, null, 4, 0, null, 0, null, 0, null, 0] },

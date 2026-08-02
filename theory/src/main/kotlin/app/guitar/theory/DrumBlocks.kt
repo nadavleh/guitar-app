@@ -189,15 +189,19 @@ fun mergedPresets(custom: Collection<PresetTrack>): List<PresetTrack> {
     return byLabel.values.toList()
 }
 
+/** The stroke the return rule writes on beat 1: an open bass note (voice 0). */
+private const val RETURN_DOWNBEAT_VOICE = 0
+
 /**
  * The 16-slot template a block cell actually plays: applies the RETURN RULE —
- * when the PREVIOUS column's phrase (wrapping around the loop) declares
- * [PresetTrack.addsReturnDownbeat] and this phrase's slot 0 is empty, slot 0
- * gains this phrase's measure-2 downbeat stroke (slot 8), accented.
+ * when the PREVIOUS column's phrase in this track (wrapping around the loop)
+ * declares [PresetTrack.addsReturnDownbeat], slot 0 (beat 1) is forced to an
+ * OPEN BASS note (voice 0) for THIS instance only, no matter which phrase
+ * follows. The library phrase is never mutated — play it after any other phrase
+ * and it is unaltered.
  */
 fun materializedTemplate(phrase: PresetTrack?, prev: PresetTrack?): List<Int?>? {
     if (phrase == null) return null
-    if (prev?.addsReturnDownbeat != true || phrase.template.getOrNull(0) != null) return phrase.template
-    val m2 = phrase.template.getOrNull(8) ?: return phrase.template
-    return phrase.template.toMutableList().also { it[0] = (m2 % PERCUSSION_ACCENT) + PERCUSSION_ACCENT }
+    if (prev?.addsReturnDownbeat != true) return phrase.template
+    return phrase.template.toMutableList().also { it[0] = RETURN_DOWNBEAT_VOICE }
 }
