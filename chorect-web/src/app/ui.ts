@@ -250,7 +250,7 @@ export class App {
     this.rhythmUnitsUI = new RhythmUnitsUI(this.rhythmUnits, this.rhythmPhrase, () => state.closeSheet(), () => this.scheduleRender());
     this.metronome = new MetronomeState({ audio: state.audio, onChange: () => this.scheduleRender() });
     this.metronomeUI = new MetronomeUI(this.metronome, () => state.closeSheet(), () => this.scheduleRender());
-    this.theoryUI = new TheoryUI(() => state.closeSheet());
+    this.theoryUI = new TheoryUI(this.ear, () => state.closeSheet(), () => this.scheduleRender());
     this.decomposeUI = new DecomposeUI(state, this.ear, () => state.closeSheet(), (symbols) => {
       this.loop.loadProgressionIntoLoop(symbols);
       state.openSheet(Sheet.Loop);

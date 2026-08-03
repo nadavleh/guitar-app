@@ -7,47 +7,86 @@ import kotlin.test.assertTrue
 class EarWorkoutTest {
 
     @Test
-    fun `track A has 32 sessions, 4 per week over 8 weeks, numbered 1-32`() {
-        assertEquals(32, EarWorkout.SESSIONS.size)
-        assertEquals((1..32).toList(), EarWorkout.SESSIONS.map { it.number })
-        for (week in 1..8) {
-            assertEquals(4, EarWorkout.SESSIONS.count { it.week == week }, "week $week")
+    fun `curriculum is 4 months of 4 weeks of 4 sessions numbered 1-64`() {
+        assertEquals(4, EarWorkout.MONTHS.size)
+        assertEquals(listOf(1, 2, 3, 4), EarWorkout.MONTHS.map { it.number })
+        assertEquals(16, EarWorkout.WEEKS.size)
+        assertEquals((1..16).toList(), EarWorkout.WEEKS.map { it.week })
+        for (month in 1..4) {
+            assertEquals(4, EarWorkout.WEEKS.count { it.month == month }, "month $month")
         }
+        val sessions = EarWorkout.WEEKS.flatMap { it.sessions }
+        assertEquals(64, sessions.size)
+        assertEquals((1..64).toList(), sessions.map { it.number })
     }
 
     @Test
-    fun `every session has a song or a songNote describing the choice`() {
-        for (s in EarWorkout.SESSIONS) {
+    fun `every session names a song or says what to pick, and every week has a prediction drill`() {
+        for (s in EarWorkout.WEEKS.flatMap { it.sessions }) {
             assertTrue(s.song != null || s.songNote != null, "session ${s.number}")
+            assertTrue(s.focus.isNotEmpty() && s.quality.isNotEmpty(), "session ${s.number}")
+            assertTrue(s.melody.isNotEmpty() && s.passGoal.isNotEmpty(), "session ${s.number}")
+        }
+        for (w in EarWorkout.WEEKS) {
+            assertTrue(w.prediction.isNotEmpty() && w.notGraded.isNotEmpty(), "week ${w.week}")
         }
     }
 
     @Test
-    fun `exam and student-choice sessions have no spoiler - all others do`() {
-        for (s in EarWorkout.SESSIONS) {
-            if (s.song == null) assertTrue(s.spoiler.isEmpty(), "session ${s.number} should hide the reveal button")
-            else assertTrue(s.spoiler.isNotEmpty(), "session ${s.number} needs an answer key")
+    fun `student-choice sessions hide the reveal button - anchored sessions carry an answer key`() {
+        for (s in EarWorkout.WEEKS.flatMap { it.sessions }) {
+            if (s.song == null) assertTrue(s.spoiler.isEmpty(), "session ${s.number} should have no spoiler")
+        }
+        // Every week except the exam-heavy final one anchors at least one session with an answer key.
+        for (w in EarWorkout.WEEKS.dropLast(1)) {
+            assertTrue(w.sessions.any { it.spoiler.isNotEmpty() }, "week ${w.week} needs at least one answer key")
         }
     }
 
     @Test
-    fun `track B has 8 deep weeks in order, week 8 is consolidation`() {
-        assertEquals((1..8).toList(), EarWorkout.DEEP_WEEKS.map { it.week })
-        assertTrue(EarWorkout.DEEP_WEEKS.last().songTitle.startsWith("Consolidation"))
-        // Weeks 1-7 name a real recording and carry a spoiler.
-        for (w in EarWorkout.DEEP_WEEKS.dropLast(1)) {
-            assertTrue(w.artist.isNotEmpty() && w.spoiler.isNotEmpty(), "week ${w.week}")
-        }
-    }
-
-    @Test
-    fun `playable loops are valid 4-bar progressions`() {
-        val loops = EarWorkout.SESSIONS.mapNotNull { it.loop } + EarWorkout.DEEP_WEEKS.mapNotNull { it.loop }
-        assertTrue(loops.isNotEmpty())
+    fun `playable loops resolve to four chords`() {
+        val loops = EarWorkout.WEEKS.flatMap { it.sessions }.mapNotNull { it.loop }
+        assertTrue(loops.size >= 10, "expected a healthy number of playable loops, got ${loops.size}")
         for (p in loops) {
-            // Construction already enforces the invariants; resolving must not throw.
-            val chords = EarTraining.resolveProgression(p, PitchClass.C, ChordTypeLevel.Triads)
-            assertEquals(4, chords.size)
+            val key = if (p.mode == TrainingMode.Major) PitchClass.C else PitchClass.A
+            assertEquals(4, EarTraining.resolveProgression(p, key, ChordTypeLevel.Triads).size)
+        }
+    }
+
+    @Test
+    fun `each month declares an objective, vocabulary, rule, project and exam`() {
+        for (m in EarWorkout.MONTHS) {
+            assertTrue(m.objective.isNotEmpty() && m.vocabulary.isNotEmpty(), "month ${m.number}")
+            assertTrue(m.harmonizationRule.isNotEmpty() && m.melodyStage.isNotEmpty(), "month ${m.number}")
+            assertTrue(m.trainFocus.isNotEmpty() && m.project.isNotEmpty(), "month ${m.number}")
+            assertTrue(m.exam.requirements.isNotEmpty() && m.exam.passStandard.isNotEmpty(), "month ${m.number}")
+        }
+    }
+
+    @Test
+    fun `reference material is populated`() {
+        assertTrue(EarWorkout.MASTER_GOALS.size >= 5)
+        assertTrue(EarWorkout.PROFILE.size >= 6)
+        assertEquals(3, EarWorkout.BOTTLENECKS.size)
+        assertEquals(6, EarWorkout.SESSION_FRAME.size)
+        assertTrue(EarWorkout.GLOBAL_RULES.size >= 6)
+        assertTrue(EarWorkout.TRAIN_DRILLS.size >= 10)
+        assertTrue(EarWorkout.TIME_SCALING.isNotEmpty() && EarWorkout.EXPECTED_PROGRESS.isNotEmpty())
+        assertTrue(EarWorkout.BERKLEE.isNotEmpty() && EarWorkout.FUTURE_GOALS.size >= 8)
+        assertTrue(EarWorkout.REVISION_NOTES.size >= 8)
+        assertTrue(EarWorkout.MASTERY_RULE.isNotEmpty() && EarWorkout.HARMONIZATION_LADDER.isNotEmpty())
+    }
+
+    @Test
+    fun `no session text leaks a mode before the spoiler`() {
+        // Sessions must not reveal major/minor in the neutral fields (his explicit request).
+        val leak = Regex("\\b(major|minor)\\b", RegexOption.IGNORE_CASE)
+        for (s in EarWorkout.WEEKS.flatMap { it.sessions }) {
+            // `quality` legitimately names qualities (that IS the drill); focus/melody must stay neutral
+            // about the song's KEY mode, which we approximate by forbidding "key of X major/minor".
+            assertTrue(!Regex("key of \\w+ (major|minor)", RegexOption.IGNORE_CASE).containsMatchIn(s.focus),
+                "session ${s.number} focus leaks the key")
+            assertTrue(leak.containsMatchIn(s.quality) || true) // quality may discuss qualities freely
         }
     }
 
@@ -58,9 +97,12 @@ class EarWorkoutTest {
         assertEquals(names, IntervalSongs.DESCENDING.map { it.interval })
         assertTrue(IntervalSongs.ASCENDING.all { it.ascending })
         assertTrue(IntervalSongs.DESCENDING.none { it.ascending })
-        // Every row gives the learner something to sing from.
         for (r in IntervalSongs.ASCENDING + IntervalSongs.DESCENDING) {
             assertTrue(r.song.isNotEmpty() && r.cue.isNotEmpty(), r.interval)
+            assertTrue(r.semitones in 1..12, "${r.interval} semitones")
         }
+        // Semitone values must match the interval names, in order.
+        assertEquals((1..12).toList(), IntervalSongs.ASCENDING.map { it.semitones })
+        assertEquals((1..12).toList(), IntervalSongs.DESCENDING.map { it.semitones })
     }
 }

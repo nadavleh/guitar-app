@@ -2496,7 +2496,7 @@ private fun IntervalGuessChips(ear: EarTrainingState, enabled: Boolean) {
 private fun IntervalsView(ear: EarTrainingState) {
     // "♪ Song refs" — the interval→song reference sheet (same content as the Theory tab).
     var refsOpen by remember { mutableStateOf(false) }
-    if (refsOpen) IntervalRefsDialog(onDismiss = { refsOpen = false })
+    if (refsOpen) IntervalRefsDialog(ear, onDismiss = { refsOpen = false })
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         if (!ear.intervalChActive) {
             Text("${ear.intervalChallengeTotal} questions. A I–V–I cadence sets the key, then the " +

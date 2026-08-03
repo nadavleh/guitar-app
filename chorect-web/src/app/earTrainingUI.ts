@@ -6,7 +6,7 @@ import { AppState, ChallengeScore, CHALLENGE_SCORE_ORDER } from "./appState";
 import { EarTrainingState, EarSubMode, EarMode } from "./earTrainingState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { shapeMarks } from "./marks";
-import { el, btn, segmented, switchRow, labelSm, songLinkRow, slider } from "./dom";
+import { el, btn, segmented, switchRow, labelSm, songLinkRow, externalSongRow, slider } from "./dom";
 import { transportDock, toneSheet } from "./transport";
 import { icon } from "./icons";
 import { renderChallengeStatsOverlay } from "./statsOverlay";
@@ -21,9 +21,10 @@ import {
   SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor, progressionFromKey, progressionLacksTonic,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow,
   ResolvedChord, ChordShape, resolveProgression, resolveNamed, resolveCircleWindow,
-  WorkoutSession, DeepWeek, WORKOUT_SESSIONS, WORKOUT_DEEP_WEEKS, WORKOUT_GLOBAL_RULES,
-  WORKOUT_SESSION_FRAME, WORKOUT_MONTH1_RULE, WORKOUT_MONTH2_RULE, WORKOUT_MONTH1_GOAL, WORKOUT_MONTH2_GOAL,
-  WORKOUT_TRAIN_DRILLS, WORKOUT_MONTH1_EXAM, WORKOUT_MONTH2_EXAM, WORKOUT_REVISION_NOTES,
+  WorkoutSession, WorkoutWeek, WORKOUT_WEEKS, WORKOUT_MONTHS,
+  WORKOUT_MASTER_GOALS, WORKOUT_PROFILE, WORKOUT_BOTTLENECKS, WORKOUT_GLOBAL_RULES, WORKOUT_SESSION_FRAME,
+  WORKOUT_MASTERY_RULE, WORKOUT_HARMONIZATION_LADDER, WORKOUT_TIME_SCALING, WORKOUT_EXPECTED_PROGRESS,
+  WORKOUT_BERKLEE, WORKOUT_FUTURE_GOALS, WORKOUT_TRAIN_DRILLS, WORKOUT_REVISION_NOTES,
 } from "../theory";
 
 const DISPLAY_FRETS = 14;
@@ -1706,101 +1707,131 @@ export class EarTrainingUI {
     return wrap;
   }
 
-  private workoutSessionCard(s: WorkoutSession): HTMLElement {
-    const line = (label: string, text: string) => el("div", { style: "font-size:13px;margin-top:3px" }, [
+  /** "Label: text" line with the label tinted. */
+  private workoutLine(label: string, text: string): HTMLElement {
+    return el("div", { style: "font-size:13px;margin-top:3px" }, [
       el("span", { style: "font-weight:600;color:var(--act)" }, [`${label}: `]), text,
     ]);
+  }
+
+  private workoutSessionCard(s: WorkoutSession): HTMLElement {
     const children: HTMLElement[] = [
-      el("div", { style: "font-weight:700" }, [`Session ${s.number} — ${s.title}`]),
+      el("div", { style: "font-weight:700;margin-top:2px" }, [`Session ${s.number} — ${s.title}`]),
     ];
-    if (s.song) children.push(songLinkRow(s.song.title, s.song.artist, s.song.version ? `  (${s.song.version})` : ""));
-    if (s.songNote) children.push(el("div", { class: "et-muted", style: "font-size:12px;font-style:italic" }, [s.songNote]));
-    children.push(line("Focus", s.focus), line("Melody", s.melody), line("Harmonize", s.harmonization), line("Pass", s.passGoal));
+    if (s.song) children.push(externalSongRow(s.song.title, s.song.artist, s.song.version ? `  (${s.song.version})` : ""));
+    if (s.songNote) {
+      children.push(el("div", { class: "et-muted", style: "font-size:12px;font-style:italic" }, [s.songNote]));
+    }
+    children.push(
+      this.workoutLine("Notice", s.focus),
+      this.workoutLine("Quality", s.quality),
+      this.workoutLine("Melody", s.melody),
+      this.workoutLine("Harmonize", s.harmonization),
+      this.workoutLine("Pass", s.passGoal),
+    );
     if (s.spoiler) children.push(this.workoutSpoiler(`s${s.number}`, s.spoiler, s.loop));
     return el("div", { style: "padding:8px 0;border-bottom:1px solid var(--surface2)" }, children);
   }
 
-  private workoutDeepWeekCard(w: DeepWeek): HTMLElement {
-    const line = (label: string, text: string) => el("div", { style: "font-size:13px;margin-top:3px" }, [
-      el("span", { style: "font-weight:600;color:var(--act)" }, [`${label}: `]), text,
+  /** One month's header card: objective, vocabulary, rules, project, exam. */
+  private workoutMonthCard(month: number): HTMLElement {
+    const m = WORKOUT_MONTHS[month - 1];
+    return el("div", {
+      class: "et-card",
+      style: "margin:12px 0 8px;background:color-mix(in srgb, var(--act) 12%, transparent)",
+    }, [
+      el("div", { style: "font-weight:700;font-size:15px" }, [`MONTH ${m.number} — ${m.title}`]),
+      el("div", { style: "font-size:13px;margin-top:4px" }, [m.objective]),
+      this.workoutLine("Vocabulary", m.vocabulary),
+      this.workoutLine("Harmonization", m.harmonizationRule),
+      this.workoutLine("Melody stage", m.melodyStage),
+      this.workoutLine("Train rides", m.trainFocus),
+      el("div", { style: "font-size:13px;margin-top:6px;font-style:italic" }, [m.project]),
+      this.workoutGroup(`exam${m.number}`, `Month ${m.number} exam — ${m.exam.timeLimit}`, null, () => [
+        ...m.exam.requirements.map((r) => el("div", { style: "font-size:13px;margin-top:2px" }, [`• ${r}`])),
+        el("div", { style: "font-size:13px;margin-top:6px;font-weight:600" }, [m.exam.passStandard]),
+      ]),
     ]);
-    const children: HTMLElement[] = [
-      el("div", { style: "font-weight:700" }, [`Week ${w.week} — ${w.songTitle}`]),
-    ];
-    if (w.artist) children.push(songLinkRow(w.songTitle, w.artist, `  (${w.recording})`));
-    else children.push(el("div", { class: "et-muted", style: "font-size:12px" }, [w.recording]));
-    children.push(line("Section", w.section), line("Target", w.target), line("Melody", w.melodyTarget));
-    if (w.notGraded.length) {
-      children.push(el("div", { style: "font-size:13px;margin-top:3px" }, [
-        el("span", { style: "font-weight:600;color:var(--act)" }, ["Not graded: "]), w.notGraded.join(" · "),
-      ]));
-    }
-    children.push(el("div", { style: "font-size:13px;margin-top:3px" }, [
-      el("span", { style: "font-weight:600;color:var(--act)" }, ["Lab drills: "]), w.labDrills.join(" · "),
-    ]));
-    children.push(line("Passing", w.passing));
-    if (w.spoiler) children.push(this.workoutSpoiler(`d${w.week}`, w.spoiler, w.loop));
-    return el("div", { style: "padding:8px 0;border-bottom:1px solid var(--surface2)" }, children);
   }
 
-  /** The Workout tab: real-song first-2-months curriculum, two tracks. */
+  private workoutWeekBody(w: WorkoutWeek): HTMLElement[] {
+    return [
+      this.workoutLine("Prediction drill", w.prediction),
+      this.workoutLine("Not graded", w.notGraded.join(" · ")),
+      ...w.sessions.map((s) => this.workoutSessionCard(s)),
+    ];
+  }
+
+  /** The Workout tab: the merged, expanded 4-month real-song curriculum. */
   private workoutView(parent: HTMLElement): void {
     parent.appendChild(el("div", { class: "et-muted", style: "font-size:13px" }, [
-      "The first-2-months real-song plan (revised from your ChatGPT curriculum). Tap a song to open it, work the session, then reveal the progression to check yourself.",
+      "One plan, 4 months · 16 weeks · 64 sessions. Every session is a real song run through the same 45-minute frame; every week trains harmony, melody, bass, harmonization and prediction together. Tap a song to open it, work the session, then reveal the answer to check yourself.",
     ]));
     parent.appendChild(el("div", { class: "v-gap-8" }));
 
-    parent.appendChild(this.workoutGroup("howto", "How to practice", null, () =>
-      WORKOUT_GLOBAL_RULES.map((r) => el("div", { style: "font-size:13px;margin-top:4px" }, [`• ${r}`]))));
-
-    parent.appendChild(this.workoutGroup("frame", "The 45-minute session frame", null, () =>
-      WORKOUT_SESSION_FRAME.map(([t, task]) => el("div", { style: "font-size:13px;margin-top:4px" }, [
-        el("span", { style: "font-weight:700;color:var(--act);min-width:44px;display:inline-block" }, [t]), task,
+    parent.appendChild(this.workoutGroup("goals", "What you're aiming at", "The master goals everything else serves.", () =>
+      WORKOUT_MASTER_GOALS.map(([k, v]) => el("div", { style: "font-size:13px;margin-top:4px" }, [
+        el("span", { style: "font-weight:600;color:var(--act)" }, [`${k} — `]), v,
       ]))));
 
-    parent.appendChild(this.workoutGroup("harm", "Harmonization constraints", null, () => [
-      el("div", { style: "font-size:13px;margin-top:4px" }, [WORKOUT_MONTH1_RULE]),
-      el("div", { style: "font-size:13px;margin-top:6px" }, [WORKOUT_MONTH2_RULE]),
+    parent.appendChild(this.workoutGroup("where", "Where you're starting from", "Your profile and the three bottlenecks this plan attacks.", () => [
+      ...WORKOUT_PROFILE.map(([k, v]) => el("div", { style: "font-size:13px;margin-top:2px" }, [
+        el("span", { style: "font-weight:600" }, [`${k}: `]), v,
+      ])),
+      el("div", { style: "font-weight:600;margin-top:8px;color:var(--act)" }, ["The three bottlenecks"]),
+      ...WORKOUT_BOTTLENECKS.map((b) => el("div", { style: "font-size:13px;margin-top:4px" }, [`• ${b}`])),
     ]));
 
-    // ---- Track A: 32 sessions in 8 collapsible weeks ----
-    parent.appendChild(el("div", { style: "font-weight:700;font-size:15px;margin:10px 0 2px" }, ["Track A — session plan (32 sessions)"]));
-    parent.appendChild(el("div", { class: "et-muted", style: "font-size:12px;margin-bottom:6px" }, [
-      `Month 1: ${WORKOUT_MONTH1_GOAL}  Month 2: ${WORKOUT_MONTH2_GOAL}`,
+    parent.appendChild(this.workoutGroup("howto", "How to practise", null, () => [
+      ...WORKOUT_GLOBAL_RULES.map((r) => el("div", { style: "font-size:13px;margin-top:4px" }, [`• ${r}`])),
+      el("div", { style: "font-size:13px;margin-top:8px;font-weight:600" }, [WORKOUT_MASTERY_RULE]),
     ]));
-    for (let week = 1; week <= 8; week++) {
-      const sessions = WORKOUT_SESSIONS.filter((s) => s.week === week);
-      parent.appendChild(this.workoutGroup(`w${week}`, `Week ${week}`,
-        sessions.map((s) => s.title).join(" · "),
-        () => sessions.map((s) => this.workoutSessionCard(s))));
+
+    parent.appendChild(this.workoutGroup("frame", "The 45-minute session frame", "Identical every session — the 18–25 speed loop is the bottleneck drill.", () =>
+      WORKOUT_SESSION_FRAME.map(([t, task]) => el("div", { style: "font-size:13px;margin-top:4px" }, [
+        el("span", { style: "font-weight:700;color:var(--act);min-width:48px;display:inline-block" }, [t]), task,
+      ]))));
+
+    parent.appendChild(this.workoutGroup("ladder", "Harmonization constraint ladder", null, () => [
+      el("div", { style: "font-size:13px;margin-top:4px" }, [WORKOUT_HARMONIZATION_LADDER]),
+    ]));
+
+    // ---- The four months, each with its four weeks ----
+    for (let month = 1; month <= 4; month++) {
+      parent.appendChild(this.workoutMonthCard(month));
+      for (const w of WORKOUT_WEEKS.filter((x) => x.month === month)) {
+        parent.appendChild(this.workoutGroup(`w${w.week}`, `Week ${w.week} — ${w.title}`,
+          w.sessions.map((s) => (s.song ? s.song.title : "student choice")).join(" · "),
+          () => this.workoutWeekBody(w)));
+      }
     }
 
-    // ---- Track B: the one-song-per-week deep plan ----
-    parent.appendChild(el("div", { style: "font-weight:700;font-size:15px;margin:10px 0 2px" }, ["Track B — deep track (one song per week)"]));
-    parent.appendChild(el("div", { class: "et-muted", style: "font-size:12px;margin-bottom:6px" }, [
-      "The stricter alternative: one named recording per week, bounded grading, sessions A–D (map / melody / lab / exam).",
-    ]));
-    for (const w of WORKOUT_DEEP_WEEKS) {
-      parent.appendChild(this.workoutGroup(`deep${w.week}`, `Week ${w.week} — ${w.songTitle}`, null,
-        () => [this.workoutDeepWeekCard(w)]));
-    }
-
-    parent.appendChild(this.workoutGroup("drills", "Train-ride synthetic drills", "Quick reaction, not deep analysis — separate from the 45-minute sessions.", () =>
+    // ---- Reference cards ----
+    parent.appendChild(this.workoutGroup("drills", "Train-ride synthetic drills",
+      "Quick reaction, not deep analysis — and never inside a 45-minute session.", () =>
       WORKOUT_TRAIN_DRILLS.map(([cat, text]) => el("div", { style: "font-size:13px;margin-top:4px" }, [
         el("span", { style: "font-weight:600;color:var(--act)" }, [`${cat}: `]), text,
       ]))));
 
-    parent.appendChild(this.workoutGroup("exams", "Exam targets", "Diagnostic targets — a missed category names the next drill; it doesn't invalidate the month.", () => [
-      el("div", { style: "font-weight:600;margin-top:4px" }, ["Month 1"]),
-      ...WORKOUT_MONTH1_EXAM.map(([skill, target]) => el("div", { style: "font-size:13px;margin-top:2px" }, [`• ${skill} — ${target}`])),
-      el("div", { style: "font-weight:600;margin-top:8px" }, ["Month 2"]),
-      ...WORKOUT_MONTH2_EXAM.map(([skill, target]) => el("div", { style: "font-size:13px;margin-top:2px" }, [`• ${skill} — ${target}`])),
-    ]));
+    parent.appendChild(this.workoutGroup("scaling", "If you practise more or less", "Baseline is 3 h/week = four 45-minute sessions.", () =>
+      WORKOUT_TIME_SCALING.map(([k, v]) => el("div", { style: "font-size:13px;margin-top:2px" }, [
+        el("span", { style: "font-weight:600;color:var(--act)" }, [`${k} — `]), v,
+      ]))));
 
-    parent.appendChild(this.workoutGroup("notes", "Revision notes (what changed vs the PDFs)", null, () =>
-      WORKOUT_REVISION_NOTES.map((r) => el("div", { style: "font-size:13px;margin-top:4px" }, [`• ${r}`]))));
+    parent.appendChild(this.workoutGroup("progress", "Honest expected progress", "After these 4 months at ~3 h/week. Realistic, not inflated.", () =>
+      WORKOUT_EXPECTED_PROGRESS.map(([k, v]) => el("div", { style: "font-size:13px;margin-top:2px" }, [`• ${k} — ${v}`]))));
+
+    parent.appendChild(this.workoutGroup("berklee", "Compared with a Berklee-style degree", null, () =>
+      WORKOUT_BERKLEE.map(([k, v]) => el("div", { style: "font-size:13px;margin-top:2px" }, [
+        el("span", { style: "font-weight:600" }, [`${k}: `]), v,
+      ]))));
+
+    parent.appendChild(this.workoutGroup("after", "After these four months", null, () =>
+      WORKOUT_FUTURE_GOALS.map((g) => el("div", { style: "font-size:13px;margin-top:4px" }, [`• ${g}`]))));
+
+    parent.appendChild(this.workoutGroup("notes", "Revision notes — what Claude changed and why", null, () =>
+      WORKOUT_REVISION_NOTES.map((r) => el("div", { style: "font-size:13px;margin-top:6px" }, [`• ${r}`]))));
   }
-
   /** "♪ Song refs" overlay for the interval trainer — same content as the Theory tab. */
   private intervalRefsOverlay(): HTMLElement {
     const body = el("div", { class: "et-card", style: "max-width:520px;max-height:75vh;overflow:auto;margin:auto" }, [
@@ -1808,7 +1839,7 @@ export class EarTrainingUI {
         el("div", { style: "font-weight:700;font-size:16px;flex:1" }, ["Interval song references"]),
         btn("Close", () => { this.intervalRefsOpen = false; this.rerender(); }, "btn text"),
       ]),
-      intervalRefsContent(),
+      intervalRefsContent(this.ear, () => this.rerender()),
     ]);
     const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:50" }, [body]);
     scrim.addEventListener("click", (e) => { if (e.target === scrim) { this.intervalRefsOpen = false; this.rerender(); } });

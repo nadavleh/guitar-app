@@ -1574,6 +1574,45 @@ export class EarTrainingState {
     this.deps.audio.playNote(this.intervalTonicMidi(), this.deps.sustainProvider());
   }
 
+  // ---------- Interval REFERENCE playback (Theory tab / song-refs sheet) ----------
+  // Independent of the challenge's key and harmonic settings: a fixed C4 base so
+  // every row sounds alike. Plays the leap melodically, then both notes together,
+  // because the stacked version is what makes the interval's colour unmistakable.
+
+  /** Which reference row is currently sounding (for the ▶/■ button), or null. */
+  intervalPreviewId: string | null = null;
+  private intervalPreviewToken = 0;
+
+  playIntervalPreview(id: string, semitones: number, ascending: boolean) {
+    this.intervalPreviewToken++;
+    const token = this.intervalPreviewToken;
+    this.intervalPreviewId = id;
+    this.notify();
+    void (async () => {
+      const base = 60;                                    // C4
+      const target = ascending ? base + semitones : base - semitones;
+      const sustain = this.deps.sustainProvider();
+      const live = () => token === this.intervalPreviewToken;
+      this.deps.audio.playNote(base, sustain);
+      await sleep(700);
+      if (!live()) return;
+      this.deps.audio.playNote(target, sustain);
+      await sleep(700);
+      if (!live()) return;
+      this.deps.audio.playChord([base, target], 0, sustain, Timbres.Clarity);
+      await sleep(900);
+      if (!live()) return;
+      this.intervalPreviewId = null;
+      this.notify();
+    })();
+  }
+
+  stopIntervalPreview() {
+    this.intervalPreviewToken++;
+    this.intervalPreviewId = null;
+    this.notify();
+  }
+
   playIntervalQuestion() {
     if (this.intervalPlaying) return;
     this.intervalToken++;   // cancels any in-flight cadence/question sequence

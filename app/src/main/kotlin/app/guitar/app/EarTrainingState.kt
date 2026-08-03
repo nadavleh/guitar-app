@@ -1893,6 +1893,41 @@ class EarTrainingState(
         }
     }
 
+    // ---------- Interval REFERENCE playback (Theory tab / song-refs dialog) ----------
+    // Independent of the challenge's key and harmonic settings: a fixed C4 base so every
+    // row sounds alike. Plays the leap melodically, then both notes together, because the
+    // stacked version is what makes the interval's colour unmistakable.
+
+    /** Which reference row is currently sounding (drives the ▶/■ button), or null. */
+    var intervalPreviewId by mutableStateOf<String?>(null)
+        private set
+    private var intervalPreviewJob: Job? = null
+
+    fun playIntervalPreview(id: String, semitones: Int, ascending: Boolean) {
+        intervalPreviewJob?.cancel()
+        intervalPreviewId = id
+        intervalPreviewJob = scope.launch {
+            try {
+                val base = 60                                   // C4
+                val target = if (ascending) base + semitones else base - semitones
+                audio.playNote(base, durationMillis = sustainProvider())
+                delay(700)
+                audio.playNote(target, durationMillis = sustainProvider())
+                delay(700)
+                audio.playChord(listOf(base, target), strumDelayMillis = 0,
+                    sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
+                delay(900)
+            } finally {
+                if (intervalPreviewId == id) intervalPreviewId = null
+            }
+        }
+    }
+
+    fun stopIntervalPreview() {
+        intervalPreviewJob?.cancel()
+        intervalPreviewId = null
+    }
+
     /** Re-sound just the tonic note (the reference). */
     fun playIntervalTonic() {
         intervalJob?.cancel()

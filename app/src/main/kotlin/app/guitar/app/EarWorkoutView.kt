@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -29,92 +30,97 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.guitar.theory.ChordTypeLevel
-import app.guitar.theory.DeepWeek
 import app.guitar.theory.EarTraining
 import app.guitar.theory.EarWorkout
 import app.guitar.theory.PitchClass
 import app.guitar.theory.Progression
 import app.guitar.theory.TrainingMode
 import app.guitar.theory.WorkoutSession
+import app.guitar.theory.WorkoutWeek
 
 /**
- * Workout — the first-2-months real-song curriculum (theory EarWorkout; spec
- * docs/superpowers/specs/2026-08-03-ear-workout-theory-tab-design.md).
+ * Workout — the merged, expanded 4-month real-song curriculum (theory EarWorkout;
+ * source digest docs/ear-training-conversation-digest.md). 16 weeks × 4 sessions,
+ * every session a real song run through the same 45-minute frame.
+ *
  * Mirror of chorect-web's workoutView in earTrainingUI.ts: collapsible groups,
- * tappable songs (YouTube/Spotify via SongLinkRow), tap-to-reveal spoilers and
- * a ▶ loop player (fixed key C / Am) where the answer is a clean diatonic loop.
+ * external song links (▶ is reserved for in-app audio), tap-to-reveal spoilers and
+ * a ▶ loop player where the answer is a clean diatonic loop.
  */
 @Composable
 internal fun WorkoutView(state: AppState, ear: EarTrainingState) {
-    var open by remember { mutableStateOf(setOf("howto", "w1")) }
+    var open by remember { mutableStateOf(setOf("goals", "w1")) }
     var revealed by remember { mutableStateOf(setOf<String>()) }
     val toggleOpen = { key: String -> open = if (key in open) open - key else open + key }
     val toggleReveal = { key: String -> revealed = if (key in revealed) revealed - key else revealed + key }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Text("The first-2-months real-song plan (revised from your ChatGPT curriculum). Tap a song to open it, " +
-            "work the session, then reveal the progression to check yourself.",
+        Text("One plan, 4 months · 16 weeks · 64 sessions. Every session is a real song run through the " +
+            "same 45-minute frame; every week trains harmony, melody, bass, harmonization and prediction " +
+            "together. Tap a song to open it, work the session, then reveal the answer to check yourself.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
 
-        WorkoutGroup("howto", "How to practice", null, open, toggleOpen) {
-            for (r in EarWorkout.GLOBAL_RULES) WorkoutText("• $r")
+        WorkoutGroup("goals", "What you're aiming at", "The master goals everything else serves.", open, toggleOpen) {
+            for ((k, v) in EarWorkout.MASTER_GOALS) WorkoutLine(k, v)
         }
-        WorkoutGroup("frame", "The 45-minute session frame", null, open, toggleOpen) {
+        WorkoutGroup("where", "Where you're starting from",
+            "Your profile and the three bottlenecks this plan attacks.", open, toggleOpen) {
+            for ((k, v) in EarWorkout.PROFILE) WorkoutLine(k, v)
+            Text("The three bottlenecks", fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
+            for (b in EarWorkout.BOTTLENECKS) WorkoutText("• $b")
+        }
+        WorkoutGroup("howto", "How to practise", null, open, toggleOpen) {
+            for (r in EarWorkout.GLOBAL_RULES) WorkoutText("• $r")
+            Text(EarWorkout.MASTERY_RULE, style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+        }
+        WorkoutGroup("frame", "The 45-minute session frame",
+            "Identical every session — the 18–25 speed loop is the bottleneck drill.", open, toggleOpen) {
             for ((t, task) in EarWorkout.SESSION_FRAME) {
                 Row(Modifier.padding(top = 4.dp)) {
                     Text(t, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(48.dp))
+                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(52.dp))
                     Text(task, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
-        WorkoutGroup("harm", "Harmonization constraints", null, open, toggleOpen) {
-            WorkoutText(EarWorkout.MONTH1_RULE)
-            Spacer(Modifier.height(6.dp))
-            WorkoutText(EarWorkout.MONTH2_RULE)
+        WorkoutGroup("ladder", "Harmonization constraint ladder", null, open, toggleOpen) {
+            WorkoutText(EarWorkout.HARMONIZATION_LADDER)
         }
 
-        // ---- Track A: 32 sessions in 8 collapsible weeks ----
-        Text("Track A — session plan (32 sessions)", fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
-        Text("Month 1: ${EarWorkout.MONTH1_GOAL}  Month 2: ${EarWorkout.MONTH2_GOAL}",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 6.dp))
-        for (week in 1..8) {
-            val sessions = EarWorkout.SESSIONS.filter { it.week == week }
-            WorkoutGroup("w$week", "Week $week", sessions.joinToString(" · ") { it.title }, open, toggleOpen) {
-                for (s in sessions) WorkoutSessionCard(state, ear, s, revealed, toggleReveal)
+        // ---- The four months, each with its four weeks ----
+        for (month in 1..4) {
+            WorkoutMonthCard(month, open, toggleOpen)
+            for (w in EarWorkout.WEEKS.filter { it.month == month }) {
+                WorkoutGroup("w${w.week}", "Week ${w.week} — ${w.title}",
+                    w.sessions.joinToString(" · ") { it.song?.title ?: "student choice" }, open, toggleOpen) {
+                    WorkoutWeekBody(ear, w, revealed, toggleReveal)
+                }
             }
         }
 
-        // ---- Track B: the one-song-per-week deep plan ----
-        Text("Track B — deep track (one song per week)", fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
-        Text("The stricter alternative: one named recording per week, bounded grading, sessions A–D (map / melody / lab / exam).",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 6.dp))
-        for (w in EarWorkout.DEEP_WEEKS) {
-            WorkoutGroup("deep${w.week}", "Week ${w.week} — ${w.songTitle}", null, open, toggleOpen) {
-                WorkoutDeepWeekCard(state, ear, w, revealed, toggleReveal)
-            }
-        }
-
+        // ---- Reference cards ----
         WorkoutGroup("drills", "Train-ride synthetic drills",
-            "Quick reaction, not deep analysis — separate from the 45-minute sessions.", open, toggleOpen) {
-            for ((cat, text) in EarWorkout.TRAIN_DRILLS) {
-                Text(buildString { append(cat); append(": "); append(text) },
-                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
-            }
+            "Quick reaction, not deep analysis — and never inside a 45-minute session.", open, toggleOpen) {
+            for ((cat, text) in EarWorkout.TRAIN_DRILLS) WorkoutLine(cat, text)
         }
-        WorkoutGroup("exams", "Exam targets",
-            "Diagnostic targets — a missed category names the next drill; it doesn't invalidate the month.", open, toggleOpen) {
-            Text("Month 1", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
-            for ((skill, target) in EarWorkout.MONTH1_EXAM) WorkoutText("• $skill — $target")
-            Text("Month 2", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
-            for ((skill, target) in EarWorkout.MONTH2_EXAM) WorkoutText("• $skill — $target")
+        WorkoutGroup("scaling", "If you practise more or less",
+            "Baseline is 3 h/week = four 45-minute sessions.", open, toggleOpen) {
+            for ((k, v) in EarWorkout.TIME_SCALING) WorkoutLine(k, v)
         }
-        WorkoutGroup("notes", "Revision notes (what changed vs the PDFs)", null, open, toggleOpen) {
+        WorkoutGroup("progress", "Honest expected progress",
+            "After these 4 months at ~3 h/week. Realistic, not inflated.", open, toggleOpen) {
+            for ((k, v) in EarWorkout.EXPECTED_PROGRESS) WorkoutText("• $k — $v")
+        }
+        WorkoutGroup("berklee", "Compared with a Berklee-style degree", null, open, toggleOpen) {
+            for ((k, v) in EarWorkout.BERKLEE) WorkoutLine(k, v)
+        }
+        WorkoutGroup("after", "After these four months", null, open, toggleOpen) {
+            for (g in EarWorkout.FUTURE_GOALS) WorkoutText("• $g")
+        }
+        WorkoutGroup("notes", "Revision notes — what Claude changed and why", null, open, toggleOpen) {
             for (r in EarWorkout.REVISION_NOTES) WorkoutText("• $r")
         }
         Spacer(Modifier.height(20.dp))
@@ -124,6 +130,16 @@ internal fun WorkoutView(state: AppState, ear: EarTrainingState) {
 @Composable
 private fun WorkoutText(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+}
+
+/** "Label: text" line with the label tinted. */
+@Composable
+private fun WorkoutLine(label: String, text: String) {
+    Row(Modifier.padding(top = 3.dp)) {
+        Text("$label: ", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodySmall)
+        Text(text, style = MaterialTheme.typography.bodySmall)
+    }
 }
 
 /** Collapsible group card (chevron accordion, multi-open). */
@@ -156,13 +172,68 @@ private fun WorkoutGroup(
     }
 }
 
-/** "Label: text" line with the label tinted. */
+/** One month's header card: objective, vocabulary, rules, project, exam. */
 @Composable
-private fun WorkoutLine(label: String, text: String) {
-    Row(Modifier.padding(top = 3.dp)) {
-        Text("$label: ", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.bodySmall)
-        Text(text, style = MaterialTheme.typography.bodySmall)
+private fun WorkoutMonthCard(month: Int, open: Set<String>, toggleOpen: (String) -> Unit) {
+    val m = EarWorkout.MONTHS[month - 1]
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text("MONTH ${m.number} — ${m.title}", fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleSmall)
+            WorkoutText(m.objective)
+            WorkoutLine("Vocabulary", m.vocabulary)
+            WorkoutLine("Harmonization", m.harmonizationRule)
+            WorkoutLine("Melody stage", m.melodyStage)
+            WorkoutLine("Train rides", m.trainFocus)
+            Text(m.project, style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic,
+                modifier = Modifier.padding(top = 6.dp))
+            WorkoutGroup("exam${m.number}", "Month ${m.number} exam — ${m.exam.timeLimit}", null, open, toggleOpen) {
+                for (r in m.exam.requirements) WorkoutText("• $r")
+                Text(m.exam.passStandard, style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkoutWeekBody(
+    ear: EarTrainingState,
+    w: WorkoutWeek,
+    revealed: Set<String>,
+    toggleReveal: (String) -> Unit,
+) {
+    WorkoutLine("Prediction drill", w.prediction)
+    WorkoutLine("Not graded", w.notGraded.joinToString(" · "))
+    for (s in w.sessions) WorkoutSessionCard(ear, s, revealed, toggleReveal)
+}
+
+@Composable
+private fun WorkoutSessionCard(
+    ear: EarTrainingState,
+    s: WorkoutSession,
+    revealed: Set<String>,
+    toggleReveal: (String) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Text("Session ${s.number} — ${s.title}", fontWeight = FontWeight.Bold)
+        val song = s.song
+        if (song != null) ExternalSongRow(song.title, song.artist, song.version?.let { "  ($it)" } ?: "")
+        val note = s.songNote
+        if (note != null) {
+            Text(note, style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        WorkoutLine("Notice", s.focus)
+        WorkoutLine("Quality", s.quality)
+        WorkoutLine("Melody", s.melody)
+        WorkoutLine("Harmonize", s.harmonization)
+        WorkoutLine("Pass", s.passGoal)
+        if (s.spoiler.isNotEmpty()) WorkoutSpoiler(ear, "s${s.number}", s.spoiler, s.loop, revealed, toggleReveal)
+        HorizontalDivider(modifier = Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -179,10 +250,10 @@ private fun WorkoutSpoiler(
     val isRevealed = key in revealed
     Spacer(Modifier.height(4.dp))
     if (!isRevealed) {
-        Button(onClick = { toggleReveal(key) }) { Text("Reveal progression") }
+        Button(onClick = { toggleReveal(key) }) { Text("Reveal answer") }
         return
     }
-    OutlinedButton(onClick = { toggleReveal(key) }) { Text("Hide progression") }
+    OutlinedButton(onClick = { toggleReveal(key) }) { Text("Hide answer") }
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f),
         shape = MaterialTheme.shapes.medium,
@@ -201,53 +272,5 @@ private fun WorkoutSpoiler(
                 }) { Text(if (playing) "Stop ■" else "▶ Hear the loop") }
             }
         }
-    }
-}
-
-@Composable
-private fun WorkoutSessionCard(
-    state: AppState,
-    ear: EarTrainingState,
-    s: WorkoutSession,
-    revealed: Set<String>,
-    toggleReveal: (String) -> Unit,
-) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Text("Session ${s.number} — ${s.title}", fontWeight = FontWeight.Bold)
-        val song = s.song
-        if (song != null) SongLinkRow(song.title, song.artist, song.version?.let { "  ($it)" } ?: "")
-        val note = s.songNote
-        if (note != null) {
-            Text(note, style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        WorkoutLine("Focus", s.focus)
-        WorkoutLine("Melody", s.melody)
-        WorkoutLine("Harmonize", s.harmonization)
-        WorkoutLine("Pass", s.passGoal)
-        if (s.spoiler.isNotEmpty()) WorkoutSpoiler(ear, "s${s.number}", s.spoiler, s.loop, revealed, toggleReveal)
-        HorizontalDivider(modifier = Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
-    }
-}
-
-@Composable
-private fun WorkoutDeepWeekCard(
-    state: AppState,
-    ear: EarTrainingState,
-    w: DeepWeek,
-    revealed: Set<String>,
-    toggleReveal: (String) -> Unit,
-) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        if (w.artist.isNotEmpty()) SongLinkRow(w.songTitle, w.artist, "  (${w.recording})")
-        else Text(w.recording, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        WorkoutLine("Section", w.section)
-        WorkoutLine("Target", w.target)
-        WorkoutLine("Melody", w.melodyTarget)
-        if (w.notGraded.isNotEmpty()) WorkoutLine("Not graded", w.notGraded.joinToString(" · "))
-        WorkoutLine("Lab drills", w.labDrills.joinToString(" · "))
-        WorkoutLine("Passing", w.passing)
-        if (w.spoiler.isNotEmpty()) WorkoutSpoiler(ear, "d${w.week}", w.spoiler, w.loop, revealed, toggleReveal)
     }
 }

@@ -135,6 +135,23 @@ export function labelSm(text: string): HTMLElement {
  *  (default, new tab); a Spotify glyph opens the same query on Spotify (alternative);
  *  plus a copy button that puts "Title — Artist" on the clipboard so you can search
  *  yourself. `extra` is appended to the label (e.g. " (key A)"). */
+/** A song row for surfaces where ▶ means "the app plays audio" (Theory tab,
+ *  Workout curriculum): the title is plain text and the two search links are
+ *  explicitly labelled, so nothing here looks like an in-app play button. */
+export function externalSongRow(title: string, artist: string, extra = ""): HTMLElement {
+  const label = artist ? `${title} — ${artist}${extra}` : `${title}${extra}`;
+  const q = encodeURIComponent(`${title} ${artist}`.trim());
+  const link = (text: string, href: string, colour: string) => el("a", {
+    href, target: "_blank", rel: "noopener", class: "btn text",
+    style: `padding:0 6px;min-width:0;font-size:12px;color:${colour};text-decoration:none;font-weight:600`,
+  }, [text]);
+  return el("div", { style: "display:flex;align-items:center;gap:6px;font-size:14px;padding:2px 0;flex-wrap:wrap" }, [
+    el("span", { style: "flex:1;min-width:140px" }, [`🔗  ${label}`]),
+    link("YouTube", `https://www.youtube.com/results?search_query=${q}`, "#FF0000"),
+    link("Spotify", `https://open.spotify.com/search/${q}`, "#1DB954"),
+  ]);
+}
+
 export function songLinkRow(title: string, artist: string, extra = ""): HTMLElement {
   const label = `${title} — ${artist}${extra}`;
   const q = encodeURIComponent(`${title} ${artist}`);

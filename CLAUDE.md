@@ -23,6 +23,10 @@ You do **NOT** need to ask permission for any action. Proceed autonomously on al
 
 Build a mobile guitar-practice app per `requirements.md`. Initial target: **Android first**, iOS later. Prioritize correctness of the music-theory engine and clean separation of theory logic from UI (see `requirements.md` §12).
 
+## Reference digests (read these instead of the source PDFs)
+
+* `docs/ear-training-conversation-digest.md` — condensed from Nadav's 203-page ChatGPT ear-training export (`C:\Users\Nadav\Desktop\Ear Training corriculum.pdf`) plus the two curriculum PDFs. Holds his diagnosed skill profile, his three bottlenecks, the master goals, every hard preference/correction he made (spiral curriculum, synthetic drills are train-ride only, work directly in function, no rhythmic dictation/solfège, spoilers in an appendix), the harmonization constraint ladder, the songs-by-harmonic-concept ladder, his logged Girl / All-of-Me attempts and scores, time-scaling and expected-progress tables. **Consult it before changing anything in the ear-training Workout curriculum** (`theory/.../EarWorkout.kt` + `chorect-web/src/theory/earWorkout.ts`).
+
 ## Working style
 
 * Per `requirements.md` §17: **do not start full implementation immediately**. First propose tech stack, architecture, data model, theory-engine API, UI hierarchy, and milestones. Confirm with Nadav before building.

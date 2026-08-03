@@ -251,6 +251,40 @@ fun SelectedPositionInfo(
  * YouTube search for the song (tap); long-press copies "Title — Artist" to the clipboard
  * so you can search it yourself. [suffix] is appended to the label (e.g. "  (A)").
  */
+/**
+ * A song row for surfaces where ▶ means "the app plays audio" (Theory tab, Workout
+ * curriculum): the title is plain text and the two search links are explicitly
+ * labelled, so nothing here looks like an in-app play button.
+ */
+@Composable
+internal fun ExternalSongRow(title: String, artist: String, suffix: String = "") {
+    val context = LocalContext.current
+    val label = if (artist.isNotEmpty()) "$title — $artist$suffix" else "$title$suffix"
+    val q = android.net.Uri.encode("$title $artist".trim())
+    val open = { url: String ->
+        runCatching {
+            context.startActivity(
+                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)),
+            )
+        }
+        Unit
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("🔗  $label", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text("YouTube", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold,
+            color = androidx.compose.ui.graphics.Color(0xFFFF0000),
+            modifier = Modifier.padding(start = 8.dp)
+                .clickable { open("https://www.youtube.com/results?search_query=$q") })
+        Text("Spotify", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold,
+            color = androidx.compose.ui.graphics.Color(0xFF1DB954),
+            modifier = Modifier.padding(start = 8.dp)
+                .clickable { open("https://open.spotify.com/search/$q") })
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun SongLinkRow(title: String, artist: String, suffix: String = "") {
