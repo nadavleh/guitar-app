@@ -29,7 +29,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 // tapering to none at the top, so chords sit on a fuller low end.
 const EAR_BASS_BOOST = 0.4;
 
-export enum EarSubMode { Progression = "Progression", Note2Chord = "Note2Chord", Flavor = "Flavor", Inversions = "Inversions", AugDim = "AugDim", Intervals = "Intervals", Drill = "Drill" }
+export enum EarSubMode { Progression = "Progression", Note2Chord = "Note2Chord", Flavor = "Flavor", Inversions = "Inversions", AugDim = "AugDim", Intervals = "Intervals", Drill = "Drill", Workout = "Workout" }
 export enum EarMode { Practice = "Practice", Challenge = "Challenge" }
 
 export interface EarDeps {

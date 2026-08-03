@@ -304,6 +304,8 @@ fun App(audio: AudioEngine) {
             RhythmUnitsScreen(state, onBack = { state.closeSheet() })
         } else if (state.currentSheet == Sheet.Metronome) {
             MetronomeScreen(state, onBack = { state.closeSheet() })
+        } else if (state.currentSheet == Sheet.Theory) {
+            TheoryScreen(state, onBack = { state.closeSheet() })
         } else {
             StatusBar(state)
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -413,6 +415,7 @@ private fun sheetLabel(s: Sheet): String = when (s) {
     Sheet.Decompose -> "Decompose"
     Sheet.RhythmUnits -> "Rhythm"
     Sheet.Metronome -> "Metronome"
+    Sheet.Theory -> "Theory"
 }
 
 @Composable

@@ -2024,7 +2024,7 @@ class EarTrainingState(
     }
 }
 
-enum class EarSubMode { Progression, Note2Chord, Flavor, Inversions, AugDim, Intervals, Drill }
+enum class EarSubMode { Progression, Note2Chord, Flavor, Inversions, AugDim, Intervals, Drill, Workout }
 
 /** Within any tab: free Practice or scored Challenge rounds. */
 enum class EarMode { Practice, Challenge }

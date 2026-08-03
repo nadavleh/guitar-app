@@ -157,8 +157,8 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
         // the compact ModeDropdown) and the sub-modes as a chip row with a "More ▾"
         // overflow (replaces SubModeDropdown). ear.switchTab / ear.earMode calls
         // are identical to before — only the picker chrome changed.
-        // Drill has no Practice/Challenge split, so its segmented control is hidden.
-        if (ear.progSubMode != EarSubMode.Drill) {
+        // Drill and Workout have no Practice/Challenge split, so their control is hidden.
+        if (ear.progSubMode != EarSubMode.Drill && ear.progSubMode != EarSubMode.Workout) {
             SegmentedRow(
                 options = EarMode.entries,
                 selected = ear.earMode,
@@ -194,6 +194,7 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                 // Intervals is challenge-only (#6) — same view in either mode.
                 EarSubMode.Intervals -> IntervalsView(ear)
                 EarSubMode.Drill -> DrillView(state, ear)
+                EarSubMode.Workout -> WorkoutView(state, ear)
             }
         }
 
@@ -227,6 +228,7 @@ private fun subModeLabel(s: EarSubMode): String = when (s) {
     EarSubMode.AugDim      -> "Aug / Dim"
     EarSubMode.Intervals   -> "Intervals"
     EarSubMode.Drill       -> "Drill"
+    EarSubMode.Workout     -> "Workout"
 }
 
 /** Sub-mode chip row (Signal move — replaces the SubModeDropdown): Progressions,
@@ -237,7 +239,7 @@ private fun subModeLabel(s: EarSubMode): String = when (s) {
 @Composable
 private fun SubModeChipRow(ear: EarTrainingState) {
     val primaryChips = listOf(EarSubMode.Progression, EarSubMode.Intervals, EarSubMode.Note2Chord)
-    val overflowChips = listOf(EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim, EarSubMode.Drill)
+    val overflowChips = listOf(EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim, EarSubMode.Drill, EarSubMode.Workout)
     var moreOpen by remember { mutableStateOf(false) }
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -2492,6 +2494,9 @@ private fun IntervalGuessChips(ear: EarTrainingState, enabled: Boolean) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun IntervalsView(ear: EarTrainingState) {
+    // "♪ Song refs" — the interval→song reference sheet (same content as the Theory tab).
+    var refsOpen by remember { mutableStateOf(false) }
+    if (refsOpen) IntervalRefsDialog(onDismiss = { refsOpen = false })
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         if (!ear.intervalChActive) {
             Text("${ear.intervalChallengeTotal} questions. A I–V–I cadence sets the key, then the " +
@@ -2531,8 +2536,10 @@ private fun IntervalsView(ear: EarTrainingState) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.height(16.dp))
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Button(onClick = { ear.startIntervalChallenge() }) { Text("Start challenge ▶") }
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(onClick = { refsOpen = true }) { Text("♪ Song refs") }
             }
             return@Column
         }
@@ -2561,6 +2568,7 @@ private fun IntervalsView(ear: EarTrainingState) {
             OutlinedButton(onClick = { ear.playIntervalTonicCadence() }) { Text("Hear I–V–I") }
             OutlinedButton(onClick = { ear.intervalTranspose(-1) }) { Text("♭") }
             OutlinedButton(onClick = { ear.intervalTranspose(1) }) { Text("♯") }
+            OutlinedButton(onClick = { refsOpen = true }) { Text("♪ Song refs") }
             Text(transposeLabel(ear.intervalTransposeSteps), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterVertically))

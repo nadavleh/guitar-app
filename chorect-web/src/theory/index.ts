@@ -6,6 +6,8 @@ export * from "./scales";
 export * from "./overlay";
 export * from "./random";
 export * from "./eartraining";
+export * from "./earWorkout";
+export * from "./intervalSongs";
 export * from "./progressionSongs";
 export * from "./cavaqSequences";
 export * from "./cavaqSongs";

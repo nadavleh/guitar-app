@@ -10,6 +10,7 @@ import { el, btn, segmented, switchRow, labelSm, songLinkRow, slider } from "./d
 import { transportDock, toneSheet } from "./transport";
 import { icon } from "./icons";
 import { renderChallengeStatsOverlay } from "./statsOverlay";
+import { intervalRefsContent } from "./theoryUI";
 import {
   spellPc, noteAt, TrainingMode, ChordTypeLevel, ChordTypeLevelName,
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
@@ -20,6 +21,9 @@ import {
   SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor, progressionFromKey, progressionLacksTonic,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow,
   ResolvedChord, ChordShape, resolveProgression, resolveNamed, resolveCircleWindow,
+  WorkoutSession, DeepWeek, WORKOUT_SESSIONS, WORKOUT_DEEP_WEEKS, WORKOUT_GLOBAL_RULES,
+  WORKOUT_SESSION_FRAME, WORKOUT_MONTH1_RULE, WORKOUT_MONTH2_RULE, WORKOUT_MONTH1_GOAL, WORKOUT_MONTH2_GOAL,
+  WORKOUT_TRAIN_DRILLS, WORKOUT_MONTH1_EXAM, WORKOUT_MONTH2_EXAM, WORKOUT_REVISION_NOTES,
 } from "../theory";
 
 const DISPLAY_FRETS = 14;
@@ -118,6 +122,12 @@ export class EarTrainingUI {
   private libFbEl: HTMLCanvasElement | null = null;
   private libFb: FretboardCanvas | null = null;
 
+  /** Workout tab: which collapsible groups are open + which spoilers are revealed. */
+  private workoutOpen = new Set<string>(["howto", "w1"]);
+  private workoutRevealed = new Set<string>();
+  /** Interval trainer's "♪ Song refs" overlay (same content as the Theory tab). */
+  private intervalRefsOpen = false;
+
   constructor(private ear: EarTrainingState, private state: AppState, private onBack: () => void, private onToLooper: (symbols: string[]) => void) {
     this.attachChallengeKeys();
   }
@@ -139,6 +149,7 @@ export class EarTrainingUI {
     [EarSubMode.AugDim]: "Aug / Dim",
     [EarSubMode.Intervals]: "Intervals",
     [EarSubMode.Drill]: "Drill",
+    [EarSubMode.Workout]: "Workout",
   };
 
   /** Sub-mode chip row (Signal move — replaces the sub-mode <select>):
@@ -150,7 +161,7 @@ export class EarTrainingUI {
     const ear = this.ear;
     const label = (s: EarSubMode) => EarTrainingUI.SUBMODE_LABEL[s];
     const primary = [EarSubMode.Progression, EarSubMode.Intervals, EarSubMode.Note2Chord];
-    const overflow = [EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim, EarSubMode.Drill];
+    const overflow = [EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim, EarSubMode.Drill, EarSubMode.Workout];
     const row = el("div", { class: "chip-row" });
     for (const s of primary) row.appendChild(chip(label(s), ear.progSubMode === s, () => ear.switchTab(s)));
 
@@ -468,9 +479,9 @@ export class EarTrainingUI {
     screen.appendChild(el("div", { class: "tool-topbar" }, topbarChildren));
 
     // Practice/Challenge segmented control (Signal move — replaces the mode
-    // <select>) + sub-mode chip row (replaces the sub-mode <select>). Drill has
-    // no practice/challenge split, so its segmented control is hidden.
-    if (ear.progSubMode !== EarSubMode.Drill) {
+    // <select>) + sub-mode chip row (replaces the sub-mode <select>). Drill and
+    // Workout have no practice/challenge split, so their control is hidden.
+    if (ear.progSubMode !== EarSubMode.Drill && ear.progSubMode !== EarSubMode.Workout) {
       screen.appendChild(el("div", { style: "margin-top:8px" }, [
         segmented(
           [{ value: EarMode.Practice, label: "Practice" }, { value: EarMode.Challenge, label: "Challenge" }],
@@ -507,6 +518,9 @@ export class EarTrainingUI {
       case EarSubMode.Drill:
         this.drillView(body);
         break;
+      case EarSubMode.Workout:
+        this.workoutView(body);
+        break;
     }
 
     // Transport dock (Signal move #2): replaces the per-view Play ▶/Stop ⏹
@@ -532,6 +546,7 @@ export class EarTrainingUI {
     container.appendChild(screen);
     if (this.statsOpen) container.appendChild(this.statsOverlay());
     if (this.libraryOpen) container.appendChild(this.libraryOverlay());
+    if (this.intervalRefsOpen) container.appendChild(this.intervalRefsOverlay());
     if (this.settingsSheetOpen) container.appendChild(this.generatorSettingsSheet(() => { this.settingsSheetOpen = false; this.rerender(); }));
     if (this.toneSheetOpen) container.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.rerender(); }));
 
@@ -1557,7 +1572,10 @@ export class EarTrainingUI {
         el("span", { class: "et-muted" }, [transposeLabel(ear.intervalTransposeSteps)]),
       ]));
       parent.appendChild(el("div", { class: "v-gap-12" }));
-      parent.appendChild(btn("Start challenge ▶", () => ear.startIntervalChallenge(), "btn primary"));
+      parent.appendChild(el("div", { class: "et-row-gap" }, [
+        btn("Start challenge ▶", () => ear.startIntervalChallenge(), "btn primary"),
+        btn("♪ Song refs", () => { this.intervalRefsOpen = true; this.rerender(); }),
+      ]));
       return;
     }
     if (ear.intervalChIndex >= ear.intervalChallengeTotal) {
@@ -1575,6 +1593,7 @@ export class EarTrainingUI {
       btn("Hear I–V–I", () => ear.playIntervalTonicCadence()),
       btn("♭", () => ear.intervalTranspose(-1)),
       btn("♯", () => ear.intervalTranspose(1)),
+      btn("♪ Song refs", () => { this.intervalRefsOpen = true; this.rerender(); }),
       el("span", { class: "et-muted" }, [transposeLabel(ear.intervalTransposeSteps)]),
     ]));
     parent.appendChild(el("div", { class: "v-gap-8" }));
@@ -1633,6 +1652,167 @@ export class EarTrainingUI {
       if (drilling) row.appendChild(this.drillControls());
       parent.appendChild(row);
     }
+  }
+
+  // ======================================================================================
+  // Workout — the first-2-months real-song curriculum (EarWorkout data; spec
+  // docs/superpowers/specs/2026-08-03-ear-workout-theory-tab-design.md)
+  // ======================================================================================
+
+  /** Collapsible group header (chevron accordion, multi-open). */
+  private workoutGroup(key: string, title: string, sub: string | null, build: () => HTMLElement[]): HTMLElement {
+    const open = this.workoutOpen.has(key);
+    const head = el("div", { style: "display:flex;gap:8px;align-items:baseline;cursor:pointer;padding:6px 0" }, [
+      el("span", { style: "flex:1;font-weight:700;color:var(--act)" }, [title]),
+      el("span", { style: "color:var(--act)" }, [open ? "▾" : "▸"]),
+    ]);
+    head.addEventListener("click", () => {
+      if (open) this.workoutOpen.delete(key); else this.workoutOpen.add(key);
+      this.rerender();
+    });
+    const children: HTMLElement[] = [head];
+    if (sub) children.push(el("div", { class: "et-muted", style: "font-size:12px;font-style:italic" }, [sub]));
+    if (open) children.push(...build());
+    return el("div", { class: "et-card", style: "margin-bottom:8px" }, children);
+  }
+
+  /** Tap-to-reveal spoiler + optional ▶ loop playback (fixed key C / Am). */
+  private workoutSpoiler(key: string, spoiler: string, loop: Progression | undefined): HTMLElement {
+    const revealed = this.workoutRevealed.has(key);
+    const wrap = el("div", { style: "margin-top:4px" });
+    const toggle = btn(revealed ? "Hide progression" : "Reveal progression", () => {
+      if (revealed) this.workoutRevealed.delete(key); else this.workoutRevealed.add(key);
+      this.rerender();
+    }, revealed ? "btn" : "btn primary");
+    wrap.appendChild(el("div", { class: "et-row-gap" }, [toggle]));
+    if (revealed) {
+      const children: HTMLElement[] = [el("div", { style: "font-size:14px" }, [spoiler])];
+      if (loop) {
+        const ear = this.ear;
+        const playing = ear.libPlayingId === `workout:${key}`;
+        const keyPc = loop.mode === TrainingMode.Major ? 0 : 9;
+        children.push(el("div", { style: "margin-top:4px" }, [
+          btn(playing ? "Stop ■" : "▶ Hear the loop", () => {
+            if (playing) ear.libraryStop();
+            else ear.libraryPlay(`workout:${key}`, resolveProgression(loop, keyPc, ChordTypeLevel.Triads));
+            this.rerender();
+          }, "btn"),
+        ]));
+      }
+      wrap.appendChild(el("div", {
+        style: "margin-top:6px;padding:8px;border-radius:8px;background:color-mix(in srgb, var(--scale-tone) 15%, transparent)",
+      }, children));
+    }
+    return wrap;
+  }
+
+  private workoutSessionCard(s: WorkoutSession): HTMLElement {
+    const line = (label: string, text: string) => el("div", { style: "font-size:13px;margin-top:3px" }, [
+      el("span", { style: "font-weight:600;color:var(--act)" }, [`${label}: `]), text,
+    ]);
+    const children: HTMLElement[] = [
+      el("div", { style: "font-weight:700" }, [`Session ${s.number} — ${s.title}`]),
+    ];
+    if (s.song) children.push(songLinkRow(s.song.title, s.song.artist, s.song.version ? `  (${s.song.version})` : ""));
+    if (s.songNote) children.push(el("div", { class: "et-muted", style: "font-size:12px;font-style:italic" }, [s.songNote]));
+    children.push(line("Focus", s.focus), line("Melody", s.melody), line("Harmonize", s.harmonization), line("Pass", s.passGoal));
+    if (s.spoiler) children.push(this.workoutSpoiler(`s${s.number}`, s.spoiler, s.loop));
+    return el("div", { style: "padding:8px 0;border-bottom:1px solid var(--surface2)" }, children);
+  }
+
+  private workoutDeepWeekCard(w: DeepWeek): HTMLElement {
+    const line = (label: string, text: string) => el("div", { style: "font-size:13px;margin-top:3px" }, [
+      el("span", { style: "font-weight:600;color:var(--act)" }, [`${label}: `]), text,
+    ]);
+    const children: HTMLElement[] = [
+      el("div", { style: "font-weight:700" }, [`Week ${w.week} — ${w.songTitle}`]),
+    ];
+    if (w.artist) children.push(songLinkRow(w.songTitle, w.artist, `  (${w.recording})`));
+    else children.push(el("div", { class: "et-muted", style: "font-size:12px" }, [w.recording]));
+    children.push(line("Section", w.section), line("Target", w.target), line("Melody", w.melodyTarget));
+    if (w.notGraded.length) {
+      children.push(el("div", { style: "font-size:13px;margin-top:3px" }, [
+        el("span", { style: "font-weight:600;color:var(--act)" }, ["Not graded: "]), w.notGraded.join(" · "),
+      ]));
+    }
+    children.push(el("div", { style: "font-size:13px;margin-top:3px" }, [
+      el("span", { style: "font-weight:600;color:var(--act)" }, ["Lab drills: "]), w.labDrills.join(" · "),
+    ]));
+    children.push(line("Passing", w.passing));
+    if (w.spoiler) children.push(this.workoutSpoiler(`d${w.week}`, w.spoiler, w.loop));
+    return el("div", { style: "padding:8px 0;border-bottom:1px solid var(--surface2)" }, children);
+  }
+
+  /** The Workout tab: real-song first-2-months curriculum, two tracks. */
+  private workoutView(parent: HTMLElement): void {
+    parent.appendChild(el("div", { class: "et-muted", style: "font-size:13px" }, [
+      "The first-2-months real-song plan (revised from your ChatGPT curriculum). Tap a song to open it, work the session, then reveal the progression to check yourself.",
+    ]));
+    parent.appendChild(el("div", { class: "v-gap-8" }));
+
+    parent.appendChild(this.workoutGroup("howto", "How to practice", null, () =>
+      WORKOUT_GLOBAL_RULES.map((r) => el("div", { style: "font-size:13px;margin-top:4px" }, [`• ${r}`]))));
+
+    parent.appendChild(this.workoutGroup("frame", "The 45-minute session frame", null, () =>
+      WORKOUT_SESSION_FRAME.map(([t, task]) => el("div", { style: "font-size:13px;margin-top:4px" }, [
+        el("span", { style: "font-weight:700;color:var(--act);min-width:44px;display:inline-block" }, [t]), task,
+      ]))));
+
+    parent.appendChild(this.workoutGroup("harm", "Harmonization constraints", null, () => [
+      el("div", { style: "font-size:13px;margin-top:4px" }, [WORKOUT_MONTH1_RULE]),
+      el("div", { style: "font-size:13px;margin-top:6px" }, [WORKOUT_MONTH2_RULE]),
+    ]));
+
+    // ---- Track A: 32 sessions in 8 collapsible weeks ----
+    parent.appendChild(el("div", { style: "font-weight:700;font-size:15px;margin:10px 0 2px" }, ["Track A — session plan (32 sessions)"]));
+    parent.appendChild(el("div", { class: "et-muted", style: "font-size:12px;margin-bottom:6px" }, [
+      `Month 1: ${WORKOUT_MONTH1_GOAL}  Month 2: ${WORKOUT_MONTH2_GOAL}`,
+    ]));
+    for (let week = 1; week <= 8; week++) {
+      const sessions = WORKOUT_SESSIONS.filter((s) => s.week === week);
+      parent.appendChild(this.workoutGroup(`w${week}`, `Week ${week}`,
+        sessions.map((s) => s.title).join(" · "),
+        () => sessions.map((s) => this.workoutSessionCard(s))));
+    }
+
+    // ---- Track B: the one-song-per-week deep plan ----
+    parent.appendChild(el("div", { style: "font-weight:700;font-size:15px;margin:10px 0 2px" }, ["Track B — deep track (one song per week)"]));
+    parent.appendChild(el("div", { class: "et-muted", style: "font-size:12px;margin-bottom:6px" }, [
+      "The stricter alternative: one named recording per week, bounded grading, sessions A–D (map / melody / lab / exam).",
+    ]));
+    for (const w of WORKOUT_DEEP_WEEKS) {
+      parent.appendChild(this.workoutGroup(`deep${w.week}`, `Week ${w.week} — ${w.songTitle}`, null,
+        () => [this.workoutDeepWeekCard(w)]));
+    }
+
+    parent.appendChild(this.workoutGroup("drills", "Train-ride synthetic drills", "Quick reaction, not deep analysis — separate from the 45-minute sessions.", () =>
+      WORKOUT_TRAIN_DRILLS.map(([cat, text]) => el("div", { style: "font-size:13px;margin-top:4px" }, [
+        el("span", { style: "font-weight:600;color:var(--act)" }, [`${cat}: `]), text,
+      ]))));
+
+    parent.appendChild(this.workoutGroup("exams", "Exam targets", "Diagnostic targets — a missed category names the next drill; it doesn't invalidate the month.", () => [
+      el("div", { style: "font-weight:600;margin-top:4px" }, ["Month 1"]),
+      ...WORKOUT_MONTH1_EXAM.map(([skill, target]) => el("div", { style: "font-size:13px;margin-top:2px" }, [`• ${skill} — ${target}`])),
+      el("div", { style: "font-weight:600;margin-top:8px" }, ["Month 2"]),
+      ...WORKOUT_MONTH2_EXAM.map(([skill, target]) => el("div", { style: "font-size:13px;margin-top:2px" }, [`• ${skill} — ${target}`])),
+    ]));
+
+    parent.appendChild(this.workoutGroup("notes", "Revision notes (what changed vs the PDFs)", null, () =>
+      WORKOUT_REVISION_NOTES.map((r) => el("div", { style: "font-size:13px;margin-top:4px" }, [`• ${r}`]))));
+  }
+
+  /** "♪ Song refs" overlay for the interval trainer — same content as the Theory tab. */
+  private intervalRefsOverlay(): HTMLElement {
+    const body = el("div", { class: "et-card", style: "max-width:520px;max-height:75vh;overflow:auto;margin:auto" }, [
+      el("div", { style: "display:flex;align-items:baseline;gap:8px;margin-bottom:8px" }, [
+        el("div", { style: "font-weight:700;font-size:16px;flex:1" }, ["Interval song references"]),
+        btn("Close", () => { this.intervalRefsOpen = false; this.rerender(); }, "btn text"),
+      ]),
+      intervalRefsContent(),
+    ]);
+    const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:50" }, [body]);
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) { this.intervalRefsOpen = false; this.rerender(); } });
+    return scrim;
   }
 
   /** The voicing + tempo panel shown under the row currently being drilled. */

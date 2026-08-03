@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.QueueMusic
 import app.guitar.theory.Instrument
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Hearing
+import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Settings
@@ -263,6 +264,7 @@ enum class TabDest(val sheet: Sheet, val label: String, val icon: ImageVector) {
     Decompose(Sheet.Decompose, "Decompose", Icons.Outlined.Extension),
     RhythmUnits(Sheet.RhythmUnits, "Rhythm", ShellIcons.RhythmNotes),
     Metronome(Sheet.Metronome, "Metronome", ShellIcons.Clock),
+    Theory(Sheet.Theory, "Theory", Icons.Outlined.MenuBook),
     // Guitar-only.
     ScalesTriads(Sheet.ScalesTriads, "Scales", Icons.Outlined.GridView),
     // Cavaquinho-only (filtered in the tab editor + More by instrument).
@@ -417,6 +419,7 @@ private fun destSubtitle(dest: TabDest): String = when (dest) {
     TabDest.RhythmUnits -> "Learn & train basic rhythmic units"
     TabDest.Metronome -> "Click track with selectable time signatures"
     TabDest.ScalesTriads -> "Guitar CAGED scales & triad practice"
+    TabDest.Theory -> "Interval song references & reference sheets — expanding"
 }
 
 /**
