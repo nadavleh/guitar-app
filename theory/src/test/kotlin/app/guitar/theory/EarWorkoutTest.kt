@@ -7,17 +7,22 @@ import kotlin.test.assertTrue
 class EarWorkoutTest {
 
     @Test
-    fun `curriculum is 4 months of 4 weeks of 4 sessions numbered 1-64`() {
-        assertEquals(4, EarWorkout.MONTHS.size)
-        assertEquals(listOf(1, 2, 3, 4), EarWorkout.MONTHS.map { it.number })
-        assertEquals(16, EarWorkout.WEEKS.size)
-        assertEquals((1..16).toList(), EarWorkout.WEEKS.map { it.week })
-        for (month in 1..4) {
+    fun `curriculum is 12 months of 4 weeks of 4 sessions numbered 1-192`() {
+        assertEquals(12, EarWorkout.MONTHS.size)
+        assertEquals((1..12).toList(), EarWorkout.MONTHS.map { it.number })
+        assertEquals(48, EarWorkout.WEEKS.size)
+        assertEquals((1..48).toList(), EarWorkout.WEEKS.map { it.week })
+        for (month in 1..12) {
             assertEquals(4, EarWorkout.WEEKS.count { it.month == month }, "month $month")
         }
         val sessions = EarWorkout.WEEKS.flatMap { it.sessions }
-        assertEquals(64, sessions.size)
-        assertEquals((1..64).toList(), sessions.map { it.number })
+        assertEquals(192, sessions.size)
+        assertEquals((1..192).toList(), sessions.map { it.number })
+        // Weeks must be numbered consistently with their month.
+        for (w in EarWorkout.WEEKS) assertEquals((w.week - 1) / 4 + 1, w.month, "week ${w.week}")
+        // Three phases, and every month declares which it belongs to.
+        assertEquals(3, EarWorkout.PHASES.size)
+        assertTrue(EarWorkout.MONTHS.all { it.phase.isNotEmpty() })
     }
 
     @Test
@@ -34,13 +39,19 @@ class EarWorkoutTest {
 
     @Test
     fun `student-choice sessions hide the reveal button - anchored sessions carry an answer key`() {
-        for (s in EarWorkout.WEEKS.flatMap { it.sessions }) {
+        val sessions = EarWorkout.WEEKS.flatMap { it.sessions }
+        // A student-choice/exam session has nothing to reveal, so it must not offer a spoiler.
+        for (s in sessions) {
             if (s.song == null) assertTrue(s.spoiler.isEmpty(), "session ${s.number} should have no spoiler")
         }
-        // Every week except the exam-heavy final one anchors at least one session with an answer key.
-        for (w in EarWorkout.WEEKS.dropLast(1)) {
-            assertTrue(w.sessions.any { it.spoiler.isNotEmpty() }, "week ${w.week} needs at least one answer key")
+        // Conversely, the anchored repertoire must be checkable: every named-song session in
+        // phases I–II (weeks 1–32, where transcription accuracy is the point) carries a key.
+        val phase12 = EarWorkout.WEEKS.filter { it.week <= 32 }.flatMap { it.sessions }
+        for (s in phase12.filter { it.song != null }) {
+            assertTrue(s.spoiler.isNotEmpty(), "session ${s.number} (${s.title}) needs an answer key")
         }
+        assertTrue(sessions.count { it.spoiler.isNotEmpty() } >= 60,
+            "expected a substantial answer key, got ${sessions.count { it.spoiler.isNotEmpty() }}")
     }
 
     @Test

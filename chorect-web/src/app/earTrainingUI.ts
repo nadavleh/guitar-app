@@ -22,7 +22,7 @@ import {
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow,
   ResolvedChord, ChordShape, resolveProgression, resolveNamed, resolveCircleWindow,
   WorkoutSession, WorkoutWeek, WORKOUT_WEEKS, WORKOUT_MONTHS,
-  WORKOUT_MASTER_GOALS, WORKOUT_PROFILE, WORKOUT_BOTTLENECKS, WORKOUT_GLOBAL_RULES, WORKOUT_SESSION_FRAME,
+  WORKOUT_MASTER_GOALS, WORKOUT_PHASES, WORKOUT_PROFILE, WORKOUT_BOTTLENECKS, WORKOUT_GLOBAL_RULES, WORKOUT_SESSION_FRAME,
   WORKOUT_MASTERY_RULE, WORKOUT_HARMONIZATION_LADDER, WORKOUT_TIME_SCALING, WORKOUT_EXPECTED_PROGRESS,
   WORKOUT_BERKLEE, WORKOUT_FUTURE_GOALS, WORKOUT_TRAIN_DRILLS, WORKOUT_REVISION_NOTES,
 } from "../theory";
@@ -1740,6 +1740,7 @@ export class EarTrainingUI {
       class: "et-card",
       style: "margin:12px 0 8px;background:color-mix(in srgb, var(--act) 12%, transparent)",
     }, [
+      el("div", { class: "et-muted", style: "font-size:11px;letter-spacing:0.5px" }, [m.phase.toUpperCase()]),
       el("div", { style: "font-weight:700;font-size:15px" }, [`MONTH ${m.number} — ${m.title}`]),
       el("div", { style: "font-size:13px;margin-top:4px" }, [m.objective]),
       this.workoutLine("Vocabulary", m.vocabulary),
@@ -1765,12 +1766,17 @@ export class EarTrainingUI {
   /** The Workout tab: the merged, expanded 4-month real-song curriculum. */
   private workoutView(parent: HTMLElement): void {
     parent.appendChild(el("div", { class: "et-muted", style: "font-size:13px" }, [
-      "One plan, 4 months · 16 weeks · 64 sessions. Every session is a real song run through the same 45-minute frame; every week trains harmony, melody, bass, harmonization and prediction together. Tap a song to open it, work the session, then reveal the answer to check yourself.",
+      "One plan, 12 months · 48 weeks · 192 sessions — the timeline your own curriculum settled on at ~3 h/week. Every session is a real song run through the same 45-minute frame; every week trains harmony, melody, bass, harmonization and prediction together. Tap a song to open it, work the session, then reveal the answer to check yourself.",
     ]));
     parent.appendChild(el("div", { class: "v-gap-8" }));
 
     parent.appendChild(this.workoutGroup("goals", "What you're aiming at", "The master goals everything else serves.", () =>
       WORKOUT_MASTER_GOALS.map(([k, v]) => el("div", { style: "font-size:13px;margin-top:4px" }, [
+        el("span", { style: "font-weight:600;color:var(--act)" }, [`${k} — `]), v,
+      ]))));
+
+    parent.appendChild(this.workoutGroup("phases", "The year in three phases", null, () =>
+      WORKOUT_PHASES.map(([k, v]) => el("div", { style: "font-size:13px;margin-top:4px" }, [
         el("span", { style: "font-weight:600;color:var(--act)" }, [`${k} — `]), v,
       ]))));
 
@@ -1796,8 +1802,8 @@ export class EarTrainingUI {
       el("div", { style: "font-size:13px;margin-top:4px" }, [WORKOUT_HARMONIZATION_LADDER]),
     ]));
 
-    // ---- The four months, each with its four weeks ----
-    for (let month = 1; month <= 4; month++) {
+    // ---- The twelve months, each with its four weeks ----
+    for (let month = 1; month <= 12; month++) {
       parent.appendChild(this.workoutMonthCard(month));
       for (const w of WORKOUT_WEEKS.filter((x) => x.month === month)) {
         parent.appendChild(this.workoutGroup(`w${w.week}`, `Week ${w.week} — ${w.title}`,

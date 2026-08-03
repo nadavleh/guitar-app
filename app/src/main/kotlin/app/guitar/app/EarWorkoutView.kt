@@ -55,14 +55,18 @@ internal fun WorkoutView(state: AppState, ear: EarTrainingState) {
     val toggleReveal = { key: String -> revealed = if (key in revealed) revealed - key else revealed + key }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Text("One plan, 4 months · 16 weeks · 64 sessions. Every session is a real song run through the " +
-            "same 45-minute frame; every week trains harmony, melody, bass, harmonization and prediction " +
-            "together. Tap a song to open it, work the session, then reveal the answer to check yourself.",
+        Text("One plan, 12 months · 48 weeks · 192 sessions — the timeline your own curriculum settled on " +
+            "at ~3 h/week. Every session is a real song run through the same 45-minute frame; every week " +
+            "trains harmony, melody, bass, harmonization and prediction together. Tap a song to open it, " +
+            "work the session, then reveal the answer to check yourself.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
 
         WorkoutGroup("goals", "What you're aiming at", "The master goals everything else serves.", open, toggleOpen) {
             for ((k, v) in EarWorkout.MASTER_GOALS) WorkoutLine(k, v)
+        }
+        WorkoutGroup("phases", "The year in three phases", null, open, toggleOpen) {
+            for ((k, v) in EarWorkout.PHASES) WorkoutLine(k, v)
         }
         WorkoutGroup("where", "Where you're starting from",
             "Your profile and the three bottlenecks this plan attacks.", open, toggleOpen) {
@@ -90,8 +94,8 @@ internal fun WorkoutView(state: AppState, ear: EarTrainingState) {
             WorkoutText(EarWorkout.HARMONIZATION_LADDER)
         }
 
-        // ---- The four months, each with its four weeks ----
-        for (month in 1..4) {
+        // ---- The twelve months, each with its four weeks ----
+        for (month in 1..12) {
             WorkoutMonthCard(month, open, toggleOpen)
             for (w in EarWorkout.WEEKS.filter { it.month == month }) {
                 WorkoutGroup("w${w.week}", "Week ${w.week} — ${w.title}",
@@ -181,6 +185,8 @@ private fun WorkoutMonthCard(month: Int, open: Set<String>, toggleOpen: (String)
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
         Column(Modifier.padding(12.dp)) {
+            Text(m.phase.uppercase(), style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("MONTH ${m.number} — ${m.title}", fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleSmall)
             WorkoutText(m.objective)
