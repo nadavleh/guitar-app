@@ -69,6 +69,23 @@ class AudioTrackEngine(
 
     private val mixer = VoiceMixer(sampleRate)
 
+    /** How long after the last sound the output thread keeps feeding the track before it
+     *  parks. Feeding it silence costs one (minimum-size) buffer of steady latency;
+     *  NOT feeding it is far worse — the track underruns, AudioFlinger drops it from the
+     *  active mix, and the audio HAL enters standby, so the next note pays codec warm-up
+     *  (tens to hundreds of ms). That warm-up is what makes play-on-touch-down feel late,
+     *  because every fretboard tap follows a silence. A practising user therefore keeps the
+     *  stream warm continuously, while a backgrounded or abandoned app still powers down. */
+    private val keepWarmNanos = 30_000_000_000L
+
+    /** Deadline until which the output thread keeps feeding the track. Started warm so the
+     *  very first tap after launch doesn't pay warm-up either. */
+    @Volatile private var warmDeadline = System.nanoTime() + keepWarmNanos
+
+    /** True while the output thread is feeding the track, so a new note starts immediately;
+     *  false while parked, meaning the next note pays HAL warm-up. Logged per note. */
+    @Volatile private var outputWarm = true
+
     /** When set, [playNote]/[playFrequency]/[playChord] play sampled voices from this
      *  bank instead of Karplus-Strong synthesis (M3). Drums ([playSamples]/[playSamplesAt])
      *  and the legacy engine are unaffected. Null = existing synth behavior (default). */
@@ -97,20 +114,31 @@ class AudioTrackEngine(
     }
 
     private fun runOutputLoop() {
-        // Idle: don't write silence — that would keep the AudioTrack ring buffer full
-        // of nothing, adding ~buffer_size of latency to the next note. Park briefly;
-        // when a voice is added we'll fall through and write immediately into a
-        // mostly-empty buffer.
+        // Keep the stream alive while idle by writing silence, rather than parking and
+        // letting the track drain: an unfed AudioTrack underruns, gets dropped from
+        // AudioFlinger's active mix, and lets the audio HAL fall into standby — so the
+        // next note waits for the codec to warm up before a single sample is heard.
+        // WRITE_BLOCKING paces the loop for us (it returns only when there's room), so
+        // no sleep is needed while warm. After [keepWarmNanos] with nothing sounding we
+        // do park, so an app left in the background stops drawing power.
         val chunkFrames = 128
         val l = FloatArray(chunkFrames)
         val r = FloatArray(chunkFrames)
         val chunk = ShortArray(chunkFrames * 2)
         while (running.get() && !Thread.currentThread().isInterrupted) {
-            if (mixer.activeCount == 0 && mixer.isRingingOut()) { try { Thread.sleep(3) } catch (_: InterruptedException) { return }; continue }
-            mixer.mixBlock(l, r, chunkFrames)
-            for (i in 0 until chunkFrames) {
-                chunk[2 * i] = (l[i] * 32767f).toInt().coerceIn(-32768, 32767).toShort()
-                chunk[2 * i + 1] = (r[i] * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+            if (nextOutputBlock(mixer, l, r, chunk, chunkFrames)) {
+                warmDeadline = System.nanoTime() + keepWarmNanos
+            } else if (System.nanoTime() - warmDeadline > 0) {
+                if (outputWarm) {
+                    outputWarm = false
+                    Log.i(TAG, "output parked after ${keepWarmNanos / 1_000_000_000} s idle — next note pays HAL warm-up")
+                }
+                try { Thread.sleep(3) } catch (_: InterruptedException) { return }
+                continue
+            }
+            if (!outputWarm) {
+                outputWarm = true
+                Log.i(TAG, "output resumed — stream warm again")
             }
             try {
                 if (track.write(chunk, 0, chunkFrames * 2, AudioTrack.WRITE_BLOCKING) < 0) break
@@ -160,6 +188,7 @@ class AudioTrackEngine(
                     "queue=${(tStart - tCall) / 1_000_000} ms " +
                     "synth=${(tEnd - tStart) / 1_000_000} ms " +
                     "add=${(tAdded - tEnd) / 1_000_000} ms " +
+                    "warm=$outputWarm " +
                     "bufFrames=${track.bufferSizeInFrames} " +
                     "head=${track.playbackHeadPosition}"
             )
@@ -278,8 +307,8 @@ class AudioTrackEngine(
 
     // Fade out rather than hard-cut: releaseAll() ramps every voice's envelope to
     // silence; mixBlock removes each once its envelope reports isSilent, so the
-    // idle-park `activeCount == 0` check in runOutputLoop naturally waits for the
-    // release tail to finish before the output thread stops writing.
+    // `activeCount == 0` check in nextOutputBlock naturally waits for the release
+    // tail to finish before the output falls back to writing silence.
     override fun stop() { mixer.releaseAll() }
 
     override fun cutReverb() { mixer.clearReverb() }
