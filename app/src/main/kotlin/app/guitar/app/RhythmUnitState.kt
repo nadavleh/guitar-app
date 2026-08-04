@@ -72,7 +72,7 @@ class RhythmUnitState(
     private fun cancelJob() { job?.cancel(); job = null }
 
     private suspend fun loop(u: RhythmUnit) {
-        val sr = 44100
+        val sr = audio.sampleRate
         val fractions = u.clickFractions()   // rests produce no click
         var nextBeatNanos = System.nanoTime()
         while (isPlaying) {
@@ -91,7 +91,7 @@ class RhythmUnitState(
         }
     }
 
-    private fun synthClick(freqHz: Double, ms: Int, sr: Int = 44100): FloatArray {
+    private fun synthClick(freqHz: Double, ms: Int, sr: Int = audio.sampleRate): FloatArray {
         val n = sr * ms / 1000
         val buf = FloatArray(n)
         val w = 2.0 * Math.PI * freqHz / sr

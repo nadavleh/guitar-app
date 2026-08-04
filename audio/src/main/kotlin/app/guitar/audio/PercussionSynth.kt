@@ -14,7 +14,7 @@ import kotlin.random.Random
  *
  * Pure Kotlin (deterministic noise via a seeded RNG) → unit-testable on the JVM.
  */
-class PercussionSynth(val sampleRate: Int = 44100) {
+class PercussionSynth(val sampleRate: Int = AudioRates.FALLBACK_RATE) {
 
     // Duplicated tracks ("surdo#2") synthesize like their base instrument.
     fun synthesize(instrument: PercussionInstrument, voiceIndex: Int): FloatArray = when (instrument.id.substringBefore('#')) {

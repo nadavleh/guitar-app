@@ -4,17 +4,20 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * Minimal RIFF/WAVE decoder → mono FloatArray at [targetRate] (default 44.1 kHz),
- * for loading bundled one-shot drum samples. Pure Kotlin (no Android), so it's
- * unit-testable on the JVM.
+ * Minimal RIFF/WAVE decoder → mono FloatArray at [targetRate], for loading bundled
+ * one-shot drum samples. Pure Kotlin (no Android), so it's unit-testable on the JVM.
  *
  * Supports PCM 8/16/24/32-bit and IEEE-float 32-bit, mono or multi-channel
  * (channels are averaged to mono). Sample rates other than [targetRate] are
  * linearly resampled.
+ *
+ * [targetRate] is deliberately required: it must be the engine's rate, since the engine
+ * interprets every buffer at that rate. Decoding at a fixed 44.1 kHz for an engine
+ * running at 48 kHz played every sample ~8.8% sharp.
  */
 object WavDecoder {
 
-    fun decode(bytes: ByteArray, targetRate: Int = 44100): FloatArray? {
+    fun decode(bytes: ByteArray, targetRate: Int): FloatArray? {
         if (bytes.size < 44) return null
         val bb = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
         if (bytes[0].toInt().toChar() != 'R' || bytes[1].toInt().toChar() != 'I' ||
@@ -77,18 +80,36 @@ object WavDecoder {
         return if (sampleRate == targetRate) mono else resample(mono, sampleRate, targetRate)
     }
 
-    /** Simple linear resampler. */
+    /**
+     * Catmull-Rom cubic resampler.
+     *
+     * Every bundled asset is 44.1 kHz, so on a 48 kHz device (the norm) EVERY sample now
+     * goes through this path — it stopped being a rare fallback when the engine moved to the
+     * device's native rate. Linear interpolation audibly dulls and roughens percussion
+     * transients; a 4-point cubic costs a few extra multiplies once at load time and is
+     * inaudible from the true waveform. Runtime cost is unchanged (buffers are cached).
+     */
     private fun resample(input: FloatArray, from: Int, to: Int): FloatArray {
         if (input.isEmpty() || from <= 0) return input
         val ratio = to.toDouble() / from
         val outLen = (input.size * ratio).toInt().coerceAtLeast(1)
         val out = FloatArray(outLen)
+        val last = input.size - 1
         for (i in 0 until outLen) {
             val src = i / ratio
-            val i0 = src.toInt()
-            val i1 = (i0 + 1).coerceAtMost(input.size - 1)
-            val frac = (src - i0).toFloat()
-            out[i] = input[i0] * (1 - frac) + input[i1] * frac
+            val i1 = src.toInt().coerceAtMost(last)
+            val t = (src - i1).toFloat()
+            // Clamp at the edges (repeat the boundary sample) so the kernel never reads
+            // outside the buffer — a one-shot starts and ends at silence anyway.
+            val p0 = input[(i1 - 1).coerceAtLeast(0)]
+            val p1 = input[i1]
+            val p2 = input[(i1 + 1).coerceAtMost(last)]
+            val p3 = input[(i1 + 2).coerceAtMost(last)]
+            // Catmull-Rom basis, Horner form.
+            val a = -0.5f * p0 + 1.5f * p1 - 1.5f * p2 + 0.5f * p3
+            val b = p0 - 2.5f * p1 + 2f * p2 - 0.5f * p3
+            val c = -0.5f * p0 + 0.5f * p2
+            out[i] = ((a * t + b) * t + c) * t + p1
         }
         return out
     }

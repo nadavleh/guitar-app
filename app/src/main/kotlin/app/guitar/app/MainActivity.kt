@@ -69,6 +69,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import app.guitar.audio.AudioEngine
+import app.guitar.audio.AudioRates
 import app.guitar.audio.AudioTrackEngine
 import app.guitar.audio.LegacyAudioTrackEngine
 import app.guitar.audio.SwitchableAudioEngine
@@ -86,13 +87,21 @@ class MainActivity : ComponentActivity() {
     // A/B scaffolding: run the new voice-graph engine and the legacy engine side by
     // side so the in-app toggle can compare them. Remove the legacy/switchable wrapper
     // (revert to plain `AudioTrackEngine()`) before shipping the overhaul.
-    private val audioEngine: AudioEngine = SwitchableAudioEngine(
-        modern = AudioTrackEngine(),
-        legacy = LegacyAudioTrackEngine(),
-    )
+    //
+    // Built in onCreate rather than as a field initializer: it reads the device's native
+    // output rate off AudioManager, which needs an attached Context.
+    private lateinit var audioEngine: AudioEngine
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Run at the device's native rate so Android grants the low-latency output path
+        // instead of resampling every note. Both engines share the rate so the A/B
+        // toggle can't invalidate cached sample buffers.
+        val nativeRate = AudioRates.outputRate(this)
+        audioEngine = SwitchableAudioEngine(
+            modern = AudioTrackEngine(nativeRate, AudioRates.framesPerBuffer(this)),
+            legacy = LegacyAudioTrackEngine(nativeRate),
+        )
         setContent {
             // Theme flag read straight from the repository so the theme wraps the
             // whole app (AppState is created inside App()).
@@ -120,7 +129,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        audioEngine.close()
+        if (::audioEngine.isInitialized) audioEngine.close()
         super.onDestroy()
     }
 }
@@ -131,22 +140,24 @@ fun App(audio: AudioEngine) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repo = remember { TuningRepository(context.applicationContext) }
-    // Loads bundled drum one-shots from assets/drums/<instrument>_<voice>.wav,
-    // decoded to mono 44.1 kHz; null → SambaLooperState falls back to the synth.
-    val drumSampleLoader = remember(context) {
+    // Loads bundled drum one-shots from assets/drums/<instrument>_<voice>.wav, decoded to
+    // mono at the ENGINE's rate (WavDecoder resamples) — decoding at a fixed 44.1 kHz while
+    // the engine runs at 48 kHz would play every drum ~8.8% sharp. Null → SambaLooperState
+    // falls back to the synth.
+    val drumSampleLoader = remember(context, audio.sampleRate) {
         loader@{ inst: app.guitar.theory.PercussionInstrument, voice: Int ->
             // Duplicated tracks ("surdo#2") share their base instrument's samples.
             val name = "drums/${inst.id.substringBefore('#')}_$voice.wav"
             runCatching {
                 context.applicationContext.assets.open(name).use { it.readBytes() }
-            }.getOrNull()?.let { app.guitar.audio.WavDecoder.decode(it) }
+            }.getOrNull()?.let { app.guitar.audio.WavDecoder.decode(it, audio.sampleRate) }
         }
     }
     // Loads a bundled guitar sample bank (assets/guitar/<inst>.json + wavs) for the
     // Sound picker; null → GuitarBankLoader falls back and AppState keeps the synth.
-    val guitarBankLoader = remember(context) {
+    val guitarBankLoader = remember(context, audio.sampleRate) {
         loader@{ inst: String ->
-            GuitarBankLoader.load(inst) { path ->
+            GuitarBankLoader.load(inst, audio.sampleRate) { path ->
                 runCatching { context.applicationContext.assets.open(path).use { it.readBytes() } }.getOrNull()
             }
         }

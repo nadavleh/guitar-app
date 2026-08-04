@@ -20,8 +20,13 @@ class TunerState(
     /** Function returning the current A4 reference frequency. Read on every analysis. */
     private val a4Provider: () -> Float,
 ) {
-    private val mic = MicInput()
-    private val detector = PitchDetector()
+    // The capture rate and the analysis rate MUST be the same value or every reading is
+    // off by their ratio, so they share one constant rather than two matching defaults.
+    // This is the INPUT path and is independent of the output engine's rate: 44.1 kHz is
+    // universally supported for AudioRecord, and a tuner cares about accuracy, not latency.
+    private val micRate = 44100
+    private val mic = MicInput(sampleRate = micRate)
+    private val detector = PitchDetector(sampleRate = micRate)
 
     /** Last detected fundamental in Hz, or null when no pitch is being heard. */
     var freqHz by mutableStateOf<Float?>(null)

@@ -30,7 +30,7 @@ class WavDecoderTest {
 
     @Test fun decodesPcm16MonoRoundTrip() {
         val src = FloatArray(1000) { sin(2 * PI * 440 * it / 44100).toFloat() * 0.5f }
-        val decoded = WavDecoder.decode(wav16(src, 44100))
+        val decoded = WavDecoder.decode(wav16(src, 44100), targetRate = 44100)
         assertNotNull(decoded)
         assertEquals(src.size, decoded.size)
         for (i in src.indices) assertTrue(kotlin.math.abs(src[i] - decoded[i]) < 1e-3f)
@@ -45,7 +45,37 @@ class WavDecoderTest {
     }
 
     @Test fun rejectsNonWav() {
-        assertEquals(null, WavDecoder.decode(ByteArray(10)))
-        assertEquals(null, WavDecoder.decode("not a wav file at all....".toByteArray()))
+        assertEquals(null, WavDecoder.decode(ByteArray(10), targetRate = 48000))
+        assertEquals(null, WavDecoder.decode("not a wav file at all....".toByteArray(), targetRate = 48000))
+    }
+
+    /** The bundled drum/guitar assets are 44.1 kHz files; on a 48 kHz engine they must come
+     *  back stretched to 48 kHz so they play at the right pitch and length. */
+    @Test fun resamples44kAssetsUpTo48k() {
+        val src = FloatArray(4410) { sin(2 * PI * 220 * it / 44100).toFloat() * 0.5f } // 0.1s @ 44100
+        val decoded = WavDecoder.decode(wav16(src, 44100), targetRate = 48000)
+        assertNotNull(decoded)
+        // 0.1 s at 48 kHz = 4800 samples (allow rounding slack).
+        assertTrue(decoded.size in 4700..4900, "got ${decoded.size}")
+    }
+
+    /** 44.1 -> 48 kHz is now the normal path for every bundled asset, so the interpolator
+     *  has to track the true waveform closely — not just land in the right ballpark. */
+    @Test fun resamplingStaysFaithfulToTheOriginalWaveform() {
+        val hz = 1000.0
+        val src = FloatArray(4410) { sin(2 * PI * hz * it / 44100).toFloat() * 0.5f }
+        val decoded = WavDecoder.decode(wav16(src, 44100), targetRate = 48000)
+        assertNotNull(decoded)
+        // Compare against the analytic 48 kHz sine, skipping the clamped edges.
+        var worst = 0f
+        for (i in 4 until decoded.size - 4) {
+            val expected = sin(2 * PI * hz * i / 48000).toFloat() * 0.5f
+            val err = kotlin.math.abs(decoded[i] - expected)
+            if (err > worst) worst = err
+        }
+        // Measured at this frequency: Catmull-Rom cubic errs by 2.3e-5, plain linear
+        // interpolation by 1.3e-3 (54x worse). The bound sits between them, so dropping
+        // back to linear interpolation fails this test rather than passing quietly.
+        assertTrue(worst < 2e-4f, "resampler drifts from the true waveform: worst err $worst")
     }
 }

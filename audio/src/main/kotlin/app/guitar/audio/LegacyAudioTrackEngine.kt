@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * This eliminates the per-tap pause/flush/play cycle that was causing glitches.
  */
 class LegacyAudioTrackEngine(
-    private val sampleRate: Int = 44100,
+    override val sampleRate: Int = AudioRates.FALLBACK_RATE,
 ) : AudioEngine {
 
     private val synth = PluckedSynth(sampleRate)

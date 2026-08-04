@@ -91,7 +91,7 @@ class RhythmPhraseState(
     }
 
     private suspend fun loop(p: RhythmPhrase) {
-        val sr = 44100
+        val sr = audio.sampleRate
         val total = p.totalSlots
         var nextOnsetNanos = System.nanoTime()
         var first = true
@@ -110,7 +110,7 @@ class RhythmPhraseState(
         }
     }
 
-    private fun synthClick(freqHz: Double, ms: Int, sr: Int = 44100): FloatArray {
+    private fun synthClick(freqHz: Double, ms: Int, sr: Int = audio.sampleRate): FloatArray {
         val n = sr * ms / 1000
         val buf = FloatArray(n)
         val w = 2.0 * Math.PI * freqHz / sr

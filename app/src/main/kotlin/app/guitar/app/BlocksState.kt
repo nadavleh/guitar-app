@@ -74,7 +74,7 @@ class BlocksState(
     fun toggleCountIn() { countIn = !countIn }
     private val mClick: FloatArray by lazy { synthWood(2000.0, 45) }
     private val mAccent: FloatArray by lazy { synthWood(2800.0, 45) }
-    private fun synthWood(freqHz: Double, ms: Int, sr: Int = 44100): FloatArray {
+    private fun synthWood(freqHz: Double, ms: Int, sr: Int = audio.sampleRate): FloatArray {
         val n = sr * ms / 1000
         val buf = FloatArray(n)
         val w = 2.0 * Math.PI * freqHz / sr
@@ -123,7 +123,7 @@ class BlocksState(
     fun deleteTrackPreset(label: String) { scope.launch { repo.deleteDrumTrackPreset(label) } }
 
     private var job: Job? = null
-    private val synth = PercussionSynth()
+    private val synth = PercussionSynth(audio.sampleRate)
     private val cache = HashMap<Pair<PercussionInstrument, Int>, FloatArray>()
 
     private fun buffer(inst: PercussionInstrument, voice: Int): FloatArray =
@@ -224,7 +224,7 @@ class BlocksState(
         if (isPlaying || block.isEmpty()) return
         isPlaying = true
         job = scope.launch {
-            val sr = 44100
+            val sr = audio.sampleRate
             val meter = PercussionMeter.DEFAULT   // phrases are 16 slots of 2/4 in 16ths
             var colStartNanos = System.nanoTime() + 60_000_000L
             // Count-in: two beats of 16th ticks (each beat's downbeat accented) before the loop.

@@ -2,6 +2,18 @@ package app.guitar.audio
 
 interface AudioEngine {
     /**
+     * Frames per second this engine renders at — the device's native output rate, so
+     * Android can grant the low-latency path instead of inserting a resampler.
+     *
+     * Everything that hands the engine a buffer or a frame count must derive it from
+     * here rather than assuming a constant: buffers passed to [playSamples] are
+     * interpreted at this rate, and [playSamplesAt]'s `delayFrames` is counted in it.
+     * Assuming 44.1 kHz while the engine runs at 48 kHz makes samples play ~8.8% sharp
+     * and sequencers run ~8.8% fast.
+     */
+    val sampleRate: Int
+
+    /**
      * Play a single MIDI note. Non-blocking; replaces any currently-playing note.
      * No-op if [midiNote] is outside 0..127.
      */
@@ -61,6 +73,7 @@ interface AudioEngine {
     companion object {
         /** A no-op engine for previews and tests. */
         val Silent: AudioEngine = object : AudioEngine {
+            override val sampleRate = AudioRates.FALLBACK_RATE
             override fun playNote(midiNote: Int, durationMillis: Int, timbre: Timbre) {}
             override fun playFrequency(freqHz: Float, durationMillis: Int, timbre: Timbre) {}
             override fun playChord(midiNotes: List<Int>, strumDelayMillis: Int, sustainMillis: Int, timbre: Timbre, bassBoost: Float) {}

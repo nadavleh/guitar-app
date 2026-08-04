@@ -28,7 +28,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  * This eliminates the per-tap pause/flush/play cycle that was causing glitches.
  */
 class AudioTrackEngine(
-    private val sampleRate: Int = 44100,
+    /** Must be the device's native output rate ([AudioRates.outputRate]) or Android
+     *  denies the low-latency path and resamples every note. */
+    override val sampleRate: Int = AudioRates.FALLBACK_RATE,
+    /** The HAL's burst size ([AudioRates.framesPerBuffer]); the output thread writes
+     *  in this quantum so its writes line up with what the HAL consumes. */
+    private val framesPerBuffer: Int = AudioRates.FALLBACK_FRAMES_PER_BUFFER,
 ) : AudioEngine {
 
     private val synth = PluckedSynth(sampleRate)
@@ -107,6 +112,7 @@ class AudioTrackEngine(
         Log.i(
             TAG,
             "engine init: sampleRate=$sampleRate " +
+                "framesPerBuffer=$framesPerBuffer " +
                 "minBufBytes=$systemMinBufferBytes (${systemMinBufferBytes * 1000.0 / (sampleRate * 2)} ms) " +
                 "trackBufFrames=${track.bufferSizeInFrames} (${track.bufferSizeInFrames * 1000.0 / sampleRate} ms) " +
                 "perfMode=LOW_LATENCY"
@@ -121,7 +127,7 @@ class AudioTrackEngine(
         // WRITE_BLOCKING paces the loop for us (it returns only when there's room), so
         // no sleep is needed while warm. After [keepWarmNanos] with nothing sounding we
         // do park, so an app left in the background stops drawing power.
-        val chunkFrames = 128
+        val chunkFrames = framesPerBuffer.coerceIn(32, 2048)
         val l = FloatArray(chunkFrames)
         val r = FloatArray(chunkFrames)
         val chunk = ShortArray(chunkFrames * 2)

@@ -16,6 +16,10 @@ class SwitchableAudioEngine(
     private val legacy: AudioEngine,
 ) : AudioEngine {
 
+    /** Both engines are built at the device's native rate, so cached sample buffers
+     *  stay valid across an A/B switch. Reported from the modern engine. */
+    override val sampleRate: Int get() = modern.sampleRate
+
     /** The modern voice-graph engine, exposed so callers can reach engine-specific
      *  knobs (e.g. [AudioTrackEngine.voiceInstrument]) that aren't part of the
      *  generic [AudioEngine] surface. */

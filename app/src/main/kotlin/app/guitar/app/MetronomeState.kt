@@ -72,7 +72,7 @@ class MetronomeState(
     fun release() = stop()
 
     private suspend fun loop() {
-        val sr = 44100
+        val sr = audio.sampleRate
         var nextBeatNanos = System.nanoTime()
         var beat = 0
         while (isPlaying) {
@@ -88,7 +88,7 @@ class MetronomeState(
         }
     }
 
-    private fun synthClick(freqHz: Double, ms: Int, sr: Int = 44100): FloatArray {
+    private fun synthClick(freqHz: Double, ms: Int, sr: Int = audio.sampleRate): FloatArray {
         val n = sr * ms / 1000
         val buf = FloatArray(n)
         val w = 2.0 * Math.PI * freqHz / sr

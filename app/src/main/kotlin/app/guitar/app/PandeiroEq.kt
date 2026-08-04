@@ -51,5 +51,5 @@ private fun highshelf(f0: Double, dB: Double, fs: Double): Biquad {
 }
 
 /** High-pass + high-shelf a pandeiro one-shot so it sits above the surdo. */
-fun pandeiroEq(samples: FloatArray, sampleRate: Int = 44100): FloatArray =
+fun pandeiroEq(samples: FloatArray, sampleRate: Int): FloatArray =
     apply(apply(samples, highpass(HP_HZ, HP_Q, sampleRate.toDouble())), highshelf(SHELF_HZ, SHELF_DB, sampleRate.toDouble()))

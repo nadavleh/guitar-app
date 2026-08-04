@@ -153,7 +153,7 @@ class SambaLooperState(
     }
     private val mClick: FloatArray by lazy { synthClick(2000.0, 45) }
     private val mAccent: FloatArray by lazy { synthClick(2800.0, 45) }
-    private fun synthClick(freqHz: Double, ms: Int, sr: Int = 44100): FloatArray {
+    private fun synthClick(freqHz: Double, ms: Int, sr: Int = audio.sampleRate): FloatArray {
         val n = sr * ms / 1000
         val buf = FloatArray(n)
         val w = 2.0 * Math.PI * freqHz / sr
@@ -287,7 +287,7 @@ class SambaLooperState(
     }
 
     private var job: Job? = null
-    private val synth = PercussionSynth()
+    private val synth = PercussionSynth(audio.sampleRate)
     private val cache = HashMap<Pair<PercussionInstrument, Int>, FloatArray>()
 
     private fun buffer(instrument: PercussionInstrument, voiceIndex: Int): FloatArray =
@@ -296,7 +296,7 @@ class SambaLooperState(
             val raw = sampleLoader(instrument, voiceIndex) ?: synth.synthesize(instrument, voiceIndex)
             // Pandeiro voices are high-passed + brightened so they clear the surdo's
             // low band (mirror of the web pandeiroEq). Applied once, then cached.
-            if (PercussionCatalog.baseId(instrument.id) == "pandeiro") pandeiroEq(raw) else raw
+            if (PercussionCatalog.baseId(instrument.id) == "pandeiro") pandeiroEq(raw, audio.sampleRate) else raw
         }
 
     /** Cycle a cell's voice and, if it became audible, preview the new voice. */
@@ -533,7 +533,7 @@ class SambaLooperState(
         if (isPlaying) return
         isPlaying = true
         job = scope.launch {
-            val sr = 44100
+            val sr = audio.sampleRate
             fun scheduleSlot(snapshot: PercussionPattern, slot: Int, delayMs: Long) {
                 val baseFrames = (delayMs * sr / 1000).toInt()
                 // Metronome click track: one click per beat, higher click on each bar's "1".
