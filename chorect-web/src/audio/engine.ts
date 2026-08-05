@@ -130,7 +130,12 @@ export class WebAudioEngine {
   private ensure(): AudioContext {
     if (!this.ctx) {
       const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.ctx = new Ctor();
+      // "interactive" asks the browser for the SMALLEST output buffer it will give us, which
+      // is what play-on-touch-down needs. It is nominally the spec default, but stating it
+      // explicitly is the documented way to request low latency and costs nothing where it
+      // already applies. (The remaining delay is the browser's own output latency — see
+      // latencyReport() — plus whatever the output device adds; Bluetooth adds 150-400 ms.)
+      this.ctx = new Ctor({ latencyHint: "interactive" });
       this.synth = new PluckedSynth(this.ctx.sampleRate);
 
       this.legacyMaster = this.ctx.createGain();
@@ -418,6 +423,25 @@ export class WebAudioEngine {
   /** The AudioContext sample rate (Hz) — for offline DSP like the pandeiro EQ. */
   get sampleRate(): number {
     return this.ensure().sampleRate;
+  }
+
+  /**
+   * What actually governs touch-to-sound delay in the browser, for the in-app readout.
+   *
+   * `baseLatency` is the buffering the browser's own audio graph adds; `outputLatency` also
+   * includes the OS and the output device, so it is the number that matches what you hear.
+   * Both are seconds; both may be 0/undefined on browsers that don't implement them.
+   * A Bluetooth output adds 150-400 ms that no code change can remove.
+   */
+  latencyReport(): { sampleRate: number; baseMs: number; outputMs: number; state: string } {
+    const ctx = this.ensure();
+    const out = (ctx as AudioContext & { outputLatency?: number }).outputLatency;
+    return {
+      sampleRate: ctx.sampleRate,
+      baseMs: (ctx.baseLatency ?? 0) * 1000,
+      outputMs: (out ?? 0) * 1000,
+      state: ctx.state,
+    };
   }
 
   /** Play a pre-rendered one-shot buffer (e.g. a percussion voice), scaled by [gain].

@@ -192,6 +192,11 @@ fun FretboardView(
             // touch-down"; detectTapGestures(onPress=…) could defer/cancel.
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
+                // How long the finger had already been down before this code ran. Touch
+                // events are delivered on the UI thread, so a janky frame delays them
+                // BEFORE the engine is even asked to play — latency the audio path can't
+                // explain. Recorded for the Settings readout.
+                InputLatencyProbe.record(down.uptimeMillis)
                 handler(down.position)
             }
         } else {

@@ -7,6 +7,7 @@
 
 import { Colors, withAlpha, boardColors, BoardPalette } from "./theme";
 import { FretMark, MarkKind } from "./marks";
+import { recordInputDispatch } from "./inputLatencyProbe";
 import { Tuning, FretPosition, fp, midiPitchClass, spellPc, stringCount } from "../theory";
 
 const OPEN_COL_FRAC = 0.08;
@@ -189,6 +190,10 @@ export class FretboardCanvas {
       this.dragged = false;
       // In strum mode taps fire on release only (a press may become a sweep).
       if (this.data?.playOnTouchDown && !this.data.strumMode) {
+        // How long the event waited before this handler ran: pointer events are dispatched
+        // on the main thread, so a busy frame delays the note before audio is involved at
+        // all. Both clocks are page-relative ms. Shown in Settings → Audio latency.
+        recordInputDispatch(performance.now() - e.timeStamp);
         const pos = this.hit(p.x, p.y);
         if (pos) { this.data.onTap(pos); this.addPluck(pos); }
       }

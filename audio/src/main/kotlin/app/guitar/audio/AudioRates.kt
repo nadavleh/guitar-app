@@ -1,6 +1,7 @@
 package app.guitar.audio
 
 import android.content.Context
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
 
 /**
@@ -39,4 +40,48 @@ object AudioRates {
     private fun property(context: Context, key: String): Int? =
         (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)
             ?.getProperty(key)?.toIntOrNull()
+
+    /**
+     * Where audio is currently being routed, and whether that route is inherently
+     * high-latency.
+     *
+     * This matters more than anything the engine does: Bluetooth A2DP buffers 150-400 ms
+     * inside the receiving device, entirely downstream of the app, the HAL and the DSP. No
+     * amount of engine tuning removes it — the only fix is wired output or the phone speaker.
+     */
+    fun outputRoute(context: Context): OutputRoute {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            ?: return OutputRoute("unknown", highLatency = false)
+        // API 31+ can report the route actually selected for media playback.
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            val attrs = android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build()
+            val type = runCatching { am.getAudioDevicesForAttributes(attrs).firstOrNull()?.type }
+                .getOrNull()
+            if (type != null) return describe(type)
+        }
+        // Older devices: no "current route" API, so infer from what's switched on.
+        @Suppress("DEPRECATION")
+        return when {
+            am.isBluetoothA2dpOn -> OutputRoute("Bluetooth (A2DP)", highLatency = true)
+            am.isWiredHeadsetOn -> OutputRoute("wired headset", highLatency = false)
+            else -> OutputRoute("phone speaker", highLatency = false)
+        }
+    }
+
+    private fun describe(type: Int): OutputRoute = when (type) {
+        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> OutputRoute("Bluetooth (A2DP)", highLatency = true)
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> OutputRoute("Bluetooth (SCO)", highLatency = true)
+        AudioDeviceInfo.TYPE_HEARING_AID -> OutputRoute("hearing aid", highLatency = true)
+        AudioDeviceInfo.TYPE_BLE_HEADSET, AudioDeviceInfo.TYPE_BLE_SPEAKER, AudioDeviceInfo.TYPE_BLE_BROADCAST ->
+            OutputRoute("Bluetooth LE", highLatency = true)
+        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> OutputRoute("phone speaker", highLatency = false)
+        AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET ->
+            OutputRoute("wired headphones", highLatency = false)
+        AudioDeviceInfo.TYPE_USB_HEADSET, AudioDeviceInfo.TYPE_USB_DEVICE ->
+            OutputRoute("USB audio", highLatency = false)
+        else -> OutputRoute("output type $type", highLatency = false)
+    }
 }

@@ -605,6 +605,9 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
         }
 
         Spacer(Modifier.height(10.dp))
+        AudioLatencyPanel(state)
+
+        Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Jazz / shell voicings", style = MaterialTheme.typography.bodyMedium)

@@ -43,8 +43,13 @@ class AudioTrackEngine(
         sampleRate, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT
     ).coerceAtLeast(2048)
 
-    // Use exactly the system min — anything bigger just adds latency in idle-skip mode.
+    // Allocate the system minimum — it is the size guaranteed to initialize. The size that
+    // actually governs latency is the EFFECTIVE size set below via setBufferSizeInFrames;
+    // requesting a tiny buffer here instead risks the track failing to build at all.
     private val bufferSizeBytes: Int = systemMinBufferBytes
+
+    /** The HAL's burst: the quantum the hardware consumes per wake-up. */
+    private val burstFrames: Int = framesPerBuffer.coerceIn(32, 2048)
 
     private val track: AudioTrack = AudioTrack.Builder()
         .setAudioAttributes(
@@ -91,6 +96,28 @@ class AudioTrackEngine(
      *  false while parked, meaning the next note pays HAL warm-up. Logged per note. */
     @Volatile private var outputWarm = true
 
+    /**
+     * Effective (NOT allocated) ring-buffer depth in frames — the engine's steady output
+     * latency, and the number worth minimizing.
+     *
+     * Because the output thread keeps the track continuously fed, a new note is only heard
+     * after the already-queued audio drains, so queued depth == delay. `getMinBufferSize()`
+     * is computed for the NORMAL mixer path and is typically several bursts deep, so leaving
+     * the buffer at that size hands back much of what the low-latency path was meant to save.
+     *
+     * Starts at two HAL bursts (the documented low-latency size, and what Oboe uses) and
+     * grows one burst at a time only if this particular device actually underruns — low
+     * latency by default, self-healing on hardware that can't sustain it.
+     */
+    @Volatile private var effectiveBufferFrames = 0
+        private set
+
+    private var lastUnderruns = 0
+
+    /** Last per-note timings, surfaced in [latencyReport] for the in-app readout. */
+    @Volatile private var lastQueueMs = -1L
+    @Volatile private var lastSynthMs = -1L
+
     /** When set, [playNote]/[playFrequency]/[playChord] play sampled voices from this
      *  bank instead of Karplus-Strong synthesis (M3). Drums ([playSamples]/[playSamplesAt])
      *  and the legacy engine are unaffected. Null = existing synth behavior (default). */
@@ -109,6 +136,10 @@ class AudioTrackEngine(
     }
 
     init {
+        // Shrink the queue to the low-latency depth. Done after build (not via
+        // setBufferSizeInBytes) so a device that refuses the small size still gets a
+        // working track at its own minimum.
+        applyEffectiveBuffer(burstFrames * 2)
         Log.i(
             TAG,
             "engine init: sampleRate=$sampleRate " +
@@ -118,6 +149,35 @@ class AudioTrackEngine(
                 "perfMode=LOW_LATENCY"
         )
     }
+
+    /** Set the effective queue depth, clamped to 1..8 bursts. Returns nothing; the granted
+     *  size (the device has the final say) is recorded in [effectiveBufferFrames]. */
+    private fun applyEffectiveBuffer(frames: Int) {
+        val want = frames.coerceIn(burstFrames, burstFrames * 8)
+        val got = try { track.setBufferSizeInFrames(want) } catch (e: Exception) {
+            Log.w(TAG, "setBufferSizeInFrames($want) threw", e); -1
+        }
+        effectiveBufferFrames = if (got > 0) got else track.bufferSizeInFrames
+        Log.i(
+            TAG,
+            "effective buffer = $effectiveBufferFrames frames " +
+                "(${"%.1f".format(effectiveBufferFrames * 1000.0 / sampleRate)} ms), " +
+                "requested $want, allocated ${track.bufferSizeInFrames}"
+        )
+    }
+
+    /** What actually governs touch-to-sound delay right now — for the in-app readout, so a
+     *  "still feels late" report can be answered with numbers instead of guesses. */
+    fun latencyReport(): AudioLatencyReport = AudioLatencyReport(
+        sampleRate = sampleRate,
+        halBurstFrames = burstFrames,
+        allocatedBufferFrames = track.bufferSizeInFrames,
+        effectiveBufferFrames = effectiveBufferFrames,
+        underruns = runCatching { track.underrunCount }.getOrDefault(-1),
+        outputWarm = outputWarm,
+        lastNoteQueueMs = lastQueueMs,
+        lastNoteSynthMs = lastSynthMs,
+    )
 
     private fun runOutputLoop() {
         // Keep the stream alive while idle by writing silence, rather than parking and
@@ -131,7 +191,23 @@ class AudioTrackEngine(
         val l = FloatArray(chunkFrames)
         val r = FloatArray(chunkFrames)
         val chunk = ShortArray(chunkFrames * 2)
+        var blocksSinceUnderrunCheck = 0
         while (running.get() && !Thread.currentThread().isInterrupted) {
+            // Every ~50 ms, let a device that genuinely can't sustain a 2-burst queue grow it
+            // a burst at a time. Underruns are audible glitches, so we trade the latency back
+            // only on hardware that demonstrably needs it — but check often enough that such
+            // a device converges in a fraction of a second instead of crackling for seconds.
+            if (++blocksSinceUnderrunCheck * chunkFrames >= sampleRate / 20) {
+                blocksSinceUnderrunCheck = 0
+                val u = runCatching { track.underrunCount }.getOrDefault(lastUnderruns)
+                if (u > lastUnderruns) {
+                    lastUnderruns = u
+                    if (effectiveBufferFrames < burstFrames * 8) {
+                        Log.i(TAG, "underruns=$u — growing the queue by one burst")
+                        applyEffectiveBuffer(effectiveBufferFrames + burstFrames)
+                    }
+                }
+            }
             if (nextOutputBlock(mixer, l, r, chunk, chunkFrames)) {
                 warmDeadline = System.nanoTime() + keepWarmNanos
             } else if (System.nanoTime() - warmDeadline > 0) {
@@ -188,6 +264,8 @@ class AudioTrackEngine(
                 releaseMs = timbre.releaseMs,
             )
             val tAdded = System.nanoTime()
+            lastQueueMs = (tStart - tCall) / 1_000_000
+            lastSynthMs = (tEnd - tStart) / 1_000_000
             Log.i(
                 TAG,
                 "midi=$midiNote " +

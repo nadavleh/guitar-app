@@ -9,6 +9,7 @@ import {
 import { icon, IconName } from "./icons";
 import { renderChallengeStatsOverlay } from "./statsOverlay";
 import { FretboardCanvas, FretboardData } from "./fretboardCanvas";
+import { inputDispatchReport } from "./inputLatencyProbe";
 import { computeMarks, scaleInfo, intervalName, shapeMarks } from "./marks";
 import { TunerState } from "./tunerState";
 import { EarTrainingState, EarSubMode } from "./earTrainingState";
@@ -1177,6 +1178,7 @@ export class App {
       "Off (default): notes play on tap-release, so swiping the neck won't sound a note. On: notes fire the instant you touch.",
       s.tapOnTouchDown, (v) => s.setTapOnTouchDown(v),
     ));
+    sheet.appendChild(this.audioLatencyPanel());
     sheet.appendChild(switchRow(
       "Jazz / shell voicings",
       "Drop the 5th (and root for 7+ chords); favor 2-4 note voicings.",
@@ -1194,6 +1196,51 @@ export class App {
 
   private sectionLabel(text: string): HTMLElement {
     return el("div", { class: "section-label" }, [text]);
+  }
+
+  /**
+   * Measured touch-to-sound budget (mirror of Android's AudioLatencyPanel).
+   *
+   * Perceived latency is hard to estimate by ear, and the biggest contributor is usually the
+   * output device rather than the app — Bluetooth buffers 150-400 ms downstream of the
+   * browser. `outputLatency` is the browser's own estimate including the OS and device, so
+   * it is the figure that corresponds to what you actually hear.
+   */
+  private audioLatencyPanel(): HTMLElement {
+    const card = el("div", { class: "latency-card" });
+    const render = () => {
+      card.textContent = "";
+      const r = this.state.audio.latencyReport();
+      card.appendChild(el("div", { class: "latency-title" }, ["Audio latency"]));
+      const row = (label: string, value: string) =>
+        card.appendChild(el("div", { class: "latency-row" }, [
+          el("span", { class: "latency-label" }, [label]),
+          el("span", {}, [value]),
+        ]));
+      row("Context rate", `${r.sampleRate} Hz`);
+      row("Graph latency", r.baseMs > 0 ? `${r.baseMs.toFixed(1)} ms` : "not reported");
+      row("Output latency", r.outputMs > 0 ? `${r.outputMs.toFixed(1)} ms` : "not reported");
+      row("Context state", r.state);
+      const d = inputDispatchReport();
+      row(
+        "Touch → app",
+        d.lastMs < 0 ? "— (tap the neck first)"
+          : `${d.lastMs.toFixed(1)} ms (worst ${d.worstMs.toFixed(1)} ms)`,
+      );
+      card.appendChild(el("div", { class: "latency-note" }, [
+        r.outputMs > 120
+          ? "That output latency is high for touch response. It is almost always a Bluetooth " +
+            "speaker or headphones buffering downstream of the browser — try wired output or " +
+            "the built-in speakers."
+          : "Output latency is the browser's own estimate, including the OS and the output " +
+            "device. Bluetooth adds 150-400 ms that no code change can remove.",
+      ]));
+      const btn = el("button", { class: "btn small" }, ["Refresh"]);
+      btn.addEventListener("click", render);
+      card.appendChild(btn);
+    };
+    render();
+    return card;
   }
 
   /** Settings → Personalize's 5 ACT-accent swatches: each circle is
