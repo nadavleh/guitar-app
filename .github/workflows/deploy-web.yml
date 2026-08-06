@@ -19,7 +19,12 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  # Must stay false. Pages publishes are serialized on GitHub's side, and
+  # cancelling a run mid-publish kills the deploy job while the Pages backend is
+  # still syncing the artifact to the CDN — which leaves the deployment stuck in
+  # "deployment_in_progress" forever and makes the next run queue behind it.
+  # This is also what GitHub's own official Pages starter workflow uses.
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -51,8 +56,17 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
-        with:
-          # Default is 10 min. GitHub's Pages backend has been reaching
-          # "deployment_in_progress" and then sitting there well past that, so the action
-          # aborted a deployment that was merely slow rather than dead. 25 min gives it room.
-          timeout: 1500000
+        # NOTE: do NOT add a `timeout:` above 600000 here. deploy-pages@v4 hard-caps
+        # this input at 600000 ms (10 min) and silently clamps anything larger with
+        # "timeout value is greater than the allowed maximum". So the 10-minute wall
+        # cannot be raised from the workflow.
+        #
+        # Consequence, seen on 2026-08-06: the Pages backend can publish the artifact
+        # to the CDN and still never flip its status API from "deployment_in_progress"
+        # to "success". The action then polls until the 10-minute cap, reports
+        # "Timeout reached, aborting!", and cancels a deployment that is ALREADY LIVE.
+        # So a red deploy job here does not prove the site is stale — before retrying,
+        # check the built asset hash in the build log against the one the live
+        # index.html references:
+        #   curl -s https://nadavleh.github.io/guitar-app/ | grep -o 'assets/index-[^"]*\.js'
+        # If they match, the deploy actually succeeded and no retry is needed.
