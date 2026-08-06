@@ -1187,6 +1187,22 @@ export class App {
 
     sheet.appendChild(el("div", { class: "divider-line" }));
 
+    // ----- Instrument volume: balances the played instrument against the drum machine,
+    // which has its own per-voice volumes. Stored per instrument (guitar vs cavaquinho are
+    // voiced differently), so the label names whichever one is selected. -----
+    sheet.appendChild(this.sectionLabel("Sound level"));
+    const volName = s.instrument === Instrument.Cavaquinho ? "Cavaquinho" : "Guitar";
+    const volVS = valueSlider((v) => `${volName} volume: ${Math.round(v)}%`, 0, 100,
+      s.instrumentVolumePct, (v) => s.setInstrumentVolumePct(v));
+    sheet.appendChild(el("div", { style: "margin-top:6px" }, [volVS.label]));
+    sheet.appendChild(volVS.input);
+    sheet.appendChild(el("div", { class: "settings-hint" }, [
+      "Level of the played notes and chords. The drum machine has its own per-voice volumes, " +
+      "so this sets the balance between the two.",
+    ]));
+
+    sheet.appendChild(el("div", { class: "divider-line" }));
+
     // ----- Tuner (A4 reference only; ring sustain/strum spread moved to Tone sheet in T6) -----
     sheet.appendChild(this.sectionLabel("Tuner"));
     const a4VS = valueSlider((v) => `A4 reference: ${Math.round(v)} Hz`, 435, 445, s.a4Hz, (v) => s.setA4Hz(v));

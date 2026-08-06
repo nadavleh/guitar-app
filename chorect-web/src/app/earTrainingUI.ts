@@ -124,7 +124,10 @@ export class EarTrainingUI {
   private libFb: FretboardCanvas | null = null;
 
   /** Workout tab: which collapsible groups are open + which spoilers are revealed. */
-  private workoutOpen = new Set<string>(["howto", "w1"]);
+  private workoutOpen = new Set<string>(["w1"]);
+  /** Last Workout scroll offset, kept so navigating away and back returns to the same
+   *  session rather than the top of the plan (mirrors EarTrainingState.workoutScroll). */
+  private workoutScroll = 0;
   private workoutRevealed = new Set<string>();
   /** Interval trainer's "♪ Song refs" overlay (same content as the Theory tab). */
   private intervalRefsOpen = false;
@@ -154,15 +157,17 @@ export class EarTrainingUI {
   };
 
   /** Sub-mode chip row (Signal move — replaces the sub-mode <select>):
-   *  Progressions/Intervals/Note→Chord are always-visible chips; Flavor/
+   *  Progressions/Intervals/Workout/Note→Chord are always-visible chips; Flavor/
    *  Inversions/AugDim live behind a "More ▾" overflow chip which shows the
    *  active sub-mode's name when it IS one of the overflowed ones, so the
    *  current mode is never hidden — mirrors Android's SubModeChipRow. */
   private subModeChipRow(): HTMLElement {
     const ear = this.ear;
     const label = (s: EarSubMode) => EarTrainingUI.SUBMODE_LABEL[s];
-    const primary = [EarSubMode.Progression, EarSubMode.Intervals, EarSubMode.Note2Chord];
-    const overflow = [EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim, EarSubMode.Drill, EarSubMode.Workout];
+    // Workout sits directly after Intervals, in the always-visible row — it's a daily
+    // destination, not something to go hunting for behind "More".
+    const primary = [EarSubMode.Progression, EarSubMode.Intervals, EarSubMode.Workout, EarSubMode.Note2Chord];
+    const overflow = [EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim, EarSubMode.Drill];
     const row = el("div", { class: "chip-row" });
     for (const s of primary) row.appendChild(chip(label(s), ear.progSubMode === s, () => ear.switchTab(s)));
 
@@ -521,6 +526,11 @@ export class EarTrainingUI {
         break;
       case EarSubMode.Workout:
         this.workoutView(body);
+        // Restore the scroll position. The DOM is rebuilt on every render and destroyed
+        // when navigating to the fretboard, which would otherwise dump the user back at the
+        // top of a 192-session plan each time they went to try a few notes on the neck.
+        requestAnimationFrame(() => { body.scrollTop = this.workoutScroll; });
+        body.addEventListener("scroll", () => { this.workoutScroll = body.scrollTop; }, { passive: true });
         break;
     }
 
@@ -898,6 +908,29 @@ export class EarTrainingUI {
     document.body.appendChild(scrim);
   }
 
+  /**
+   * Prominent warning for a progression with no tonic in it (e.g. IV V7 iii7 vi7).
+   *
+   * These are the genuinely hard ones: with no I chord to land on there's no home to measure
+   * the other functions against, so a wrong key guess stays wrong for all four bars. Previously
+   * flagged only in the library and drill lists — this states the same fact where you actually
+   * meet the progression, in Practice and in Challenge. Returns null when it doesn't apply.
+   */
+  private noTonicBanner(): HTMLElement | null {
+    const p = this.ear.progProgression;
+    if (!p || !progressionLacksTonic(p)) return null;
+    return el("div", {
+      style: "margin:6px 0;padding:8px 10px;border-radius:8px;background:rgba(211,47,47,0.18);" +
+        "border:1px solid rgba(211,47,47,0.55)",
+    }, [
+      el("div", { style: "font-weight:800;letter-spacing:0.5px" }, ["◆  NO TONIC  ◆"]),
+      el("div", { style: "font-size:12px;margin-top:2px" }, [
+        "This progression never lands on the tonic — one of the hard ones. " +
+        "Don't wait to hear home; judge each chord by its pull instead.",
+      ]),
+    ]);
+  }
+
   private progressionView(parent: HTMLElement): void {
     const ear = this.ear;
     if (!ear.hasGenerated) {
@@ -913,6 +946,8 @@ export class EarTrainingUI {
     parent.appendChild(this.revealCard("Key & Mode", !ear.keyRevealed,
       spellPc(ear.progKey) + "  " + (ear.progMode === TrainingMode.Major ? "Major" : "Minor"),
       () => ear.toggleKeyModeReveal(), false));
+    const practiceNoTonic = this.noTonicBanner();
+    if (practiceNoTonic) parent.appendChild(practiceNoTonic);
     parent.appendChild(el("div", { class: "v-gap-12" }));
     parent.appendChild(this.chordSlots());
     parent.appendChild(el("div", { class: "v-gap-8" }));
@@ -1000,6 +1035,9 @@ export class EarTrainingUI {
         this.challengeDotStrip(),
       ]),
     ]));
+
+    const challengeNoTonic = this.noTonicBanner();
+    if (challengeNoTonic) parent.appendChild(challengeNoTonic);
 
     parent.appendChild(el("div", { class: "v-gap-8" }));
 
@@ -1722,13 +1760,10 @@ export class EarTrainingUI {
     if (s.songNote) {
       children.push(el("div", { class: "et-muted", style: "font-size:12px;font-style:italic" }, [s.songNote]));
     }
-    children.push(
-      this.workoutLine("Notice", s.focus),
-      this.workoutLine("Quality", s.quality),
-      this.workoutLine("Melody", s.melody),
-      this.workoutLine("Harmonize", s.harmonization),
-      this.workoutLine("Pass", s.passGoal),
-    );
+    // The per-session focus / quality / melody / harmonize / pass text is deliberately NOT
+    // shown: it repeated the 45-minute frame four times a week and buried the song. The
+    // method lives once in "About this plan"; the title carries the gist; the answer is
+    // behind Reveal. Only a genuine session-specific note (songNote, above) survives.
     if (s.spoiler) children.push(this.workoutSpoiler(`s${s.number}`, s.spoiler, s.loop));
     return el("div", { style: "padding:8px 0;border-bottom:1px solid var(--surface2)" }, children);
   }
@@ -1756,51 +1791,43 @@ export class EarTrainingUI {
   }
 
   private workoutWeekBody(w: WorkoutWeek): HTMLElement[] {
-    return [
-      this.workoutLine("Prediction drill", w.prediction),
-      this.workoutLine("Not graded", w.notGraded.join(" · ")),
-      ...w.sessions.map((s) => this.workoutSessionCard(s)),
-    ];
+    return w.sessions.map((s) => this.workoutSessionCard(s));
   }
 
   /** The Workout tab: the merged, expanded 4-month real-song curriculum. */
   private workoutView(parent: HTMLElement): void {
     parent.appendChild(el("div", { class: "et-muted", style: "font-size:13px" }, [
-      "One plan, 12 months · 48 weeks · 192 sessions — the timeline your own curriculum settled on at ~3 h/week. Every session is a real song run through the same 45-minute frame; every week trains harmony, melody, bass, harmonization and prediction together. Tap a song to open it, work the session, then reveal the answer to check yourself.",
+      "One plan, 12 months · 48 weeks · 192 sessions. Every session is a real song run through the same 45-minute frame. Tap a song to open it, work the session, then reveal the answer to check yourself.",
     ]));
     parent.appendChild(el("div", { class: "v-gap-8" }));
 
-    parent.appendChild(this.workoutGroup("goals", "What you're aiming at", "The master goals everything else serves.", () =>
-      WORKOUT_MASTER_GOALS.map(([k, v]) => el("div", { style: "font-size:13px;margin-top:4px" }, [
-        el("span", { style: "font-weight:600;color:var(--act)" }, [`${k} — `]), v,
-      ]))));
-
-    parent.appendChild(this.workoutGroup("phases", "The year in three phases", null, () =>
-      WORKOUT_PHASES.map(([k, v]) => el("div", { style: "font-size:13px;margin-top:4px" }, [
-        el("span", { style: "font-weight:600;color:var(--act)" }, [`${k} — `]), v,
-      ]))));
-
-    parent.appendChild(this.workoutGroup("where", "Where you're starting from", "Your profile and the three bottlenecks this plan attacks.", () => [
-      ...WORKOUT_PROFILE.map(([k, v]) => el("div", { style: "font-size:13px;margin-top:2px" }, [
-        el("span", { style: "font-weight:600" }, [`${k}: `]), v,
-      ])),
-      el("div", { style: "font-weight:600;margin-top:8px;color:var(--act)" }, ["The three bottlenecks"]),
-      ...WORKOUT_BOTTLENECKS.map((b) => el("div", { style: "font-size:13px;margin-top:4px" }, [`• ${b}`])),
-    ]));
-
-    parent.appendChild(this.workoutGroup("howto", "How to practise", null, () => [
-      ...WORKOUT_GLOBAL_RULES.map((r) => el("div", { style: "font-size:13px;margin-top:4px" }, [`• ${r}`])),
-      el("div", { style: "font-size:13px;margin-top:8px;font-weight:600" }, [WORKOUT_MASTERY_RULE]),
-    ]));
-
-    parent.appendChild(this.workoutGroup("frame", "The 45-minute session frame", "Identical every session — the 18–25 speed loop is the bottleneck drill.", () =>
-      WORKOUT_SESSION_FRAME.map(([t, task]) => el("div", { style: "font-size:13px;margin-top:4px" }, [
-        el("span", { style: "font-weight:700;color:var(--act);min-width:48px;display:inline-block" }, [t]), task,
-      ]))));
-
-    parent.appendChild(this.workoutGroup("ladder", "Harmonization constraint ladder", null, () => [
-      el("div", { style: "font-size:13px;margin-top:4px" }, [WORKOUT_HARMONIZATION_LADDER]),
-    ]));
+    // Everything that explains the plan rather than being the plan sits behind ONE collapsed
+    // header, so opening the tab lands on the actual months and weeks.
+    const sub = (text: string) => el("div", { style: "font-weight:600;margin-top:10px;color:var(--act)" }, [text]);
+    const pair = ([k, v]: readonly [string, string]) => el("div", { style: "font-size:13px;margin-top:3px" }, [
+      el("span", { style: "font-weight:600;color:var(--act)" }, [`${k}: `]), v,
+    ]);
+    const bullet = (t: string) => el("div", { style: "font-size:13px;margin-top:4px" }, [`• ${t}`]);
+    parent.appendChild(this.workoutGroup("about", "About this plan",
+      "Goals, phases, your profile, how to practise, the 45-minute frame.", () => [
+        sub("What you're aiming at"),
+        ...WORKOUT_MASTER_GOALS.map(pair),
+        sub("The year in three phases"),
+        ...WORKOUT_PHASES.map(pair),
+        sub("Where you're starting from"),
+        ...WORKOUT_PROFILE.map(pair),
+        sub("The three bottlenecks"),
+        ...WORKOUT_BOTTLENECKS.map(bullet),
+        sub("How to practise"),
+        ...WORKOUT_GLOBAL_RULES.map(bullet),
+        el("div", { style: "font-size:13px;margin-top:8px;font-weight:600" }, [WORKOUT_MASTERY_RULE]),
+        sub("The 45-minute session frame"),
+        ...WORKOUT_SESSION_FRAME.map(([t, task]) => el("div", { style: "font-size:13px;margin-top:4px" }, [
+          el("span", { style: "font-weight:700;color:var(--act);min-width:48px;display:inline-block" }, [t]), task,
+        ])),
+        sub("Harmonization constraint ladder"),
+        el("div", { style: "font-size:13px;margin-top:4px" }, [WORKOUT_HARMONIZATION_LADDER]),
+      ]));
 
     // ---- The twelve months, each with its four weeks ----
     for (let month = 1; month <= 12; month++) {

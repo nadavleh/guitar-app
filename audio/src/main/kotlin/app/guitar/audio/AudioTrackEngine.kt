@@ -240,7 +240,7 @@ class AudioTrackEngine(
                     // Samples ignore the synth's amplitude param, so map it to voice
                     // gain (0.6 = the Timbre default = unity) — keeps per-timbre level
                     // differences (e.g. the ear-training root boost) audible on samples.
-                    gain = (timbre.amplitude / 0.6).toFloat(),
+                    gain = (timbre.amplitude / 0.6).toFloat() * voiceLevel,
                     pan = Panner.forMidi(midiNote),
                     reverbSend = voiceReverbSend,
                     releaseMs = timbre.releaseMs,
@@ -259,6 +259,7 @@ class AudioTrackEngine(
             val tEnd = System.nanoTime()
             addVoice(
                 samples,
+                gain = voiceLevel,
                 pan = Panner.forMidi(midiNote),
                 reverbSend = voiceReverbSend,
                 releaseMs = timbre.releaseMs,
@@ -286,7 +287,7 @@ class AudioTrackEngine(
             val inst = voiceInstrument
             if (inst != null) {
                 val midi = Math.round(69 + 12 * (Math.log(freqHz.toDouble() / 440.0) / Math.log(2.0))).toInt().coerceIn(0, 127)
-                addVoiceSource(SampleSource(inst, midi), gain = (timbre.amplitude / 0.6).toFloat(),
+                addVoiceSource(SampleSource(inst, midi), gain = (timbre.amplitude / 0.6).toFloat() * voiceLevel,
                     reverbSend = voiceReverbSend, releaseMs = timbre.releaseMs)
                 return@execute
             }
@@ -298,7 +299,7 @@ class AudioTrackEngine(
                 amplitude = timbre.amplitude,
                 brightnessDecay = GUITAR_BRIGHTNESS_DECAY,
             )
-            addVoice(samples, reverbSend = voiceReverbSend, releaseMs = timbre.releaseMs)
+            addVoice(samples, gain = voiceLevel, reverbSend = voiceReverbSend, releaseMs = timbre.releaseMs)
         }
     }
 
@@ -315,7 +316,7 @@ class AudioTrackEngine(
             val inst = voiceInstrument
             // Samples ignore the synth's amplitude param, so fold it into the voice
             // gain (0.6 = the Timbre default = unity); synth buffers already bake it in.
-            val voiceGain = if (inst != null) (gain * timbre.amplitude / 0.6).toFloat() else gain
+            val voiceGain = (if (inst != null) (gain * timbre.amplitude / 0.6).toFloat() else gain) * voiceLevel
             notes.forEachIndexed { i, midi ->
                 val boost = 1f + bassBoost * ((maxMidi - midi).toFloat() / span)
                 val source: VoiceSource = if (inst != null) SampleSource(inst, midi)
@@ -406,6 +407,20 @@ class AudioTrackEngine(
         private set
 
     fun setReverbSend(amount: Float) { voiceReverbSend = amount.coerceIn(0f, 1f) }
+
+    /**
+     * Output level (0..1) for the MELODIC voices — [playNote], [playFrequency], [playChord]
+     * — i.e. the guitar/cavaquinho sound, set per instrument by the app.
+     *
+     * Deliberately NOT applied to [playSamples]/[playSamplesAt]: those are the drum machine,
+     * which already has its own per-instrument volumes. This is instrument level (balance
+     * against the drums), which is a different thing from a Timbre's amplitude (that shapes
+     * articulation within the voice).
+     */
+    @Volatile var voiceLevel: Float = 1f
+        private set
+
+    fun setVoiceLevel(level: Float) { voiceLevel = level.coerceIn(0f, 1f) }
 
     override fun close() {
         running.set(false)

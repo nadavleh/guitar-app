@@ -60,6 +60,7 @@ import app.guitar.theory.ChordLibrary
 import app.guitar.theory.ChordShapeGenerator
 import app.guitar.theory.ChordTypeLevel
 import app.guitar.theory.EarTraining
+import app.guitar.theory.Instrument
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
 import app.guitar.theory.ScaleLibrary
@@ -625,6 +626,30 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
                 }
             )
         }
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(8.dp))
+
+        // ----- Instrument volume: balances the played instrument against the drum machine.
+        // Stored per instrument (guitar vs cavaquinho are voiced differently), so the label
+        // names whichever one is selected. -----
+        SectionLabel("Sound level")
+        Spacer(Modifier.height(8.dp))
+        val volInstrument = if (state.instrument == Instrument.Cavaquinho) "Cavaquinho" else "Guitar"
+        Text("$volInstrument volume: ${state.instrumentVolumePct}%",
+            style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "Level of the played notes and chords. The drum machine has its own per-voice " +
+                "volumes, so this sets the balance between the two.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        androidx.compose.material3.Slider(
+            value = state.instrumentVolumePct.toFloat(),
+            onValueChange = { state.setInstrumentVolumePct(it.toInt()) },
+            valueRange = 0f..100f,
+        )
 
         Spacer(Modifier.height(12.dp))
         HorizontalDivider()

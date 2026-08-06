@@ -15,7 +15,7 @@ import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../au
 
 export const DISPLAY_FRETS = 14;
 /** App version shown beside the header wordmark. Keep in sync with package.json on release. */
-export const APP_VERSION = "2.60.0";
+export const APP_VERSION = "2.61.0";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 
@@ -118,6 +118,8 @@ interface Persisted {
   ringSustainMs: number;
   strumMs: number;
   tapOnTouchDown: boolean;
+  guitarVolumePct?: number;
+  cavaquinhoVolumePct?: number;
   sound: string;
   eq: Record<SoundName, EqSettings>;
   reverb: Record<SoundName, number>;
@@ -180,6 +182,12 @@ export class AppState {
 
   a4Hz = 440;
   ringSustainMs = 1500;
+
+  // Melodic-instrument volume, PER INSTRUMENT (guitar and cavaquinho are voiced and mixed
+  // differently, so one shared level would just need re-adjusting on every switch). Balances
+  // the played instrument against the drum machine, which has its own per-voice volumes.
+  guitarVolumePct = 100;
+  cavaquinhoVolumePct = 100;
   strumMs = 30;
   tapOnTouchDown = true;
 
@@ -213,6 +221,7 @@ export class AppState {
 
   constructor(public readonly audio: WebAudioEngine) {
     this.load();
+    this.pushInstrumentVolume();   // restore the persisted level for the loaded instrument
     // Cavaquinho opens on the G-major chord (by position, intervals); the display
     // state isn't persisted, so this seeds the default each launch for cavaquinho.
     if (this.instrument === Instrument.Cavaquinho) this.applyCavaquinhoFretboardDefaults();
@@ -265,6 +274,8 @@ export class AppState {
       if (typeof p.voicingShell === "boolean") this.voicingStyle = p.voicingShell ? VoicingStyle.Shell : VoicingStyle.Standard;
       if (typeof p.a4Hz === "number") this.a4Hz = p.a4Hz;
       if (typeof p.ringSustainMs === "number") this.ringSustainMs = p.ringSustainMs;
+      if (typeof p.guitarVolumePct === "number") this.guitarVolumePct = p.guitarVolumePct;
+      if (typeof p.cavaquinhoVolumePct === "number") this.cavaquinhoVolumePct = p.cavaquinhoVolumePct;
       if (typeof p.strumMs === "number") this.strumMs = p.strumMs;
       if (typeof p.tapOnTouchDown === "boolean") this.tapOnTouchDown = p.tapOnTouchDown;
       if (p.sound === "Synth" || p.sound === "Acoustic" || p.sound === "Nylon" || p.sound === "Electric") this.sound = p.sound;
@@ -328,6 +339,8 @@ export class AppState {
       ringSustainMs: this.ringSustainMs,
       strumMs: this.strumMs,
       tapOnTouchDown: this.tapOnTouchDown,
+      guitarVolumePct: this.guitarVolumePct,
+      cavaquinhoVolumePct: this.cavaquinhoVolumePct,
       sound: this.sound,
       eq: this.eq,
       reverb: this.reverb,
@@ -433,6 +446,7 @@ export class AppState {
       if (value === Instrument.Cavaquinho) this.applyCavaquinhoFretboardDefaults();
       else this.displayMode = DisplayMode.None;   // guitar opens with an empty board
     });
+    this.pushInstrumentVolume();   // each instrument carries its own level
   }
 
   /** Cavaquinho opens the fretboard on the G-major chord, shown by position with
@@ -530,6 +544,26 @@ export class AppState {
   }
   setTapOnTouchDown(v: boolean): void { this.commit(() => { this.tapOnTouchDown = v; }); }
   setA4Hz(v: number): void { this.commit(() => { this.a4Hz = Math.min(Math.max(Math.round(v), 435), 445); }); }
+  /** Volume of whichever instrument is selected, 0..100. */
+  get instrumentVolumePct(): number {
+    return this.instrument === Instrument.Cavaquinho ? this.cavaquinhoVolumePct : this.guitarVolumePct;
+  }
+
+  /** Push the selected instrument's level to the engine. Call after any volume change OR
+   *  after switching instrument (each instrument carries its own level). */
+  pushInstrumentVolume(): void {
+    this.audio.setVoiceLevel(this.instrumentVolumePct / 100);
+  }
+
+  setInstrumentVolumePct(v: number): void {
+    const clamped = Math.min(100, Math.max(0, Math.round(v)));
+    this.commit(() => {
+      if (this.instrument === Instrument.Cavaquinho) this.cavaquinhoVolumePct = clamped;
+      else this.guitarVolumePct = clamped;
+    });
+    this.pushInstrumentVolume();
+  }
+
   setRingSustainMs(v: number): void { this.commit(() => { this.ringSustainMs = Math.min(Math.max(Math.round(v), 300), 4000); }); }
   setStrumMs(v: number): void { this.commit(() => { this.strumMs = Math.min(Math.max(Math.round(v), 0), 150); }); }
   toggleVoicingStyle(shell: boolean): void { this.commit(() => { this.voicingStyle = shell ? VoicingStyle.Shell : VoicingStyle.Standard; this.chordPositionIndex = 0; }); }

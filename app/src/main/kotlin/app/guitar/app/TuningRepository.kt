@@ -144,6 +144,11 @@ class TuningRepository(private val context: Context) {
 
     private val keyRingSustain = intPreferencesKey("ring_sustain_ms")
 
+    // Melodic-instrument output level, per instrument (guitar and cavaquinho are voiced and
+    // mixed differently, so one shared slider would be wrong). Stored 0..100.
+    private val keyGuitarVolume = intPreferencesKey("guitar_volume_pct")
+    private val keyCavaquinhoVolume = intPreferencesKey("cavaquinho_volume_pct")
+
     /** Ring sustain in milliseconds (default 1500 = 1.5 s). */
     val ringSustainMs: Flow<Int> =
         context.tuningDataStore.data.map { prefs -> prefs[keyRingSustain] ?: 1500 }
@@ -152,6 +157,20 @@ class TuningRepository(private val context: Context) {
         context.tuningDataStore.edit { prefs ->
             prefs[keyRingSustain] = value
         }
+    }
+
+    val guitarVolumePct: Flow<Int> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyGuitarVolume] ?: 100 }
+
+    suspend fun setGuitarVolumePct(value: Int) {
+        context.tuningDataStore.edit { prefs -> prefs[keyGuitarVolume] = value }
+    }
+
+    val cavaquinhoVolumePct: Flow<Int> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyCavaquinhoVolume] ?: 100 }
+
+    suspend fun setCavaquinhoVolumePct(value: Int) {
+        context.tuningDataStore.edit { prefs -> prefs[keyCavaquinhoVolume] = value }
     }
 
     private val keyStrumMs = intPreferencesKey("strum_ms")

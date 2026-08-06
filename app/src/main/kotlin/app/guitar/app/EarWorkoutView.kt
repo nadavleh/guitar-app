@@ -20,10 +20,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
@@ -49,39 +46,42 @@ import app.guitar.theory.WorkoutWeek
  */
 @Composable
 internal fun WorkoutView(state: AppState, ear: EarTrainingState) {
-    var open by remember { mutableStateOf(setOf("goals", "w1")) }
-    var revealed by remember { mutableStateOf(setOf<String>()) }
-    val toggleOpen = { key: String -> open = if (key in open) open - key else open + key }
-    val toggleReveal = { key: String -> revealed = if (key in revealed) revealed - key else revealed + key }
+    // Open sections / revealed answers / scroll all live in EarTrainingState so a trip to the
+    // fretboard and back returns to the session being worked on (see its workout* fields).
+    val open = ear.workoutOpen
+    val revealed = ear.workoutRevealed
+    val toggleOpen = { key: String -> ear.toggleWorkoutOpen(key) }
+    val toggleReveal = { key: String -> ear.toggleWorkoutReveal(key) }
 
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Text("One plan, 12 months · 48 weeks · 192 sessions — the timeline your own curriculum settled on " +
-            "at ~3 h/week. Every session is a real song run through the same 45-minute frame; every week " +
-            "trains harmony, melody, bass, harmonization and prediction together. Tap a song to open it, " +
-            "work the session, then reveal the answer to check yourself.",
+    val scroll = rememberScrollState()
+    // Restore once per entry, after the content has been measured (a plain scrolling Column
+    // knows its full height, so this lands exactly where the user left off).
+    LaunchedEffect(Unit) { scroll.scrollTo(ear.workoutScroll) }
+    LaunchedEffect(scroll.value) { ear.workoutScroll = scroll.value }
+
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(scroll)) {
+        Text("One plan, 12 months · 48 weeks · 192 sessions. Every session is a real song run " +
+            "through the same 45-minute frame. Tap a song to open it, work the session, then " +
+            "reveal the answer to check yourself.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
 
-        WorkoutGroup("goals", "What you're aiming at", "The master goals everything else serves.", open, toggleOpen) {
+        // Everything that explains the plan rather than being the plan sits behind ONE
+        // collapsed header, so opening the tab lands on the actual months and weeks.
+        WorkoutGroup("about", "About this plan", "Goals, phases, your profile, how to practise, the 45-minute frame.", open, toggleOpen) {
+            WorkoutSubHeading("What you're aiming at")
             for ((k, v) in EarWorkout.MASTER_GOALS) WorkoutLine(k, v)
-        }
-        WorkoutGroup("phases", "The year in three phases", null, open, toggleOpen) {
+            WorkoutSubHeading("The year in three phases")
             for ((k, v) in EarWorkout.PHASES) WorkoutLine(k, v)
-        }
-        WorkoutGroup("where", "Where you're starting from",
-            "Your profile and the three bottlenecks this plan attacks.", open, toggleOpen) {
+            WorkoutSubHeading("Where you're starting from")
             for ((k, v) in EarWorkout.PROFILE) WorkoutLine(k, v)
-            Text("The three bottlenecks", fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
+            WorkoutSubHeading("The three bottlenecks")
             for (b in EarWorkout.BOTTLENECKS) WorkoutText("• $b")
-        }
-        WorkoutGroup("howto", "How to practise", null, open, toggleOpen) {
+            WorkoutSubHeading("How to practise")
             for (r in EarWorkout.GLOBAL_RULES) WorkoutText("• $r")
             Text(EarWorkout.MASTERY_RULE, style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
-        }
-        WorkoutGroup("frame", "The 45-minute session frame",
-            "Identical every session — the 18–25 speed loop is the bottleneck drill.", open, toggleOpen) {
+            WorkoutSubHeading("The 45-minute session frame")
             for ((t, task) in EarWorkout.SESSION_FRAME) {
                 Row(Modifier.padding(top = 4.dp)) {
                     Text(t, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
@@ -89,8 +89,7 @@ internal fun WorkoutView(state: AppState, ear: EarTrainingState) {
                     Text(task, style = MaterialTheme.typography.bodySmall)
                 }
             }
-        }
-        WorkoutGroup("ladder", "Harmonization constraint ladder", null, open, toggleOpen) {
+            WorkoutSubHeading("Harmonization constraint ladder")
             WorkoutText(EarWorkout.HARMONIZATION_LADDER)
         }
 
@@ -212,11 +211,17 @@ private fun WorkoutWeekBody(
     revealed: Set<String>,
     toggleReveal: (String) -> Unit,
 ) {
-    WorkoutLine("Prediction drill", w.prediction)
-    WorkoutLine("Not graded", w.notGraded.joinToString(" · "))
     for (s in w.sessions) WorkoutSessionCard(ear, s, revealed, toggleReveal)
 }
 
+/**
+ * One session: what to play, and only a note if that session has something you'd actually
+ * need told to you.
+ *
+ * The per-session focus / quality / melody / harmonize / pass text is deliberately NOT shown —
+ * it repeated the 45-minute frame four times per week and buried the song. The method lives
+ * once in "About this plan"; the session title carries the gist; the answer is behind Reveal.
+ */
 @Composable
 private fun WorkoutSessionCard(
     ear: EarTrainingState,
@@ -233,14 +238,16 @@ private fun WorkoutSessionCard(
             Text(note, style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        WorkoutLine("Notice", s.focus)
-        WorkoutLine("Quality", s.quality)
-        WorkoutLine("Melody", s.melody)
-        WorkoutLine("Harmonize", s.harmonization)
-        WorkoutLine("Pass", s.passGoal)
         if (s.spoiler.isNotEmpty()) WorkoutSpoiler(ear, "s${s.number}", s.spoiler, s.loop, revealed, toggleReveal)
         HorizontalDivider(modifier = Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
     }
+}
+
+/** Section heading inside the single "About this plan" group. */
+@Composable
+private fun WorkoutSubHeading(text: String) {
+    Text(text, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary,
+        style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 10.dp))
 }
 
 /** Tap-to-reveal spoiler + optional ▶ loop playback (fixed key C / Am). */

@@ -545,6 +545,27 @@ class EarTrainingState(
     // inversion so the 5th's position (above/below the root) is controllable —
     // shell drops the 5th, so the override switches to a fuller voicing.
 
+    // ---------- Workout tab view state ----------
+    // Held here, not remembered inside WorkoutView, because navigating to the fretboard to
+    // try a few notes disposes the ear screen. Losing the open sections and the scroll
+    // position would dump the user back at the top of a 192-session plan every time they
+    // went to touch the neck — so it lives with the state that outlives the screen.
+
+    /** Keys of the expanded accordion sections. */
+    var workoutOpen by mutableStateOf(setOf("w1"))
+    /** Keys of the sessions whose answer is currently revealed. */
+    var workoutRevealed by mutableStateOf(setOf<String>())
+    /** Last vertical scroll offset, in pixels. */
+    var workoutScroll by mutableStateOf(0)
+
+    fun toggleWorkoutOpen(key: String) {
+        workoutOpen = if (key in workoutOpen) workoutOpen - key else workoutOpen + key
+    }
+
+    fun toggleWorkoutReveal(key: String) {
+        workoutRevealed = if (key in workoutRevealed) workoutRevealed - key else workoutRevealed + key
+    }
+
     var drillKey by mutableStateOf<String?>(null)
         private set
     var drillProg by mutableStateOf<Progression?>(null)

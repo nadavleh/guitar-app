@@ -49,6 +49,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -238,8 +239,10 @@ private fun subModeLabel(s: EarSubMode): String = when (s) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SubModeChipRow(ear: EarTrainingState) {
-    val primaryChips = listOf(EarSubMode.Progression, EarSubMode.Intervals, EarSubMode.Note2Chord)
-    val overflowChips = listOf(EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim, EarSubMode.Drill, EarSubMode.Workout)
+    // Workout sits directly after Intervals, in the always-visible row — it's a daily
+    // destination, not something to go hunting for behind "More".
+    val primaryChips = listOf(EarSubMode.Progression, EarSubMode.Intervals, EarSubMode.Workout, EarSubMode.Note2Chord)
+    val overflowChips = listOf(EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim, EarSubMode.Drill)
     var moreOpen by remember { mutableStateOf(false) }
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -443,6 +446,8 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
             modifier = Modifier.width(150.dp),
             contentSizeSp = 15,
         )
+
+        NoTonicBanner(ear)
 
         Spacer(Modifier.height(12.dp))
 
@@ -1412,6 +1417,8 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                 ChallengeDotStrip(ear)
             }
         }
+
+        NoTonicBanner(ear)
 
         Spacer(Modifier.height(10.dp))
 
@@ -2763,6 +2770,40 @@ internal fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
  *  anchors the key, so it's harder to place by ear — flagged as "difficult". */
 private fun tonicMark(p: Progression): String =
     if (EarTraining.progressionLacksTonic(p)) "   ◆ no-tonic (hard)" else ""
+
+/**
+ * Prominent warning for a progression with no tonic in it (e.g. IV V7 iii7 vi7).
+ *
+ * These are the genuinely hard ones: with no I chord to land on, there's no home to measure
+ * the other functions against, so a wrong key guess stays wrong for all four bars. It was
+ * previously flagged only in the library and drill lists — this is the same fact, stated where
+ * you actually meet the progression, in Practice and in Challenge.
+ */
+@Composable
+private fun NoTonicBanner(ear: EarTrainingState) {
+    val prog = ear.progProgression ?: return
+    if (!EarTraining.progressionLacksTonic(prog)) return
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+    ) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text(
+                "◆  NO TONIC  ◆",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Text(
+                "This progression never lands on the tonic — one of the hard ones. " +
+                    "Don't wait to hear home; judge each chord by its pull instead.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+    }
+}
 
 @Composable
 private fun ProgressionLibraryDialog(state: AppState, onDismiss: () -> Unit) {

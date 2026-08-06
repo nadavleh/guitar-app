@@ -65,6 +65,15 @@ export class WebAudioEngine {
 
   // Per-sound reverb send (0..1) for MODERN guitar voices; set per selected Sound.
   private voiceReverbSend = 0.03;
+  /**
+   * Output level (0..1) for the MELODIC voices — notes and chords, i.e. the guitar/cavaquinho
+   * sound, set per instrument by the app.
+   *
+   * Deliberately NOT applied to playSamples(): that's the drum machine, which has its own
+   * per-instrument volumes. This is instrument level (balance against the drums), distinct
+   * from a Timbre's amplitude, which shapes articulation within the voice.
+   */
+  private voiceLevel = 1;
 
   /** Set the per-voice reverb send amount (0..1) for subsequently-played modern voices. */
   setReverbSend(amount: number): void {
@@ -222,7 +231,14 @@ export class WebAudioEngine {
     buffer.getChannelData(0).set(samples);
     const src = ctx.createBufferSource();
     src.buffer = buffer;
-    src.connect(this.legacyMaster!);
+    if (this.voiceLevel >= 1) {
+      src.connect(this.legacyMaster!);
+    } else {
+      const lvl = ctx.createGain();
+      lvl.gain.value = this.voiceLevel;
+      src.connect(lvl);
+      lvl.connect(this.legacyMaster!);
+    }
     const entry: ActiveVoice = { src };
     src.onended = () => {
       this.active.delete(entry);
@@ -248,7 +264,7 @@ export class WebAudioEngine {
 
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, startT);
-    env.gain.linearRampToValueAtTime(level, startT + 0.003);
+    env.gain.linearRampToValueAtTime(level * this.voiceLevel, startT + 0.003);
 
     const panner = ctx.createStereoPanner();
     panner.pan.value = pan;
@@ -295,7 +311,7 @@ export class WebAudioEngine {
 
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, startT);
-    env.gain.linearRampToValueAtTime(level, startT + 0.003);
+    env.gain.linearRampToValueAtTime(level * this.voiceLevel, startT + 0.003);
 
     const panner = ctx.createStereoPanner();
     panner.pan.value = pan;
@@ -423,6 +439,11 @@ export class WebAudioEngine {
   /** The AudioContext sample rate (Hz) — for offline DSP like the pandeiro EQ. */
   get sampleRate(): number {
     return this.ensure().sampleRate;
+  }
+
+  /** Set the melodic-instrument output level (0..1). See [voiceLevel]. */
+  setVoiceLevel(level: number): void {
+    this.voiceLevel = Math.min(1, Math.max(0, level));
   }
 
   /**

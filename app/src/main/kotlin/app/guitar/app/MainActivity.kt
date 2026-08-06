@@ -173,6 +173,8 @@ fun App(audio: AudioEngine) {
     val persistedSustain by repo.ringSustainMs.collectAsState(initial = 1500)
     val persistedStrum by repo.strumMs.collectAsState(initial = 30)
     val persistedTapOnTouchDown by repo.tapOnTouchDown.collectAsState(initial = true)
+    val persistedGuitarVol by repo.guitarVolumePct.collectAsState(initial = 100)
+    val persistedCavaquinhoVol by repo.cavaquinhoVolumePct.collectAsState(initial = 100)
     val persistedInstrument by repo.instrument.collectAsState(initial = app.guitar.theory.Instrument.Guitar.name)
 
     LaunchedEffect(savedSelected, customTunings) {
@@ -193,6 +195,9 @@ fun App(audio: AudioEngine) {
     LaunchedEffect(persistedSustain) { state.ringSustainMs = persistedSustain }
     LaunchedEffect(persistedStrum) { state.strumMs = persistedStrum }
     LaunchedEffect(persistedTapOnTouchDown) { state.tapOnTouchDown = persistedTapOnTouchDown }
+    LaunchedEffect(persistedGuitarVol, persistedCavaquinhoVol) {
+        state.applyPersistedVolumes(persistedGuitarVol, persistedCavaquinhoVol)
+    }
     // Instrument + label restore, combined so cavaquinho can seed its fretboard default
     // (G by position, intervals) ONCE on first resolution — after which the user's own
     // label choice is honored. Guitar just restores the persisted label mode.

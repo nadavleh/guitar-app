@@ -94,6 +94,7 @@ class AppState(
         isEditedTuning = false
         if (value == Instrument.Cavaquinho) applyCavaquinhoFretboardDefaults()
         else displayMode = DisplayMode.None   // guitar opens with an empty board
+        pushInstrumentVolume()   // each instrument carries its own level
         scope.launch {
             repo.setInstrument(value.name)
             repo.setSelected(defaultName)
@@ -226,6 +227,47 @@ class AppState(
     private fun pushReverb(s: GuitarSound) {
         if (s != sound) return
         (audio as? app.guitar.audio.SwitchableAudioEngine)?.modernEngine?.setReverbSend(reverbFor(s))
+    }
+
+    // ---------- Melodic-instrument volume (guitar / cavaquinho) ----------
+    // Balances the played instrument against the drum machine, which has its own per-voice
+    // volumes. Kept PER INSTRUMENT: the guitar and cavaquinho are voiced and sampled
+    // differently, so one shared level would just have to be re-adjusted on every switch.
+    // (This is instrument level — distinct from a Timbre's amplitude, which shapes
+    // articulation contrast inside the voice.)
+
+    var guitarVolumePct by mutableStateOf(100)
+        private set
+    var cavaquinhoVolumePct by mutableStateOf(100)
+        private set
+
+    /** Volume of whichever instrument is selected, 0..100. */
+    val instrumentVolumePct: Int
+        get() = if (instrument == Instrument.Cavaquinho) cavaquinhoVolumePct else guitarVolumePct
+
+    /** Push the selected instrument's level to the engine. Call after any change to the
+     *  volumes OR to the selected instrument. */
+    fun pushInstrumentVolume() {
+        (audio as? app.guitar.audio.SwitchableAudioEngine)?.modernEngine
+            ?.setVoiceLevel(instrumentVolumePct / 100f)
+    }
+
+    fun setInstrumentVolumePct(value: Int) {
+        val clamped = value.coerceIn(0, 100)
+        if (instrument == Instrument.Cavaquinho) cavaquinhoVolumePct = clamped
+        else guitarVolumePct = clamped
+        pushInstrumentVolume()
+        scope.launch {
+            if (instrument == Instrument.Cavaquinho) repo.setCavaquinhoVolumePct(clamped)
+            else repo.setGuitarVolumePct(clamped)
+        }
+    }
+
+    /** Restore persisted volumes on launch (see MainActivity's LaunchedEffect). */
+    fun applyPersistedVolumes(guitarPct: Int, cavaquinhoPct: Int) {
+        guitarVolumePct = guitarPct.coerceIn(0, 100)
+        cavaquinhoVolumePct = cavaquinhoPct.coerceIn(0, 100)
+        pushInstrumentVolume()
     }
 
     fun setReverb(s: GuitarSound, amount: Float) {
