@@ -51,3 +51,8 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # Default is 10 min. GitHub's Pages backend has been reaching
+          # "deployment_in_progress" and then sitting there well past that, so the action
+          # aborted a deployment that was merely slow rather than dead. 25 min gives it room.
+          timeout: 1500000
