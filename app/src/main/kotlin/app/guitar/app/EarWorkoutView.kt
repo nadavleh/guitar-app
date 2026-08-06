@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,6 +35,10 @@ import app.guitar.theory.Progression
 import app.guitar.theory.TrainingMode
 import app.guitar.theory.WorkoutSession
 import app.guitar.theory.WorkoutWeek
+
+/** Month-header tint: a soft pink that reads as a section break without competing with the
+ *  accent colour used for interactive text. */
+private val MONTH_TINT = Color(0xFFF6D9E4)
 
 /**
  * Workout — the merged, expanded 4-month real-song curriculum (theory EarWorkout;
@@ -60,11 +65,9 @@ internal fun WorkoutView(state: AppState, ear: EarTrainingState) {
     LaunchedEffect(scroll.value) { ear.workoutScroll = scroll.value }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(scroll)) {
-        Text("One plan, 12 months · 48 weeks · 192 sessions. Every session is a real song run " +
-            "through the same 45-minute frame. Tap a song to open it, work the session, then " +
-            "reveal the answer to check yourself.",
+        Text("12 months · 48 weeks · 192 real songs. Tap a song, work it, reveal the answer.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
 
         // Everything that explains the plan rather than being the plan sits behind ONE
         // collapsed header, so opening the tab lands on the actual months and weeks.
@@ -91,6 +94,19 @@ internal fun WorkoutView(state: AppState, ear: EarTrainingState) {
             }
             WorkoutSubHeading("Harmonization constraint ladder")
             WorkoutText(EarWorkout.HARMONIZATION_LADDER)
+            WorkoutSubHeading("Train-ride synthetic drills")
+            WorkoutText("Quick reaction, not deep analysis — and never inside a 45-minute session.")
+            for ((cat, text) in EarWorkout.TRAIN_DRILLS) WorkoutLine(cat, text)
+            WorkoutSubHeading("If you practise more or less")
+            for ((k, v) in EarWorkout.TIME_SCALING) WorkoutLine(k, v)
+            WorkoutSubHeading("Honest expected progress")
+            for ((k, v) in EarWorkout.EXPECTED_PROGRESS) WorkoutText("• $k — $v")
+            WorkoutSubHeading("Compared with a Berklee-style degree")
+            for ((k, v) in EarWorkout.BERKLEE) WorkoutLine(k, v)
+            WorkoutSubHeading("After the twelve months")
+            for (g in EarWorkout.FUTURE_GOALS) WorkoutText("• $g")
+            WorkoutSubHeading("Revision notes — what changed and why")
+            for (r in EarWorkout.REVISION_NOTES) WorkoutText("• $r")
         }
 
         // ---- The twelve months, each with its four weeks ----
@@ -104,28 +120,6 @@ internal fun WorkoutView(state: AppState, ear: EarTrainingState) {
             }
         }
 
-        // ---- Reference cards ----
-        WorkoutGroup("drills", "Train-ride synthetic drills",
-            "Quick reaction, not deep analysis — and never inside a 45-minute session.", open, toggleOpen) {
-            for ((cat, text) in EarWorkout.TRAIN_DRILLS) WorkoutLine(cat, text)
-        }
-        WorkoutGroup("scaling", "If you practise more or less",
-            "Baseline is 3 h/week = four 45-minute sessions.", open, toggleOpen) {
-            for ((k, v) in EarWorkout.TIME_SCALING) WorkoutLine(k, v)
-        }
-        WorkoutGroup("progress", "Honest expected progress",
-            "After these 4 months at ~3 h/week. Realistic, not inflated.", open, toggleOpen) {
-            for ((k, v) in EarWorkout.EXPECTED_PROGRESS) WorkoutText("• $k — $v")
-        }
-        WorkoutGroup("berklee", "Compared with a Berklee-style degree", null, open, toggleOpen) {
-            for ((k, v) in EarWorkout.BERKLEE) WorkoutLine(k, v)
-        }
-        WorkoutGroup("after", "After these four months", null, open, toggleOpen) {
-            for (g in EarWorkout.FUTURE_GOALS) WorkoutText("• $g")
-        }
-        WorkoutGroup("notes", "Revision notes — what Claude changed and why", null, open, toggleOpen) {
-            for (r in EarWorkout.REVISION_NOTES) WorkoutText("• $r")
-        }
         Spacer(Modifier.height(20.dp))
     }
 }
@@ -175,30 +169,51 @@ private fun WorkoutGroup(
     }
 }
 
-/** One month's header card: objective, vocabulary, rules, project, exam. */
+/**
+ * One month's header: a tinted, foldable summary.
+ *
+ * Folded by default — the months and weeks are what you navigate; the month's prose is
+ * reference you read once. Collapsing it turns twelve screens of text into twelve rows.
+ */
 @Composable
 private fun WorkoutMonthCard(month: Int, open: Set<String>, toggleOpen: (String) -> Unit) {
     val m = EarWorkout.MONTHS[month - 1]
+    val key = "m${m.number}"
+    val isOpen = key in open
     Card(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = MONTH_TINT),
     ) {
-        Column(Modifier.padding(12.dp)) {
-            Text(m.phase.uppercase(), style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("MONTH ${m.number} — ${m.title}", fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleSmall)
-            WorkoutText(m.objective)
-            WorkoutLine("Vocabulary", m.vocabulary)
-            WorkoutLine("Harmonization", m.harmonizationRule)
-            WorkoutLine("Melody stage", m.melodyStage)
-            WorkoutLine("Train rides", m.trainFocus)
-            Text(m.project, style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic,
-                modifier = Modifier.padding(top = 6.dp))
-            WorkoutGroup("exam${m.number}", "Month ${m.number} exam — ${m.exam.timeLimit}", null, open, toggleOpen) {
-                for (r in m.exam.requirements) WorkoutText("• $r")
-                Text(m.exam.passStandard, style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().clickable { toggleOpen(key) },
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("MONTH ${m.number} — ${m.title}", fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall)
+                    Text(m.phase, style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(if (isOpen) "▾" else "▸", color = MaterialTheme.colorScheme.primary)
+            }
+            // The scope caveat stays visible even when folded — it's the one thing you need
+            // while working the month's sessions.
+            Text(m.scope, style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+            if (isOpen) {
+                WorkoutText(m.objective)
+                WorkoutLine("Vocabulary", m.vocabulary)
+                WorkoutLine("Harmonization", m.harmonizationRule)
+                WorkoutLine("Melody stage", m.melodyStage)
+                WorkoutLine("Train rides", m.trainFocus)
+                Text(m.project, style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic,
+                    modifier = Modifier.padding(top = 6.dp))
+                WorkoutGroup("exam${m.number}", "Month ${m.number} exam — ${m.exam.timeLimit}", null, open, toggleOpen) {
+                    for (r in m.exam.requirements) WorkoutText("• $r")
+                    Text(m.exam.passStandard, style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
+                }
             }
         }
     }
@@ -211,28 +226,38 @@ private fun WorkoutWeekBody(
     revealed: Set<String>,
     toggleReveal: (String) -> Unit,
 ) {
-    for (s in w.sessions) WorkoutSessionCard(ear, s, revealed, toggleReveal)
+    val monthScope = EarWorkout.MONTHS[w.month - 1].scope
+    for (s in w.sessions) WorkoutSessionCard(ear, s, monthScope, revealed, toggleReveal)
 }
 
 /**
- * One session: what to play, and only a note if that session has something you'd actually
- * need told to you.
+ * One session: the song, what you're expected to get out of it, and the answer.
  *
- * The per-session focus / quality / melody / harmonize / pass text is deliberately NOT shown —
- * it repeated the 45-minute frame four times per week and buried the song. The method lives
- * once in "About this plan"; the session title carries the gist; the answer is behind Reveal.
+ * No "Session n — title" heading: the numbering was noise and the title only restated the
+ * month. The song IS the heading. The per-session focus / quality / melody / harmonize /
+ * pass prose is gone too — it repeated the 45-minute frame four times a week. What survives
+ * is the one line that answers "how much of this am I supposed to get?" (the session's own
+ * caveat, or the month's scope), plus any note specific to this recording.
  */
 @Composable
 private fun WorkoutSessionCard(
     ear: EarTrainingState,
     s: WorkoutSession,
+    monthScope: String,
     revealed: Set<String>,
     toggleReveal: (String) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Text("Session ${s.number} — ${s.title}", fontWeight = FontWeight.Bold)
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
         val song = s.song
-        if (song != null) ExternalSongRow(song.title, song.artist, song.version?.let { "  ($it)" } ?: "")
+        if (song != null) {
+            ExternalSongRow(song.title, song.artist, song.version?.let { "  ($it)" } ?: "")
+        } else {
+            Text("Your pick — any song that fits this month.", fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyMedium)
+        }
+        val caveat = s.caveat.ifEmpty { monthScope }
+        Text("▸ $caveat", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary)
         val note = s.songNote
         if (note != null) {
             Text(note, style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic,

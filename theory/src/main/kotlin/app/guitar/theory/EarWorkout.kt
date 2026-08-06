@@ -24,6 +24,12 @@ data class WorkoutSession(
     val title: String,
     val song: WorkoutSong?,
     val songNote: String? = null,
+    /**
+     * Short scope caveat shown on the card — e.g. "recognize only the first 3 chord changes".
+     * Empty means "use this month's [WorkoutMonth.scope]", which is the normal case; set it
+     * only where a session's scope genuinely differs from its month's.
+     */
+    val caveat: String = "",
     /** Function/structure to notice. */
     val focus: String,
     /** The quality discrimination this session trains (the real bottleneck). */
@@ -65,6 +71,12 @@ data class WorkoutMonth(
     val phase: String,
     val objective: String,
     val vocabulary: String,
+    /**
+     * How much of a song you're expected to call this month, in one short clause. Shown as
+     * the caveat on every session card in the month (unless the session overrides it), so
+     * the answer to "how much of this am I supposed to get?" is always on screen.
+     */
+    val scope: String,
     val harmonizationRule: String,
     val melodyStage: String,
     /** Which [TRAIN_DRILLS] categories to run on train rides this month. */
@@ -225,6 +237,7 @@ object EarWorkout {
         WorkoutMonth(1, "Diatonic function and quality, at speed", "Phase I · Functional hearing",
             objective = "Call function AND triad quality in ordinary loops without stopping to reason. Build the reflex before adding colour.",
             vocabulary = "I, ii, IV, V, vi (+ a first taste of V/V and V/IV).",
+            scope = "Recognize only the first 3 chord changes — function and quality, nothing more.",
             harmonizationRule = "Level 1 — melody note must be the root, 3rd or 5th. No extensions as justification.",
             melodyStage = "Note-by-note searching is acceptable. Accuracy over fluency.",
             trainFocus = "Diatonic 7th loops · Pre-dominant → dominant · Tonic substitutes & deception · V/V",
@@ -237,6 +250,7 @@ object EarWorkout {
         WorkoutMonth(2, "Diatonic fluency, speed and prediction", "Phase I · Functional hearing",
             objective = "Stop recognizing chords after the fact. Start EXPECTING harmonic motion, and make the whole month-1 vocabulary automatic.",
             vocabulary = "The same diatonic set, but called in time — plus phrase-level expectation (tonic / pre-dominant / dominant / deceptive).",
+            scope = "First 4 changes, called in time — and predict the next one before it lands.",
             harmonizationRule = "Level 1, faster: two alternative harmonizations of the same phrase, decided in minutes not hours.",
             melodyStage = "2-note chunks, and transpose each phrase to two other keys.",
             trainFocus = "Pre-dominant → dominant · Tonic substitutes & deception · Diatonic 7th loops (speed)",
@@ -249,6 +263,7 @@ object EarWorkout {
         WorkoutMonth(3, "Secondary dominants, part 1 — the dominant arrow", "Phase I · Functional hearing",
             objective = "Hear a dominant as an ARROW and name its target. Kill the confusions your All-of-Me attempt exposed: iii vs III7, vi vs VI7, ii vs II7.",
             vocabulary = "maj7, m7, dom7, m7♭5; V/V, V/vi, V/ii, V/IV; ii–V–I; inversions (bass on the 3rd).",
+            scope = "The whole loop, plus name any dominant arrow by the chord it targets.",
             harmonizationRule = "Level 2 — the melody may also be the 7th when the function is clear.",
             melodyStage = "2–3 note chunks; over each dominant, name whether the melody is root, 3rd, 5th or ♭7.",
             trainFocus = "V/vi and V/ii · ii–V–I / jazz cadences · V/V",
@@ -261,6 +276,7 @@ object EarWorkout {
         WorkoutMonth(4, "Secondary dominants, part 2 — speed and melody", "Phase I · Functional hearing",
             objective = "Make dominant arrows automatic, and connect them to what the melody is doing over them.",
             vocabulary = "Dominant chains (III7–vi–II7–V), ii–V through moving key centres, V/IV, m7♭5.",
+            scope = "The whole loop at speed, arrows included — without stopping the track.",
             harmonizationRule = "Level 2, applied: insert or remove an arrow deliberately, melody permitting.",
             melodyStage = "Mark where the melody lands on 3rds and 7ths, not just roots.",
             trainFocus = "ii–V–I / jazz cadences · V/vi and V/ii · Diatonic 7th loops",
@@ -272,6 +288,7 @@ object EarWorkout {
         WorkoutMonth(5, "Borrowed chords and modal mixture", "Phase II · Harmonic fluency",
             objective = "Hear a chord from outside the key as COLOUR rather than as a mistake — and stop mistaking modal motion for dominant function.",
             vocabulary = "iv, ♭VII, ♭VI, ♭III; iii vs vi; minor i–iv–V; major/minor ambiguity.",
+            scope = "The whole loop, and flag the one borrowed chord: what did it replace?",
             harmonizationRule = "Level 3 opens — borrowed chords allowed when the melody sits in THAT chord's triad (iv = 4, ♭6, 1; ♭VII = ♭7, 2, 4).",
             melodyStage = "Short phrases before playing — stop hunting note by note.",
             trainFocus = "Borrowed & modal · Minor-key motion · Tonic substitutes & deception",
@@ -284,6 +301,7 @@ object EarWorkout {
         WorkoutMonth(6, "Borrowed harmony, actively used", "Phase II · Harmonic fluency",
             objective = "Move from recognizing borrowed colour to USING it: take songs you know and recolour them convincingly.",
             vocabulary = "iv, ♭VII, ♭VI, ♭III as tools; chromatic bass under static function; iii–♭III–ii motion.",
+            scope = "The whole loop, with borrowed chords used on purpose rather than just spotted.",
             harmonizationRule = "Level 3 — build three versions of a phrase: plain diatonic, borrowed, jazzier dominant.",
             melodyStage = "Play the melody while comping the changed harmony underneath it.",
             trainFocus = "Borrowed & modal · Reharmonization moves · Melody-degree options",
@@ -295,6 +313,7 @@ object EarWorkout {
         WorkoutMonth(7, "Brazilian harmony, part 1 — diminished motion", "Phase II · Harmonic fluency",
             objective = "Hear diminished chords as MOTION into a target, not as strange chords — in the repertoire you actually play.",
             vocabulary = "#I°→ii, #ii°→iii, #iv°→V; VI7/II7 chains; bossa maj7/m7/dom7 as ordinary colour.",
+            scope = "The whole loop, and catch the passing diminished and where it's heading.",
             harmonizationRule = "Level 3 — approach a target chord by its dominant OR by a diminished passing chord.",
             melodyStage = "Long melody tones over changing harmony; phrase chunks.",
             trainFocus = "Diminished approach · Brazilian / bossa loops · V/vi and V/ii",
@@ -307,6 +326,7 @@ object EarWorkout {
         WorkoutMonth(8, "Brazilian harmony, part 2 — integration and modulation", "Phase II · Harmonic fluency",
             objective = "Connect bass, diminished motion, dominants, melody and style — and hear the key itself move.",
             vocabulary = "Modulation to the relative major/minor, chromatic descending sequences, tritone substitution.",
+            scope = "The whole loop through the modulation — and name the key it lands in.",
             harmonizationRule = "Level 3 — reharmonize a chromatic passage with FEWER chords while keeping the descent audible.",
             melodyStage = "A full A-section, correct contour and ≥80% exact pitches.",
             trainFocus = "Brazilian / bossa loops · Diminished approach · Reharmonization moves",
@@ -319,6 +339,7 @@ object EarWorkout {
         WorkoutMonth(9, "Harmonization from melody", "Phase III · Professional musicianship",
             objective = "Given a melody alone, immediately hear what chords COULD support it — composition rather than transcription.",
             vocabulary = "Melody-degree → chord options; modal vs tonal harmonization; folk / country / jazz-lite styles.",
+            scope = "Melody first: harmonize it yourself, then check against the record.",
             harmonizationRule = "Level 4 opens — extensions and substitutions allowed once the function is already unmistakable.",
             melodyStage = "Play these melodies instantly, without hunting. They are deliberately easy so the work is harmonic.",
             trainFocus = "Melody-degree options · Reharmonization moves · Pre-dominant → dominant",
@@ -330,6 +351,7 @@ object EarWorkout {
         WorkoutMonth(10, "Arrangement and reharmonization", "Phase III · Professional musicianship",
             objective = "Turn ear training into arrangement: three levels of the same song, and a playable guitar+voice version.",
             vocabulary = "I→vi, IV→ii, V→ii–V, I→iii–vi, IV→iv, dominant and diminished approaches, bass movement.",
+            scope = "The whole chart, then reharmonize one phrase your own way.",
             harmonizationRule = "Level 4 — three versions per song: original/simple, richer pop, jazzier.",
             melodyStage = "Melody and chords together — chord-melody thinking begins here.",
             trainFocus = "Reharmonization moves · ii–V–I / jazz cadences · Brazilian / bossa loops",
@@ -341,6 +363,7 @@ object EarWorkout {
         WorkoutMonth(11, "Full song transcription", "Phase III · Professional musicianship",
             objective = "Produce usable lead sheets from recordings, unaided — one whole song per week, four styles.",
             vocabulary = "Everything so far, applied to complete forms rather than fragments.",
+            scope = "Full transcription: progression, bass and melody.",
             harmonizationRule = "Level 4 — include one alternative harmonization in every lead sheet.",
             melodyStage = "Full melody of the song, written and playable.",
             trainFocus = "Whatever the week's song exposes — use the drills as primers before each session.",
@@ -352,6 +375,7 @@ object EarWorkout {
         WorkoutMonth(12, "Real-time musicianship", "Phase III · Professional musicianship",
             objective = "Play along with unfamiliar music as it happens — the whole point of the year.",
             vocabulary = "All of it, at speed, without stopping.",
+            scope = "Real time — call it on the first listen, no rewinds.",
             harmonizationRule = "Level 4 — reharmonize a section live, after one pass.",
             melodyStage = "Hear a phrase and play it immediately; no searching.",
             trainFocus = "Quick primers before each song: I–IV–V · I–vi–IV–V · ii–V–I · I–IV–iv–I · I–VI7–ii–V · I–#I°–ii–V",
@@ -375,7 +399,8 @@ object EarWorkout {
     private fun ses(
         n: Int, title: String, song: WorkoutSong?, focus: String, quality: String, melody: String,
         harm: String, pass: String, spoiler: String = "", loop: Progression? = null, note: String? = null,
-    ) = WorkoutSession(n, title, song, note, focus, quality, melody, harm, pass, spoiler, loop)
+        caveat: String = "",
+    ) = WorkoutSession(n, title, song, note, caveat, focus, quality, melody, harm, pass, spoiler, loop)
 
     private fun wk(week: Int, month: Int, title: String, prediction: String, notGraded: List<String>,
                    sessions: List<WorkoutSession>) = WorkoutWeek(week, month, title, prediction, notGraded, sessions)

@@ -70,6 +70,9 @@ class EarWorkoutTest {
             assertTrue(m.objective.isNotEmpty() && m.vocabulary.isNotEmpty(), "month ${m.number}")
             assertTrue(m.harmonizationRule.isNotEmpty() && m.melodyStage.isNotEmpty(), "month ${m.number}")
             assertTrue(m.trainFocus.isNotEmpty() && m.project.isNotEmpty(), "month ${m.number}")
+            // Every month must state how much of a song you're expected to call: it's the
+            // caveat shown on every session card in that month.
+            assertTrue(m.scope.isNotEmpty(), "month ${m.number} has no scope caveat")
             assertTrue(m.exam.requirements.isNotEmpty() && m.exam.passStandard.isNotEmpty(), "month ${m.number}")
         }
     }

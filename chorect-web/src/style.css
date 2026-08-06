@@ -1220,3 +1220,11 @@ select.et-select {
   margin-top: 2px;
 }
 .latency-card .btn.small { align-self: flex-start; margin-top: 4px; }
+
+/* Workout month header tint: a soft pink that reads as a section break without competing
+   with the accent colour used for interactive text. Mirrors Android's MONTH_TINT. */
+:root { --workout-month-tint: #F6D9E4; }
+:root[data-theme="dark"], html.dark { --workout-month-tint: rgba(246, 217, 228, 0.14); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --workout-month-tint: rgba(246, 217, 228, 0.14); }
+}
