@@ -163,7 +163,7 @@ export class AppState {
   tabOrder: TabDestName[] = [...DEFAULT_TAB_ORDER];
 
   displayMode = DisplayMode.None;
-  currentSheet: Sheet | null = Sheet.SambaLooper;   // app opens on the drum machine
+  currentSheet: Sheet | null = Sheet.EarTraining;   // app opens on ear training
   lastSheet: Sheet | null = null;
   chordView = ChordScaleView.AllNotes;
   scaleView = ChordScaleView.AllNotes;
