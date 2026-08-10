@@ -102,6 +102,8 @@ export class EarTrainingUI {
 
   /** Sub-mode chip row's "More ▾" overflow (Flavor/Inversions/AugDim). */
   private subModeMoreOpen = false;
+  /** "More tools" fold in the compact Progression Challenge (closed per screen entry). */
+  private challengeMoreOpen = false;
   private subModeOutsideCloser: ((e: Event) => void) | null = null;
 
   /** One shared bottom sheet for the Progression generator/key/level settings
@@ -164,9 +166,9 @@ export class EarTrainingUI {
   private subModeChipRow(): HTMLElement {
     const ear = this.ear;
     const label = (s: EarSubMode) => EarTrainingUI.SUBMODE_LABEL[s];
-    // Workout sits directly after Intervals, in the always-visible row — it's a daily
+    // Workout sits directly after Progressions, in the always-visible row — it's a daily
     // destination, not something to go hunting for behind "More".
-    const primary = [EarSubMode.Progression, EarSubMode.Intervals, EarSubMode.Workout, EarSubMode.Note2Chord];
+    const primary = [EarSubMode.Progression, EarSubMode.Workout, EarSubMode.Intervals, EarSubMode.Note2Chord];
     const overflow = [EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim, EarSubMode.Drill];
     const row = el("div", { class: "chip-row" });
     for (const s of primary) row.appendChild(chip(label(s), ear.progSubMode === s, () => ear.switchTab(s)));
@@ -1007,6 +1009,9 @@ export class EarTrainingUI {
     if (!ear.challengeActive) {
       parent.appendChild(el("div", { class: "et-muted" }, [`A challenge is ${ear.challengeTotal} progressions in a row. Listen, then tap the correct Roman numeral for each bar (and its extension when shown). Each question auto-scores; your total appears at the end.`]));
       parent.appendChild(el("div", { class: "v-gap-12" }));
+      parent.appendChild(labelSm("Draw questions from"));
+      parent.appendChild(this.challengeSourceRow());
+      parent.appendChild(el("div", { class: "v-gap-8" }));
       parent.appendChild(this.generatorSummaryCard(() => this.openSettingsSheet()));
       parent.appendChild(el("div", { class: "v-gap-12" }));
       parent.appendChild(btn("Start challenge ▶", () => ear.startChallenge(), "btn primary"));
@@ -1024,9 +1029,8 @@ export class EarTrainingUI {
       this.padPickedBar = null;
     }
 
-    // ---- Progress ring + per-question dot strip (Signal move — replaces the
-    // old "Question n/N · Score · Restart · Quit" row; Restart/Quit are now
-    // pinned icon buttons in the screen header, and "Q n/N" lives in the ring). ----
+    // ---- Progress ring + per-question dot strip (Restart/Quit are pinned icon
+    // buttons in the screen header; "Q n/N" lives in the ring). ----
     parent.appendChild(el("div", { class: "row", style: "align-items:center;gap:14px" }, [
       this.challengeProgressRing(ear.challengeIndex, ear.challengeTotal),
       el("div", { style: "flex:1;min-width:0" }, [
@@ -1036,67 +1040,108 @@ export class EarTrainingUI {
       ]),
     ]));
 
+    parent.appendChild(el("div", { class: "v-gap-8" }));
+
+    // ---- Compact core (v2.63): everything touched on every question fits one
+    // screen-high stack — play + degree references, the four answer squares, the
+    // answer pad, one nav row. Seldom-used tools (1–5–1 cadence, re-roll, songs,
+    // drawn-from, key & mode reveal, transpose) fold behind "More tools". ----
+
+    // ▶ Play sits RIGHT above the squares it fills (it used to live only in the
+    // bottom dock, far from the answering area). The degree reference palette plays
+    // in the hidden key; its chip toggles full chords vs bare root notes.
+    const playBtn = btn(ear.isLooping ? "■ Stop" : "▶ Play progression",
+      () => { if (ear.isLooping) ear.stopLoop(); else ear.startLoop(); }, "btn primary");
+    const refBtns = ear.challengeReferenceLabels().map(([deg, label]) =>
+      btn(label, () => ear.auditionProgDegree(deg), "btn", "degree reference — plays in the hidden key"));
+    const refToggle = chip(ear.degreeRefChords ? "♪ chords" : "♪ notes", true,
+      () => { ear.toggleDegreeRefChords(); this.rerender(); });
+    refToggle.title = "What the degree buttons play: the full diatonic chord, or just the bare root note";
+    parent.appendChild(el("div", { class: "et-row-gap", style: "align-items:center" },
+      [playBtn, labelSm("Degrees:"), ...refBtns, refToggle]));
+
+    parent.appendChild(el("div", { class: "v-gap-8" }));
+
+    // The four bar squares: tap one to target it, answer from the pad below.
+    const sqRow = el("div", { class: "et-slot-row" });
+    for (let i = 0; i < 4; i++) sqRow.appendChild(this.barSquare(i, this.challengeSelectedBar, () => { this.challengeSelectedBar = i; this.rerender(); }));
+    parent.appendChild(sqRow);
+
+    // The no-tonic warning sits directly under the squares being filled — on top it
+    // scrolled away from the answering area, which is where it matters.
     const challengeNoTonic = this.noTonicBanner();
     if (challengeNoTonic) parent.appendChild(challengeNoTonic);
 
     parent.appendChild(el("div", { class: "v-gap-8" }));
+    parent.appendChild(this.challengeAnswerPad(this.challengeSelectedBar));
 
-    // Question navigation: Prev = reddish pill, Next = greenish pill (filled like the
-    // Challenge segment button, tinted) so Next is never mistaken for it and Prev is
-    // clearly visible (the old plain-dark ← Prev was nearly invisible). Pinned up top
-    // AND repeated at the bottom (below the answer pad) so Prev is reachable there too.
+    // Single nav row — the old duplicated top+bottom nav cost a screen of height.
     const tintRed = (b: HTMLElement) => { b.style.background = "#c0392b"; b.style.color = "#fff"; b.style.border = "none"; };
     const tintGreen = (b: HTMLElement) => { b.style.background = "#2e9e4f"; b.style.color = "#fff"; b.style.border = "none"; };
     const lastQ = ear.challengeIndex === ear.challengeTotal - 1;
     const prevBtn = btn("← Prev", () => ear.previousChallengeQuestion(), "btn");
     prevBtn.style.flex = "1"; tintRed(prevBtn);
     if (!ear.canGoPrevChallenge) prevBtn.disabled = true;
-    const nextTopBtn = btn(lastQ ? "See score →" : "Next →", () => ear.advanceChallenge(), "btn");
-    nextTopBtn.style.flex = "1"; tintGreen(nextTopBtn);
-    parent.appendChild(el("div", { class: "row", style: "gap:8px" }, [prevBtn, nextTopBtn]));
-
-    // Tools row: Hear the cadence · Re-roll · Transpose (Signal move — one row).
-    parent.appendChild(el("div", { class: "et-row-gap" }, [
-      btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
-      btn("Re-roll", () => ear.rerollChallengeQuestion()),
-      this.songsButton(),
-    ]));
-    // What the challenge draws from (library/mode/level) — visible AND changeable
-    // mid-challenge; a change applies from the next question on.
-    parent.appendChild(labelSm("Drawn from  (tap to change — applies to the next question)"));
-    parent.appendChild(this.generatorSummaryCard(() => this.openSettingsSheet()));
-    // Transpose shifts the key/chords but not the degrees, so it's safe in the challenge.
-    parent.appendChild(this.transposeRow());
-    parent.appendChild(this.revealCard("Key & Mode (hint)", !ear.keyRevealed,
-      spellPc(ear.progKey) + "  " + (ear.progMode === TrainingMode.Major ? "Major" : "Minor"),
-      () => ear.toggleKeyModeReveal(), false));
-
-    parent.appendChild(labelSm("Hear the degrees  (reference — plays in the hidden key)"));
-    parent.appendChild(el("div", { class: "et-row-gap" }, ear.challengeReferenceLabels().map(([deg, label]) => btn(`▶ ${label}`, () => ear.auditionProgDegree(deg)))));
-
-    // #6/Signal: fixed answer pad — tap a bar square to target it, then answer
-    // it from the always-visible pad below (replaces the old popup keyboard;
-    // the per-bar ▶ Play and reference palette above are the only things that
-    // sound — selecting a bar / a key is silent).
-    parent.appendChild(labelSm("Fill each bar  (tap a square to select it, then tap its chord below)"));
-    const sqRow = el("div", { class: "et-slot-row" });
-    for (let i = 0; i < 4; i++) sqRow.appendChild(this.barSquare(i, this.challengeSelectedBar, () => { this.challengeSelectedBar = i; this.rerender(); }));
-    parent.appendChild(sqRow);
+    const nextBtn = btn(lastQ ? "See score →" : "Next →", () => ear.advanceChallenge(), "btn");
+    nextBtn.style.flex = "1"; tintGreen(nextBtn);
     parent.appendChild(el("div", { class: "v-gap-8" }));
-    parent.appendChild(this.challengeAnswerPad(this.challengeSelectedBar));
-
-    parent.appendChild(el("div", { class: "v-gap-8" }));
-    // Bottom nav: reddish Prev + greenish Next question (same tinted-pill styling as the
-    // top nav) so Prev is present and visible at the bottom of the page too.
-    const prevBottom = btn("← Prev question", () => ear.previousChallengeQuestion(), "btn");
-    prevBottom.style.flex = "1"; tintRed(prevBottom);
-    if (!ear.canGoPrevChallenge) prevBottom.disabled = true;
-    const nextBottom = btn(lastQ ? "See score →" : "Next question →", () => ear.advanceChallenge(), "btn");
-    nextBottom.style.flex = "1"; tintGreen(nextBottom);
-    parent.appendChild(el("div", { class: "row", style: "gap:8px" }, [prevBottom, nextBottom]));
+    parent.appendChild(el("div", { class: "row", style: "gap:8px" }, [prevBtn, nextBtn]));
     parent.appendChild(el("div", { class: "et-muted", style: "margin-top:2px" }, ["Unanswered bars count as correct."]));
+
+    parent.appendChild(el("div", { class: "v-gap-8" }));
+    parent.appendChild(this.challengeMoreCard());
+
     parent.appendChild(el("div", { class: "v-gap-12" }));
     this.fretboardPanel(parent);
+  }
+
+  /** Seldom-used challenge tools, folded into one card: 1–5–1 cadence, re-roll, songs,
+   *  what the challenge draws from (source + generator — changeable mid-challenge,
+   *  applies from the next question), key & mode reveal, transpose. */
+  private challengeMoreCard(): HTMLElement {
+    const ear = this.ear;
+    const open = this.challengeMoreOpen;
+    const head = el("div", { style: "display:flex;gap:8px;align-items:baseline;cursor:pointer;padding:2px 0" }, [
+      el("span", { style: "flex:1;font-weight:700;color:var(--act)" }, ["More tools"]),
+      el("span", { style: "color:var(--act)" }, [open ? "▾" : "▸"]),
+    ]);
+    head.addEventListener("click", () => { this.challengeMoreOpen = !open; this.rerender(); });
+    const children: HTMLElement[] = [head];
+    if (open) {
+      children.push(
+        el("div", { class: "et-row-gap", style: "margin-top:6px" }, [
+          btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
+          btn("Re-roll", () => ear.rerollChallengeQuestion()),
+          this.songsButton(),
+        ]),
+        el("div", { class: "v-gap-8" }),
+        labelSm("Drawn from  (tap to change — applies to the next question)"),
+        this.challengeSourceRow(),
+        this.generatorSummaryCard(() => this.openSettingsSheet()),
+        // Transpose shifts the key/chords but not the degrees, so it's challenge-safe.
+        this.transposeRow(),
+        this.revealCard("Key & Mode (hint)", !ear.keyRevealed,
+          spellPc(ear.progKey) + "  " + (ear.progMode === TrainingMode.Major ? "Major" : "Minor"),
+          () => ear.toggleKeyModeReveal(), false),
+      );
+    }
+    return el("div", { class: "et-card" }, children);
+  }
+
+  /** Generator vs Drill-list question-source chips (start screen + "More tools").
+   *  The Drill chip is disabled while nothing is tracked. */
+  private challengeSourceRow(): HTMLElement {
+    const ear = this.ear;
+    const n = ear.drillPoolSize;
+    const drill = chip(`Drill list (${n})`, ear.challengeSource === "drill",
+      () => { ear.setChallengeSource("drill"); this.rerender(); }, n > 0);
+    drill.title = n > 0
+      ? "Questions come strictly from the progressions tracked in the Drill tab, most-missed appearing more often"
+      : "Nothing tracked yet — progressions you miss in a challenge land in the Drill tab";
+    return chipsRow([
+      chip("Generator", ear.challengeSource === "generator", () => { ear.setChallengeSource("generator"); this.rerender(); }),
+      drill,
+    ]);
   }
 
   /** One bar's answer square: a tappable tile targeting the fixed answer pad
@@ -1757,18 +1802,19 @@ export class EarTrainingUI {
    *
    * No "Session n — title" heading: the numbering was noise and the title only restated the
    * month, so the song IS the heading. The focus / quality / melody / harmonize / pass prose
-   * is gone too — it repeated the 45-minute frame four times a week. What survives is the one
-   * line answering "how much of this am I supposed to get?" (the session's own caveat, or the
-   * month's scope), plus any note specific to this recording.
+   * is gone too — it repeated the 45-minute frame four times a week. The ▸ caveat line appears
+   * ONLY when this session's target genuinely differs from the month scope (an excerpt bound,
+   * a required version) — the month scope itself already sits on the month card, visible even
+   * folded, so echoing it on all 16 session cards was pure duplication.
    */
-  private workoutSessionCard(s: WorkoutSession, monthScope: string): HTMLElement {
+  private workoutSessionCard(s: WorkoutSession): HTMLElement {
     const children: HTMLElement[] = [];
     if (s.song) {
       children.push(externalSongRow(s.song.title, s.song.artist, s.song.version ? `  (${s.song.version})` : ""));
     } else {
       children.push(el("div", { style: "font-weight:600" }, ["Your pick — any song that fits this month."]));
     }
-    children.push(el("div", { style: "font-size:12px;color:var(--act)" }, [`▸ ${s.caveat || monthScope}`]));
+    if (s.caveat) children.push(el("div", { style: "font-size:12px;color:var(--act)" }, [`▸ ${s.caveat}`]));
     if (s.songNote) {
       children.push(el("div", { class: "et-muted", style: "font-size:12px;font-style:italic" }, [s.songNote]));
     }
@@ -1823,26 +1869,21 @@ export class EarTrainingUI {
   }
 
   private workoutWeekBody(w: WorkoutWeek): HTMLElement[] {
-    const monthScope = WORKOUT_MONTHS[w.month - 1].scope;
-    return w.sessions.map((s) => this.workoutSessionCard(s, monthScope));
+    return w.sessions.map((s) => this.workoutSessionCard(s));
   }
 
-  /** The Workout tab: the merged, expanded 4-month real-song curriculum. */
+  /** The Workout tab: the merged, expanded 12-month real-song curriculum. */
   private workoutView(parent: HTMLElement): void {
-    parent.appendChild(el("div", { class: "et-muted", style: "font-size:13px" }, [
-      "12 months · 48 weeks · 192 real songs. Tap a song, work it, reveal the answer.",
-    ]));
-    parent.appendChild(el("div", { class: "v-gap-8" }));
-
-    // Everything that explains the plan rather than being the plan sits behind ONE collapsed
-    // header, so opening the tab lands on the actual months and weeks.
+    // EVERYTHING that explains the plan rather than being the plan — the intro line
+    // included — sits behind ONE collapsed row, so opening the tab lands on MONTH 1.
     const sub = (text: string) => el("div", { style: "font-weight:600;margin-top:10px;color:var(--act)" }, [text]);
     const pair = ([k, v]: readonly [string, string]) => el("div", { style: "font-size:13px;margin-top:3px" }, [
       el("span", { style: "font-weight:600;color:var(--act)" }, [`${k}: `]), v,
     ]);
     const bullet = (t: string) => el("div", { style: "font-size:13px;margin-top:4px" }, [`• ${t}`]);
     parent.appendChild(this.workoutGroup("about", "About this plan",
-      "Goals, phases, your profile, how to practise, the 45-minute frame.", () => [
+      "12 months · 48 weeks · 192 real songs — tap a song, work it, reveal the answer. " +
+      "Inside: goals, phases, your profile, how to practise, the 45-minute frame.", () => [
         sub("What you're aiming at"),
         ...WORKOUT_MASTER_GOALS.map(pair),
         sub("The year in three phases"),

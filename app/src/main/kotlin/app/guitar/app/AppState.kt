@@ -25,7 +25,9 @@ import app.guitar.theory.VoicingStyle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -470,7 +472,14 @@ class AppState(
                 recordChallengeScore(score, total, durationMs, kind)
             },
             onProgressionMistake = { progKey -> recordProgressionMistake(progKey) },
+            progressionMistakesProvider = { progressionMistakesSnapshot.value },
         )
+    }
+
+    /** Eager in-memory mirror of [progressionMistakes], so question generation (which is
+     *  synchronous) can read the Drill pool without suspending. */
+    private val progressionMistakesSnapshot by lazy {
+        repo.progressionMistakes.stateIn(scope, SharingStarted.Eagerly, emptyMap())
     }
 
     /** Persisted challenge results across all ear-training kinds (best first). */

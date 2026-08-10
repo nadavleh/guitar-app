@@ -65,13 +65,12 @@ internal fun WorkoutView(state: AppState, ear: EarTrainingState) {
     LaunchedEffect(scroll.value) { ear.workoutScroll = scroll.value }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(scroll)) {
-        Text("12 months · 48 weeks · 192 real songs. Tap a song, work it, reveal the answer.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(6.dp))
-
-        // Everything that explains the plan rather than being the plan sits behind ONE
-        // collapsed header, so opening the tab lands on the actual months and weeks.
-        WorkoutGroup("about", "About this plan", "Goals, phases, your profile, how to practise, the 45-minute frame.", open, toggleOpen) {
+        // EVERYTHING that explains the plan rather than being the plan — the intro line
+        // included — sits behind ONE collapsed row, so opening the tab lands on MONTH 1.
+        WorkoutGroup("about", "About this plan",
+            "12 months · 48 weeks · 192 real songs — tap a song, work it, reveal the answer. " +
+                "Inside: goals, phases, your profile, how to practise, the 45-minute frame.",
+            open, toggleOpen) {
             WorkoutSubHeading("What you're aiming at")
             for ((k, v) in EarWorkout.MASTER_GOALS) WorkoutLine(k, v)
             WorkoutSubHeading("The year in three phases")
@@ -226,8 +225,7 @@ private fun WorkoutWeekBody(
     revealed: Set<String>,
     toggleReveal: (String) -> Unit,
 ) {
-    val monthScope = EarWorkout.MONTHS[w.month - 1].scope
-    for (s in w.sessions) WorkoutSessionCard(ear, s, monthScope, revealed, toggleReveal)
+    for (s in w.sessions) WorkoutSessionCard(ear, s, revealed, toggleReveal)
 }
 
 /**
@@ -235,15 +233,15 @@ private fun WorkoutWeekBody(
  *
  * No "Session n — title" heading: the numbering was noise and the title only restated the
  * month. The song IS the heading. The per-session focus / quality / melody / harmonize /
- * pass prose is gone too — it repeated the 45-minute frame four times a week. What survives
- * is the one line that answers "how much of this am I supposed to get?" (the session's own
- * caveat, or the month's scope), plus any note specific to this recording.
+ * pass prose is gone too — it repeated the 45-minute frame four times a week. The ▸ caveat
+ * line appears ONLY when this session's target genuinely differs from the month scope (an
+ * excerpt bound, a required version) — the month scope already sits on the month card,
+ * visible even folded, so echoing it on all 16 session cards was pure duplication.
  */
 @Composable
 private fun WorkoutSessionCard(
     ear: EarTrainingState,
     s: WorkoutSession,
-    monthScope: String,
     revealed: Set<String>,
     toggleReveal: (String) -> Unit,
 ) {
@@ -255,9 +253,10 @@ private fun WorkoutSessionCard(
             Text("Your pick — any song that fits this month.", fontWeight = FontWeight.SemiBold,
                 style = MaterialTheme.typography.bodyMedium)
         }
-        val caveat = s.caveat.ifEmpty { monthScope }
-        Text("▸ $caveat", style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary)
+        if (s.caveat.isNotEmpty()) {
+            Text("▸ ${s.caveat}", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary)
+        }
         val note = s.songNote
         if (note != null) {
             Text(note, style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic,

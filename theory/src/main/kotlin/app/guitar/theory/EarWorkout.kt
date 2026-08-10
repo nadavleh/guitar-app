@@ -25,9 +25,10 @@ data class WorkoutSession(
     val song: WorkoutSong?,
     val songNote: String? = null,
     /**
-     * Short scope caveat shown on the card — e.g. "recognize only the first 3 chord changes".
-     * Empty means "use this month's [WorkoutMonth.scope]", which is the normal case; set it
-     * only where a session's scope genuinely differs from its month's.
+     * Short scope caveat shown on the card — e.g. "First 8 bars only". Set ONLY where this
+     * session's target genuinely differs from its month's [WorkoutMonth.scope] (an excerpt
+     * bound, a required version). Empty for the normal case — the month card already
+     * displays the month scope, so it is not echoed per session.
      */
     val caveat: String = "",
     /** Function/structure to notice. */
@@ -72,9 +73,9 @@ data class WorkoutMonth(
     val objective: String,
     val vocabulary: String,
     /**
-     * How much of a song you're expected to call this month, in one short clause. Shown as
-     * the caveat on every session card in the month (unless the session overrides it), so
-     * the answer to "how much of this am I supposed to get?" is always on screen.
+     * How much of a song you're expected to call this month, in one short clause. Shown on
+     * the month card (visible even when the card is folded), so the answer to "how much of
+     * this am I supposed to get?" is always one glance away.
      */
     val scope: String,
     val harmonizationRule: String,
@@ -443,7 +444,8 @@ object EarWorkout {
                     "The opening vocal phrase only.",
                     "A plain triadic version, then one where a chord points into the next — melody must be root/3rd/5th of it.",
                     "You hear a chord gaining directional colour rather than just becoming “weird”.",
-                    "The opening teaches I → I7-ish colour → IV direction (V/IV → IV), plus chromatic line colour."),
+                    "The opening teaches I → I7-ish colour → IV direction (V/IV → IV), plus chromatic line colour.",
+                    caveat = "Opening phrase only — do NOT analyse the whole song."),
             )),
 
         wk(2, 1, "Pre-dominant choices: ii against IV",
@@ -532,7 +534,8 @@ object EarWorkout {
                     "A plain version, then a forward-pointing version, only where the melody fits the altered chord.",
                     "You hear the difference between plain home and home turned into a dominant colour.",
                     "Versions with the lab move read I → I7 → IV, i.e. V7/IV → IV.",
-                    note = "Caveat: most simple versions are plain I–IV–V and teach nothing here. The secondary dominant is the tonic becoming a dominant 7th so it points at IV. If your version lacks that, use it as plain function practice."),
+                    note = "Most simple versions are plain I–IV–V and teach nothing here. The secondary dominant is the tonic becoming a dominant 7th so it points at IV. If your version lacks that, use it as plain function practice.",
+                    caveat = "Only a version containing the I7 → IV move teaches anything — check yours first."),
                 ses(15, "Girl — controlled micro-lab (two loops only)", sg("Girl", "The Beatles", "original 1965 — verse opening and chorus ONLY"),
                     "Loop A: the minor-tonic verse opening and its dominant pull. Loop B: the chorus, which genuinely shifts to a new home.",
                     "Loop A: minor tonic vs dominant 7. Loop B: major → minor → minor → dominant.",
@@ -541,7 +544,8 @@ object EarWorkout {
                     "You can say the chorus moved home, and that its second chord is NOT the relative minor of a doo-wop loop.",
                     "Verse opening: i – V7 – i. Chorus (relative major): I – iii – ii – V7 — shaped like doo-wop I – vi – IV – V, but iii is not vi and ii is not IV.",
                     maj(1, 3, 2, 5),
-                    note = "This is the song that exhausted you. Do NOT transcribe it — two loops, diagnostic only. Its real vocabulary arrives in month 5, where it returns."),
+                    note = "This is the song that exhausted you. Do NOT transcribe it — two loops, diagnostic only. Its real vocabulary arrives in month 5, where it returns.",
+                    caveat = "Two loops only (verse opening + chorus) — diagnostic; do NOT transcribe the song."),
                 ses(16, "MONTH 1 EXAMINATION", null,
                     "Everything from month 1, cold, with nothing prepared. See the Month 1 exam card.",
                     "Major / minor / dominant, named for every event.",
@@ -699,7 +703,8 @@ object EarWorkout {
                     "Verse melody — the melody-harmony relationship here is unusually clear.",
                     "Harmonize one phrase plainly, then insert the dominant arrow where the melody allows.",
                     "You hear the arrow AND name its target, without a chart.",
-                    "Contains a secondary dominant pointing toward the relative minor, plus another dominant-function event in the bridge."),
+                    "Contains a secondary dominant pointing toward the relative minor, plus another dominant-function event in the bridge.",
+                    caveat = "Verse only."),
                 ses(34, "Tonic → dominant-coloured tonic → IV", sg("Something", "The Beatles", "original — full verse now"),
                     "Take the whole verse: the tonic gains dominant colour and moves to IV over a chromatic line.",
                     "I against I7 — same root, one note different, completely different direction.",
@@ -721,7 +726,8 @@ object EarWorkout {
                     "Diatonic version first (I–vi–ii–V), then restore only the arrows you can actually hear.",
                     "Identify at least two outside dominants by their targets — an improvement on your logged 4.5/10 quality accuracy.",
                     "First 8 bars simplified: I | V/vi | V/ii | ii | V/vi | vi | V/V | ii V | I — in C: C | E7 | A7 | Dm | E7 | Am | D7 | Dm G7 | C. Your earlier answer had iv where vi/VI7 belonged and missed VI7→ii and II7→V.",
-                    note = "Do NOT learn the tune. Its chord rhythm is fast and that's what exhausted you; most early chords last two bars, so listen for the ARROWS, not every comping chord."),
+                    note = "Do NOT learn the tune. Its chord rhythm is fast and that's what exhausted you; most early chords last two bars, so listen for the ARROWS, not every comping chord.",
+                    caveat = "First 8 bars only — call the arrows; don't learn the tune."),
             )),
 
         wk(10, 3, "iii vs III7 · vi vs VI7 · ii vs II7 — the named bottleneck",
@@ -741,7 +747,8 @@ object EarWorkout {
                     "Opening phrase, long notes first.",
                     "Simple version first, then add one secondary dominant. Diminished approach is a preview only.",
                     "A usable skeleton with at most one wrong function, plus one restored arrow.",
-                    "Reduces to I, secondary dominants (V/vi, V/ii), ii, V and chromatic approach colours."),
+                    "Reduces to I, secondary dominants (V/vi, V/ii), ii, V and chromatic approach colours.",
+                    caveat = "Opening only — function + arrows; ignore extensions."),
                 ses(39, "Seventh-quality laboratory", sg("Use Me", "Bill Withers", "original 1972 (Still Bill)"),
                     "Two chords for a whole session. Roman-numeral function is deliberately NOT graded — pure quality hearing.",
                     "m7 against dom7, the most useful seventh discrimination there is. Then maj7 against m7.",
@@ -926,7 +933,8 @@ object EarWorkout {
                     "First 16 bars of melody, fluent.",
                     "Restore only the arrows you can hear, and check each against the melody note above it.",
                     "16 bars of melody played fluently, with every arrow justified.",
-                    "I | V/vi | V/ii | ii | V/vi | vi | V/V | ii V | I, continuing through the second phrase."),
+                    "I | V/vi | V/ii | ii | V/vi | vi | V/V | ii V | I, continuing through the second phrase.",
+                    caveat = "First 16 bars, melody only — the harmony was settled in week 10."),
             )),
 
         wk(16, 4, "Review, comping, and the Month 4 exam",
@@ -1063,7 +1071,8 @@ object EarWorkout {
                     "One rhythmically clear 4–6 note vocal cell.",
                     "Harmonize the cell in minor with triads only.",
                     "Correct tonal centre and every recurring harmony by broad quality.",
-                    "Normalized: i – VI – V (in B♭ minor: B♭m – G♭ – F).", mnr(listOf(1, 6, 5, 5), setOf(2, 3))),
+                    "Normalized: i – VI – V (in B♭ minor: B♭m – G♭ – F).", mnr(listOf(1, 6, 5, 5), setOf(2, 3)),
+                    caveat = "First verse only."),
             )),
 
         wk(20, 5, "Girl — properly this time — and the Month 5 exam",
@@ -1077,14 +1086,16 @@ object EarWorkout {
                     "Harmonize the fragment with i, iv and the relative major only.",
                     "You describe the move as “subdominant colour → relative-major rest → dominant back home”.",
                     "iv → ♭VI6 (≈ iv7 with ♭6 in the bass) → ♭III → V7, in C minor: Fm → A♭6 → E♭ → G7. A♭6 and Fm7 are the same collection heard from different roots — which is why it didn't announce itself as ♭VI.",
-                    note = "You now have the vocabulary this needs. Your earlier miss was reasonable: that chord is almost the same pitch collection as the minor iv with a different bass, so it behaves like iv-family colour."),
+                    note = "You now have the vocabulary this needs. Your earlier miss was reasonable: that chord is almost the same pitch collection as the minor iv with a different bass, so it behaves like iv-family colour.",
+                    caveat = "Verse second half only."),
                 ses(78, "Girl, chorus — iii is not vi, ii is not IV", sg("Girl", "The Beatles", "original 1965 — chorus only"),
                     "The chorus really does move home to the relative major — your instinct was right. The inner colour was what was wrong.",
                     "iii (weak, smooth tonic-family) against vi (emotional relative minor); ii (directed) against IV (broad).",
                     "Chorus phrase, fluent.",
                     "Play the chorus loop and the doo-wop loop back to back until the middle chords stop sounding interchangeable.",
                     "8/10 on iii-vs-vi and ii-vs-IV, and you can explain why your original guess was right in shape and wrong in quality.",
-                    "Chorus in the relative major: I – iii – ii – V7 (E♭ – Gm – Fm – B♭7). Doo-wop for comparison: I – vi – IV – V. Same broad shape, different inner functions.", maj(1, 3, 2, 5)),
+                    "Chorus in the relative major: I – iii – ii – V7 (E♭ – Gm – Fm – B♭7). Doo-wop for comparison: I – vi – IV – V. Same broad shape, different inner functions.", maj(1, 3, 2, 5),
+                    caveat = "Chorus only."),
                 ses(79, "Chromatic bass under a static function", sg("Something Stupid", "Frank & Nancy Sinatra", "original"),
                     "A descending chromatic bass under harmony that barely moves. Chromatic motion is decoration over function far more often than it is new function.",
                     "Real functional change against chromatic decoration.",

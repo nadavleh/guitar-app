@@ -43,7 +43,14 @@ export interface EarDeps {
   onChallengeComplete?: (kind: string, score: number, total: number, durationMs: number) => void;
   /** Fires once per wrongly-answered progression when a Progression Challenge ends. */
   onProgressionMistake?: (progKey: string) => void;
+  /** Snapshot of the tracked mistake counts (progressionKey → times missed) — the pool
+   *  the "Drill list" challenge source draws from. */
+  progressionMistakesProvider?: () => Record<string, number>;
 }
+
+/** Where Progression Challenge questions come from: the generator settings (normal), or
+ *  strictly the progressions tracked in the Drill tab, weighted most-missed-first. */
+export type ChallengeSource = "generator" | "drill";
 
 /** One challenge question: the generated progression + the user's saved guesses. */
 interface QState {
@@ -718,6 +725,11 @@ export class EarTrainingState {
   // ---------- Progression Challenge ----------
 
   challengeTotal = 10;
+  /** Question source. "drill" draws strictly from the tracked Drill list (weighted by miss
+   *  count, no auto-retire — the list only changes via normal miss tracking and ✕); it
+   *  falls back to the generator whenever the list is empty. Switchable mid-challenge;
+   *  applies from the next question on. */
+  challengeSource: ChallengeSource = "generator";
   challengeAnswers: (boolean | null)[] = [];
   challengeBarsCorrect: number[] = [];
   challengeIndex = 0;
@@ -811,7 +823,44 @@ export class EarTrainingState {
 
   private challengeLog: QState[] = [];
 
+  setChallengeSource(s: ChallengeSource) { this.challengeSource = s; this.notify(); }
+
+  /** Number of progressions currently in the Drill pool (tracked mistakes). */
+  get drillPoolSize(): number {
+    return Object.keys(this.deps.progressionMistakesProvider?.() ?? {}).length;
+  }
+
+  /** Weighted draw from the tracked Drill list: a progression missed 3× is three times as
+   *  likely as one missed once. Avoids the same progression twice in a row when the pool
+   *  allows. Returns null when nothing is tracked (caller falls back to the generator). */
+  private drillSourceQuestion(): QState | null {
+    const pool = Object.entries(this.deps.progressionMistakesProvider?.() ?? {})
+      .map(([k, count]) => ({ k, count, prog: progressionFromKey(k) }))
+      .filter((e) => e.prog !== null && e.count > 0);
+    if (!pool.length) return null;
+    const last = this.challengeLog[this.challengeLog.length - 1];
+    const lastKey = last ? progressionKey(last.prog) : null;
+    const usable = pool.length >= 2 ? pool.filter((e) => e.k !== lastKey) : pool;
+    const total = usable.reduce((a, e) => a + e.count, 0);
+    let r = this.rng.int(total);
+    let picked = usable[usable.length - 1];
+    for (const e of usable) { if (r < e.count) { picked = e; break; } r -= e.count; }
+    const prog = picked.prog!;
+    const key = this.fixedKey ?? this.rng.int(12);
+    return {
+      key, mode: prog.mode, prog, resolved: this.resolveCurrent(prog, key),
+      guessDeg: [null, null, null, null],
+      guessExt: [null, null, null, null],
+      guessLabel: [null, null, null, null],
+      guessDom: [false, false, false, false],
+    };
+  }
+
   private freshChallengeQuestion(): QState {
+    if (this.challengeSource === "drill") {
+      const q = this.drillSourceQuestion();
+      if (q) return q;
+    }
     const candidates: TrainingMode[] = [];
     if (this.includeMajor) candidates.push(TrainingMode.Major);
     if (this.includeMinor) candidates.push(TrainingMode.Minor);
@@ -1174,7 +1223,18 @@ export class EarTrainingState {
    *  bar's EXACT cached voice-led shape; otherwise voice the degree with the SAME
    *  ear-training style (shell/standard, earShapes/earMidis + bass boost) — so a
    *  reference chord never sounds like a different voicing than the progression. */
+  /** Degree reference palette plays full chords (default) or single root notes. */
+  degreeRefChords = true;
+  toggleDegreeRefChords() { this.degreeRefChords = !this.degreeRefChords; this.notify(); }
+
   auditionProgDegree(deg: number) {
+    // Note mode: just the degree's root, mid guitar register — the bare scale step,
+    // no quality information at all.
+    if (!this.degreeRefChords) {
+      const root = degreeRoot(this.progKey, deg, this.progMode);
+      this.playEarChord([52 + root], root, this.deps.sustainProvider());
+      return;
+    }
     this.ensureProgShapes();
     const progIdx = this.progProgression?.degrees.indexOf(deg) ?? -1;
     const cached = progIdx >= 0 ? this.progShapes[progIdx] : null;

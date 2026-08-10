@@ -58,6 +58,9 @@ class EarTrainingState(
         { _, _, _, _ -> },
     /** Called once per wrongly-answered progression when a Progression Challenge ends. */
     private val onProgressionMistake: (progKey: String) -> Unit = { },
+    /** Snapshot of the tracked mistake counts (progressionKey → times missed) — the pool
+     *  the "Drill list" challenge source draws from. */
+    private val progressionMistakesProvider: () -> Map<String, Int> = { emptyMap() },
 ) {
     /** Per-kind challenge start time, for duration in the recorded stats. */
     private val kindChallengeStart = HashMap<String, Long>()
@@ -980,7 +983,40 @@ class EarTrainingState(
 
     private val challengeLog = ArrayList<QState>()
 
+    /** Question source. DrillList draws strictly from the tracked Drill list (weighted by
+     *  miss count, no auto-retire — the list only changes via normal miss tracking and ✕);
+     *  it falls back to the generator whenever the list is empty. Switchable mid-challenge;
+     *  applies from the next question on. */
+    var challengeSource by mutableStateOf(ChallengeSource.Generator)
+
+    /** Number of progressions currently in the Drill pool (tracked mistakes). */
+    val drillPoolSize: Int get() = progressionMistakesProvider().size
+
+    /** Weighted draw from the tracked Drill list: a progression missed 3× is three times as
+     *  likely as one missed once. Avoids the same progression twice in a row when the pool
+     *  allows. Returns null when nothing is tracked (caller falls back to the generator). */
+    private fun drillSourceQuestion(): QState? {
+        data class Entry(val k: String, val count: Int, val prog: Progression)
+        val pool = progressionMistakesProvider().mapNotNull { (k, count) ->
+            val prog = EarTraining.progressionFromKey(k)
+            if (prog != null && count > 0) Entry(k, count, prog) else null
+        }
+        if (pool.isEmpty()) return null
+        val lastKey = challengeLog.lastOrNull()?.let { EarTraining.progressionKey(it.prog) }
+        val usable = if (pool.size >= 2) pool.filter { it.k != lastKey } else pool
+        val total = usable.sumOf { it.count }
+        var r = rng.nextInt(total)
+        var picked = usable.last()
+        for (e in usable) { if (r < e.count) { picked = e; break }; r -= e.count }
+        val key = fixedKey ?: PitchClass(rng.nextInt(12))
+        return QState(key, picked.prog.mode, picked.prog, resolveCurrent(picked.prog, key),
+            List(4) { null }, List(4) { null }, List(4) { null }, List(4) { false })
+    }
+
     private fun freshChallengeQuestion(): QState {
+        if (challengeSource == ChallengeSource.DrillList) {
+            drillSourceQuestion()?.let { return it }
+        }
         val candidates = buildList {
             if (includeMajor) add(TrainingMode.Major)
             if (includeMinor) add(TrainingMode.Minor)
@@ -1416,7 +1452,19 @@ class EarTrainingState(
      *  ear-training style (shell/standard, earShapes/earMidis + bass boost) the
      *  progression uses — so a reference chord never sounds like a different voicing
      *  than the progression. Never mutates the fretboard (no answer reveal). */
+    /** Degree reference palette plays full chords (default) or single root notes. */
+    var degreeRefChords by mutableStateOf(true)
+
     fun auditionProgDegree(deg: Int) {
+        // Note mode: just the degree's root, mid guitar register — the bare scale step,
+        // no quality information at all.
+        if (!degreeRefChords) {
+            val parsed = ChordLibrary.parse(
+                EarTraining.resolve(deg, progKey, progMode, ChordTypeLevel.Triads, rng).symbol) ?: return
+            val root = parsed.first.value
+            playEarChord(listOf(52 + root), root, sustainProvider())
+            return
+        }
         ensureProgShapes()
         val progIdx = progProgression?.degrees?.indexOf(deg) ?: -1
         val cached = if (progIdx >= 0) progShapes.getOrNull(progIdx) else null
@@ -2081,6 +2129,10 @@ class EarTrainingState(
 }
 
 enum class EarSubMode { Progression, Note2Chord, Flavor, Inversions, AugDim, Intervals, Drill, Workout }
+
+/** Where Progression Challenge questions come from: the generator settings (normal), or
+ *  strictly the progressions tracked in the Drill tab, weighted most-missed-first. */
+enum class ChallengeSource { Generator, DrillList }
 
 /** Within any tab: free Practice or scored Challenge rounds. */
 enum class EarMode { Practice, Challenge }
