@@ -467,6 +467,8 @@ export class EarTrainingUI {
     if (progChallengeInFlight) {
       screen.appendChild(el("div", { style: "margin:8px 0" }, [this.challengeModeFold()]));
     } else {
+      // The fold isn't on screen — never let a stale open flag pop it open later.
+      this.modeFoldOpen = false;
       if (ear.progSubMode !== EarSubMode.Drill && ear.progSubMode !== EarSubMode.Workout) {
         screen.appendChild(el("div", { style: "margin-top:8px" }, [
           segmented(
