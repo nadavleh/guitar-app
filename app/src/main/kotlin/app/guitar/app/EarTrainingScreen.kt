@@ -1,7 +1,6 @@
 package app.guitar.app
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -65,8 +63,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -117,6 +113,10 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
     ) {
         // Title row: title + (while a Progression challenge is in flight) pinned
         // Restart/Quit icons + Stats + Tune + Back.
+        val progChallengeInFlight = ear.progSubMode == EarSubMode.Progression &&
+            ear.earMode == EarMode.Challenge &&
+            if (ear.specialProgMode) ear.advChActive && ear.advChIndex < ear.advChallengeTotal
+            else ear.challengeActive && ear.challengeIndex < ear.challengeTotal
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(
                 "EAR TRAINING",
@@ -125,10 +125,6 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
             )
-            val progChallengeInFlight = ear.progSubMode == EarSubMode.Progression &&
-                ear.earMode == EarMode.Challenge &&
-                if (ear.specialProgMode) ear.advChActive && ear.advChIndex < ear.advChallengeTotal
-                else ear.challengeActive && ear.challengeIndex < ear.challengeTotal
             if (progChallengeInFlight) {
                 IconButton(onClick = {
                     if (ear.specialProgMode) ear.startAdvChallenge() else ear.startChallenge()
@@ -159,16 +155,23 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
         // overflow (replaces SubModeDropdown). ear.switchTab / ear.earMode calls
         // are identical to before — only the picker chrome changed.
         // Drill and Workout have no Practice/Challenge split, so their control is hidden.
-        if (ear.progSubMode != EarSubMode.Drill && ear.progSubMode != EarSubMode.Workout) {
-            SegmentedRow(
-                options = EarMode.entries,
-                selected = ear.earMode,
-                onSelect = { ear.earMode = it },
-                label = { if (it == EarMode.Practice) "Practice" else "Challenge" },
-            )
+        // While a Progression challenge is in flight both rows fold into ONE compact
+        // dropdown (v2.64) — they cost two rows of prime space while answering.
+        if (progChallengeInFlight) {
+            ChallengeModeFold(state, ear)
             Spacer(Modifier.height(8.dp))
+        } else {
+            if (ear.progSubMode != EarSubMode.Drill && ear.progSubMode != EarSubMode.Workout) {
+                SegmentedRow(
+                    options = EarMode.entries,
+                    selected = ear.earMode,
+                    onSelect = { ear.earMode = it },
+                    label = { if (it == EarMode.Practice) "Practice" else "Challenge" },
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            SubModeChipRow(ear)
         }
-        SubModeChipRow(ear)
 
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (ear.progSubMode) {
@@ -273,6 +276,82 @@ private fun SubModeChipRow(ear: EarTrainingState) {
             }
         }
     }
+}
+
+/** The in-flight challenge header fold (v2.64): one compact chip replacing the
+ *  Practice/Challenge switch + sub-mode chips while a Progression challenge runs.
+ *  Expands to a dropdown holding those pickers plus the seldom-used tools that
+ *  used to live in the body's "More tools" card: 1–5–1 cadence, re-roll, songs,
+ *  the ♪ chords/notes reference toggle, drawn-from (source + generator —
+ *  changeable mid-challenge, applies from the next question), transpose, and
+ *  the key & mode reveal. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChallengeModeFold(state: AppState, ear: EarTrainingState) {
+    var open by remember { mutableStateOf(false) }
+    var settingsOpen by remember { mutableStateOf(false) }
+    Box {
+        FilterChip(
+            selected = open,
+            onClick = { open = !open },
+            label = { Text("${subModeLabel(ear.progSubMode)} · Challenge · More tools  " + if (open) "▴" else "▾") },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            Column(Modifier.width(300.dp).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                SegmentedRow(
+                    options = EarMode.entries,
+                    selected = ear.earMode,
+                    onSelect = { ear.earMode = it },
+                    label = { if (it == EarMode.Practice) "Practice" else "Challenge" },
+                )
+                Spacer(Modifier.height(8.dp))
+                SubModeChipRow(ear)
+                if (!ear.specialProgMode && ear.challengeActive) {
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(onClick = { ear.playProgKeyCadence() }) { Text("Hear ${ear.progCadenceLabel()}") }
+                        OutlinedButton(onClick = { ear.rerollChallengeQuestion() }) { Text("Re-roll") }
+                        ProgressionSongsButton(ear)
+                        // What the challenge screen's degree buttons play (moved here
+                        // from the play row): the full diatonic chord, or the bare root.
+                        FilterChip(
+                            selected = true,
+                            onClick = { ear.degreeRefChords = !ear.degreeRefChords },
+                            label = { Text(if (ear.degreeRefChords) "♪ chords" else "♪ notes") },
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Drawn from  (tap to change — applies to the next question)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+                    )
+                    ChallengeSourceRow(ear)
+                    Spacer(Modifier.height(4.dp))
+                    GeneratorSummaryCard(ear, onClick = { settingsOpen = true })
+                    Spacer(Modifier.height(8.dp))
+                    // Transpose shifts the key/chords but not the degrees — challenge-safe.
+                    TransposeClicker(ear)
+                    Spacer(Modifier.height(8.dp))
+                    RevealCard(
+                        label = "Key & Mode (hint)",
+                        hidden = !ear.keyRevealed,
+                        content = NoteSpeller.spell(ear.progKey) + "  " +
+                            if (ear.progMode == TrainingMode.Major) "Major" else "Minor",
+                        onToggle = { ear.toggleKeyModeReveal() },
+                        modifier = Modifier.width(170.dp),
+                        contentSizeSp = 15,
+                    )
+                }
+            }
+        }
+    }
+    if (settingsOpen) GeneratorSettingsSheet(state, ear, onDismiss = { settingsOpen = false })
 }
 
 /** Short label for the current progression generator. */
@@ -1410,57 +1489,54 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         }
 
         // ---- in-flight question screen ----
-        // Progress ring + per-question dot strip (Signal move — replaces the old
-        // "Question n/N · Score · Restart · Quit" row; Restart/Quit are now pinned
-        // icon buttons in the screen header, and "Q n/N" lives inside the ring).
+        // Plain one-line counter (v2.64): the progress ring + per-question dot
+        // strip cost ~80dp of height for information a text row carries fine.
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            ChallengeProgressRing(index = ear.challengeIndex, total = ear.challengeTotal)
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Score: ${ear.challengeBarScore} / ${ear.challengeBarTotal} bars",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.height(6.dp))
-                ChallengeDotStrip(ear)
-            }
+            Text(
+                "Q ${ear.challengeIndex + 1}/${ear.challengeTotal}",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "Score: ${ear.challengeBarScore} / ${ear.challengeBarTotal} bars",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
 
         Spacer(Modifier.height(8.dp))
 
-        // ---- Compact core (v2.63): everything touched on every question fits one
-        // screen-high stack — play + degree references, the four answer squares, the
-        // answer pad, one nav row. Seldom-used tools (1–5–1 cadence, re-roll, songs,
-        // drawn-from, key & mode reveal, transpose) fold behind "More tools". ----
+        // ---- Compact core (v2.63, tightened v2.64): everything touched on every
+        // question fits one screen-high stack — play + degree references, the four
+        // answer squares, the answer pad, one nav row. Seldom-used tools fold into
+        // the header dropdown (see ChallengeModeFold). ----
 
         var selectedBar by remember { mutableStateOf(0) }
         // Land back on bar 1 whenever a fresh question starts.
         LaunchedEffect(ear.challengeIndex) { selectedBar = 0 }
 
-        // ▶ Play sits RIGHT above the squares it fills (it used to live only in the
-        // bottom dock, far from the answering area). The degree reference palette plays
-        // in the hidden key; its chip toggles full chords vs bare root notes. These are
-        // the ONLY things that sound — the answer pad below just selects.
-        FlowRow(
+        // ▶ Play + the 7 degree references share ONE compact row (v2.64). The
+        // palette plays in the hidden key; its ♪ chords/notes toggle lives in the
+        // header dropdown. These are the ONLY things that sound — the answer pad
+        // below just selects.
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Button(onClick = { if (ear.isLooping) ear.stopLoop() else ear.startLoop() }) {
-                Text(if (ear.isLooping) "■ Stop" else "▶ Play progression")
-            }
+            Button(
+                onClick = { if (ear.isLooping) ear.stopLoop() else ear.startLoop() },
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                modifier = Modifier.height(34.dp),
+            ) { Text(if (ear.isLooping) "■ Stop" else "▶ Play", maxLines = 1) }
             for ((deg, label) in ear.challengeReferenceLabels()) {
                 OutlinedButton(
                     onClick = { ear.auditionProgDegree(deg) },
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                ) { Text(label) }
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.weight(1f).height(34.dp),
+                ) { Text(label, maxLines = 1) }
             }
-            FilterChip(
-                selected = true,
-                onClick = { ear.degreeRefChords = !ear.degreeRefChords },
-                label = { Text(if (ear.degreeRefChords) "♪ chords" else "♪ notes") },
-            )
         }
 
         Spacer(Modifier.height(8.dp))
@@ -1527,10 +1603,6 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
             modifier = Modifier.padding(top = 2.dp),
         )
 
-        Spacer(Modifier.height(8.dp))
-
-        ChallengeMoreCard(ear, onOpenSettings = { settingsOpen = true })
-
         Spacer(Modifier.height(12.dp))
 
         // Optional fretboard: re-uses the same toggle as Progressions sub-mode.
@@ -1569,62 +1641,6 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         Spacer(Modifier.height(20.dp))
     }
     if (settingsOpen) GeneratorSettingsSheet(state, ear, onDismiss = { settingsOpen = false })
-}
-
-/** Seldom-used challenge tools, folded into one card: 1–5–1 cadence, re-roll, songs,
- *  what the challenge draws from (source + generator — changeable mid-challenge,
- *  applies from the next question), key & mode reveal, transpose. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ChallengeMoreCard(ear: EarTrainingState, onOpenSettings: () -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().clickable { open = !open },
-            ) {
-                Text("More tools", fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-                Text(if (open) "▾" else "▸", color = MaterialTheme.colorScheme.primary)
-            }
-            if (open) {
-                Spacer(Modifier.height(6.dp))
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedButton(onClick = { ear.playProgKeyCadence() }) { Text("Hear ${ear.progCadenceLabel()}") }
-                    OutlinedButton(onClick = { ear.rerollChallengeQuestion() }) { Text("Re-roll") }
-                    ProgressionSongsButton(ear)
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Drawn from  (tap to change — applies to the next question)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
-                )
-                ChallengeSourceRow(ear)
-                Spacer(Modifier.height(4.dp))
-                GeneratorSummaryCard(ear, onClick = onOpenSettings)
-                Spacer(Modifier.height(8.dp))
-                // Transpose shifts the key/chords but not the degrees — challenge-safe.
-                TransposeClicker(ear)
-                Spacer(Modifier.height(8.dp))
-                RevealCard(
-                    label = "Key & Mode (hint)",
-                    hidden = !ear.keyRevealed,
-                    content = NoteSpeller.spell(ear.progKey) + "  " +
-                        if (ear.progMode == TrainingMode.Major) "Major" else "Minor",
-                    onToggle = { ear.toggleKeyModeReveal() },
-                    modifier = Modifier.width(170.dp),
-                    contentSizeSp = 15,
-                )
-            }
-        }
-    }
 }
 
 /** Generator vs Drill-list question-source chips (start screen + "More tools").
@@ -1751,10 +1767,11 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
-            // Major/Minor shift sits on the LEFT; the bar label fills the rest, right-aligned.
-            // The chosen side fills SOLID with the primary color — the stock FilterChip
-            // tint was too subtle to tell which keyboard is active.
+        Column(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+            // Major/Minor shift sits on the LEFT; the bar label + Clear fill the rest,
+            // right-aligned (v2.64: Clear moved up here — its own bottom row cost a
+            // full row of height). The chosen side fills SOLID with the primary color —
+            // the stock FilterChip tint was too subtle to tell which keyboard is active.
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 FilterChip(
                     selected = !ear.keyboardMinor,
@@ -1769,22 +1786,26 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
                 FilterChip(
                     selected = ear.keyboardMinor,
                     onClick = { if (!ear.keyboardMinor) ear.toggleKeyboardShift() },
-                    label = { Text("⇧ Minor", fontWeight = if (ear.keyboardMinor) FontWeight.Bold else FontWeight.Normal) },
+                    label = { Text("Minor", fontWeight = if (ear.keyboardMinor) FontWeight.Bold else FontWeight.Normal) },
                     colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                 )
-                Text("Bar ${bar + 1} answer", style = MaterialTheme.typography.labelMedium,
+                Text("Bar ${bar + 1}", style = MaterialTheme.typography.labelMedium,
                     textAlign = androidx.compose.ui.text.style.TextAlign.End,
                     modifier = Modifier.weight(1f))
+                TextButton(
+                    onClick = { ear.clearChallengeBar(bar); reset() },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                ) { Text("Clear") }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             // Degree grid — 4 columns (I ii iii IV / V vi vii° / …), plus the
             // extensions key when this level needs one.
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
                 maxItemsInEachRow = 4,
             ) {
                 for ((majDeg, roman) in ear.keyboardKeys()) {
@@ -1843,63 +1864,6 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
                     }
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            TextButton(onClick = { ear.clearChallengeBar(bar); reset() }) { Text("Clear bar ${bar + 1}") }
-        }
-    }
-}
-
-/** 72dp progress ring for the Progression Challenge: a muted (outline) track with
- *  an act-colored arc sweeping to the answered fraction, and "Q n/N" centered. */
-@Composable
-private fun ChallengeProgressRing(index: Int, total: Int) {
-    val trackColor = MaterialTheme.colorScheme.outline
-    val actColor = MaterialTheme.colorScheme.primary
-    val fraction = (index.toFloat() / total).coerceIn(0f, 1f)
-    Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
-            drawArc(color = trackColor, startAngle = -90f, sweepAngle = 360f, useCenter = false, style = stroke)
-            if (fraction > 0f) {
-                drawArc(color = actColor, startAngle = -90f, sweepAngle = 360f * fraction, useCenter = false, style = stroke)
-            }
-        }
-        Text(
-            "Q ${index + 1}/$total",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-        )
-    }
-}
-
-/** Per-question dot strip for the Progression Challenge: teal = fully right,
- *  coral (error) = wrong, act-filled with a ring = the current question, muted
- *  (outline) = upcoming/unanswered. Derived from [EarTrainingState.challengeAnswers]
- *  and [EarTrainingState.challengeIndex]. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ChallengeDotStrip(ear: EarTrainingState) {
-    val palette = LocalSignal.current
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (i in 0 until ear.challengeTotal) {
-            val isCurrent = i == ear.challengeIndex
-            val answer = ear.challengeAnswers.getOrNull(i)
-            val dotColor = when {
-                isCurrent -> MaterialTheme.colorScheme.primary
-                answer == true -> palette.feedback
-                answer == false -> MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.surfaceVariant
-            }
-            Box(
-                modifier = Modifier
-                    .size(16.dp)
-                    .clip(CircleShape)
-                    .background(dotColor)
-                    .then(
-                        if (isCurrent) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                        else Modifier,
-                    ),
-            )
         }
     }
 }

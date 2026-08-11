@@ -1462,7 +1462,9 @@ class EarTrainingState(
             val parsed = ChordLibrary.parse(
                 EarTraining.resolve(deg, progKey, progMode, ChordTypeLevel.Triads, rng).symbol) ?: return
             val root = parsed.first.value
-            playEarChord(listOf(52 + root), root, sustainProvider())
+            // Anchored to the tonic so 1 is always the lowest and 2..7 ascend above it
+            // (52 + root put the octave at the mercy of the pc wrap point).
+            playEarChord(listOf(EarTraining.degreeRefMidi(progKey, deg, progMode)), root, sustainProvider())
             return
         }
         ensureProgShapes()

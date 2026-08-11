@@ -795,39 +795,36 @@ select.et-select {
 }
 .et-submenu-item:hover { background: rgba(255, 255, 255, 0.05); }
 
-.et-ring {
-  width: 64px;
-  height: 64px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.et-ring-inner {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
+/* In-flight challenge header fold (v2.64): the Practice/Challenge switch, the
+   sub-mode chips and the seldom-used tools live in this dropdown panel. */
+.et-modefold-pop {
+  position: absolute;
+  z-index: 30;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  max-height: 65vh;
+  overflow: auto;
   background: var(--surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
 }
 
-.et-dotc { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; }
-.et-dotc.right { background: var(--feedback); }
-.et-dotc.wrong { background: var(--root-tone); }
-.et-dotc.current { background: var(--act); border: 2px solid var(--text-primary); }
-.et-dotc.muted { background: var(--surface-elev); border: 1px solid var(--divider); }
+/* ▶ Play + the 7 degree-reference buttons in one compact row (v2.64). */
+.et-degref-row { display: flex; gap: 4px; align-items: center; }
+.et-degref-row .btn { white-space: nowrap; }
+.et-degref-row .et-degref { flex: 1 1 0; min-width: 0; padding: 5px 0; text-align: center; }
 
+.et-pad-card { padding: 8px; }
 .et-pad-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  gap: 4px;
 }
-.et-pad-grid .chip { width: 100%; text-align: center; }
+.et-pad-grid .chip { width: 100%; text-align: center; padding: 4px 4px; }
 
 /* ---------- Drum machine ---------- */
 

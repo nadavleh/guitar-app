@@ -102,9 +102,11 @@ export class EarTrainingUI {
 
   /** Sub-mode chip row's "More ▾" overflow (Flavor/Inversions/AugDim). */
   private subModeMoreOpen = false;
-  /** "More tools" fold in the compact Progression Challenge (closed per screen entry). */
-  private challengeMoreOpen = false;
   private subModeOutsideCloser: ((e: Event) => void) | null = null;
+  /** In-flight challenge header fold (v2.64): the Practice/Challenge switch, the
+   *  sub-mode chips AND the seldom-used tools all collapse into one dropdown row. */
+  private modeFoldOpen = false;
+  private modeFoldOutsideCloser: ((e: Event) => void) | null = null;
 
   /** One shared bottom sheet for the Progression generator/key/level settings
    *  (Signal move — replaces the always-expanded settings block with a
@@ -304,35 +306,6 @@ export class EarTrainingUI {
     ]);
   }
 
-  /** 64px progress ring for the Progression Challenge: a muted track with an
-   *  act-colored arc swept to the answered fraction (CSS conic-gradient donut —
-   *  an inner surface-colored circle masks the middle so only a ring shows),
-   *  "Q n/N" centered. Mirrors Android's ChallengeProgressRing (Canvas arcs). */
-  private challengeProgressRing(index: number, total: number): HTMLElement {
-    const fraction = Math.min(Math.max(total > 0 ? index / total : 0, 0), 1);
-    const deg = Math.round(fraction * 360);
-    const ring = el("div", {
-      class: "et-ring",
-      style: `background: conic-gradient(var(--act) ${deg}deg, var(--divider) ${deg}deg)`,
-    }, [el("div", { class: "et-ring-inner" }, [`Q ${index + 1}/${total}`])]);
-    return ring;
-  }
-
-  /** Per-question dot strip for the Progression Challenge: feedback(teal) =
-   *  right, act(coral/error) = wrong, act-filled+ring = current, muted =
-   *  upcoming/unanswered. Mirrors Android's ChallengeDotStrip. */
-  private challengeDotStrip(): HTMLElement {
-    const ear = this.ear;
-    const row = el("div", { class: "chip-row" });
-    for (let i = 0; i < ear.challengeTotal; i++) {
-      const isCurrent = i === ear.challengeIndex;
-      const answer = ear.challengeAnswers[i];
-      const cls = isCurrent ? "et-dotc current" : answer === true ? "et-dotc right" : answer === false ? "et-dotc wrong" : "et-dotc muted";
-      row.appendChild(el("div", { class: cls }));
-    }
-    return row;
-  }
-
   private resetPad(): void {
     this.padPickedDeg = null; this.padPickedRoman = null; this.padPickedExt = null; this.padPickedDominant = false; this.padExtOpen = false;
   }
@@ -413,12 +386,16 @@ export class EarTrainingUI {
     // The chosen side gets a SOLID opaque fill (shift-chip) — the regular selected
     // tint was too subtle to tell which keyboard is active.
     const majorChip = chip("Major", !ear.keyboardMinor, () => { if (ear.keyboardMinor) ear.toggleKeyboardShift(); });
-    const minorChip = chip("⇧ Minor", ear.keyboardMinor, () => { if (!ear.keyboardMinor) ear.toggleKeyboardShift(); });
+    const minorChip = chip("Minor", ear.keyboardMinor, () => { if (!ear.keyboardMinor) ear.toggleKeyboardShift(); });
     majorChip.classList.add("shift-chip");
     minorChip.classList.add("shift-chip");
-    const header = el("div", { class: "row" }, [
+    // Clear moved up into the header row (v2.64) — its own bottom row cost a
+    // full row of height in the pad.
+    const clearBtn = btn("Clear", () => { ear.clearChallengeBar(bar); this.resetPad(); this.rerender(); }, "btn text", `Clear bar ${bar + 1}'s answer`);
+    const header = el("div", { class: "row", style: "align-items:center" }, [
       majorChip, minorChip,
-      el("span", { class: "ans-label", style: "flex:1;text-align:right" }, [`Bar ${bar + 1} answer`]),
+      el("span", { class: "ans-label", style: "flex:1;text-align:right" }, [`Bar ${bar + 1}`]),
+      clearBtn,
     ]);
 
     const grid = el("div", { class: "et-pad-grid" }, ear.keyboardKeys().map(([majDeg, roman]) =>
@@ -449,11 +426,7 @@ export class EarTrainingUI {
           chip(ext === "" ? "triad" : ext, this.padPickedExt === ext, () => { this.padPickedExt = ext; commit(ext); }))));
       }
     }
-    children.push(el("div", { style: "margin-top:6px" }, [
-      btn(`Clear bar ${bar + 1}`, () => { ear.clearChallengeBar(bar); this.resetPad(); this.rerender(); }, "btn text"),
-    ]));
-
-    return el("div", { class: "et-card", style: `background:color-mix(in srgb, var(--surface2) 70%, transparent)` }, children);
+    return el("div", { class: "et-card et-pad-card", style: `background:color-mix(in srgb, var(--surface2) 70%, transparent)` }, children);
   }
 
   render(container: HTMLElement): void {
@@ -489,16 +462,22 @@ export class EarTrainingUI {
     // Practice/Challenge segmented control (Signal move — replaces the mode
     // <select>) + sub-mode chip row (replaces the sub-mode <select>). Drill and
     // Workout have no practice/challenge split, so their control is hidden.
-    if (ear.progSubMode !== EarSubMode.Drill && ear.progSubMode !== EarSubMode.Workout) {
-      screen.appendChild(el("div", { style: "margin-top:8px" }, [
-        segmented(
-          [{ value: EarMode.Practice, label: "Practice" }, { value: EarMode.Challenge, label: "Challenge" }],
-          ear.earMode,
-          (v) => ear.setEarMode(v),
-        ),
-      ]));
+    // While a Progression challenge is in flight both rows fold into ONE compact
+    // dropdown (v2.64) — they cost two rows of prime space while answering.
+    if (progChallengeInFlight) {
+      screen.appendChild(el("div", { style: "margin:8px 0" }, [this.challengeModeFold()]));
+    } else {
+      if (ear.progSubMode !== EarSubMode.Drill && ear.progSubMode !== EarSubMode.Workout) {
+        screen.appendChild(el("div", { style: "margin-top:8px" }, [
+          segmented(
+            [{ value: EarMode.Practice, label: "Practice" }, { value: EarMode.Challenge, label: "Challenge" }],
+            ear.earMode,
+            (v) => ear.setEarMode(v),
+          ),
+        ]));
+      }
+      screen.appendChild(el("div", { style: "margin:8px 0" }, [this.subModeChipRow()]));
     }
-    screen.appendChild(el("div", { style: "margin:8px 0" }, [this.subModeChipRow()]));
 
     const body = el("div", { class: "et-scroll" });
     screen.appendChild(body);
@@ -580,6 +559,24 @@ export class EarTrainingUI {
       };
       this.subModeOutsideCloser = onDoc;
       setTimeout(() => { if (this.subModeOutsideCloser === onDoc) document.addEventListener("pointerdown", onDoc, true); }, 0);
+    }
+
+    // Same outside-tap closer for the in-flight challenge header fold.
+    if (this.modeFoldOutsideCloser) {
+      document.removeEventListener("pointerdown", this.modeFoldOutsideCloser, true);
+      this.modeFoldOutsideCloser = null;
+    }
+    if (this.modeFoldOpen) {
+      const onDoc = (e: Event) => {
+        if (!(e.target as HTMLElement).closest(".et-modefold-wrap")) {
+          document.removeEventListener("pointerdown", onDoc, true);
+          if (this.modeFoldOutsideCloser === onDoc) this.modeFoldOutsideCloser = null;
+          this.modeFoldOpen = false;
+          this.rerender();
+        }
+      };
+      this.modeFoldOutsideCloser = onDoc;
+      setTimeout(() => { if (this.modeFoldOutsideCloser === onDoc) document.addEventListener("pointerdown", onDoc, true); }, 0);
     }
   }
 
@@ -1029,36 +1026,29 @@ export class EarTrainingUI {
       this.padPickedBar = null;
     }
 
-    // ---- Progress ring + per-question dot strip (Restart/Quit are pinned icon
-    // buttons in the screen header; "Q n/N" lives in the ring). ----
-    parent.appendChild(el("div", { class: "row", style: "align-items:center;gap:14px" }, [
-      this.challengeProgressRing(ear.challengeIndex, ear.challengeTotal),
-      el("div", { style: "flex:1;min-width:0" }, [
-        el("div", { style: `font-weight:600;color:var(--act)` }, [`Score: ${ear.challengeBarScore()} / ${ear.challengeBarTotal()} bars`]),
-        el("div", { class: "v-gap-8" }),
-        this.challengeDotStrip(),
-      ]),
-    ]));
+    // ---- Plain one-line counter (v2.64): the progress ring + per-question dot
+    // strip cost ~70px of height for information a text row carries fine. ----
+    parent.appendChild(this.challengeScoreRow(
+      `Q ${ear.challengeIndex + 1}/${ear.challengeTotal}`,
+      `Score: ${ear.challengeBarScore()} / ${ear.challengeBarTotal()} bars`));
 
     parent.appendChild(el("div", { class: "v-gap-8" }));
 
-    // ---- Compact core (v2.63): everything touched on every question fits one
-    // screen-high stack — play + degree references, the four answer squares, the
-    // answer pad, one nav row. Seldom-used tools (1–5–1 cadence, re-roll, songs,
-    // drawn-from, key & mode reveal, transpose) fold behind "More tools". ----
+    // ---- Compact core (v2.63, tightened v2.64): everything touched on every
+    // question fits one screen-high stack — play + degree references, the four
+    // answer squares, the answer pad, one nav row. Seldom-used tools fold into
+    // the header dropdown (see challengeModeFold). ----
 
-    // ▶ Play sits RIGHT above the squares it fills (it used to live only in the
-    // bottom dock, far from the answering area). The degree reference palette plays
-    // in the hidden key; its chip toggles full chords vs bare root notes.
-    const playBtn = btn(ear.isLooping ? "■ Stop" : "▶ Play progression",
+    // ▶ Play + the 7 degree references share ONE row. The degree palette plays
+    // in the hidden key; its ♪ chords/notes toggle lives in the header dropdown.
+    const playBtn = btn(ear.isLooping ? "■ Stop" : "▶ Play",
       () => { if (ear.isLooping) ear.stopLoop(); else ear.startLoop(); }, "btn primary");
-    const refBtns = ear.challengeReferenceLabels().map(([deg, label]) =>
-      btn(label, () => ear.auditionProgDegree(deg), "btn", "degree reference — plays in the hidden key"));
-    const refToggle = chip(ear.degreeRefChords ? "♪ chords" : "♪ notes", true,
-      () => { ear.toggleDegreeRefChords(); this.rerender(); });
-    refToggle.title = "What the degree buttons play: the full diatonic chord, or just the bare root note";
-    parent.appendChild(el("div", { class: "et-row-gap", style: "align-items:center" },
-      [playBtn, labelSm("Degrees:"), ...refBtns, refToggle]));
+    const refBtns = ear.challengeReferenceLabels().map(([deg, label]) => {
+      const b = btn(label, () => ear.auditionProgDegree(deg), "btn", "degree reference — plays in the hidden key");
+      b.classList.add("et-degref");
+      return b;
+    });
+    parent.appendChild(el("div", { class: "et-degref-row" }, [playBtn, ...refBtns]));
 
     parent.appendChild(el("div", { class: "v-gap-8" }));
 
@@ -1088,44 +1078,59 @@ export class EarTrainingUI {
     parent.appendChild(el("div", { class: "row", style: "gap:8px" }, [prevBtn, nextBtn]));
     parent.appendChild(el("div", { class: "et-muted", style: "margin-top:2px" }, ["Unanswered bars count as correct."]));
 
-    parent.appendChild(el("div", { class: "v-gap-8" }));
-    parent.appendChild(this.challengeMoreCard());
-
     parent.appendChild(el("div", { class: "v-gap-12" }));
     this.fretboardPanel(parent);
   }
 
-  /** Seldom-used challenge tools, folded into one card: 1–5–1 cadence, re-roll, songs,
-   *  what the challenge draws from (source + generator — changeable mid-challenge,
-   *  applies from the next question), key & mode reveal, transpose. */
-  private challengeMoreCard(): HTMLElement {
+  /** The in-flight challenge header fold (v2.64): one compact chip row that
+   *  replaces the Practice/Challenge switch + sub-mode chips while a Progression
+   *  challenge runs. Expands to a dropdown holding those pickers plus the
+   *  seldom-used tools that used to live in the body's "More tools" card:
+   *  1–5–1 cadence, re-roll, songs, the ♪ chords/notes reference toggle,
+   *  drawn-from (source + generator — changeable mid-challenge, applies from
+   *  the next question), transpose, key & mode reveal. */
+  private challengeModeFold(): HTMLElement {
     const ear = this.ear;
-    const open = this.challengeMoreOpen;
-    const head = el("div", { style: "display:flex;gap:8px;align-items:baseline;cursor:pointer;padding:2px 0" }, [
-      el("span", { style: "flex:1;font-weight:700;color:var(--act)" }, ["More tools"]),
-      el("span", { style: "color:var(--act)" }, [open ? "▾" : "▸"]),
-    ]);
-    head.addEventListener("click", () => { this.challengeMoreOpen = !open; this.rerender(); });
-    const children: HTMLElement[] = [head];
-    if (open) {
-      children.push(
-        el("div", { class: "et-row-gap", style: "margin-top:6px" }, [
-          btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
-          btn("Re-roll", () => ear.rerollChallengeQuestion()),
-          this.songsButton(),
-        ]),
-        el("div", { class: "v-gap-8" }),
-        labelSm("Drawn from  (tap to change — applies to the next question)"),
-        this.challengeSourceRow(),
-        this.generatorSummaryCard(() => this.openSettingsSheet()),
-        // Transpose shifts the key/chords but not the degrees, so it's challenge-safe.
-        this.transposeRow(),
-        this.revealCard("Key & Mode (hint)", !ear.keyRevealed,
-          spellPc(ear.progKey) + "  " + (ear.progMode === TrainingMode.Major ? "Major" : "Minor"),
-          () => ear.toggleKeyModeReveal(), false),
-      );
+    const wrap = el("div", { class: "et-modefold-wrap", style: "position:relative" });
+    const head = chip(
+      `${EarTrainingUI.SUBMODE_LABEL[ear.progSubMode]} · Challenge · More tools  ${this.modeFoldOpen ? "▴" : "▾"}`,
+      this.modeFoldOpen,
+      () => { this.modeFoldOpen = !this.modeFoldOpen; this.rerender(); },
+    );
+    wrap.appendChild(head);
+    if (!this.modeFoldOpen) return wrap;
+
+    const pop = el("div", { class: "et-modefold-pop" });
+    pop.appendChild(segmented(
+      [{ value: EarMode.Practice, label: "Practice" }, { value: EarMode.Challenge, label: "Challenge" }],
+      ear.earMode,
+      (v) => ear.setEarMode(v),
+    ));
+    pop.appendChild(el("div", { class: "v-gap-8" }));
+    pop.appendChild(this.subModeChipRow());
+    if (!ear.specialProgMode && ear.challengeActive) {
+      pop.appendChild(el("div", { style: "border-top:1px solid var(--divider);margin:8px 0" }));
+      const refToggle = chip(ear.degreeRefChords ? "♪ chords" : "♪ notes", true,
+        () => { ear.toggleDegreeRefChords(); this.rerender(); });
+      refToggle.title = "What the degree buttons play: the full diatonic chord, or just the bare root note";
+      pop.appendChild(el("div", { class: "et-row-gap" }, [
+        btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
+        btn("Re-roll", () => ear.rerollChallengeQuestion()),
+        this.songsButton(),
+        refToggle,
+      ]));
+      pop.appendChild(el("div", { class: "v-gap-8" }));
+      pop.appendChild(labelSm("Drawn from  (tap to change — applies to the next question)"));
+      pop.appendChild(this.challengeSourceRow());
+      pop.appendChild(this.generatorSummaryCard(() => this.openSettingsSheet()));
+      // Transpose shifts the key/chords but not the degrees, so it's challenge-safe.
+      pop.appendChild(this.transposeRow());
+      pop.appendChild(this.revealCard("Key & Mode (hint)", !ear.keyRevealed,
+        spellPc(ear.progKey) + "  " + (ear.progMode === TrainingMode.Major ? "Major" : "Minor"),
+        () => ear.toggleKeyModeReveal(), false));
     }
-    return el("div", { class: "et-card" }, children);
+    wrap.appendChild(pop);
+    return wrap;
   }
 
   /** Generator vs Drill-list question-source chips (start screen + "More tools").

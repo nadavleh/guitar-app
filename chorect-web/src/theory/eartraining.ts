@@ -79,6 +79,16 @@ export function degreeRoot(key: PitchClass, degree: number, mode: TrainingMode):
   return pcOf(key + scale[degree - 1]);
 }
 
+/** MIDI note for a bare degree-reference tone, anchored to the tonic: degree 1
+ *  always sounds at 52 + key (mid guitar register) and degrees 2..7 land in the
+ *  octave ABOVE it, so 1..7 form one ascending scale in every key. (Mapping the
+ *  pitch class straight to 52 + pc made the octave depend on where the key's
+ *  degrees fell around the pc wrap point — e.g. G major dropped an octave at 4.)
+ *  Mirrors Kotlin EarTraining.degreeRefMidi. */
+export function degreeRefMidi(key: PitchClass, degree: number, mode: TrainingMode): number {
+  return 52 + key + ((degreeRoot(key, degree, mode) - key + 12) % 12);
+}
+
 /** Build the displayed Roman label for a non-triad level. */
 export function romanLabel(triadRoman: string, quality: string): string {
   if (triadRoman.endsWith("°")) {

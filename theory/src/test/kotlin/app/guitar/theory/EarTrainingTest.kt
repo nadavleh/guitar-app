@@ -37,6 +37,34 @@ class EarTrainingTest {
         assertEquals(6, EarTraining.majorRelativeDegree(1, TrainingMode.Minor))
     }
 
+    // ----- degreeRefMidi (degree-reference "♪ notes" octave anchoring) -----
+
+    @Test fun `degree-reference notes ascend from the tonic in every key`() {
+        // The v2.63 bug: G major mapped 3=B to 63 but 4=C to 52 — the scale dropped
+        // an octave at the pc wrap point. Anchored to the tonic, degree 1 is always
+        // the lowest note and 2..7 ascend strictly within the octave above it.
+        for (mode in TrainingMode.entries) {
+            for (pc in 0..11) {
+                val key = PitchClass.of(pc)
+                val midis = (1..7).map { EarTraining.degreeRefMidi(key, it, mode) }
+                assertEquals(52 + key.value, midis.first())
+                for (i in 1 until midis.size) {
+                    assertTrue(midis[i] > midis[i - 1],
+                        "degree ${i + 1} must sound above degree $i in $key $mode, got $midis")
+                }
+                assertTrue(midis.last() < midis.first() + 12)
+            }
+        }
+    }
+
+    @Test fun `G major reference puts 1=G below 7=F#`() {
+        val g = EarTraining.degreeRefMidi(PitchClass.G, 1, TrainingMode.Major)
+        val fs = EarTraining.degreeRefMidi(PitchClass.G, 7, TrainingMode.Major)
+        assertEquals(59, g)   // G3, mid guitar register
+        assertEquals(70, fs)  // F#4, a major 7th above — no octave drop mid-scale
+        assertTrue(g < fs)
+    }
+
     // ----- degreeRoot -----
 
     @Test fun `I in C major is C`() {

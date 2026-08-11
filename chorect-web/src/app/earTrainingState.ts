@@ -8,7 +8,7 @@ import {
   Tuning, PitchClass, ChordShape, ChordShapeGenerator, VoicingStyle, CagedShape,
   parseChord, QUALITIES, spellPc,
   TrainingMode, ChordTypeLevel, Progression, ResolvedChord, NamedProgression,
-  EarTrainingDegrees, degreeRoot, resolve as resolveDegree, resolveProgression,
+  EarTrainingDegrees, degreeRoot, degreeRefMidi, resolve as resolveDegree, resolveProgression,
   randomProgression, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
   MINOR_DOMINANT, progressionKey, progressionFromKey,
   majorRelativeDegree, degreeFromMajorRelative,
@@ -1232,7 +1232,9 @@ export class EarTrainingState {
     // no quality information at all.
     if (!this.degreeRefChords) {
       const root = degreeRoot(this.progKey, deg, this.progMode);
-      this.playEarChord([52 + root], root, this.deps.sustainProvider());
+      // Anchored to the tonic so 1 is always the lowest and 2..7 ascend above it
+      // (52 + root put the octave at the mercy of the pc wrap point).
+      this.playEarChord([degreeRefMidi(this.progKey, deg, this.progMode)], root, this.deps.sustainProvider());
       return;
     }
     this.ensureProgShapes();

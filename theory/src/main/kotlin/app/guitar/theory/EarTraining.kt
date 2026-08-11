@@ -109,6 +109,14 @@ object EarTraining {
         return PitchClass.of(key.value + scale[degree - 1])
     }
 
+    /** MIDI note for a bare degree-reference tone, anchored to the tonic: degree 1
+     *  always sounds at 52 + key (mid guitar register) and degrees 2..7 land in the
+     *  octave ABOVE it, so 1..7 form one ascending scale in every key. (Mapping the
+     *  pitch class straight to 52 + pc made the octave depend on where the key's
+     *  degrees fell around the pc wrap point — e.g. G major dropped an octave at 4.) */
+    fun degreeRefMidi(key: PitchClass, degree: Int, mode: TrainingMode): Int =
+        52 + key.value + ((degreeRoot(key, degree, mode).value - key.value + 12) % 12)
+
     /** Build the displayed Roman label for a non-triad level: e.g. "ii"+"m7" → "ii7", "V"+"7" → "V7". */
     fun romanLabel(triadRoman: String, quality: String): String {
         // Ignore any leading accidental (b/#) when deciding major/minor case, so
