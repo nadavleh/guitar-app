@@ -1064,6 +1064,11 @@ export class EarTrainingUI {
     const challengeNoTonic = this.noTonicBanner();
     if (challengeNoTonic) parent.appendChild(challengeNoTonic);
 
+    // Optional fretboard (v2.65: moved up from the bottom of the screen, where
+    // checking it meant scrolling down and back up to hit ▶ on the next bar).
+    // It answers the bar squares' ▶ buttons, so it belongs right under them.
+    this.fretboardPanel(parent);
+
     parent.appendChild(el("div", { class: "v-gap-8" }));
     parent.appendChild(this.challengeAnswerPad(this.challengeSelectedBar));
 
@@ -1081,7 +1086,6 @@ export class EarTrainingUI {
     parent.appendChild(el("div", { class: "et-muted", style: "margin-top:2px" }, ["Unanswered bars count as correct."]));
 
     parent.appendChild(el("div", { class: "v-gap-12" }));
-    this.fretboardPanel(parent);
   }
 
   /** The in-flight challenge header fold (v2.64): one compact chip row that

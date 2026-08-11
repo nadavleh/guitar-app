@@ -1567,6 +1567,43 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         // scrolled away from the answering area, which is where it matters.
         NoTonicBanner(ear)
 
+        // Optional fretboard (v2.65: moved up from the bottom of the screen, where
+        // checking it meant scrolling down and back up to hit ▶ on the next bar).
+        // It answers the bar squares' ▶ buttons, so it belongs right under them.
+        // Re-uses the same toggle as the Progressions sub-mode.
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Show chord on fretboard",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f))
+            Switch(checked = ear.showFretboard, onCheckedChange = { ear.showFretboard = it })
+        }
+        if (ear.showFretboard) {
+            val shape = ear.currentPlayingShape ?: ear.lastShownShape
+            val marks = remember(shape, state.labelMode) {
+                shape?.let { shapeMarks(it, state.labelMode) } ?: emptyMap()
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .padding(vertical = 4.dp),
+            ) {
+                FretboardView(
+                    tuning = state.liveTuning,
+                    marks = marks,
+                    selectedPosition = null,
+                    onTap = { pos ->
+                        val midi = Fretboard.noteAt(state.liveTuning, pos).midi.value
+                        state.audio.playNote(midi, durationMillis = state.ringSustainMs)
+                    },
+                    numFrets = DISPLAY_FRETS,
+                    leftHanded = state.leftHanded,
+                    // Hoisted camera: keeps the zoom when the panel is toggled off/on.
+                    camera = ear.progFretboardCamera,
+                )
+            }
+        }
+
         Spacer(Modifier.height(8.dp))
         ChallengeAnswerPad(ear, bar = selectedBar)
 
@@ -1603,41 +1640,6 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
             modifier = Modifier.padding(top = 2.dp),
         )
 
-        Spacer(Modifier.height(12.dp))
-
-        // Optional fretboard: re-uses the same toggle as Progressions sub-mode.
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("Show chord on fretboard",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f))
-            Switch(checked = ear.showFretboard, onCheckedChange = { ear.showFretboard = it })
-        }
-        if (ear.showFretboard) {
-            val shape = ear.currentPlayingShape ?: ear.lastShownShape
-            val marks = remember(shape, state.labelMode) {
-                shape?.let { shapeMarks(it, state.labelMode) } ?: emptyMap()
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp)
-                    .padding(vertical = 4.dp),
-            ) {
-                FretboardView(
-                    tuning = state.liveTuning,
-                    marks = marks,
-                    selectedPosition = null,
-                    onTap = { pos ->
-                        val midi = Fretboard.noteAt(state.liveTuning, pos).midi.value
-                        state.audio.playNote(midi, durationMillis = state.ringSustainMs)
-                    },
-                    numFrets = DISPLAY_FRETS,
-                    leftHanded = state.leftHanded,
-                    // Hoisted camera: keeps the zoom when the panel is toggled off/on.
-                    camera = ear.progFretboardCamera,
-                )
-            }
-        }
         Spacer(Modifier.height(20.dp))
     }
     if (settingsOpen) GeneratorSettingsSheet(state, ear, onDismiss = { settingsOpen = false })
