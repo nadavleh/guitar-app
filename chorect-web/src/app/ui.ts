@@ -161,6 +161,13 @@ export class App {
    *  transient 3-item edit is dropped on dismiss, same as Android. */
   private tabOrderPending: TabDestName[] | null = null;
 
+  /** Settings → "Look & tabs" fold (theme / accent / tabs & order). Collapsed by
+   *  default and reset to collapsed whenever the Settings sheet is dismissed,
+   *  mirroring Android's `remember`-scoped AppearanceSection flag. Kept as a
+   *  field rather than a `<details open>` because picking an accent rerenders
+   *  (and so rebuilds) the whole sheet. */
+  private appearanceOpen = false;
+
   private ear: EarTrainingState;
   private earUI: EarTrainingUI;
   private samba: SambaLooperState;
@@ -930,7 +937,7 @@ export class App {
     // AppState — drop any in-flight (<4) edit once the Settings sheet isn't
     // showing, same as Android's remember-scoped TabOrderEditor being
     // disposed on dismiss.
-    if (route !== Sheet.Options) this.tabOrderPending = null;
+    if (route !== Sheet.Options) { this.tabOrderPending = null; this.appearanceOpen = false; }
     if (this.moreOpen) {
       this.sheetLayer.appendChild(this.moreSheet());
       if (this.moreStatsOpen) {
@@ -1106,28 +1113,18 @@ export class App {
   }
 
   /** Settings sheet content (Signal T12, mirrors Android's Screens.kt
-   *  OptionsSheet grouping exactly): Personalize (theme/accent/tabs & order/
-   *  left-handed) → Instrument (tuning, unchanged) → Behavior (labels/touch/
-   *  voicing, unchanged) → Tuner (A4 only — ring sustain/strum spread live in
-   *  the Tone sheet, see transport.ts, so aren't duplicated here). */
+   *  OptionsSheet grouping exactly): Personalize (left-handed) → Instrument
+   *  (tuning, unchanged) → Behavior (labels/touch/voicing, unchanged) → Tuner
+   *  (A4 only — ring sustain/strum spread live in the Tone sheet, see
+   *  transport.ts, so aren't duplicated here) → "Look & tabs" fold
+   *  (theme/accent/tabs & order, collapsed, last). */
   private fillOptionsSheet(sheet: HTMLElement): void {
     const s = this.state;
 
-    // ----- Personalize -----
+    // ----- Personalize (theme / accent / tabs & order moved into the collapsed
+    // "Look & tabs" fold at the bottom — set-once options shouldn't push the
+    // settings you actually revisit off-screen) -----
     sheet.appendChild(this.sectionLabel("Personalize"));
-
-    sheet.appendChild(labelSm("Theme"));
-    sheet.appendChild(segmented<ThemeMode>(
-      ALL_THEME_MODES.map((m) => ({ value: m, label: m })),
-      s.themeMode, (v) => s.setThemeMode(v),
-    ));
-
-    sheet.appendChild(labelSm("Accent"));
-    sheet.appendChild(this.accentRow());
-
-    sheet.appendChild(labelSm("Tabs & order"));
-    sheet.appendChild(el("div", { class: "settings-hint" }, ["Pick 4 tabs; everything else lives in More"]));
-    sheet.appendChild(this.tabOrderEditor());
 
     sheet.appendChild(switchRow("Left-handed", null, s.leftHanded, (v) => s.toggleLeftHanded(v)));
 
@@ -1209,6 +1206,46 @@ export class App {
     const a4VS = valueSlider((v) => `A4 reference: ${Math.round(v)} Hz`, 435, 445, s.a4Hz, (v) => s.setA4Hz(v));
     sheet.appendChild(el("div", { style: "margin-top:6px" }, [a4VS.label]));
     sheet.appendChild(a4VS.input);
+
+    sheet.appendChild(el("div", { class: "divider-line" }));
+
+    // ----- Look & tabs (collapsed by default; last section on purpose) -----
+    sheet.appendChild(this.appearanceFold());
+  }
+
+  /** Settings → "Look & tabs": theme mode, accent swatches and the tab picker,
+   *  all behind one collapsed row at the bottom of the sheet. Mirrors Android's
+   *  AppearanceSection. */
+  private appearanceFold(): HTMLElement {
+    const s = this.state;
+    const open = this.appearanceOpen;
+    const head = el("div", { class: "settings-fold-head" }, [
+      el("div", { style: "flex:1" }, [
+        el("div", {}, ["Look & tabs"]),
+        el("div", { class: "settings-hint", style: "margin:0" }, ["Theme, accent, which 4 tabs show"]),
+      ]),
+      el("span", { class: "settings-fold-chevron" }, [open ? "▴" : "▾"]),
+    ]);
+    head.addEventListener("click", () => { this.appearanceOpen = !this.appearanceOpen; this.render(); });
+
+    const wrap = el("div", {}, [head]);
+    if (!open) return wrap;
+
+    const body = el("div", { class: "settings-fold-body" });
+    body.appendChild(labelSm("Theme"));
+    body.appendChild(segmented<ThemeMode>(
+      ALL_THEME_MODES.map((m) => ({ value: m, label: m })),
+      s.themeMode, (v) => s.setThemeMode(v),
+    ));
+
+    body.appendChild(labelSm("Accent"));
+    body.appendChild(this.accentRow());
+
+    body.appendChild(labelSm("Tabs & order"));
+    body.appendChild(el("div", { class: "settings-hint" }, ["Pick 4 tabs; everything else lives in More"]));
+    body.appendChild(this.tabOrderEditor());
+    wrap.appendChild(body);
+    return wrap;
   }
 
   private sectionLabel(text: string): HTMLElement {

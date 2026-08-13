@@ -24,8 +24,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -421,6 +424,72 @@ private fun TabOrderEditor(state: AppState) {
     }
 }
 
+/** Settings → "Look & tabs": theme mode, accent swatches and the tab picker, all
+ *  behind one collapsed row at the bottom of the sheet.
+ *
+ *  These three are set-once-and-forget, unlike the tuning / behavior / level
+ *  controls above them, so they used to push the settings Nadav actually revisits
+ *  off-screen. Collapsed state is `remember`ed, i.e. it survives recomposition
+ *  (changing accent recomposes the whole sheet) but resets to closed each time
+ *  the sheet is reopened. */
+@Composable
+private fun AppearanceSection(state: AppState) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 8.dp),
+        ) {
+            Icon(Icons.Outlined.Palette, contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Look & tabs", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Theme, accent, which 4 tabs show",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (expanded) {
+            Column(modifier = Modifier.padding(start = 30.dp, bottom = 4.dp)) {
+                Text("Theme", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(6.dp))
+                SegmentedRow(
+                    options = ThemeMode.entries,
+                    selected = state.themeMode,
+                    onSelect = { state.setThemeMode(it) },
+                    label = { it.name },
+                )
+
+                Spacer(Modifier.height(14.dp))
+                Text("Accent", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(6.dp))
+                AccentRow(state)
+
+                Spacer(Modifier.height(14.dp))
+                Text("Tabs & order", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    "Pick 4 tabs; everything else lives in More",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                TabOrderEditor(state)
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
@@ -435,35 +504,12 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
     SheetBody(scrollState = scroll) {
         SheetHeader("Settings", state)
 
-        // ----- Personalize -----
+        // ----- Personalize (theme / accent / tabs & order live in the collapsed
+        // "Look & tabs" section at the very bottom — they're set-once options, so
+        // they shouldn't cost screen space above the settings you actually revisit) -----
         SectionLabel("Personalize")
         Spacer(Modifier.height(8.dp))
 
-        Text("Theme", style = MaterialTheme.typography.labelMedium)
-        Spacer(Modifier.height(6.dp))
-        SegmentedRow(
-            options = ThemeMode.entries,
-            selected = state.themeMode,
-            onSelect = { state.setThemeMode(it) },
-            label = { it.name },
-        )
-
-        Spacer(Modifier.height(14.dp))
-        Text("Accent", style = MaterialTheme.typography.labelMedium)
-        Spacer(Modifier.height(6.dp))
-        AccentRow(state)
-
-        Spacer(Modifier.height(14.dp))
-        Text("Tabs & order", style = MaterialTheme.typography.labelMedium)
-        Text(
-            "Pick 4 tabs; everything else lives in More",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(4.dp))
-        TabOrderEditor(state)
-
-        Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Left-handed", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             Switch(checked = state.leftHanded, onCheckedChange = { state.toggleLeftHanded(it) })
@@ -666,6 +712,13 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
             valueRange = 435f..445f,
             steps = 9,  // 1 Hz increments
         )
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(4.dp))
+
+        // ----- Look & tabs (collapsed by default; last section on purpose) -----
+        AppearanceSection(state)
 
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {

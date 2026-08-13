@@ -447,6 +447,20 @@ select.btn option { background: var(--surface2); color: var(--text-primary); }
   margin: -2px 0 6px;
 }
 
+/* "Look & tabs" fold: one tappable summary row at the bottom of the Settings
+   sheet that expands to the theme/accent/tab-order controls (ui.ts
+   appearanceFold, mirroring Android's AppearanceSection). */
+.settings-fold-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.settings-fold-chevron { color: var(--text-secondary); flex: 0 0 auto; }
+.settings-fold-body { padding-left: 12px; }
+
 /* Accent picker: 5 circular swatches, each given its accent's hex as an
    inline background-color (ui.ts's accentRow/ACCENT_SWATCH_HEX) clipped to
    the content box so the border only shows as a ring on the selected swatch.
