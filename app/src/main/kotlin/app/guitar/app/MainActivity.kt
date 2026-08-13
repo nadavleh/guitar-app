@@ -167,6 +167,7 @@ fun App(audio: AudioEngine) {
     val customTunings by state.customTunings.collectAsState(initial = emptyMap())
     val savedSelected by state.savedSelectedName.collectAsState(initial = "Standard")
     val persistedLeftHanded by repo.leftHanded.collectAsState(initial = false)
+    val persistedAppearanceExpanded by repo.appearanceExpanded.collectAsState(initial = false)
     val persistedVoicingShell by repo.voicingShell.collectAsState(initial = false)
     val persistedLabelMode by repo.labelMode.collectAsState(initial = LabelMode.Intervals.name)
     val persistedA4 by repo.a4Hz.collectAsState(initial = 440f)
@@ -186,6 +187,7 @@ fun App(audio: AudioEngine) {
         }
     }
     LaunchedEffect(persistedLeftHanded) { state.leftHanded = persistedLeftHanded }
+    LaunchedEffect(persistedAppearanceExpanded) { state.appearanceExpanded = persistedAppearanceExpanded }
     LaunchedEffect(persistedVoicingShell) {
         state.voicingStyle =
             if (persistedVoicingShell) app.guitar.theory.VoicingStyle.Shell

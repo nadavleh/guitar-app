@@ -403,6 +403,11 @@ class AppState(
     var selectedPosition by mutableStateOf<FretPosition?>(null)
     var leftHanded by mutableStateOf(false)
 
+    /** Settings' "Look & tabs" fold. Lives here (persisted) rather than in a
+     *  `remember` inside the sheet so it survives both recomposition and the
+     *  sheet being dismissed/reopened — and app restarts. */
+    var appearanceExpanded by mutableStateOf(false)
+
     // v1 GUI state.
     // Start with NOTHING lit on the neck (task #5): the user wants a clean
     // fretboard on launch. Opening the Fretboard tool flips this to Chord (see
@@ -833,6 +838,11 @@ class AppState(
     fun toggleLeftHanded(value: Boolean) {
         leftHanded = value
         scope.launch { repo.setLeftHanded(value) }
+    }
+
+    fun toggleAppearanceExpanded(value: Boolean) {
+        appearanceExpanded = value
+        scope.launch { repo.setAppearanceExpanded(value) }
     }
 
     // ---------- Sheet / display-mode interactions ----------

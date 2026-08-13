@@ -272,9 +272,14 @@ enum class TabDest(val sheet: Sheet, val label: String, val icon: ImageVector) {
 }
 
 /** Destinations that only make sense for a specific instrument — hidden from the tab
- *  editor and the More overlay unless that instrument is active. */
+ *  editor and the More overlay unless that instrument is active.
+ *
+ *  CavaqProgressions is deliberately NOT gated: the screen's value is the functional
+ *  progressions themselves, and its voicings follow `liveTuning` (4-string tunings get
+ *  the cavaquinho pool, anything else the CAGED generator), so it reads fine on guitar.
+ *  Nadav works mostly in guitar mode and wants to glance at those progressions without
+ *  switching instrument and back. */
 fun TabDest.availableFor(state: AppState): Boolean = when (this) {
-    TabDest.CavaqProgressions -> state.instrument == Instrument.Cavaquinho
     TabDest.ScalesTriads -> state.instrument == Instrument.Guitar
     else -> true
 }

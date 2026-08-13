@@ -1,15 +1,25 @@
 # Deploys the chorect-web app to GitHub Pages — for FREE static hosting.
 #
-# This is MANUAL-ONLY (workflow_dispatch): it never runs on its own, so nothing
-# is published until you deliberately trigger it. To go live:
-#   1. On GitHub: Settings → Pages → "Build and deployment" → Source = GitHub Actions.
-#   2. Actions tab → "Deploy web to GitHub Pages" → "Run workflow".
-# The site then lives at  https://<user>.github.io/<repo>/  (e.g.
-# https://nadavleh.github.io/guitar-app/). The --base flag below must match the
-# repo name so asset URLs resolve under that sub-path.
+# Runs AUTOMATICALLY on every push to main that touches the web app (or this
+# workflow), plus manually from Actions → "Deploy web to GitHub Pages" → "Run
+# workflow". It used to be workflow_dispatch-only, which meant a push looked
+# green while nothing had actually been type-checked or published until someone
+# remembered to click Run — pushes and deploys are kept in lockstep instead.
+# Android-only commits don't touch chorect-web/, so they cost no CI minutes.
+#
+# One-time setup (already done): GitHub → Settings → Pages → "Build and
+# deployment" → Source = GitHub Actions. The site lives at
+# https://<user>.github.io/<repo>/ (e.g. https://nadavleh.github.io/guitar-app/).
+# The --base flag below must match the repo name so asset URLs resolve under
+# that sub-path.
 name: Deploy web to GitHub Pages
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "chorect-web/**"
+      - ".github/workflows/deploy-web.yml"
   workflow_dispatch:
 
 permissions:

@@ -429,18 +429,18 @@ private fun TabOrderEditor(state: AppState) {
  *
  *  These three are set-once-and-forget, unlike the tuning / behavior / level
  *  controls above them, so they used to push the settings Nadav actually revisits
- *  off-screen. Collapsed state is `remember`ed, i.e. it survives recomposition
- *  (changing accent recomposes the whole sheet) but resets to closed each time
- *  the sheet is reopened. */
+ *  off-screen. The open/closed flag is persisted ([AppState.appearanceExpanded] →
+ *  DataStore), not `remember`ed, so the fold stays however it was left across
+ *  reopening the sheet and across app restarts. */
 @Composable
 private fun AppearanceSection(state: AppState) {
-    var expanded by remember { mutableStateOf(false) }
+    val expanded = state.appearanceExpanded
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { expanded = !expanded }
+                .clickable { state.toggleAppearanceExpanded(!expanded) }
                 .padding(vertical = 8.dp),
         ) {
             Icon(Icons.Outlined.Palette, contentDescription = null,

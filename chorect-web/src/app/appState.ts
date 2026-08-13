@@ -15,7 +15,7 @@ import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../au
 
 export const DISPLAY_FRETS = 14;
 /** App version shown beside the header wordmark. Keep in sync with package.json on release. */
-export const APP_VERSION = "2.66.0";
+export const APP_VERSION = "2.67.0";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 
@@ -109,6 +109,7 @@ interface Persisted {
   tuningName: string;
   labelMode: string;
   leftHanded: boolean;
+  appearanceExpanded?: boolean;
   darkTheme: boolean;
   themeMode: string;
   accent: string;
@@ -146,6 +147,10 @@ export class AppState {
   labelMode = LabelMode.Intervals;
   selectedPosition: FretPosition | null = null;
   leftHanded = false;
+  /** Settings' "Look & tabs" fold. Persisted rather than held in the UI layer so
+   *  it survives the sheet being dismissed/reopened and page reloads, mirroring
+   *  Android's AppState.appearanceExpanded. */
+  appearanceExpanded = false;
   /** UI theme; dark is the original look. Dead now that `themeMode` drives the
    *  UI (Settings' Theme segmented) Ã¢â‚¬â€ kept only as the migration fallback's
    *  source (see `load()`), mirroring Android's AppState.darkTheme. */
@@ -255,6 +260,7 @@ export class AppState {
       if (p.instrument && p.instrument in InstrumentInfo) this.instrument = p.instrument as Instrument;
       if (p.labelMode && p.labelMode in LabelMode) this.labelMode = p.labelMode as LabelMode;
       if (typeof p.leftHanded === "boolean") this.leftHanded = p.leftHanded;
+      if (typeof p.appearanceExpanded === "boolean") this.appearanceExpanded = p.appearanceExpanded;
       if (typeof p.darkTheme === "boolean") this.darkTheme = p.darkTheme;
       // themeMode migration: prefer the new field; if this profile predates it,
       // fall back to the old boolean flag (mirrors Android's TuningRepository
@@ -330,6 +336,7 @@ export class AppState {
       tuningName: this.tuningName,
       labelMode: this.labelMode,
       leftHanded: this.leftHanded,
+      appearanceExpanded: this.appearanceExpanded,
       darkTheme: this.darkTheme,
       themeMode: this.themeMode,
       accent: this.accent,
@@ -519,6 +526,7 @@ export class AppState {
   setScaleView(v: ChordScaleView): void { this.commit(() => { this.scaleView = v; }); }
   setLabelMode(m: LabelMode): void { this.commit(() => { this.labelMode = m; }); }
   toggleLeftHanded(v: boolean): void { this.commit(() => { this.leftHanded = v; }); }
+  setAppearanceExpanded(v: boolean): void { this.commit(() => { this.appearanceExpanded = v; }); }
   toggleDarkTheme(v: boolean): void { this.commit(() => { this.darkTheme = v; }); }
   /** Persist the chosen Theme mode (Personalize's segmented Dark/Light/Auto).
    *  Resolving "Auto" against the live system preference happens in ui.ts's

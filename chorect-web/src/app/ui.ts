@@ -85,11 +85,15 @@ const TAB_SUBTITLE: Record<TabDestName, string> = {
   Theory: "Interval song references & reference sheets — expanding",
 };
 
-/** Whether a tab destination is available for the current instrument. The
- *  cavaquinho Progressions screen only makes sense on cavaquinho (mirrors
- *  Android's TabDest.availableFor). */
+/** Whether a tab destination is available for the current instrument (mirrors
+ *  Android's TabDest.availableFor).
+ *
+ *  CavaqProgressions is deliberately NOT gated: the screen's value is the functional
+ *  progressions themselves, and its voicings follow `liveTuning` (4-string tunings get
+ *  the cavaquinho pool, anything else the CAGED generator), so it reads fine on guitar.
+ *  Nadav works mostly in guitar mode and wants to glance at those progressions without
+ *  switching instrument and back. */
 function availableFor(dest: TabDestName, instrument: Instrument): boolean {
-  if (dest === "CavaqProgressions") return instrument === Instrument.Cavaquinho;
   if (dest === "ScalesTriads") return instrument === Instrument.Guitar;
   return true;
 }
@@ -160,13 +164,6 @@ export class App {
    *  edit); reset to `null` whenever the Settings sheet isn't showing, so a
    *  transient 3-item edit is dropped on dismiss, same as Android. */
   private tabOrderPending: TabDestName[] | null = null;
-
-  /** Settings → "Look & tabs" fold (theme / accent / tabs & order). Collapsed by
-   *  default and reset to collapsed whenever the Settings sheet is dismissed,
-   *  mirroring Android's `remember`-scoped AppearanceSection flag. Kept as a
-   *  field rather than a `<details open>` because picking an accent rerenders
-   *  (and so rebuilds) the whole sheet. */
-  private appearanceOpen = false;
 
   private ear: EarTrainingState;
   private earUI: EarTrainingUI;
@@ -937,7 +934,7 @@ export class App {
     // AppState — drop any in-flight (<4) edit once the Settings sheet isn't
     // showing, same as Android's remember-scoped TabOrderEditor being
     // disposed on dismiss.
-    if (route !== Sheet.Options) { this.tabOrderPending = null; this.appearanceOpen = false; }
+    if (route !== Sheet.Options) this.tabOrderPending = null;
     if (this.moreOpen) {
       this.sheetLayer.appendChild(this.moreSheet());
       if (this.moreStatsOpen) {
@@ -1214,11 +1211,13 @@ export class App {
   }
 
   /** Settings → "Look & tabs": theme mode, accent swatches and the tab picker,
-   *  all behind one collapsed row at the bottom of the sheet. Mirrors Android's
-   *  AppearanceSection. */
+   *  all behind one fold at the bottom of the sheet. Mirrors Android's
+   *  AppearanceSection, including the persisted open flag — kept in AppState
+   *  rather than a `<details open>` because picking an accent rerenders (and so
+   *  rebuilds) the whole sheet, which would drop native element state. */
   private appearanceFold(): HTMLElement {
     const s = this.state;
-    const open = this.appearanceOpen;
+    const open = s.appearanceExpanded;
     const head = el("div", { class: "settings-fold-head" }, [
       el("div", { style: "flex:1" }, [
         el("div", {}, ["Look & tabs"]),
@@ -1226,7 +1225,7 @@ export class App {
       ]),
       el("span", { class: "settings-fold-chevron" }, [open ? "▴" : "▾"]),
     ]);
-    head.addEventListener("click", () => { this.appearanceOpen = !this.appearanceOpen; this.render(); });
+    head.addEventListener("click", () => s.setAppearanceExpanded(!open));
 
     const wrap = el("div", {}, [head]);
     if (!open) return wrap;

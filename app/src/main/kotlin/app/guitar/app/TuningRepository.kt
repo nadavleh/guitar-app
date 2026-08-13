@@ -40,6 +40,7 @@ class TuningRepository(private val context: Context) {
     private val keyCustom = stringPreferencesKey("custom_tunings")
     private val keySelected = stringPreferencesKey("selected_tuning")
     private val keyLeftHanded = booleanPreferencesKey("left_handed")
+    private val keyAppearanceExpanded = booleanPreferencesKey("settings_appearance_expanded")
 
     val customTunings: Flow<Map<String, Tuning>> =
         context.tuningDataStore.data.map { prefs ->
@@ -83,6 +84,17 @@ class TuningRepository(private val context: Context) {
     suspend fun setLeftHanded(value: Boolean) {
         context.tuningDataStore.edit { prefs ->
             prefs[keyLeftHanded] = value
+        }
+    }
+
+    /** Whether Settings' "Look & tabs" fold is open. Persisted (not just remembered
+     *  for the session) so the fold stays however it was left across app restarts. */
+    val appearanceExpanded: Flow<Boolean> =
+        context.tuningDataStore.data.map { prefs -> prefs[keyAppearanceExpanded] ?: false }
+
+    suspend fun setAppearanceExpanded(value: Boolean) {
+        context.tuningDataStore.edit { prefs ->
+            prefs[keyAppearanceExpanded] = value
         }
     }
 
