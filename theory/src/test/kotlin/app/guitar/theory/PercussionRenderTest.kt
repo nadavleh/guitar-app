@@ -182,6 +182,37 @@ class PercussionRenderTest {
         }
     }
 
+    /**
+     * The Default model's 1st-16th offset (+s/6 slot) is INTENDED — see
+     * docs/superpowers/specs/2026-07-29-swing-models.md. But it recurs identically on
+     * every pos-0, so it is common-mode: it cancels out of every inter-onset interval
+     * and only shifts the loop's absolute phase. Anchoring slot 0 to sample 0 for the
+     * render therefore preserves the swing shape exactly — this pins that.
+     */
+    @Test fun `anchoring the downbeat shifts phase only and preserves every interval`() {
+        val m = PercussionMeter.DEFAULT
+        for (swing in listOf(25, 50, 100)) {
+            for (model in SwingModel.entries) {
+                val raw = (0..16).map { PercussionTiming.swungOnsetMsExact(it, 90, swing, m, model) }
+                val anchored = raw.map { it - raw[0] }
+                // Every gap — including the one across the loop seam (slot 15 → 16) — is
+                // untouched by the anchor.
+                for (k in 0 until 16) {
+                    assertEquals(raw[k + 1] - raw[k], anchored[k + 1] - anchored[k], 1e-9,
+                        "swing $swing $model: gap at slot $k changed")
+                }
+                // The offset really is common-mode: every beat's downbeat carries it.
+                val delta = raw[0]
+                for (k in listOf(0, 4, 8, 12, 16)) {
+                    assertEquals(delta, raw[k] - k * PercussionTiming.slotMsExact(90, 16), 1e-9,
+                        "swing $swing $model: pos-0 offset is not constant at slot $k")
+                }
+                // ...and the loop is one full cycle long either way.
+                assertEquals(16 * PercussionTiming.slotMsExact(90, 16), anchored[16], 1e-9)
+            }
+        }
+    }
+
     @Test fun `a swung render still puts the downbeat at sample zero`() {
         val p = patternOf("0,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-")
         for (swing in listOf(0, 50, 100)) {
