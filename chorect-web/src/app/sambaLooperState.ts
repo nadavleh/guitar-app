@@ -6,6 +6,7 @@ import {
   PercussionInstrument, PercussionCatalog, basePercussionId, PresetTrack,
   PercussionMeter, PercussionPattern, swungSlotMs, SwingModel, voiceCount, BUILTIN_PATTERNS,
   BEAT_UNITS, DIVISIONS, PERCUSSION_DYN_FACTORS, PERCUSSION_ACCENT,
+  renderPercussion, encodeWavMono16, PercussionRenderResult,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
 import { synthClick, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
@@ -314,12 +315,88 @@ export class SambaLooperState {
     for (let v = 0; v < voiceCount(inst); v++) {
       const k = this.key(inst, v);
       this.pendingSamples.add(k);   // silent (not the clicky synth) until its WAV decodes
-      void this.deps.loadSample(inst, v).then((buf) => {
+      const p = this.deps.loadSample(inst, v).then((buf) => {
         this.pendingSamples.delete(k);
         if (buf) this.loadedSamples.set(k, buf);
         this.notify();
       });
+      this.samplePromises.push(p);
+      void p;
     }
+  }
+
+  /** In-flight sample fetches, so [awaitSamplesLoaded] can wait for them. */
+  private samplePromises: Promise<unknown>[] = [];
+
+  /** Load samples and resolve once every requested voice has settled. An EXPORT must
+   *  not race the fetches: playback tolerates a still-decoding voice by staying silent
+   *  for one pass, but a rendered file would bake that silence in permanently. */
+  private async awaitSamplesLoaded(): Promise<void> {
+    this.ensureSamplesLoaded();
+    while (this.samplePromises.length > 0) {
+      const batch = this.samplePromises;
+      this.samplePromises = [];
+      await Promise.allSettled(batch);   // a load kicked off meanwhile lands in the next round
+    }
+  }
+
+  // ---- WAV export ----
+
+  /** How many times the loop repeats in an exported file. */
+  exportCycles = 4;
+  /** true = the file is exactly [exportCycles] cycles and loops seamlessly (a hit's
+   *  ring-out wraps onto the start); false = the last ring-out is appended instead. */
+  exportLoopExact = true;
+
+  /**
+   * Render the current LOOP offline to a 16-bit WAV.
+   *
+   * `onlyTrack` null exports the full kit exactly as you hear it (mute/solo, track and
+   * voice volumes, accents and per-slot dynamics all applied); an instrument id exports
+   * that track alone as a stem — deliberately ignoring mute/solo, since you named it.
+   *
+   * This is a RENDER, not a recording (see renderPercussion), so the file is identical
+   * every time and unaffected by audio glitches or the tab losing focus.
+   */
+  async exportWav(onlyTrack: string | null = null): Promise<{
+    fileName: string; bytes: Uint8Array; result: PercussionRenderResult;
+  }> {
+    await this.awaitSamplesLoaded();
+    const result = renderPercussion({
+      pattern: this.pattern,
+      bpm: this.bpm,
+      swing: this.swing,
+      swingModel: this.swingModel,
+      onlyTrack,
+      includeTrack: (id) => {
+        const inst = this.pattern.instruments.find((i) => i.id === id);
+        return inst ? this.isAudible(inst) : true;
+      },
+      cycles: this.exportCycles,
+      loopExact: this.exportLoopExact,
+      sampleRate: this.deps.audio.sampleRate,
+      voiceGain: (id, voice) => {
+        const inst = this.pattern.instruments.find((i) => i.id === id);
+        return inst ? this.voiceVolumeOf(inst, voice) : 1;
+      },
+    }, (id, voice) => {
+      const inst = this.pattern.instruments.find((i) => i.id === id);
+      if (!inst) return null;
+      const buf = this.buffer(inst, voice);
+      return buf.length > 0 ? buf : null;
+    });
+    return {
+      fileName: this.exportFileName(onlyTrack),
+      bytes: encodeWavMono16(result.samples, result.sampleRate),
+      result,
+    };
+  }
+
+  /** e.g. "Partido-Alto-Groove_surdo_90bpm_4x.wav" — safe on every filesystem. */
+  private exportFileName(onlyTrack: string | null): string {
+    const beat = (this.loadedName ?? "beat").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+    const track = onlyTrack?.replace("#", "-") ?? "full-mix";
+    return `${beat || "beat"}_${track}_${this.bpm}bpm_${this.exportCycles}x.wav`;
   }
 
   toggleMute(inst: PercussionInstrument) {

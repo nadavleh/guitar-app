@@ -768,6 +768,34 @@ export function loopMs(bpm: number): number {
   return slotMs(bpm) * PERCUSSION_SLOTS;
 }
 
+/** [slotMs] without the integer truncation. The live scheduler rounds to whole
+ *  milliseconds twice, which runs slightly FAST (at 90 bpm a 16th is 166 ms where
+ *  166.667 is exact, so a cycle is 2656 ms instead of 2666.667 — 0.4 % sharp).
+ *  Inaudible while looping, but an exported file must be exactly its musical length
+ *  or it drifts against a DAW's grid, so renders use the exact value.
+ *  Mirror of Kotlin PercussionTiming.slotMsExact. */
+export function slotMsExact(bpm: number, division = 16): number {
+  return (60000 / Math.max(bpm, 10)) * 4 / division;
+}
+
+/**
+ * Exact onset of [slot], in ms from the loop start, with the same swing feel
+ * [swungSlotMs] applies but no per-onset rounding. Offline renders use this so one
+ * cycle comes out exactly `totalSlots × slotMsExact` long; see [slotMsExact].
+ * Mirror of Kotlin PercussionTiming.swungOnsetMsExact.
+ */
+export function swungOnsetMsExact(
+  slot: number, bpm: number, swingPercent: number, meter: PercussionMeter,
+  model: SwingModel = SwingModel.Default,
+): number {
+  const base = slotMsExact(bpm, meter.division);
+  // Swing is defined only for a quarter-note beat divided into four 16ths.
+  if (meter.beatUnit !== 4 || meter.division !== 16) return slot * base;
+  const sw = Math.min(Math.max(swingPercent, 0), 100) / 100;
+  const pos = ((slot % 4) + 4) % 4;
+  return (Math.floor(slot / 4) * 4 + pos + swingOffset(pos, sw, model)) * base;
+}
+
 /**
  * Wait (ms) after [slot] before the next slot, applying a Brazilian 16th-note swing.
  *

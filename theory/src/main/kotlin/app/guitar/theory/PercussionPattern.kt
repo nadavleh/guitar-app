@@ -928,6 +928,32 @@ object PercussionTiming {
      *  so a 1/[division] note = quarter × 4 / division). */
     fun slotMs(bpm: Int, division: Int = 16): Long = (60_000L / bpm.coerceAtLeast(10)) * 4 / division
 
+    /** [slotMs] without the integer truncation. The live scheduler rounds to whole
+     *  milliseconds twice, which runs slightly FAST (at 90 bpm a 16th is 166 ms where
+     *  166.667 is exact, so a cycle is 2656 ms instead of 2666.667 — 0.4 % sharp).
+     *  Inaudible while looping, but an exported file must be exactly its musical
+     *  length or it drifts against a DAW's grid, so renders use the exact value. */
+    fun slotMsExact(bpm: Int, division: Int = 16): Double =
+        60_000.0 / bpm.coerceAtLeast(10) * 4.0 / division
+
+    /**
+     * Exact onset of [slot], in milliseconds from the loop start, with the same swing
+     * feel [swungSlotMs] applies but no per-onset rounding. Offline renders use this so
+     * one cycle comes out exactly `totalSlots × slotMsExact` long; see [slotMsExact].
+     */
+    fun swungOnsetMsExact(
+        slot: Int, bpm: Int, swingPercent: Int, meter: PercussionMeter,
+        model: SwingModel = SwingModel.Default,
+    ): Double {
+        val base = slotMsExact(bpm, meter.division)
+        // Swing is defined only for a quarter-note beat divided into four 16ths.
+        if (meter.beatUnit != 4 || meter.division != 16) return slot * base
+        val s = swingPercent.coerceIn(0, 100) / 100.0
+        val pos = ((slot % 4) + 4) % 4
+        val offsetSlots = pos + swingOffset(pos, s, model)
+        return (Math.floorDiv(slot, 4) * 4 + offsetSlots) * base
+    }
+
     /** Total loop length in milliseconds for the default 16-slot meter. */
     fun loopMs(bpm: Int): Long = slotMs(bpm) * PERCUSSION_SLOTS
 

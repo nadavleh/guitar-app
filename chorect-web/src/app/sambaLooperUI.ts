@@ -12,7 +12,7 @@ import { SambaLooperState } from "./sambaLooperState";
 import { BlocksState } from "./blocksState";
 import { EarTrainingState } from "./earTrainingState";
 import { Colors } from "./theme";
-import { el, btn, valueSlider, segmented } from "./dom";
+import { el, btn, valueSlider, segmented, switchRow, labelSm } from "./dom";
 import { icon } from "./icons";
 import { transportDock, toneSheet } from "./transport";
 import { AppState } from "./appState";
@@ -469,6 +469,8 @@ export class SambaLooperUI {
       erase, accent, dyn, this.saveControl(), btn("Clear all", () => s.clearAll()),
       btn("✕ Tracks", () => s.removeAllTracks(), "btn", "remove ALL tracks (Undo restores them)"),
       undoBtn, notesBtn, btn("Export", () => this.exportBeat()), btn("Import", () => this.importBeat()),
+      btn("🎧 Export audio", () => this.openWavExport(), "btn",
+        "Render this loop to WAV — the full mix or one track at a time"),
       this.addInstrumentControl(),
     ]));
 
@@ -1285,6 +1287,93 @@ export class SambaLooperUI {
     }
     if (saved.size === 0) side.appendChild(el("div", { class: "lrow", style: "color:var(--text-secondary);cursor:default" }, ["(no saved beats yet)"]));
     return side;
+  }
+
+  /**
+   * "Export audio" — renders the loop to a WAV per track, or as the full mix.
+   *
+   * An offline RENDER, not a recording of playback (see renderPercussion), so it takes a
+   * few milliseconds regardless of loop length and the file is identical every time. The
+   * sheet stays open after each download so you can pull several stems in a row.
+   */
+  private openWavExport(): void {
+    const s = this.samba;
+    const card = el("div", {
+      class: "et-card",
+      style: "background:var(--surface);margin:auto;max-width:420px;width:100%;max-height:88vh;overflow:auto;padding:16px",
+    });
+    const scrim = el("div", {
+      style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:60",
+    }, [card]);
+    // Only a click on the backdrop itself closes — not one that bubbles up from the card.
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) scrim.remove(); });
+
+    const status = el("div", { class: "et-muted", style: "margin-top:10px;white-space:pre-line" });
+
+    const build = () => {
+      card.replaceChildren();
+      card.appendChild(el("div", { style: "font-weight:600;margin-bottom:8px" }, ["Export audio"]));
+
+      card.appendChild(labelSm("Length"));
+      card.appendChild(el("div", { class: "chip-row" }, [1, 2, 4, 8].map((n) =>
+        btn(n === 1 ? "1 cycle" : `${n} cycles`,
+          () => { s.exportCycles = n; build(); },
+          s.exportCycles === n ? "btn primary" : "btn"))));
+
+      card.appendChild(el("div", { class: "v-gap-8" }));
+      card.appendChild(switchRow("Seamless loop",
+        s.exportLoopExact
+          ? `Exactly ${s.exportCycles} cycle(s); a ring-out past the end wraps to the start`
+          : "Ends one-shot — the last hit is allowed to ring out past the loop",
+        s.exportLoopExact, (v) => { s.exportLoopExact = v; build(); }));
+
+      card.appendChild(el("div", { class: "divider-line" }));
+      card.appendChild(labelSm("Tap what to render — one file each"));
+
+      const audible = s.pattern.instruments.filter((i) => s.isAudible(i)).length;
+      card.appendChild(btn(`Full mix (${audible} track(s))`, () => void run(null, "Full mix"), "btn primary"));
+      for (const inst of s.pattern.instruments) {
+        // A muted track still exports as a stem — you asked for it by name.
+        const suffix = s.isAudible(inst) ? "" : "  (muted in the mix)";
+        card.appendChild(el("div", { class: "v-gap-8" }));
+        card.appendChild(btn(inst.displayName + suffix, () => void run(inst.id, inst.displayName)));
+      }
+      card.appendChild(status);
+      card.appendChild(el("div", { class: "row", style: "justify-content:flex-end;margin-top:12px" }, [
+        btn("Done", () => scrim.remove()),
+      ]));
+    };
+
+    const run = async (onlyTrack: string | null, label: string) => {
+      status.textContent = `Rendering ${label}…`;
+      try {
+        const wav = await s.exportWav(onlyTrack);
+        if (wav.result.hits === 0) { status.textContent = `${label} had no hits to render — nothing to export.`; return; }
+        this.downloadBytesInternal(wav.bytes, wav.fileName);
+        let msg = `Downloaded ${wav.fileName}  (${wav.result.durationSec.toFixed(1)} s)`;
+        if (wav.result.safetyGain < 1) msg += "\nMix was hot — turned down to fit the file.";
+        if (wav.result.missingVoices.length) {
+          msg += `\nNo sound for ${wav.result.missingVoices.join(", ")} — those hits were skipped.`;
+        }
+        status.textContent = msg;
+      } catch (e) {
+        status.textContent = `Couldn't render ${label}: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    };
+
+    build();
+    document.body.appendChild(scrim);
+  }
+
+  /** Hand the browser a file to save. Binary sibling of the JSON exports below. */
+  private downloadBytesInternal(bytes: Uint8Array, fileName: string): void {
+    const blob = new Blob([bytes], { type: "audio/wav" });
+    const url = URL.createObjectURL(blob);
+    const a = el("a", { href: url, download: fileName }) as HTMLAnchorElement;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   /** Download the current beat as a Chorect beat file (JSON: name + bpm + swing + pattern). */

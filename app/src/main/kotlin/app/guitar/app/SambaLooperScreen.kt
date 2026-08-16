@@ -44,6 +44,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -296,6 +297,7 @@ private fun PatternSection(
 ) {
     // ----- Section header: Save / Clear / Erase / Accent / Notes -----
     var saveDialog by remember { mutableStateOf(false) }
+    var wavDialog by remember { mutableStateOf(false) }
     var saveName by remember { mutableStateOf("") }
     var notesOpen by remember { mutableStateOf(false) }
     // Redesign: keep the toolbar to a single compact row so the GRID gets the space.
@@ -480,6 +482,8 @@ private fun PatternSection(
                 DropdownMenuItem(text = { Text("✕ Remove all tracks") },
                     onClick = { samba.removeAllTracks(); moreMenu = false })
                 HorizontalDivider()
+                DropdownMenuItem(text = { Text("🎧 Export audio (WAV)…") },
+                    onClick = { wavDialog = true; moreMenu = false })
                 DropdownMenuItem(text = { Text("⤓ Export beat…") },
                     onClick = {
                         exportLauncher.launch("${(samba.loadedName ?: "beat").replace(Regex("[^\\w-]+"), "_")}.chorect.json")
@@ -490,6 +494,8 @@ private fun PatternSection(
             }
         }
     }
+
+    if (wavDialog) ExportWavDialog(samba) { wavDialog = false }
 
     if (saveDialog) {
         AlertDialog(
@@ -1276,6 +1282,91 @@ private fun BlocksSection(blocks: BlocksState) {
         }
     }
     Spacer(Modifier.height(10.dp))
+}
+
+/**
+ * "Export audio (WAV)" — renders the loop to a file per track, or as the full mix.
+ *
+ * It is an offline RENDER, not a recording of playback (see [PercussionRender]), so the
+ * file is deterministic and takes a few milliseconds regardless of how long the loop is.
+ * Each row writes one file and reports where it landed; the dialog stays open so you can
+ * pull several stems in a row.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ExportWavDialog(samba: SambaLooperState, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var status by remember { mutableStateOf<String?>(null) }
+    val tracks = samba.pattern.instruments
+
+    fun export(onlyTrack: String?, label: String) {
+        val wav = samba.exportWav(onlyTrack)
+        val where = WavExport.save(context, wav.fileName, wav.bytes)
+        status = when {
+            where == null -> "Couldn't write $label — storage unavailable."
+            wav.result.hits == 0 -> "$label had no hits to render — nothing to export."
+            else -> buildString {
+                append("Saved $where  (%.1f s)".format(wav.result.durationSec))
+                if (wav.result.safetyGain < 1f) append("\nMix was hot — turned down to fit the file.")
+                if (wav.result.missingVoices.isNotEmpty()) {
+                    append("\nNo sound for ${wav.result.missingVoices.joinToString()} — those hits were skipped.")
+                }
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Export audio") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Length", style = MaterialTheme.typography.labelMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (n in listOf(1, 2, 4, 8)) {
+                        FilterChip(
+                            selected = samba.exportCycles == n,
+                            onClick = { samba.exportCycles = n },
+                            label = { Text(if (n == 1) "1 cycle" else "$n cycles") },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Seamless loop", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            if (samba.exportLoopExact)
+                                "Exactly ${samba.exportCycles} cycle(s); a ring-out past the end wraps to the start"
+                            else "Ends one-shot — the last hit is allowed to ring out past the loop",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = samba.exportLoopExact, onCheckedChange = { samba.exportLoopExact = it })
+                }
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                Text("Tap what to render — one file each", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(4.dp))
+                Button(onClick = { export(null, "Full mix") }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Full mix (${tracks.count { samba.isAudible(it) }} track(s))")
+                }
+                for (inst in tracks) {
+                    OutlinedButton(
+                        onClick = { export(inst.id, inst.displayName) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        // A muted track still exports as a stem — you asked for it by name.
+                        Text(inst.displayName + if (samba.isAudible(inst)) "" else "  (muted in the mix)")
+                    }
+                }
+                status?.let {
+                    Spacer(Modifier.height(10.dp))
+                    Text(it, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
 }
 
 /** Load… control: a scrolling beats popup (Grooves + Saved) whose scroll

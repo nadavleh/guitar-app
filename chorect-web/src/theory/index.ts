@@ -15,6 +15,7 @@ export * from "./inversions";
 export * from "./note2chord";
 export * from "./voiceLeading";
 export * from "./percussion";
+export * from "./percussionRender";
 export * from "./drumBlocks";
 export * from "./chordDecomposition";
 export * from "./rhythmUnits";

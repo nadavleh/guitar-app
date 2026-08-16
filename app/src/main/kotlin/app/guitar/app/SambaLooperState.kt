@@ -11,7 +11,9 @@ import app.guitar.theory.PercussionInstrument
 import app.guitar.theory.PercussionMeter
 import app.guitar.theory.PercussionBuiltins
 import app.guitar.theory.PercussionPattern
+import app.guitar.theory.PercussionRender
 import app.guitar.theory.PercussionTiming
+import app.guitar.theory.WavFile
 import app.guitar.theory.PercussionVoices
 import app.guitar.theory.SavedBeat
 import kotlinx.coroutines.CoroutineScope
@@ -284,6 +286,62 @@ class SambaLooperState(
 
         fun defaultVoiceVolume(instId: String, voiceIndex: Int): Float =
             SOFT_VOICE_DEFAULTS["$instId:$voiceIndex"] ?: 1f
+    }
+
+    // ---- WAV export ----
+
+    /** How many times the loop repeats in an exported file. */
+    var exportCycles by mutableStateOf(4)
+    /** true = the file is exactly [exportCycles] cycles and loops seamlessly (a hit's
+     *  ring-out wraps onto the start); false = the last ring-out is appended instead. */
+    var exportLoopExact by mutableStateOf(true)
+
+    /** One rendered file: the WAV bytes, a suggested name, and the render's own report. */
+    data class ExportedWav(
+        val fileName: String,
+        val bytes: ByteArray,
+        val result: PercussionRender.Result,
+    )
+
+    /**
+     * Render the current LOOP offline to a 16-bit WAV.
+     *
+     * [onlyTrack] null exports the full kit exactly as you hear it (mute/solo, track and
+     * voice volumes, accents and per-slot dynamics all applied); an instrument id exports
+     * that track alone as a stem — deliberately ignoring mute/solo, since you named it.
+     *
+     * This is a RENDER, not a recording: [PercussionRender] places every hit from the
+     * pattern, so the file is identical every time and unaffected by audio glitches.
+     */
+    fun exportWav(onlyTrack: String? = null): ExportedWav {
+        val spec = PercussionRender.Spec(
+            pattern = pattern,
+            bpm = bpm,
+            swing = swing,
+            swingModel = swingModel,
+            onlyTrack = onlyTrack,
+            includeTrack = { id -> pattern.instruments.firstOrNull { it.id == id }?.let { isAudible(it) } ?: true },
+            cycles = exportCycles,
+            loopExact = exportLoopExact,
+            sampleRate = audio.sampleRate,
+            voiceGain = { id, voice ->
+                pattern.instruments.firstOrNull { it.id == id }?.let { voiceVolumeOf(it, voice) } ?: 1f
+            },
+        )
+        val result = PercussionRender.render(spec) { id, voice ->
+            // The kit's own instance, so the buffer cache hits (a clone id like
+            // "surdo#2" resolves to a fresh copy each call otherwise).
+            val inst = pattern.instruments.firstOrNull { it.id == id } ?: PercussionCatalog.resolve(id)
+            inst?.let { buffer(it, voice).takeIf { b -> b.isNotEmpty() } }
+        }
+        return ExportedWav(exportFileName(onlyTrack), WavFile.encodeMono16(result.samples, result.sampleRate), result)
+    }
+
+    /** e.g. "Partido-Alto-Groove_surdo_90bpm_4x.wav" — safe on every filesystem. */
+    private fun exportFileName(onlyTrack: String?): String {
+        val beat = (loadedName ?: "beat").replace(Regex("[^A-Za-z0-9]+"), "-").trim('-').take(40)
+        val track = onlyTrack?.replace('#', '-') ?: "full-mix"
+        return "${beat.ifEmpty { "beat" }}_${track}_${bpm}bpm_${exportCycles}x.wav"
     }
 
     private var job: Job? = null
