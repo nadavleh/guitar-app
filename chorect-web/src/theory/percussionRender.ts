@@ -211,12 +211,16 @@ function msToSamples(ms: number, sampleRate: number): number {
  *
  * Values outside [-1, 1] are clamped rather than allowed to wrap, so a hot mix distorts
  * gracefully instead of producing the loud crackle of integer overflow.
+ *
+ * Returns a plain ArrayBuffer: it is what `new Blob([...])` wants, and unlike a typed
+ * array its type has stayed stable across TypeScript's lib revisions.
  */
-export function encodeWavMono16(samples: Float32Array, sampleRate: number): Uint8Array {
+export function encodeWavMono16(samples: Float32Array, sampleRate: number): ArrayBuffer {
   const bytesPerSample = 2;
   const dataBytes = samples.length * bytesPerSample;
-  const out = new Uint8Array(44 + dataBytes);
-  const view = new DataView(out.buffer);
+  const buffer = new ArrayBuffer(44 + dataBytes);
+  const out = new Uint8Array(buffer);
+  const view = new DataView(buffer);
   let p = 0;
   const ascii = (s: string) => { for (const c of s) out[p++] = c.charCodeAt(0); };
   const le32 = (v: number) => { view.setUint32(p, v, true); p += 4; };
@@ -238,5 +242,5 @@ export function encodeWavMono16(samples: Float32Array, sampleRate: number): Uint
     view.setInt16(p, Math.round(clamped * 32767), true);
     p += 2;
   }
-  return out;
+  return buffer;
 }

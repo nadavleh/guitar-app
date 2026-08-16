@@ -359,7 +359,7 @@ export class SambaLooperState {
    * every time and unaffected by audio glitches or the tab losing focus.
    */
   async exportWav(onlyTrack: string | null = null): Promise<{
-    fileName: string; bytes: Uint8Array; result: PercussionRenderResult;
+    fileName: string; bytes: ArrayBuffer; result: PercussionRenderResult;
   }> {
     await this.awaitSamplesLoaded();
     const result = renderPercussion({

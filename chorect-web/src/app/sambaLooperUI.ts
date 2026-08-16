@@ -1366,7 +1366,7 @@ export class SambaLooperUI {
   }
 
   /** Hand the browser a file to save. Binary sibling of the JSON exports below. */
-  private downloadBytesInternal(bytes: Uint8Array, fileName: string): void {
+  private downloadBytesInternal(bytes: ArrayBuffer, fileName: string): void {
     const blob = new Blob([bytes], { type: "audio/wav" });
     const url = URL.createObjectURL(blob);
     const a = el("a", { href: url, download: fileName }) as HTMLAnchorElement;
