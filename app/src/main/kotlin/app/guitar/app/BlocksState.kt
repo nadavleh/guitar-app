@@ -229,14 +229,14 @@ class BlocksState(
             var colStartNanos = System.nanoTime() + 60_000_000L
             // Count-in: two beats of 16th ticks (each beat's downbeat accented) before the loop.
             if (countIn) {
-                val stepMs = PercussionTiming.slotMs(bpm, meter.division)
+                val stepMs = PercussionTiming.slotMsExact(bpm, meter.division)
                 val ticks = 2 * meter.slotsPerBeat
                 for (i in 0 until ticks) {
                     val accent = i % meter.slotsPerBeat == 0
-                    val delayMs = ((colStartNanos - System.nanoTime()) / 1_000_000 + i.toLong() * stepMs).coerceAtLeast(0)
+                    val delayMs = ((colStartNanos - System.nanoTime()) / 1_000_000 + Math.round(i * stepMs)).coerceAtLeast(0)
                     audio.playSamplesAt(if (accent) mAccent else mClick, if (accent) 0.9f else 0.55f, (delayMs * sr / 1000).toInt())
                 }
-                colStartNanos += ticks.toLong() * stepMs * 1_000_000
+                colStartNanos += Math.round(ticks * stepMs * 1_000_000)
             }
             var colIndex = 0
             while (isPlaying) {
@@ -261,7 +261,7 @@ class BlocksState(
                     val prev = playedAt(colIndex - 1)
                     val tmpl = materializedTemplate(phrase, prev) ?: continue
                     val swing = phrase?.swing ?: 0
-                    var onsetMs = 0L
+                    var onsetMs = 0.0
                     for (slot in 0 until 16) {
                         val raw = tmpl.getOrNull(slot)
                         if (raw != null) {
@@ -269,23 +269,23 @@ class BlocksState(
                             val accented = (raw / PERCUSSION_ACCENT) % 10 == 1
                             val dyn = raw / PERCUSSION_DYN
                             val gain = (if (accented) 1.4f else 1f) * PERCUSSION_DYN_FACTORS[dyn]
-                            val delayMs = ((colStartNanos - System.nanoTime()) / 1_000_000 + onsetMs).coerceAtLeast(0)
+                            val delayMs = ((colStartNanos - System.nanoTime()) / 1_000_000 + Math.round(onsetMs)).coerceAtLeast(0)
                             // Self-choke per TRACK (blocks may repeat an instrument —
                             // two pandeiro players don't damp each other).
                             val chokeKey = if (t.instrument.selfChoke) "${t.instrument.id}@$ti" else null
                             audio.playSamplesAt(buffer(t.instrument, voice), gain, (delayMs * sr / 1000).toInt(), chokeKey)
                         }
-                        onsetMs += PercussionTiming.swungSlotMs(slot, bpm, swing, meter)
+                        onsetMs += PercussionTiming.swungSlotMsExact(slot, bpm, swing, meter)
                     }
                 }
                 // Metronome click track: one click per beat on the straight clock,
                 // higher click on each bar's "1" (bars are 8 slots in 2/4 · 1/16).
                 if (metronomeOn) {
-                    val baseMs = PercussionTiming.slotMs(bpm, meter.division)
+                    val baseMs = PercussionTiming.slotMsExact(bpm, meter.division)
                     var slot = 0
                     while (slot < 16) {
                         val barDown = slot % meter.slotsPerBar == 0
-                        val delayMs = ((colStartNanos - System.nanoTime()) / 1_000_000 + slot * baseMs).coerceAtLeast(0)
+                        val delayMs = ((colStartNanos - System.nanoTime()) / 1_000_000 + Math.round(slot * baseMs)).coerceAtLeast(0)
                         audio.playSamplesAt(if (barDown) mAccent else mClick, if (barDown) 0.9f else 0.6f, (delayMs * sr / 1000).toInt())
                         slot += meter.slotsPerBeat
                     }
@@ -294,15 +294,15 @@ class BlocksState(
                 // tracks. Walk the 16 slots for the UI playhead (audio is already
                 // queued); the last delay ends ~30 ms early so the next column
                 // schedules in time.
-                val slotDurMs = PercussionTiming.slotMs(bpm, meter.division)
+                val slotDurMs = PercussionTiming.slotMsExact(bpm, meter.division)
                 for (sl in 0 until 16) {
                     if (!isPlaying) break
                     currentSlot = sl
-                    val targetNanos = colStartNanos + (sl + 1) * slotDurMs * 1_000_000
+                    val targetNanos = colStartNanos + Math.round((sl + 1) * slotDurMs * 1_000_000)
                     val early = if (sl == 15) 30 else 0
                     delay(((targetNanos - System.nanoTime()) / 1_000_000 - early).coerceAtLeast(0))
                 }
-                colStartNanos += slotDurMs * 16 * 1_000_000
+                colStartNanos += Math.round(slotDurMs * 16 * 1_000_000)
                 colIndex++
             }
         }

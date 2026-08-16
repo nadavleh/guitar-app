@@ -140,19 +140,58 @@ class PercussionRenderTest {
 
     // ---- exact vs scheduler timing ----
 
-    @Test fun `exact onsets fix the schedulers rounded-millisecond drift`() {
+    /**
+     * The drum machine used to run measurably FAST. `slotMs` truncated twice —
+     * `(60_000L / bpm) * 4 / division` — so at 90 bpm a 16th was 166 ms instead of
+     * 166.667 and a cycle came out 2656 ms instead of 2666.667: 0.4 % sharp. Playback
+     * now accumulates the exact value, so app and export agree and both sit on a DAW's
+     * bar line. This pins the tempo, which is otherwise easy to regress silently.
+     */
+    @Test fun `the loop runs at the true tempo`() {
         val m = PercussionMeter.DEFAULT
-        // The live grid truncates twice: at 90 bpm a 16th is 166 ms, not 166.667.
-        assertEquals(166L, PercussionTiming.slotMs(90, 16))
         assertEquals(166.667, PercussionTiming.slotMsExact(90, 16), 1e-3)
-        // Over one cycle that is ~10 ms — enough to drift against a DAW's bar line.
-        val rounded = (0 until m.totalSlots).sumOf { PercussionTiming.swungSlotMs(it, 90, 0, m) }
-        val exact = m.totalSlots * PercussionTiming.slotMsExact(90, m.division)
-        assertEquals(2656L, rounded)
-        assertEquals(2666.667, exact, 1e-3)
+        assertEquals(167L, PercussionTiming.slotMs(90, 16), "the integer form rounds, never truncates")
+
+        // One cycle = 4 quarter-note beats. At 90 bpm that is exactly 2666.667 ms.
+        val exactCycle = (0 until m.totalSlots).sumOf { PercussionTiming.swungSlotMsExact(it, 90, 0, m) }
+        assertEquals(4 * 60_000.0 / 90, exactCycle, 1e-9)
+        assertEquals(2666.667, exactCycle, 1e-3)
+
+        // The rounded grid is still available and now lands within a millisecond of it
+        // (it used to be 10 ms out), so nothing that needs whole ms is badly wrong.
+        val roundedCycle = (0 until m.totalSlots).sumOf { PercussionTiming.swungSlotMs(it, 90, 0, m) }
+        assertTrue(abs(roundedCycle - exactCycle) <= 1.0, "rounded cycle $roundedCycle vs exact $exactCycle")
+
+        // Swing never changes the tempo — the cycle is the same length at any setting.
+        for (swing in listOf(0, 33, 50, 100)) {
+            for (model in SwingModel.entries) {
+                val cycle = (0 until m.totalSlots).sumOf { PercussionTiming.swungSlotMsExact(it, 90, swing, m, model) }
+                assertEquals(4 * 60_000.0 / 90, cycle, 1e-9, "swing $swing $model changed the cycle length")
+            }
+        }
         // Straight (swing 0) exact onsets are plain multiples of the slot.
         for (k in 0..16) {
             assertEquals(k * PercussionTiming.slotMsExact(90, 16), PercussionTiming.swungOnsetMsExact(k, 90, 0, m), 1e-6)
+        }
+    }
+
+    @Test fun `the render and the drum machine agree slot for slot`() {
+        // The scheduler accumulates swungSlotMsExact from the downbeat; the render places
+        // hits at swungOnsetMsExact anchored to the downbeat. Same numbers, or the
+        // exported file would not be what the app plays.
+        val m = PercussionMeter.DEFAULT
+        for (bpm in listOf(60, 90, 128)) {
+            for (swing in listOf(0, 40, 100)) {
+                for (model in SwingModel.entries) {
+                    var scheduler = 0.0
+                    val zero = PercussionTiming.swungOnsetMsExact(0, bpm, swing, m, model)
+                    for (k in 0 until m.totalSlots) {
+                        val render = PercussionTiming.swungOnsetMsExact(k, bpm, swing, m, model) - zero
+                        assertEquals(render, scheduler, 1e-9, "bpm $bpm swing $swing $model slot $k")
+                        scheduler += PercussionTiming.swungSlotMsExact(k, bpm, swing, m, model)
+                    }
+                }
+            }
         }
     }
 

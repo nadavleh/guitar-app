@@ -924,17 +924,21 @@ object PercussionTiming {
         }
     }
 
-    /** Milliseconds of one [division]-note slot at [bpm] (a quarter-note = 4 sixteenths,
-     *  so a 1/[division] note = quarter × 4 / division). */
-    fun slotMs(bpm: Int, division: Int = 16): Long = (60_000L / bpm.coerceAtLeast(10)) * 4 / division
-
-    /** [slotMs] without the integer truncation. The live scheduler rounds to whole
-     *  milliseconds twice, which runs slightly FAST (at 90 bpm a 16th is 166 ms where
-     *  166.667 is exact, so a cycle is 2656 ms instead of 2666.667 — 0.4 % sharp).
-     *  Inaudible while looping, but an exported file must be exactly its musical
-     *  length or it drifts against a DAW's grid, so renders use the exact value. */
+    /** Exact milliseconds of one [division]-note slot at [bpm] (a quarter-note = 4
+     *  sixteenths, so a 1/[division] note = quarter × 4 / division). This is the one
+     *  true value; [slotMs] is its rounded form. */
     fun slotMsExact(bpm: Int, division: Int = 16): Double =
         60_000.0 / bpm.coerceAtLeast(10) * 4.0 / division
+
+    /**
+     * [slotMsExact] rounded to whole milliseconds, for callers that need an integer.
+     *
+     * This used to TRUNCATE twice — `(60_000L / bpm) * 4 / division` — which made the app
+     * play measurably fast: at 90 bpm a 16th came out 166 ms instead of 166.667, so a
+     * cycle ran 2656 ms instead of 2666.667 (0.4 % sharp). Anything driving playback
+     * should accumulate [swungSlotMsExact] rather than whole milliseconds at all.
+     */
+    fun slotMs(bpm: Int, division: Int = 16): Long = Math.round(slotMsExact(bpm, division))
 
     /**
      * Exact onset of [slot], in milliseconds from the loop start, with the same swing
@@ -976,13 +980,25 @@ object PercussionTiming {
      * while advancing the 4th — at high percentages the middle notes bunched together
      * and the groove sounded lopsided rather than swung.)
      */
+    /** Exact duration of [slot] in ms — [swungSlotMs] with no rounding at all. Playback
+     *  schedulers accumulate THIS so the loop runs at the true tempo; they round only
+     *  once, when handing a time to the platform's audio clock. */
+    fun swungSlotMsExact(
+        slot: Int, bpm: Int, swingPercent: Int, meter: PercussionMeter,
+        model: SwingModel = SwingModel.Default,
+    ): Double =
+        swungOnsetMsExact(slot + 1, bpm, swingPercent, meter, model) -
+            swungOnsetMsExact(slot, bpm, swingPercent, meter, model)
+
     fun swungSlotMs(
         slot: Int, bpm: Int, swingPercent: Int, meter: PercussionMeter,
         model: SwingModel = SwingModel.Default,
     ): Long {
-        val base = slotMs(bpm, meter.division)
+        // The EXACT slot length, so the rounding below happens once on absolute onsets
+        // rather than compounding on top of an already-truncated base.
+        val base = slotMsExact(bpm, meter.division)
         // Swing is defined only for a quarter-note beat divided into four 16ths.
-        if (meter.beatUnit != 4 || meter.division != 16) return base.coerceAtLeast(1L)
+        if (meter.beatUnit != 4 || meter.division != 16) return Math.round(base).coerceAtLeast(1L)
         val s = swingPercent.coerceIn(0, 100) / 100.0
         // Each 16th's onset, in ms from loop start, rounded independently — so the
         // anchors (beat start, quarter-beat, beat boundary) stay exactly on grid and

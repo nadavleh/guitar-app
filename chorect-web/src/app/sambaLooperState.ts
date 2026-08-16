@@ -4,7 +4,7 @@
 
 import {
   PercussionInstrument, PercussionCatalog, basePercussionId, PresetTrack,
-  PercussionMeter, PercussionPattern, swungSlotMs, SwingModel, voiceCount, BUILTIN_PATTERNS,
+  PercussionMeter, PercussionPattern, swungSlotMsExact, SwingModel, voiceCount, BUILTIN_PATTERNS,
   BEAT_UNITS, DIVISIONS, PERCUSSION_DYN_FACTORS, PERCUSSION_ACCENT,
   renderPercussion, encodeWavMono16, PercussionRenderResult,
 } from "../theory";
@@ -709,7 +709,9 @@ export class SambaLooperState {
           if (!this.isPlaying || token !== this.token) break;
           this.currentSlot = slot;
           if (first) { scheduleSlot(op, slot, 0); first = false; }
-          const slotSec = swungSlotMs(slot, this.bpm, this.swing, op.meter, this.swingModel) / 1000;
+          // Exact (fractional ms), so the loop runs at the true tempo instead of
+          // drifting on rounded slot durations.
+          const slotSec = swungSlotMsExact(slot, this.bpm, this.swing, op.meter, this.swingModel) / 1000;
           nextOnset += slotSec;
           // Next up: the opening's next slot, or the loop's downbeat when it ends.
           if (slot + 1 < op.slots) {
@@ -731,7 +733,7 @@ export class SambaLooperState {
           if (!this.isPlaying || token !== this.token) break;
           this.currentSlot = slot;
           if (first) { scheduleSlot(snapshot, slot, 0); first = false; }
-          const slotSec = swungSlotMs(slot, this.bpm, this.swing, snapshot.meter, this.swingModel) / 1000;
+          const slotSec = swungSlotMsExact(slot, this.bpm, this.swing, snapshot.meter, this.swingModel) / 1000;
           nextOnset += slotSec;
           const nextSlot = (slot + 1) % snapshot.slots;
           const nextSnapshot = nextSlot === 0 ? this.pattern : snapshot;
@@ -791,7 +793,9 @@ export class SambaLooperState {
     const tm = this.effectiveTrackSwingModel(id);
     let delta = 0;
     for (let k = 0; k < slot; k++) {
-      delta += swungSlotMs(k, this.bpm, s, snapshot.meter, tm) - swungSlotMs(k, this.bpm, this.swing, snapshot.meter, this.swingModel);
+      // Exact, so a track's own feel isn't quantised on top of the master clock's
+      // rounding (the two errors used to compound).
+      delta += swungSlotMsExact(k, this.bpm, s, snapshot.meter, tm) - swungSlotMsExact(k, this.bpm, this.swing, snapshot.meter, this.swingModel);
     }
     return delta / 1000;
   }

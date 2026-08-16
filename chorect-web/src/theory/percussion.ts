@@ -758,24 +758,26 @@ export function decodeBeatFile(text: string): { name: string; bpm: number; swing
 
 // ---- Timing ----
 
-/** Milliseconds of one [division]-note slot at [bpm] (a quarter-note = 4 sixteenths,
- *  so a 1/[division] note = quarter × 4 / division). Floored to mirror Kotlin's
- *  integer arithmetic. */
+/** Exact milliseconds of one [division]-note slot at [bpm] (a quarter-note = 4
+ *  sixteenths, so a 1/[division] note = quarter × 4 / division). This is the one true
+ *  value; [slotMs] is its rounded form. Mirror of Kotlin PercussionTiming.slotMsExact. */
+export function slotMsExact(bpm: number, division = 16): number {
+  return (60000 / Math.max(bpm, 10)) * 4 / division;
+}
+
+/**
+ * [slotMsExact] rounded to whole milliseconds, for callers that need an integer.
+ *
+ * This used to FLOOR — mirroring Kotlin's old integer arithmetic — which made the app
+ * play measurably fast: at 90 bpm a 16th came out 166 ms instead of 166.667, so a cycle
+ * ran 2656 ms instead of 2666.667 (0.4 % sharp). Anything driving playback should
+ * accumulate [swungSlotMsExact] rather than whole milliseconds at all.
+ */
 export function slotMs(bpm: number, division = 16): number {
-  return Math.floor((60000 / Math.max(bpm, 10)) * 4 / division);
+  return Math.round(slotMsExact(bpm, division));
 }
 export function loopMs(bpm: number): number {
   return slotMs(bpm) * PERCUSSION_SLOTS;
-}
-
-/** [slotMs] without the integer truncation. The live scheduler rounds to whole
- *  milliseconds twice, which runs slightly FAST (at 90 bpm a 16th is 166 ms where
- *  166.667 is exact, so a cycle is 2656 ms instead of 2666.667 — 0.4 % sharp).
- *  Inaudible while looping, but an exported file must be exactly its musical length
- *  or it drifts against a DAW's grid, so renders use the exact value.
- *  Mirror of Kotlin PercussionTiming.slotMsExact. */
-export function slotMsExact(bpm: number, division = 16): number {
-  return (60000 / Math.max(bpm, 10)) * 4 / division;
 }
 
 /**
@@ -838,12 +840,25 @@ export const SWING_MODEL_FORMULA: Record<SwingModel, string> = {
   [SwingModel.Hemiola]: "[0,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)]",
 };
 
+/** Exact duration of [slot] in ms — [swungSlotMs] with no rounding at all. Playback
+ *  schedulers accumulate THIS so the loop runs at the true tempo; they round only once,
+ *  when handing a time to the audio clock. Mirror of Kotlin swungSlotMsExact. */
+export function swungSlotMsExact(
+  slot: number, bpm: number, swingPercent: number, meter: PercussionMeter,
+  model: SwingModel = SwingModel.Default,
+): number {
+  return swungOnsetMsExact(slot + 1, bpm, swingPercent, meter, model) -
+    swungOnsetMsExact(slot, bpm, swingPercent, meter, model);
+}
+
 export function swungSlotMs(
   slot: number, bpm: number, swingPercent: number, meter: PercussionMeter,
   model: SwingModel = SwingModel.Default,
 ): number {
-  const base = slotMs(bpm, meter.division);
-  if (meter.beatUnit !== 4 || meter.division !== 16) return Math.max(base, 1);
+  // The EXACT slot length, so the rounding below happens once on absolute onsets
+  // rather than compounding on top of an already-floored base.
+  const base = slotMsExact(bpm, meter.division);
+  if (meter.beatUnit !== 4 || meter.division !== 16) return Math.max(Math.round(base), 1);
   const sw = Math.min(Math.max(swingPercent, 0), 100) / 100;
   const onsetMs = (k: number): number => {
     const pos = ((k % 4) + 4) % 4;

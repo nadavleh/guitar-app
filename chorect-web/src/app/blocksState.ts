@@ -13,7 +13,7 @@ import {
   DrumBlock, materializedTemplate, PresetTrack, presetByLabel, basePercussionId,
   encodePresetTrack, decodePresetTrack, mergedPresets,
   encodeBlockFile, decodeBlockFile, BUILTIN_BLOCKS,
-  PercussionInstrument, PercussionCatalog, slotMs, swungSlotMs, PercussionMeter,
+  PercussionInstrument, PercussionCatalog, slotMsExact, swungSlotMsExact, PercussionMeter,
   PERCUSSION_ACCENT, PERCUSSION_DYN, PERCUSSION_DYN_FACTORS, voiceCount,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
@@ -259,7 +259,7 @@ export class BlocksState {
    *  telescoped sum of swungSlotMs durations, so anchors match the beat looper. */
   private onsetSec(slot: number, swing: number): number {
     let ms = 0;
-    for (let k = 0; k < slot; k++) ms += swungSlotMs(k, this.bpm, swing, PHRASE_METER);
+    for (let k = 0; k < slot; k++) ms += swungSlotMsExact(k, this.bpm, swing, PHRASE_METER);
     return ms / 1000;
   }
 
@@ -277,7 +277,7 @@ export class BlocksState {
       // Count-in: two beats of 16th ticks (each beat's downbeat accented) before
       // the first column, then the loop begins right after.
       if (this.countIn) {
-        const stepSec = slotMs(this.bpm, PHRASE_METER.division) / 1000;
+        const stepSec = slotMsExact(this.bpm, PHRASE_METER.division) / 1000;
         const ticks = 2 * PHRASE_METER.slotsPerBeat;
         for (let i = 0; i < ticks; i++) {
           const accent = i % PHRASE_METER.slotsPerBeat === 0;
@@ -325,7 +325,7 @@ export class BlocksState {
         // Metronome click track: one click per beat on the straight clock,
         // higher click on each bar's "1" (bars are 8 slots in 2/4 · 1/16).
         if (this.metronomeOn) {
-          const baseSec = slotMs(this.bpm, PHRASE_METER.division) / 1000;
+          const baseSec = slotMsExact(this.bpm, PHRASE_METER.division) / 1000;
           for (let slot = 0; slot < PHRASE_SLOTS; slot += PHRASE_METER.slotsPerBeat) {
             const barDownbeat = slot % PHRASE_METER.slotsPerBar === 0;
             this.deps.audio.playSamples(barDownbeat ? this.mAccent : this.mClick, barDownbeat ? 0.9 : 0.6, colStart + slot * baseSec);
@@ -334,7 +334,7 @@ export class BlocksState {
         // Columns advance on the STRAIGHT clock (16 × base slot) for all tracks.
         // Walk the 16 slots for the UI playhead (audio is already queued);
         // the last sleep ends ~30 ms early so the next column schedules in time.
-        const slotSec = slotMs(this.bpm, PHRASE_METER.division) / 1000;
+        const slotSec = slotMsExact(this.bpm, PHRASE_METER.division) / 1000;
         for (let sl = 0; sl < PHRASE_SLOTS && this.isPlaying && token === this.token; sl++) {
           this.currentSlot = sl;
           this.notify();

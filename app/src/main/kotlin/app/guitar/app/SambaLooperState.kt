@@ -458,12 +458,14 @@ class SambaLooperState(
         val s = effectiveTrackSwing(snapshot, id)
         if (s == swing) return 0
         val tm = effectiveTrackSwingModel(id)
-        var d = 0L
+        // Exact, so a track's own feel isn't quantised to whole milliseconds on top of
+        // the master clock's rounding (the two errors used to compound).
+        var d = 0.0
         for (k in 0 until slot) {
-            d += PercussionTiming.swungSlotMs(k, bpm, s, snapshot.meter, tm) -
-                PercussionTiming.swungSlotMs(k, bpm, swing, snapshot.meter, swingModel)
+            d += PercussionTiming.swungSlotMsExact(k, bpm, s, snapshot.meter, tm) -
+                PercussionTiming.swungSlotMsExact(k, bpm, swing, snapshot.meter, swingModel)
         }
-        return d
+        return Math.round(d)
     }
 
     /** MULTIPLE PLAYHEADS: tracks with their own swing carry their own playhead
@@ -657,8 +659,10 @@ class SambaLooperState(
                     if (!isPlaying) break
                     currentSlot = slot
                     if (first) { scheduleSlot(op, slot, 0); first = false }
-                    val slotMs = PercussionTiming.swungSlotMs(slot, bpm, swing, op.meter, swingModel)
-                    nextOnsetNanos += slotMs * 1_000_000
+                    // Exact (fractional ms) accumulated in NANOSECONDS, so the loop runs
+                    // at the true tempo instead of drifting on rounded slot durations.
+                    val slotMs = PercussionTiming.swungSlotMsExact(slot, bpm, swing, op.meter, swingModel)
+                    nextOnsetNanos += Math.round(slotMs * 1_000_000)
                     val delayMs = ((nextOnsetNanos - System.nanoTime()) / 1_000_000).coerceAtLeast(0)
                     // Next up: the opening's next slot, or the loop's downbeat when it ends.
                     if (slot + 1 < op.slots) {
@@ -679,8 +683,8 @@ class SambaLooperState(
                     if (!isPlaying) break
                     currentSlot = slot
                     if (first) { scheduleSlot(snapshot, slot, 0); first = false }
-                    val slotMs = PercussionTiming.swungSlotMs(slot, bpm, swing, snapshot.meter, swingModel)
-                    nextOnsetNanos += slotMs * 1_000_000
+                    val slotMs = PercussionTiming.swungSlotMsExact(slot, bpm, swing, snapshot.meter, swingModel)
+                    nextOnsetNanos += Math.round(slotMs * 1_000_000)
                     val nextSlot = (slot + 1) % snapshot.slots
                     val nextSnapshot = if (nextSlot == 0) pattern else snapshot
                     val delayMs = ((nextOnsetNanos - System.nanoTime()) / 1_000_000).coerceAtLeast(0)
