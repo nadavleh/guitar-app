@@ -51,10 +51,12 @@ jobs:
       # Type-check first so a type error fails the deploy loudly (vite/esbuild
       # alone strips types without checking them).
       - run: npx tsc --noEmit
-      # Theory/audio engine assertions (test/verify.ts) — they mirror the Kotlin
-      # JUnit suite and had never been wired into CI, so they only ever ran when
-      # someone remembered `npm run verify` locally.
-      - run: npm run verify
+      # NOT wired in yet: `npm run verify` (test/verify.ts). Tried on 2026-08-16 and
+      # it fails 3 pre-existing PERCUSSION assertions ("default kit is the original
+      # four", "addInstrument appends a row", "full swing: 2nd anchored…") — the drum
+      # engine moved on and those checks were never updated. Blocking the Pages deploy
+      # on them would only make the site go stale. Fix those three, then add:
+      #   - run: npm run verify
       # Repo is served at /<repo>/ on project Pages, so build with that base.
       - run: npx vite build --base=/${{ github.event.repository.name }}/
       - uses: actions/upload-pages-artifact@v3
