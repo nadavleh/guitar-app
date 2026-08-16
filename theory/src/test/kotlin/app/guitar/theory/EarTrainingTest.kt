@@ -336,4 +336,32 @@ class EarTrainingTest {
         assertEquals(null, EarTraining.progressionFromKey("maj:1,5,6,8"))   // degree out of range
         assertEquals(null, EarTraining.progressionFromKey("xyz:1,5,6,4"))   // bad prefix
     }
+
+    // ---- Major/minor-ambiguous Roman labels (challenge answer disambiguation) ----
+
+    @Test fun `only the dominant V family reads the same in major and minor`() {
+        // Every label the harmonic-minor dominant can print, at every chord level.
+        for (r in listOf("V", "V7", "V9", "V6", "V11", "V13")) {
+            assertTrue(EarTraining.romanIsModeAmbiguous(r), "$r should be ambiguous")
+        }
+        // Every other degree of both rows is separated by case or an accidental.
+        val unambiguous = (EarTraining.MAJOR_DEGREES.values.map { it.roman } +
+            EarTraining.MINOR_DEGREES.values.map { it.roman }).filter { it != "V" }
+        for (r in unambiguous) {
+            assertTrue(!EarTraining.romanIsModeAmbiguous(r), "$r should not be ambiguous")
+        }
+        // Near-misses that start with V but are a different numeral.
+        for (r in listOf("VI7", "vi", "v7", "bVII", "bVI", "")) {
+            assertTrue(!EarTraining.romanIsModeAmbiguous(r), "$r should not be ambiguous")
+        }
+    }
+
+    @Test fun `harmonic-minor dominant and major V print the same bare label`() {
+        val minorV7 = EarTraining.resolve(5, PitchClass.A, TrainingMode.Minor, ChordTypeLevel.Sevenths, asDominant = true)
+        val majorV7 = EarTraining.resolve(5, PitchClass.C, TrainingMode.Major, ChordTypeLevel.Sevenths)
+        assertEquals("V7", minorV7.romanLabel)
+        assertEquals("V7", majorV7.romanLabel)   // identical — hence the "(minor)" marker
+        assertEquals("E7", minorV7.symbol)
+        assertEquals("G7", majorV7.symbol)       // ...but different chords entirely
+    }
 }

@@ -71,6 +71,22 @@ export const MINOR_DEGREES: Map<number, DegreeInfo> = new Map([
  *  challenge scores a degree-5 answer identically for either. */
 export const MINOR_DOMINANT: DegreeInfo = di("V", "", "7", "9");
 
+/** Marker appended to a Roman that is read in the MINOR key, when the bare numeral
+ *  would print identically to the major key's. See [romanIsModeAmbiguous]. */
+export const MINOR_ROMAN_TAG = "(minor)";
+
+/**
+ * True when `roman` reads the same in a major and in a minor key, so showing it on its
+ * own is ambiguous. The dominant V-family ("V", "V7", "V9", "V13"…) is the only such
+ * case: it is both the major key's degree 5 and the harmonic-minor degree 5
+ * ([MINOR_DOMINANT]) — two *different* answers on the challenge pad that print the same.
+ * Every other degree is separated by case or an accidental (IV vs iv, iii vs bIII,
+ * vii° vs bVII), so it needs no marking.
+ */
+export function romanIsModeAmbiguous(roman: string): boolean {
+  return /^V\d*$/.test(roman);
+}
+
 const MAJOR_SCALE_SEMITONES = [0, 2, 4, 5, 7, 9, 11];
 const NATURAL_MINOR_SEMITONES = [0, 2, 3, 5, 7, 8, 10];
 

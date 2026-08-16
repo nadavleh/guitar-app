@@ -7,6 +7,7 @@ import {
   scalePositionsFor, scaleNotesFrom, SCALES, parsePitchClass, midiPitchClass,
   TrainingMode, ChordTypeLevel, resolve as resolveDegree, degreeRoot, romanLabel,
   ADVANCED_PROGRESSIONS, resolveNamed, QUALITIES, inversionMidis, randomN2c, n2cAnswerLabel,
+  romanIsModeAmbiguous, MAJOR_DEGREES, MINOR_DEGREES,
 } from "../src/theory";
 import { standard } from "../src/theory/tunings";
 import {
@@ -114,6 +115,19 @@ const iiChord = resolveDegree(2, parsePitchClass("C"), TrainingMode.Major, Chord
 check("ii7 in C major = Dm7, labelled ii7 (not iim7)", iiChord.symbol === "Dm7" && iiChord.romanLabel === "ii7");
 check("degreeRoot vi in C major = A", degreeRoot(parsePitchClass("C"), 6, TrainingMode.Major) === 9);
 check("romanLabel vii°+m7b5 = vii°7", romanLabel("vii°", "m7b5") === "vii°7");
+
+// --- Major/minor-ambiguous Romans (challenge answer disambiguation) ---
+// The harmonic-minor dominant prints exactly like the major key's V7 but is a
+// completely different chord, so only that V-family gets the "(minor)" marker.
+const minorV7 = resolveDegree(5, parsePitchClass("A"), TrainingMode.Minor, ChordTypeLevel.Sevenths, undefined, true);
+check("harmonic-minor V7 in A minor = E7, labelled V7 like the major key's",
+  minorV7.symbol === "E7" && minorV7.romanLabel === "V7" && vChord.romanLabel === minorV7.romanLabel);
+check("V-family Romans are mode-ambiguous",
+  ["V", "V6", "V7", "V9", "V11", "V13"].every(romanIsModeAmbiguous));
+check("every other degree of both rows is unambiguous",
+  [...MAJOR_DEGREES.values(), ...MINOR_DEGREES.values()].map((d) => d.roman)
+    .filter((r) => r !== "V").every((r) => !romanIsModeAmbiguous(r)) &&
+  !romanIsModeAmbiguous("VI7") && !romanIsModeAmbiguous("v7") && !romanIsModeAmbiguous(""));
 
 // --- Ear training: every advanced progression resolves to parseable chords in any key ---
 let advOk = true;

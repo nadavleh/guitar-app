@@ -1164,6 +1164,9 @@ export class EarTrainingUI {
     const selected = selectedBar === i;
     const playhead = ear.isLooping && ear.currentBar === i;   // playing "head" highlight
     const label = ear.challengeGuessLabel[i];
+    // "(minor)" under the numeral when the answer was the harmonic-minor dominant —
+    // a bare "V7" there is indistinguishable from the major key's V7.
+    const guessTag = ear.challengeGuessTag(i);
     const border = verdict === true ? "var(--act)" : verdict === false ? "var(--root-tone)" : selected ? "var(--act)" : "var(--line)";
     // Playhead (teal bg + teal ring) is deliberately a different hue from the
     // coral selection border, so a selected bar the playhead is on shows BOTH.
@@ -1171,7 +1174,9 @@ export class EarTrainingUI {
     const box = el("div", {
       class: "et-barsq",
       style: `border-color:${border};border-width:${selected && verdict === null ? "3px" : "2px"};background:${bg}${playhead ? ";box-shadow:0 0 0 3px var(--feedback)" : ""}`,
-    }, [label ?? "?"]);
+    }, guessTag
+      ? [el("div", {}, [label ?? "?"]), el("div", { class: "et-barsq-tag" }, [guessTag])]
+      : [label ?? "?"]);
     box.addEventListener("click", onSelect);
     const col = el("div", { class: "et-slot" }, [
       el("div", { class: "ans-label" }, [`Bar ${i + 1}`]),
@@ -1180,9 +1185,10 @@ export class EarTrainingUI {
       btn("▶", () => { onSelect(); ear.playBarOnce(i); }),
     ]);
     if (verdict !== null) {
-      const answer = ear.progResolved[i]?.romanLabel ?? "";
+      const answer = ear.challengeAnswerLabel(i);
       col.appendChild(el("div", {
-        style: `font-size:11px;font-weight:600;margin-top:2px;color:${verdict ? "var(--act)" : "var(--root-tone)"}`,
+        // line-height so a wrapped, disambiguated answer ("✘ V7 (minor)") stays tidy.
+        style: `font-size:11px;font-weight:600;line-height:1.25;margin-top:2px;color:${verdict ? "var(--act)" : "var(--root-tone)"}`,
       }, [verdict ? "✔" : `✘ ${answer}`]));
     }
     return col;

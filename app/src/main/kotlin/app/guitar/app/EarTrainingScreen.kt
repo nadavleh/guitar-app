@@ -1551,8 +1551,11 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                 BarSquare(
                     barNumber = i + 1,
                     label = ear.challengeGuessLabel.getOrNull(i),
+                    // "(minor)" when the answer was the harmonic-minor dominant — a bare
+                    // "V7" there is indistinguishable from the major key's V7.
+                    labelTag = ear.challengeGuessTag(i),
                     verdict = verdict,
-                    answer = if (verdict != null) ear.progResolved.getOrNull(i)?.romanLabel else null,
+                    answer = if (verdict != null) ear.challengeAnswerLabel(i) else null,
                     selected = selectedBar == i,
                     playhead = ear.isLooping && ear.currentBar == i,   // playing "head"
                     onTap = { selectedBar = i },
@@ -1672,6 +1675,8 @@ private fun ChallengeSourceRow(ear: EarTrainingState) {
 private fun BarSquare(
     barNumber: Int,
     label: String?,
+    /** Small marker under [label] (e.g. "(minor)") when the numeral alone is ambiguous. */
+    labelTag: String? = null,
     verdict: Boolean?,
     answer: String?,
     selected: Boolean = false,
@@ -1711,14 +1716,27 @@ private fun BarSquare(
                 .clickable { onTap() },
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                label ?: "?",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                color = if (label == null) MaterialTheme.colorScheme.onSurfaceVariant
-                        else MaterialTheme.colorScheme.onSurface,
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    label ?: "?",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    color = if (label == null) MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onSurface,
+                )
+                // "(minor)" etc. — too long to sit inline next to a 22sp numeral in a
+                // quarter-width square, so it gets its own small line.
+                if (labelTag != null) {
+                    Text(
+                        labelTag,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
         Spacer(Modifier.height(2.dp))
         OutlinedButton(
@@ -1729,7 +1747,10 @@ private fun BarSquare(
             Text(
                 if (verdict) "✔" else "✘ ${answer ?: ""}",
                 style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
+                // 2 lines: a disambiguated answer ("V7 (minor)") doesn't fit a
+                // quarter-width column on one line.
+                maxLines = 2,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 color = if (verdict) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
             )
         }

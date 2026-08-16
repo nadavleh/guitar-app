@@ -10,7 +10,7 @@ import {
   TrainingMode, ChordTypeLevel, Progression, ResolvedChord, NamedProgression,
   EarTrainingDegrees, degreeRoot, degreeRefMidi, resolve as resolveDegree, resolveProgression,
   randomProgression, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
-  MINOR_DOMINANT, progressionKey, progressionFromKey,
+  MINOR_DOMINANT, MINOR_ROMAN_TAG, romanIsModeAmbiguous, progressionKey, progressionFromKey,
   majorRelativeDegree, degreeFromMajorRelative,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow, importedSongsForDiatonic, CIRCLE_WINDOWS, namedRomanLine,
   N2cChallenge, randomN2c, n2cAnswerLabel, n2cChordSymbol, n2cTestNote, n2cLabel,
@@ -984,10 +984,36 @@ export class EarTrainingState {
     if (this.challengeNeedsExt && this.challengeGuessExt[i] == null) return null;
     // Degree must match AND the major-V/natural-v choice must match: a harmonic-dominant
     // bar is only correct via the "V7" key, a natural degree-5 bar only via plain "v".
-    const barDominant = this.progMode === TrainingMode.Minor && (this.progProgression?.dominantBars ?? []).includes(i);
-    const degOk = g === deg && (this.challengeGuessDominant[i] === true) === barDominant;
+    const degOk = g === deg && (this.challengeGuessDominant[i] === true) === this.challengeBarIsDominant(i);
     const extOk = !this.challengeNeedsExt || this.challengeGuessExt[i] === this.correctExtLabel(i);
     return degOk && extOk;
+  }
+
+  /** True when bar [i] of the current progression sounds the harmonic-minor dominant
+   *  (a major V / V7 in a minor key) rather than a natural diatonic degree. */
+  challengeBarIsDominant(i: number): boolean {
+    return this.progMode === TrainingMode.Minor && (this.progProgression?.dominantBars ?? []).includes(i);
+  }
+
+  /**
+   * The revealed correct Roman for bar [i], marked "(minor)" when it is the harmonic-minor
+   * dominant. Without the marker a minor key's "V7" prints exactly like the major key's
+   * "V7" the user may have answered with, so a wrong answer looked identical to the right
+   * one. Unambiguous numerals (iv vs IV, iii vs bIII) are returned untouched — see
+   * [romanIsModeAmbiguous].
+   */
+  challengeAnswerLabel(i: number): string {
+    const roman = this.progResolved[i]?.romanLabel ?? "";
+    return this.challengeBarIsDominant(i) && romanIsModeAmbiguous(roman)
+      ? `${roman} ${MINOR_ROMAN_TAG}` : roman;
+  }
+
+  /** "(minor)" when bar [i] was answered with the harmonic-minor dominant key and the
+   *  label alone would be ambiguous; null otherwise (nothing to disambiguate). */
+  challengeGuessTag(i: number): string | null {
+    const label = this.challengeGuessLabel[i];
+    if (label == null) return null;
+    return this.challengeGuessDominant[i] && romanIsModeAmbiguous(label) ? MINOR_ROMAN_TAG : null;
   }
 
   guessChallengeDegree(bar: number, degree: number) {

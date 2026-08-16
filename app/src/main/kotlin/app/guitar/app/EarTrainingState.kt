@@ -1132,6 +1132,32 @@ class EarTrainingState(
         return degOk && extOk
     }
 
+    /** True when bar [i] of the current progression sounds the harmonic-minor dominant
+     *  (a major V / V7 in a minor key) rather than a natural diatonic degree. */
+    fun challengeBarIsDominant(i: Int): Boolean =
+        progMode == TrainingMode.Minor && progProgression?.dominantBars?.contains(i) == true
+
+    /**
+     * The revealed correct Roman for bar [i], marked "(minor)" when it is the
+     * harmonic-minor dominant. Without the marker a minor key's "V7" prints exactly like
+     * the major key's "V7" the user may have answered with, so a wrong answer looked
+     * identical to the right one. Unambiguous numerals (iv vs IV, iii vs bIII) are
+     * returned untouched — see [EarTraining.romanIsModeAmbiguous].
+     */
+    fun challengeAnswerLabel(i: Int): String {
+        val roman = progResolved.getOrNull(i)?.romanLabel ?: return ""
+        return if (challengeBarIsDominant(i) && EarTraining.romanIsModeAmbiguous(roman))
+            "$roman ${EarTraining.MINOR_ROMAN_TAG}" else roman
+    }
+
+    /** "(minor)" when bar [i] was answered with the harmonic-minor dominant key and the
+     *  label alone would be ambiguous; null otherwise (nothing to disambiguate). */
+    fun challengeGuessTag(i: Int): String? {
+        val label = challengeGuessLabel.getOrNull(i) ?: return null
+        val dominant = challengeGuessDominant.getOrNull(i) == true
+        return if (dominant && EarTraining.romanIsModeAmbiguous(label)) EarTraining.MINOR_ROMAN_TAG else null
+    }
+
     fun guessChallengeDegree(bar: Int, degree: Int) {
         if (!challengeActive) return
         challengeGuessDegree = challengeGuessDegree.toMutableList().also { it[bar] = degree }
