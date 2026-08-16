@@ -71,9 +71,17 @@ export const MINOR_DEGREES: Map<number, DegreeInfo> = new Map([
  *  challenge scores a degree-5 answer identically for either. */
 export const MINOR_DOMINANT: DegreeInfo = di("V", "", "7", "9");
 
-/** Marker appended to a Roman that is read in the MINOR key, when the bare numeral
- *  would print identically to the major key's. See [romanIsModeAmbiguous]. */
+/** Markers appended to a Roman that prints the same in both keys, saying which one it is
+ *  read in. BOTH readings are marked — leaving the major one bare made the answer
+ *  "✘ V7" look like it needed no explanation, which is the confusion the marker exists
+ *  to remove. See [romanIsModeAmbiguous]. */
 export const MINOR_ROMAN_TAG = "(minor)";
+export const MAJOR_ROMAN_TAG = "(major)";
+
+/** The tag for a Roman read in the minor key (`minorReading`) or the major key. */
+export function romanModeTag(minorReading: boolean): string {
+  return minorReading ? MINOR_ROMAN_TAG : MAJOR_ROMAN_TAG;
+}
 
 /**
  * True when `roman` reads the same in a major and in a minor key, so showing it on its

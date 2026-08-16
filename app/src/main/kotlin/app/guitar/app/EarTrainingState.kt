@@ -1141,24 +1141,25 @@ class EarTrainingState(
         progMode == TrainingMode.Minor && progProgression?.dominantBars?.contains(i) == true
 
     /**
-     * The revealed correct Roman for bar [i], marked "(minor)" when it is the
-     * harmonic-minor dominant. Without the marker a minor key's "V7" prints exactly like
-     * the major key's "V7" the user may have answered with, so a wrong answer looked
-     * identical to the right one. Unambiguous numerals (iv vs IV, iii vs bIII) are
-     * returned untouched — see [EarTraining.romanIsModeAmbiguous].
+     * The revealed correct Roman for bar [i], marked "(major)" or "(minor)" whenever the
+     * numeral alone is ambiguous — a minor key's harmonic dominant prints exactly like
+     * the major key's "V7", so an unmarked answer looked identical to the wrong guess
+     * beside it. Unambiguous numerals (iv vs IV, iii vs bIII) are returned untouched —
+     * see [EarTraining.romanIsModeAmbiguous].
      */
     fun challengeAnswerLabel(i: Int): String {
         val roman = progResolved.getOrNull(i)?.romanLabel ?: return ""
-        return if (challengeBarIsDominant(i) && EarTraining.romanIsModeAmbiguous(roman))
-            "$roman ${EarTraining.MINOR_ROMAN_TAG}" else roman
+        return if (EarTraining.romanIsModeAmbiguous(roman))
+            "$roman ${EarTraining.romanModeTag(challengeBarIsDominant(i))}" else roman
     }
 
-    /** "(minor)" when bar [i] was answered with the harmonic-minor dominant key and the
-     *  label alone would be ambiguous; null otherwise (nothing to disambiguate). */
+    /** "(major)"/"(minor)" for bar [i]'s ANSWER — which Roman system the key you tapped
+     *  belongs to; null when the label needs no disambiguating. Only the major row's
+     *  degree 5 and the harmonic-dominant key can produce an ambiguous label. */
     fun challengeGuessTag(i: Int): String? {
         val label = challengeGuessLabel.getOrNull(i) ?: return null
-        val dominant = challengeGuessDominant.getOrNull(i) == true
-        return if (dominant && EarTraining.romanIsModeAmbiguous(label)) EarTraining.MINOR_ROMAN_TAG else null
+        if (!EarTraining.romanIsModeAmbiguous(label)) return null
+        return EarTraining.romanModeTag(challengeGuessDominant.getOrNull(i) == true)
     }
 
     fun guessChallengeDegree(bar: Int, degree: Int) {

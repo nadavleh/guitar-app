@@ -99,9 +99,16 @@ object EarTraining {
      *  natural `v`'s, so the challenge scores a degree-5 answer identically for either. */
     val MINOR_DOMINANT = DegreeInfo("V", "", "7", "9")
 
-    /** Marker appended to a Roman that is read in the MINOR key, when the bare numeral
-     *  would print identically to the major key's. See [romanIsModeAmbiguous]. */
+    /** Markers appended to a Roman that prints the same in both keys, saying which one
+     *  it is read in. BOTH readings are marked — leaving the major one bare made the
+     *  answer "✘ V7" look like it needed no explanation, which is the confusion the
+     *  marker exists to remove. See [romanIsModeAmbiguous]. */
     const val MINOR_ROMAN_TAG = "(minor)"
+    const val MAJOR_ROMAN_TAG = "(major)"
+
+    /** The tag for a Roman read in the minor key ([minorReading]) or the major key. */
+    fun romanModeTag(minorReading: Boolean): String =
+        if (minorReading) MINOR_ROMAN_TAG else MAJOR_ROMAN_TAG
 
     /**
      * True when [roman] reads the same in a major and in a minor key, so showing it on

@@ -10,7 +10,7 @@ import {
   TrainingMode, ChordTypeLevel, Progression, ResolvedChord, NamedProgression,
   EarTrainingDegrees, degreeRoot, degreeRefMidi, resolve as resolveDegree, resolveProgression,
   randomProgression, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
-  MINOR_DOMINANT, MINOR_ROMAN_TAG, romanIsModeAmbiguous, progressionKey, progressionFromKey,
+  MINOR_DOMINANT, romanModeTag, romanIsModeAmbiguous, progressionKey, progressionFromKey,
   majorRelativeDegree, degreeFromMajorRelative,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow, importedSongsForDiatonic, CIRCLE_WINDOWS, namedRomanLine,
   N2cChallenge, randomN2c, n2cAnswerLabel, n2cChordSymbol, n2cTestNote, n2cLabel,
@@ -999,24 +999,25 @@ export class EarTrainingState {
   }
 
   /**
-   * The revealed correct Roman for bar [i], marked "(minor)" when it is the harmonic-minor
-   * dominant. Without the marker a minor key's "V7" prints exactly like the major key's
-   * "V7" the user may have answered with, so a wrong answer looked identical to the right
-   * one. Unambiguous numerals (iv vs IV, iii vs bIII) are returned untouched — see
+   * The revealed correct Roman for bar [i], marked "(major)" or "(minor)" whenever the
+   * numeral alone is ambiguous — a minor key's harmonic dominant prints exactly like the
+   * major key's "V7", so an unmarked answer looked identical to the wrong guess beside
+   * it. Unambiguous numerals (iv vs IV, iii vs bIII) are returned untouched — see
    * [romanIsModeAmbiguous].
    */
   challengeAnswerLabel(i: number): string {
     const roman = this.progResolved[i]?.romanLabel ?? "";
-    return this.challengeBarIsDominant(i) && romanIsModeAmbiguous(roman)
-      ? `${roman} ${MINOR_ROMAN_TAG}` : roman;
+    return romanIsModeAmbiguous(roman)
+      ? `${roman} ${romanModeTag(this.challengeBarIsDominant(i))}` : roman;
   }
 
-  /** "(minor)" when bar [i] was answered with the harmonic-minor dominant key and the
-   *  label alone would be ambiguous; null otherwise (nothing to disambiguate). */
+  /** "(major)"/"(minor)" for bar [i]'s ANSWER — which Roman system the key you tapped
+   *  belongs to; null when the label needs no disambiguating. Only the major row's
+   *  degree 5 and the harmonic-dominant key can produce an ambiguous label. */
   challengeGuessTag(i: number): string | null {
     const label = this.challengeGuessLabel[i];
-    if (label == null) return null;
-    return this.challengeGuessDominant[i] && romanIsModeAmbiguous(label) ? MINOR_ROMAN_TAG : null;
+    if (label == null || !romanIsModeAmbiguous(label)) return null;
+    return romanModeTag(this.challengeGuessDominant[i]);
   }
 
   guessChallengeDegree(bar: number, degree: number) {

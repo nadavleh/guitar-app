@@ -356,6 +356,13 @@ class EarTrainingTest {
         }
     }
 
+    @Test fun `both readings of an ambiguous Roman are tagged`() {
+        // Tagging only the minor one left "✘ V7" looking self-explanatory next to a
+        // guess reading "V7 (minor)" — the pair has to say which is which.
+        assertEquals("(minor)", EarTraining.romanModeTag(minorReading = true))
+        assertEquals("(major)", EarTraining.romanModeTag(minorReading = false))
+    }
+
     @Test fun `harmonic-minor dominant and major V print the same bare label`() {
         val minorV7 = EarTraining.resolve(5, PitchClass.A, TrainingMode.Minor, ChordTypeLevel.Sevenths, asDominant = true)
         val majorV7 = EarTraining.resolve(5, PitchClass.C, TrainingMode.Major, ChordTypeLevel.Sevenths)
