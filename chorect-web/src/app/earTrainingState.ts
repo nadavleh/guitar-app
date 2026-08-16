@@ -894,7 +894,10 @@ export class EarTrainingState {
     this.modeRevealed = false;
     this.currentBar = 0;
     this.challengeRevealed = false;
-    if (this.isLooping) { this.stopLoop(); this.startLoop(); }
+    // A different progression is now loaded, so the loop always STOPS — it used to
+    // carry over and start sounding the next question the instant you hit Next,
+    // before you were ready to listen. Every question is played on demand.
+    this.stopLoop();
     this.notify();
   }
 
@@ -1388,7 +1391,10 @@ export class EarTrainingState {
     this.progTranspose = 0;
     this.advRevealed = false;
     this.hasGenerated = true;
-    if (this.isLooping) { this.stopLoop(); this.startLoop(); }
+    // In a CHALLENGE the loop always stops on a new progression — you play each
+    // question explicitly. Practice keeps looping so you can browse hands-free.
+    if (this.earMode === EarMode.Challenge) this.stopLoop();
+    else if (this.isLooping) { this.stopLoop(); this.startLoop(); }
     this.notify();
   }
   toggleAdvReveal() { this.advRevealed = !this.advRevealed; this.notify(); }
@@ -1399,7 +1405,9 @@ export class EarTrainingState {
   advChScore = 0;
   advChMarked = false;
 
-  startAdvChallenge() { this.advChActive = true; this.advChIndex = 0; this.advChScore = 0; this.advChMarked = false; this.nextAdvancedProgression(); this.startLoop(); }
+  // No startLoop() here — the first question is played on demand like every other
+  // one, matching the diatonic challenge.
+  startAdvChallenge() { this.advChActive = true; this.advChIndex = 0; this.advChScore = 0; this.advChMarked = false; this.nextAdvancedProgression(); }
   markAdv(correct: boolean) {
     if (!this.advChActive || this.advChMarked) return;
     this.advChMarked = true; this.advRevealed = true;

@@ -1045,7 +1045,10 @@ class EarTrainingState(
         modeRevealed = false
         currentBar = 0
         challengeRevealed = false
-        if (isLooping) { stopLoop(); startLoop() }
+        // A different progression is now loaded, so the loop always STOPS — it used to
+        // carry over and start sounding the next question the instant you hit Next,
+        // before you were ready to listen. Every question is played on demand.
+        stopLoop()
     }
 
     /** Persist the live guesses back into the log for the current index. */
@@ -1637,7 +1640,10 @@ class EarTrainingState(
         progTranspose = 0
         advRevealed = false
         hasGenerated = true
-        if (isLooping) { stopLoop(); startLoop() }
+        // In a CHALLENGE the loop always stops on a new progression — you play each
+        // question explicitly. Practice keeps looping so you can browse hands-free.
+        if (earMode == EarMode.Challenge) stopLoop()
+        else if (isLooping) { stopLoop(); startLoop() }
     }
 
     fun toggleAdvReveal() { advRevealed = !advRevealed }
@@ -1653,10 +1659,11 @@ class EarTrainingState(
     var advChMarked by mutableStateOf(false)
         private set
 
+    // No startLoop() here — the first question is played on demand like every other
+    // one, matching the diatonic challenge.
     fun startAdvChallenge() {
         advChActive = true; advChIndex = 0; advChScore = 0; advChMarked = false
         nextAdvancedProgression()
-        startLoop()
     }
     fun markAdv(correct: Boolean) {
         if (!advChActive || advChMarked) return

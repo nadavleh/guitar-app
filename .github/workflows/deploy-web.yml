@@ -51,6 +51,10 @@ jobs:
       # Type-check first so a type error fails the deploy loudly (vite/esbuild
       # alone strips types without checking them).
       - run: npx tsc --noEmit
+      # Theory/audio engine assertions (test/verify.ts) — they mirror the Kotlin
+      # JUnit suite and had never been wired into CI, so they only ever ran when
+      # someone remembered `npm run verify` locally.
+      - run: npm run verify
       # Repo is served at /<repo>/ on project Pages, so build with that base.
       - run: npx vite build --base=/${{ github.event.repository.name }}/
       - uses: actions/upload-pages-artifact@v3
