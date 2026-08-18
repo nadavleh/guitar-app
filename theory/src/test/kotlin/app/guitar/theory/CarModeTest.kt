@@ -42,8 +42,10 @@ class CarModeTest {
     }
 
     @Test fun `exercise length at 140 bpm over 4 bars is about 36 seconds`() {
-        val ms = CarMode.exerciseMs(140, 4)
-        assertTrue(ms in 35_000..37_000, "expected ~35.8 s, got ${ms} ms")
+        // Pinned to the exact value, NOT a range: verify.ts asserts the same literal,
+        // which is what makes the two ports provably agree. 60000/140 truncates to 428,
+        // so 1500 + 5 * 4 * 428 * 4 = 35740.
+        assertEquals(35_740L, CarMode.exerciseMs(140, 4))
     }
 
     @Test fun `exerciseMs scales with rounds and bars and never divides by zero`() {

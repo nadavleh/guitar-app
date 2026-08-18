@@ -364,6 +364,8 @@ Highlights of the **Progression Challenge** (the most elaborate view):
 - Optional `Show chord on fretboard` switch renders a 220-dp `FretboardView` of the current/last shape.
 - **Score screen** (`ChallengeDoneCard`): big `score / total` bars-correct, duration, a **wrapping per-question dot strip** (15 numbered squares, green/red/outline), and a **High-scores table** — best first, ties broken by faster completion time (`CHALLENGE_SCORE_ORDER`), each row showing rank, `score/total`, time, and date; the current run is **bold + "← you"**. The just-finished run is merged in locally so it shows even before the async DataStore write lands. `Restart` / `Exit`.
 
+The config screen also carries the entry to **Car mode** (see §10.4).
+
 Practice (Progression) mode mirrors the transport and settings but reveals answers via `RevealCard`s and adds a `→ Looper` button that pushes the current progression into the Loop tool. Note→Chord and Flavor sub-modes follow the same Practice/Challenge pattern with their own question types.
 
 ### 10.1 Progressions — Advanced (non-diatonic)
@@ -388,6 +390,54 @@ Challenge (`InversionsChallengeView`): same palette on the config screen, then s
 Practice (`AugDimView`): a **"Chord types"** palette over `augDimPalette` — `Augmented (+)`, `Diminished (°)`, `dim7 (°7)`, `m7♭5 (half-dim ø)`, `7♯5 (aug 7th)`, `maj7♯5` — to enable qualities (default: Augmented + Diminished); **New chord ▶ / Replay**; a **"Which chord?"** guess-chip row (only the *enabled* qualities) where **tapping a chip auditions it**; then a **reveal card** (root + quality + family) with a `✔/✘` line.
 
 Challenge (`AugDimChallengeView`): same palette on the config screen (Start is disabled until at least one quality is enabled), then scored rounds (`Restart` / `Quit` in the header) with **Replay ▶**, the guess chips, **Submit**, the answer line, and **Next → / See score →**. Ends on `SimpleDoneCard`.
+
+### 10.4 Progressions — Car mode (hands-free)
+
+A **hands-free** variant of the Progression challenge, for practising while driving. `EarMode` has a third value, `Car`, alongside `Practice`/`Challenge`.
+
+**Entry point.** A full-width secondary `Car mode — hands-free` button on the Progression **Challenge config screen**, directly under `Start challenge ▶`, with the caption "5 plays per progression, revealing one more chord each play. Not graded." It lives there deliberately: that is the screen you sit on *before* driving, it inherits the generator settings shown immediately above it, and it is unreachable while answering, so it cannot be mis-tapped mid-question. It adds **no permanent chrome** — no new tab, no dock button, and it is **not** a third segment in the Practice/Challenge picker (both platforms now pass `Practice, Challenge` explicitly instead of `EarMode.entries`, or a Car segment would appear labelled "Challenge").
+
+**One exercise** (all timings from `theory/CarMode`, mirrored in `chorect-web/src/theory/carMode.ts`):
+
+| step | timing |
+|---|---|
+| 3 lead-in beeps announcing a new exercise | onsets at 0 / 500 / 1000 ms, scheduled on the **audio clock** so the spacing is sample-accurate |
+| first chord | 1500 ms — one more gap after beep 3, giving "3-2-1-go" |
+| the progression sounds 5 times | one chord per bar, the same voice-led `soundBar` path the practice looper uses |
+| silent self-assessment gap | 4000 ms, then auto-advance draws the next exercise |
+
+The beep is an 880 Hz sine, 140 ms, 5 ms linear attack then exponential decay — **synthesised** by `audio/CueBeep`, so no asset ships. 880 Hz sits above the progression voicings (MIDI 45-70 ≈ 110-490 Hz) and above the sub-500 Hz road-noise hump, so it cuts through a car cabin.
+
+**Reveal ramp.** Round 1 reveals nothing (guess blind); each later round reveals one more slot. For a 4-chord progression: `? ? ? ?` → `I ? ? ?` → `I V ? ?` → `I V vi ?` → `I V vi IV`. Three-chord advanced/circle progressions clamp. The count is **derived** (`CarMode.revealedSlots(round, slotCount)`), never stored, so it cannot go stale.
+
+**Layout.** Car mode owns the whole content column — the tab bar (portrait) / tab rail (landscape) stays, per the Studio invariant, but the sub-mode chips, mode picker, answer pad, degree-reference row, fretboard, transport dock and generator card are all gone:
+
+```
+CAR MODE     Exercise 7 - play 3/5                 Exit
+Diatonic  -  7th chords                          (read-only)
++---------+  +---------+  +---------+  +---------+
+|    I    |  |   V7    |  |    ?    |  |    ?    |   slots fill all
++---------+  +---------+  +---------+  +---------+   remaining height
+              * * * o o   (round dots)
+[  Replay 5x  ] [   Next    ] [    Stop    ]         56dp, equal flex
+[x] Auto-advance (4 s gap)
+```
+
+- Slot labels are sized off the **shorter** viewport edge (`clamp(40px, 13vmin, 132px)` web; `min(width/slots, height) * 0.42` on Android), so **one layout serves both orientations** — landscape simply makes the slots taller.
+- The sounding slot takes the accent fill + inset ring, so a glance shows *where* in the bar cycle you are.
+- Hidden slots show `?` at 45% opacity. Labels are **Roman-numeral functions only** — never chord symbols, and the key is **never** shown (per the ear-training digest: work directly in function).
+- Idle state: one 72dp `Start ▶` plus an "≈N s per exercise" estimate from `CarMode.exerciseMs`.
+- Existing tokens only (`--surface2`, `--act`, `--line`, `--muted`), so both themes work with no new palette entries.
+
+**Not graded.** Car mode never touches `challengeActive`, `challengeLog`, the guess arrays or `reportChallengeDone`, so a half-finished challenge survives a drive intact. The reveals *are* the feedback; you self-assess during the gap.
+
+**Cancellation, wake and rotation.**
+
+- `stopLoop()` is the single cancellation point for both the practice looper and the car driver, so `switchTab`, `release`, the transport dock's Stop and the Android `onDispose` guard all cancel a running exercise for free. A cancelled exercise **freezes** its reveals rather than spoiling the rest.
+- The screen is kept awake by `keepScreenOn` (Android — no manifest permission needed) and the **Screen Wake Lock API** on web, re-acquired on `visibilitychange`; a browser without the API still runs car mode, it just lets the screen sleep.
+- **Rotation does not cancel** — the driver job lives on `AppState.scope`, not on the composable. **Navigating away does.** On web, hiding the tab stops the exercise, because background tabs clamp `setTimeout` to ≥1 s and would smear the bar grid.
+
+All generators apply (diatonic / I→iii focus / 3rd-vs-6th focus / advanced / advanced II / sus / circle), including the key and chord-level settings, because car mode draws through the existing `nextProgression()` / `nextAdvancedProgression()`.
 
 ---
 

@@ -340,7 +340,7 @@ check("reveal count clamps to the slot count and never goes negative",
   CarMode.revealedSlots(0, 4) === 0 && CarMode.revealedSlots(-1, 4) === 0);
 check("exercise at 140bpm over 4 bars is ~36s",
   CarMode.exerciseMs(140, 4) >= 35_000 && CarMode.exerciseMs(140, 4) <= 37_000);
-check("exerciseMs matches Kotlin integer division exactly", CarMode.exerciseMs(140, 4) === 35780);
+check("exerciseMs matches Kotlin integer division exactly", CarMode.exerciseMs(140, 4) === 35740);
 check("exerciseMs doubles with the bars and clamps a nonsense bpm",
   (CarMode.exerciseMs(140, 8) - CarMode.LEAD_IN_MS) === 2 * (CarMode.exerciseMs(140, 4) - CarMode.LEAD_IN_MS) &&
   CarMode.exerciseMs(0, 4) > 0);
