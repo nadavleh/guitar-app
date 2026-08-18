@@ -308,6 +308,20 @@ object EarTraining {
         Progression(TrainingMode.Minor, listOf(1, 6, 3, 4)),   // i–bVI–bIII–iv
     )
 
+    /** Drill-only CONTRAST progressions for the 3rd-vs-6th drill: a 1↔6 move (I→vi,
+     *  i→bVI, or the reverse) and NO degree 3 — the "was that the 6th or the 3rd?" foil.
+     *  The library alone left this pool degenerate: with harmonic minor off there was
+     *  exactly ONE minor entry, so 30 % of questions repeated the same progression.
+     *  Drill-only, like [THIRD_SIXTH_DRILL_PROGRESSIONS] — no song lists needed. */
+    val THIRD_SIXTH_CONTRAST_DRILL: List<Progression> = listOf(
+        Progression(TrainingMode.Major, listOf(1, 6, 4, 1)),   // I–vi–IV–I
+        Progression(TrainingMode.Major, listOf(1, 6, 5, 4)),   // I–vi–V–IV
+        Progression(TrainingMode.Major, listOf(4, 5, 1, 6)),   // IV–V–I–vi (wraps vi→I)
+        Progression(TrainingMode.Minor, listOf(1, 6, 4, 5)),   // i–bVI–iv–v (natural v)
+        Progression(TrainingMode.Minor, listOf(1, 6, 7, 5)),   // i–bVI–bVII–v
+        Progression(TrainingMode.Minor, listOf(1, 6, 4, 1)),   // i–bVI–iv–i
+    )
+
     /** Percent of [ProgFocus.ThirdVsSixth] draws taken from the CONTRAST pool (a 1↔6
      *  move and no degree 3) rather than the degree-3 pool. Integer percent, not a
      *  float, so the draw uses `nextInt` and matches the web port on a shared seed. */
@@ -344,8 +358,9 @@ object EarTraining {
     /** CONTRAST pool of the 3rd-vs-6th drill: library progressions that make the I↔vi
      *  (i↔bVI) move and contain NO degree 3 — the "is that the 6th or the 3rd?" foil. */
     fun thirdSixthContrastPool(mode: TrainingMode, includeHarmonicMinor: Boolean = true): List<Progression> =
-        dedupe(diatonicUniverse(mode, includeHarmonicMinor)
-            .filter { 3 !in it.degrees && hasOneSixStep(it.degrees) })
+        dedupe(THIRD_SIXTH_CONTRAST_DRILL.filter { it.mode == mode } +
+            diatonicUniverse(mode, includeHarmonicMinor)
+                .filter { 3 !in it.degrees && hasOneSixStep(it.degrees) })
 
     /** Pick a random progression for [mode], using [rng]. [focus] swaps the draw pool:
      *  [ProgFocus.Iiii] draws the I→iii drill (always major); [ProgFocus.ThirdVsSixth]

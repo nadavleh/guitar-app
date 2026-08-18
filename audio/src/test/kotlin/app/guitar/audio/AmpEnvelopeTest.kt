@@ -27,4 +27,19 @@ class AmpEnvelopeTest {
         assertEquals(0f, buf[95], 1e-4f)
         assertTrue(env.isSilent)
     }
+
+    @Test
+    fun `a voice released before it ever sounds stays silent`() {
+        // This is the mechanism that makes stopping a Car-mode exercise mid-lead-in
+        // silence the beeps that are already QUEUED (playSamplesAt schedules them up to
+        // a second ahead, and AudioTrackEngine.stop() -> releaseAll() only releases
+        // envelopes). A fresh envelope sits at level 0, so releasing it must collapse
+        // straight to DONE rather than ramping down from 1.
+        val env = AmpEnvelope(48_000, attackMs = 3.0, releaseMs = 20.0)
+        env.release()
+        val buf = FloatArray(256) { 1f }
+        env.applyInPlace(buf, buf.size)
+        for ((i, v) in buf.withIndex()) assertEquals(0f, v, 1e-7f, "sample $i leaked audio")
+        assertTrue(env.isSilent)
+    }
 }

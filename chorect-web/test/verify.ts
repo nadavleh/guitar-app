@@ -9,7 +9,7 @@ import {
   ADVANCED_PROGRESSIONS, resolveNamed, QUALITIES, inversionMidis, randomN2c, n2cAnswerLabel,
   romanIsModeAmbiguous, MAJOR_DEGREES, MINOR_DEGREES,
   ProgFocus, randomProgression, hasOneSixStep, thirdSixthPrimaryPool, thirdSixthContrastPool,
-  THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode,
+  THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode,
 } from "../src/theory";
 import { standard } from "../src/theory/tunings";
 import {
@@ -295,15 +295,15 @@ const poolKeys = (ps: Progression[]): string => ps.map(poolKey).join(" / ");
 check("3rd-vs-6th primary pool (major) matches Kotlin", poolKeys(thirdSixthPrimaryPool(TrainingMode.Major)) ===
   "1,3,6,4| / 1,6,3,4| / 1,3,6,1| / 1,6,3,5| / 4,3,6,1| / 1,3,6,5| / 1,3,4,5| / 4,5,3,6| / 1,3,4,1| / 1,3,2,5| / 1,3,1,4|");
 check("3rd-vs-6th contrast pool (major) matches Kotlin", poolKeys(thirdSixthContrastPool(TrainingMode.Major)) ===
-  "1,6,4,5| / 1,6,2,5| / 6,2,5,1| / 1,2,5,6|");
+  "1,6,4,1| / 1,6,5,4| / 4,5,1,6| / 1,6,4,5| / 1,6,2,5| / 6,2,5,1| / 1,2,5,6|");
 check("3rd-vs-6th primary pool (minor, harmonic on) matches Kotlin", poolKeys(thirdSixthPrimaryPool(TrainingMode.Minor)) ===
   "1,3,6,4| / 1,6,3,5| / 1,3,6,7| / 1,6,3,4| / 1,6,3,7| / 1,4,7,3| / 1,3,7,4| / 1,6,3,5|3 / 1,3,6,5|3");
 check("3rd-vs-6th contrast pool (minor, harmonic on) matches Kotlin", poolKeys(thirdSixthContrastPool(TrainingMode.Minor)) ===
-  "1,6,7,1| / 1,6,2,5|3 / 1,6,4,5|3");
+  "1,6,4,5| / 1,6,7,5| / 1,6,4,1| / 1,6,7,1| / 1,6,2,5|3 / 1,6,4,5|3");
 check("3rd-vs-6th primary pool (minor, harmonic off) matches Kotlin", poolKeys(thirdSixthPrimaryPool(TrainingMode.Minor, false)) ===
   "1,3,6,4| / 1,6,3,5| / 1,3,6,7| / 1,6,3,4| / 1,6,3,7| / 1,4,7,3| / 1,3,7,4|");
 check("3rd-vs-6th contrast pool (minor, harmonic off) matches Kotlin", poolKeys(thirdSixthContrastPool(TrainingMode.Minor, false)) ===
-  "1,6,7,1|");
+  "1,6,4,5| / 1,6,7,5| / 1,6,4,1| / 1,6,7,1|");
 
 check("1<->6 step counts the loop wrap", hasOneSixStep([1, 6, 4, 5]) && hasOneSixStep([1, 2, 5, 6]) &&
   hasOneSixStep([6, 2, 5, 1]) && !hasOneSixStep([1, 5, 6, 4]) && !hasOneSixStep([1, 4, 6, 5]));
@@ -393,6 +393,19 @@ check("only the V family needs a mode tag in car mode",
   romanIsModeAmbiguous("V") && romanIsModeAmbiguous("V7") && romanIsModeAmbiguous("V9") &&
   !romanIsModeAmbiguous("v") && !romanIsModeAmbiguous("iii") && !romanIsModeAmbiguous("bIII") &&
   !romanIsModeAmbiguous("IV") && !romanIsModeAmbiguous("iv") && !romanIsModeAmbiguous("bVII"));
+
+// No mode/toggle combination may go degenerate: the library alone left the minor
+// contrast pool with ONE entry once harmonic minor was off, so 30 % of questions
+// repeated the same progression. Mirrors the Kotlin guard.
+for (const m of [TrainingMode.Major, TrainingMode.Minor]) {
+  for (const hm of [true, false]) {
+    check(`3rd-vs-6th pools stay varied (${m}, harmonic=${hm})`,
+      thirdSixthPrimaryPool(m, hm).length >= 6 && thirdSixthContrastPool(m, hm).length >= 4);
+  }
+}
+check("every contrast drill entry is a 1<->6 move with no degree 3",
+  THIRD_SIXTH_CONTRAST_DRILL.every((p) => hasOneSixStep(p.degrees) && !p.degrees.includes(3) &&
+    (p.dominantBars ?? []).length === 0));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

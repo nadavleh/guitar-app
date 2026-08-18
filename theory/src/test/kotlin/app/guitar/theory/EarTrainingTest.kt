@@ -473,4 +473,28 @@ class EarTrainingTest {
             assertEquals(listOf(1, 3), p.degrees.take(2)) // and always opens I–iii
         }
     }
+
+    @Test fun `no 3rd-vs-6th pool is degenerate in any mode or toggle combination`() {
+        // The library alone gave the minor CONTRAST pool exactly one entry once harmonic
+        // minor was off, so 30 % of questions were the same progression over and over.
+        // Every combination must stay varied enough to be a drill.
+        for (mode in TrainingMode.entries) {
+            for (hm in listOf(true, false)) {
+                val primary = EarTraining.thirdSixthPrimaryPool(mode, hm)
+                val contrast = EarTraining.thirdSixthContrastPool(mode, hm)
+                assertTrue(primary.size >= 6, "$mode hm=$hm primary pool only has ${primary.size}")
+                assertTrue(contrast.size >= 4, "$mode hm=$hm contrast pool only has ${contrast.size}")
+            }
+        }
+    }
+
+    @Test fun `every contrast drill entry is a 1-6 move with no degree 3`() {
+        for (p in EarTraining.THIRD_SIXTH_CONTRAST_DRILL) {
+            assertTrue(EarTraining.hasOneSixStep(p.degrees), "${p.mode} ${p.degrees} has no 1↔6 step")
+            assertTrue(3 !in p.degrees, "${p.mode} ${p.degrees} is a foil, so it must not contain degree 3")
+            assertTrue(p.dominantBars.isEmpty(), "${p.mode} ${p.degrees} — drill foils use the natural mode")
+        }
+        assertTrue(EarTraining.THIRD_SIXTH_CONTRAST_DRILL.any { it.mode == TrainingMode.Major })
+        assertTrue(EarTraining.THIRD_SIXTH_CONTRAST_DRILL.any { it.mode == TrainingMode.Minor })
+    }
 }

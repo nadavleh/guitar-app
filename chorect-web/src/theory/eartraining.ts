@@ -259,6 +259,20 @@ export const THIRD_SIXTH_DRILL_PROGRESSIONS: Progression[] = [
   { mode: TrainingMode.Minor, degrees: [1, 6, 3, 4] },   // i–bVI–bIII–iv
 ];
 
+/** Drill-only CONTRAST progressions for the 3rd-vs-6th drill: a 1↔6 move (I→vi, i→bVI,
+ *  or the reverse) and NO degree 3 — the "was that the 6th or the 3rd?" foil. The library
+ *  alone left this pool degenerate: with harmonic minor off there was exactly ONE minor
+ *  entry, so 30 % of questions repeated the same progression. Drill-only, like
+ *  THIRD_SIXTH_DRILL_PROGRESSIONS — no song lists needed. */
+export const THIRD_SIXTH_CONTRAST_DRILL: Progression[] = [
+  { mode: TrainingMode.Major, degrees: [1, 6, 4, 1] },   // I–vi–IV–I
+  { mode: TrainingMode.Major, degrees: [1, 6, 5, 4] },   // I–vi–V–IV
+  { mode: TrainingMode.Major, degrees: [4, 5, 1, 6] },   // IV–V–I–vi (wraps vi→I)
+  { mode: TrainingMode.Minor, degrees: [1, 6, 4, 5] },   // i–bVI–iv–v (natural v)
+  { mode: TrainingMode.Minor, degrees: [1, 6, 7, 5] },   // i–bVI–bVII–v
+  { mode: TrainingMode.Minor, degrees: [1, 6, 4, 1] },   // i–bVI–iv–i
+];
+
 /** Percent of ProgFocus.ThirdVsSixth draws taken from the CONTRAST pool (a 1↔6 move
  *  and no degree 3) rather than the degree-3 pool. Integer percent, not a float, so
  *  the draw uses `rng.int` and matches Kotlin bit-for-bit on a shared seed. */
@@ -301,8 +315,11 @@ export function thirdSixthPrimaryPool(mode: TrainingMode, includeHarmonicMinor =
 /** CONTRAST pool of the 3rd-vs-6th drill: library progressions that make the I↔vi
  *  (i↔bVI) move and contain NO degree 3 — the "is that the 6th or the 3rd?" foil. */
 export function thirdSixthContrastPool(mode: TrainingMode, includeHarmonicMinor = true): Progression[] {
-  return dedupeProgressions(diatonicUniverse(mode, includeHarmonicMinor)
-    .filter((p) => !p.degrees.includes(3) && hasOneSixStep(p.degrees)));
+  return dedupeProgressions([
+    ...THIRD_SIXTH_CONTRAST_DRILL.filter((p) => p.mode === mode),
+    ...diatonicUniverse(mode, includeHarmonicMinor)
+      .filter((p) => !p.degrees.includes(3) && hasOneSixStep(p.degrees)),
+  ]);
 }
 
 /** Pick a random progression for `mode`, using `rng`. `focus` swaps the draw pool:
