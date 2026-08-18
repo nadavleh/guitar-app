@@ -1431,10 +1431,31 @@ export class EarTrainingState {
   /** Seconds one exercise takes at the current tempo, for the on-screen estimate. */
   get carExerciseSeconds(): number {
     const slots = this.progResolved.length || 4;
-    return Math.round((CarMode.exerciseMs(this.progBpm, slots) + CarMode.GAP_MS) / 1000);
+    return Math.trunc((CarMode.exerciseMs(this.progBpm, slots) + CarMode.GAP_MS) / 1000);
   }
 
+  /** The progression-view state car mode borrows and must give back. Drawing an exercise
+   *  overwrites the LIVE progression, and challenge grading reads that live progression
+   *  (`challengeBarCorrect`) rather than `challengeLog` — so without this, running one
+   *  car exercise mid-challenge and returning would score your remaining bars against
+   *  the car-mode progression. The guess arrays themselves were never the problem. */
+  private carSaved: {
+    prog: Progression | null; resolved: ResolvedChord[]; key: PitchClass; mode: TrainingMode;
+    transpose: number; advProg: NamedProgression | null; advRevealed: boolean;
+    barRevealed: Set<number>; keyRevealed: boolean; modeRevealed: boolean;
+    currentBar: number; hasGenerated: boolean; progressionCount: number;
+  } | null = null;
+
   enterCarMode() {
+    // Borrow the progression view, remembering everything an exercise will clobber.
+    this.carSaved = {
+      prog: this.progProgression, resolved: this.progResolved, key: this.progKey,
+      mode: this.progMode, transpose: this.progTranspose, advProg: this.advProg,
+      advRevealed: this.advRevealed, barRevealed: new Set(this.progBarRevealed),
+      keyRevealed: this.keyRevealed, modeRevealed: this.modeRevealed,
+      currentBar: this.currentBar, hasGenerated: this.hasGenerated,
+      progressionCount: this.progressionCount,
+    };
     this.earMode = EarMode.Car;
     this.carPhase = CarPhase.Idle;
     this.carRound = 0;
@@ -1445,6 +1466,24 @@ export class EarTrainingState {
 
   exitCarMode() {
     this.stopCarExercise();
+    const sv = this.carSaved;
+    if (sv) {
+      this.progProgression = sv.prog;
+      this.progResolved = sv.resolved;
+      this.progKey = sv.key;
+      this.progMode = sv.mode;
+      this.progTranspose = sv.transpose;
+      this.advProg = sv.advProg;
+      this.advRevealed = sv.advRevealed;
+      this.progBarRevealed = sv.barRevealed;
+      this.keyRevealed = sv.keyRevealed;
+      this.modeRevealed = sv.modeRevealed;
+      this.currentBar = sv.currentBar;
+      this.hasGenerated = sv.hasGenerated;
+      // Car exercises are not practice: they must not inflate the practice counter.
+      this.progressionCount = sv.progressionCount;
+      this.carSaved = null;
+    }
     this.earMode = EarMode.Challenge;
     this.notify();
   }
@@ -1508,6 +1547,12 @@ export class EarTrainingState {
     if (this.carCancelled(token)) return;
 
     for (let round = 1; round <= CarMode.ROUNDS; round++) {
+      // Checked HERE, not just inside the bar loop: a stale frame resuming from the last
+      // `sleep` of a round would otherwise increment `round` and stamp carRound/carPhase
+      // after a Stop — revealing one more slot than the freeze is supposed to show, and
+      // on the final round handing over the complete answer. Android is immune because
+      // coroutine cancellation unwinds at `delay`; the web token model must check.
+      if (this.carCancelled(token)) return;
       this.carRound = round;            // round 1 → 0 revealed … round 5 → 4 revealed
       this.carPhase = CarPhase.Playing;
       this.notify();
@@ -1524,6 +1569,7 @@ export class EarTrainingState {
       }
     }
 
+    if (this.carCancelled(token)) return;   // a Stop in the last bar must not reveal all
     this.carRound = CarMode.ROUNDS;      // keep the full reveal on screen
     this.carPhase = CarPhase.Between;
     this.isLooping = false;

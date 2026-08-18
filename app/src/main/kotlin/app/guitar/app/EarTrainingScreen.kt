@@ -3146,7 +3146,10 @@ private fun CarModeView(state: AppState, ear: EarTrainingState) {
                 val chars = ear.carLongestLabel.coerceAtLeast(1)
                 val byWidth = perSlot.value * 0.80f / (0.62f * chars)
                 val byHeight = maxHeight.value * 0.5f
-                val labelSp = minOf(byWidth, byHeight).coerceIn(16f, 132f).sp
+                // No lower clamp: byWidth is already the largest size that FITS, and
+                // coercing it UP re-introduced clipping on the 6-8 chord advanced
+                // progressions (7 slots, a 5-glyph "#IV°7" wants ~13sp in a ~44dp slot).
+                val labelSp = minOf(byWidth, byHeight).coerceAtMost(132f).coerceAtLeast(8f).sp
                 Row(
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),

@@ -166,7 +166,7 @@ This matches a standard light gauge (.010-.046) acoustic/electric set. We don't 
 > / `SignalTabRail`, Material icons — no emoji). Portrait gets a bottom `SignalTabBar`;
 > landscape gets a compact `SignalTabRail` on the left; both share one `TabBarItem`
 > composable so they can't drift. Exactly **4 user-chosen tabs** (from `AppState.tabOrder`,
-> default Neck/Ear/Rhythm/Loop, reorderable in Settings → Personalize) plus a fixed
+> default Neck/Ear/Rhythm/Tuner, reorderable in Settings → Personalize) plus a fixed
 > **More** slot for everything else (Tuner, Decompose, Challenge Stats, Settings). Neck
 > (the bare fretboard) is the implicit home screen and reads as selected whenever no
 > sheet is open, matching the rail's old "Fretboard active when nothing else is" rule.

@@ -2,7 +2,10 @@
 
 Every chord progression the ear-training trainer can generate, by category, plus the
 cavaquinho functional sequences. Roman numerals are relative to the key; minor degrees are
-named against the major scale (bIII/bVI/bVII). Auto-generated from the theory engine.
+named against the major scale (bIII/bVI/bVII).
+
+**Hand-maintained** — there is no generator for this file. Update it by hand from
+`theory/.../EarTraining.kt` + `chorect-web/src/theory/eartraining.ts` when the pools change.
 
 ## Diatonic — Major (18)
 

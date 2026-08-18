@@ -251,15 +251,35 @@ export class EarTrainingUI {
   // ---------- Car mode (hands-free progression drill) ----------
 
   private carWake: WakeLockHandle | null = null;
+  private carWakePending = false;
+  private carWakeUnavailable = false;
   private carVisListener: (() => void) | null = null;
 
   /** Hold a screen wake lock while car mode is on screen, and release it when it
    *  isn't. Also registers the visibility handler that stops an exercise when the
    *  tab is hidden: background tabs clamp setTimeout to >=1s, which would smear the
    *  bar grid into nonsense. */
+  /** Release the wake lock and stop any running exercise — called when the route changes
+   *  away from the Ear screen. Car mode renders no Back button, so without this the lock
+   *  (and the visibilitychange listener) survived on every other tool indefinitely. */
+  leaveCarMode(): void {
+    this.ear.stopCarExercise();
+    this.applyCarWakeLock(false);
+  }
+
   private applyCarWakeLock(on: boolean): void {
     if (on) {
-      if (!this.carWake) void acquireWakeLock().then((h) => { this.carWake = h; });
+      // `carWake` is only assigned when the request RESOLVES, so guarding on it alone let
+      // two renders inside that window each acquire a sentinel — the second overwrote the
+      // first, which then leaked. `carWakeUnavailable` stops re-requesting forever on a
+      // browser without the API (car mode re-renders once per bar).
+      if (!this.carWake && !this.carWakePending && !this.carWakeUnavailable) {
+        this.carWakePending = true;
+        void acquireWakeLock().then((h) => {
+          this.carWakePending = false;
+          if (h) this.carWake = h; else this.carWakeUnavailable = true;
+        });
+      }
       if (!this.carVisListener) {
         const onVis = () => {
           if (document.hidden) {

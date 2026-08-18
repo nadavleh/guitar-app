@@ -12,7 +12,7 @@ import { FretboardCanvas, FretboardData } from "./fretboardCanvas";
 import { inputDispatchReport } from "./inputLatencyProbe";
 import { computeMarks, scaleInfo, intervalName, shapeMarks } from "./marks";
 import { TunerState } from "./tunerState";
-import { EarTrainingState, EarSubMode } from "./earTrainingState";
+import { EarTrainingState, EarSubMode, EarMode } from "./earTrainingState";
 import { EarTrainingUI } from "./earTrainingUI";
 import { SambaLooperState } from "./sambaLooperState";
 import { BlocksState } from "./blocksState";
@@ -477,7 +477,9 @@ export class App {
       if (e.code === "Space") {
         if (sheet === Sheet.SambaLooper) { e.preventDefault(); this.sambaUI.togglePlay(); }
         else if (sheet === Sheet.Loop) { e.preventDefault(); if (this.loop.isLooping) this.loop.stopLoop(); else this.loop.startLoop(); }
-        else if (sheet === Sheet.EarTraining && this.ear.progSubMode === EarSubMode.Progression) { e.preventDefault(); if (this.ear.isLooping) this.ear.stopLoop(); else this.ear.startLoop(); }
+        // Car mode excluded: it drives its own clock, and startLoop() here would run the
+        // endless practice looper alongside it (two clocks, doubled chords).
+        else if (sheet === Sheet.EarTraining && this.ear.progSubMode === EarSubMode.Progression && this.ear.earMode !== EarMode.Car) { e.preventDefault(); if (this.ear.isLooping) this.ear.stopLoop(); else this.ear.startLoop(); }
         else if (sheet === Sheet.CavaqProgressions) { e.preventDefault(); this.cavaq.toggle(); }
         else if (sheet === Sheet.RhythmUnits) { e.preventDefault(); this.rhythmUnits.toggle(); }
         else if (sheet === Sheet.Metronome) { e.preventDefault(); this.metronome.toggle(); }
@@ -497,7 +499,8 @@ export class App {
 
       // Ear-training PRACTICE progression: ←/→ prev/next, digits play a bar.
       // (Challenge bar navigation lives in EarTrainingUI's own handler.)
-      if (sheet === Sheet.EarTraining && this.ear.progSubMode === EarSubMode.Progression && !this.ear.challengeActive) {
+      if (sheet === Sheet.EarTraining && this.ear.progSubMode === EarSubMode.Progression &&
+          !this.ear.challengeActive && this.ear.earMode !== EarMode.Car) {
         const adv = this.ear.specialProgMode;
         if (e.key === "ArrowLeft") { e.preventDefault(); if (adv) this.ear.previousAdvancedProgression(); else this.ear.previousProgression(); }
         else if (e.key === "ArrowRight") { e.preventDefault(); if (adv) this.ear.nextAdvancedProgression(); else this.ear.nextProgression(); }
@@ -591,7 +594,14 @@ export class App {
       this.tuner = null;
     }
     // Leaving the Ear screen halts its looper but keeps all state (Kotlin DisposableEffect).
-    if (route !== Sheet.EarTraining && this.ear.isLooping) this.ear.stopLoop();
+    // NOT gated on isLooping: the car driver clears that flag before its silent
+    // auto-advance gap, so a gated check let the chain survive a tab change and then draw
+    // a new progression while another tool was on screen. Android's onDispose is
+    // unconditional for the same reason.
+    if (route !== Sheet.EarTraining) {
+      if (this.ear.earMode === EarMode.Car) this.earUI.leaveCarMode();
+      else if (this.ear.isLooping) this.ear.stopLoop();
+    }
     if (route !== Sheet.SambaLooper && this.samba.isPlaying) this.samba.stop();
     if (route !== Sheet.SambaLooper && this.drumBlocks.isPlaying) this.drumBlocks.stop();
     if (route !== Sheet.CavaqProgressions && this.cavaq.isPlaying) this.cavaq.stop();

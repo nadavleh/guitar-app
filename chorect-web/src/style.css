@@ -1299,7 +1299,10 @@ select.et-select {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  font-size: clamp(16px, var(--car-lab, 34vh), 132px);
+  /* No floor: --car-lab is already the largest size that FITS (computed from the slot
+     count and the longest label). Clamping it up re-introduced clipping on 6-8 chord
+     advanced progressions, where being small but complete beats being big but cut. */
+  font-size: min(var(--car-lab, 34vh), 132px);
   white-space: nowrap;
 }
 .car-slot .lab.hidden { opacity: 0.45; }

@@ -289,7 +289,7 @@ Chorect/
 │       ├── LegacyAudioTrackEngine.kt + SwitchableAudioEngine.kt  # A/B engine toggle
 │       ├── VoiceMixer.kt Freeverb.kt Panner.kt ThreeBandEq.kt    # mixer bus + effects
 │       ├── PluckedSynth.kt                    # pure-Kotlin Karplus-Strong DSP
-│       ├── SampleInstrument.kt + GuitarBankLoader.kt  # multisample player + bundled guitar banks
+│       ├── SampleInstrument.kt          # multisample player (GuitarBankLoader.kt is in app/)
 │       ├── PercussionSynth.kt                 # pure-Kotlin percussion voices (synth fallback)
 │       ├── WavDecoder.kt                       # RIFF/WAVE → mono 44.1 kHz, for bundled samples
 │       ├── PitchDetector.kt PitchAnalysis.kt  # pure-Kotlin YIN + Hz↔MIDI↔cents (configurable A4)

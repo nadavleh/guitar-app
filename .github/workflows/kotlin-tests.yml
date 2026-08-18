@@ -1,0 +1,50 @@
+name: Kotlin tests
+
+# The web port has been gated by CI for a while (deploy-web.yml runs tsc + verify),
+# but the ~940 Kotlin unit tests ran ONLY on the dev machine — so an Android-only
+# commit got zero automated verification. This closes that asymmetry.
+#
+# :theory is a plain kotlin-jvm module (a JDK is enough). :audio is an android-library,
+# and ubuntu-latest ships the Android SDK preinstalled, so it needs no extra setup.
+# :app is deliberately excluded — it has no test source set, and assembling it here
+# would just burn minutes.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "theory/**"
+      - "audio/**"
+      - "gradle/**"
+      - "**/*.gradle.kts"
+      - "gradle.properties"
+      - ".github/workflows/kotlin-tests.yml"
+  pull_request:
+    paths:
+      - "theory/**"
+      - "audio/**"
+      - "gradle/**"
+      - "**/*.gradle.kts"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests (theory + audio)
+        run: ./gradlew --no-daemon :theory:test :audio:test
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            theory/build/reports/tests/
+            audio/build/reports/tests/
+          if-no-files-found: ignore

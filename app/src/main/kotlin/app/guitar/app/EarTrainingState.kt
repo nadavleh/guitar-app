@@ -1682,7 +1682,46 @@ class EarTrainingState(
             return ((CarMode.exerciseMs(progBpm, slots) + CarMode.GAP_MS) / 1000).toInt()
         }
 
+    /** The progression-view state car mode borrows and must give back. Drawing an exercise
+     *  overwrites the LIVE progression, and challenge grading reads that live progression
+     *  ([challengeBarCorrect]) rather than [challengeLog] — so without this, running one
+     *  car exercise mid-challenge and returning would score your remaining bars against
+     *  the car-mode progression. The guess arrays themselves were never the problem. */
+    private data class CarSaved(
+        val prog: Progression?,
+        val resolved: List<ResolvedChord>,
+        val key: PitchClass,
+        val mode: TrainingMode,
+        val transpose: Int,
+        val advProg: EarTraining.NamedProgression?,
+        val advRevealed: Boolean,
+        val barRevealed: Set<Int>,
+        val keyRevealed: Boolean,
+        val modeRevealed: Boolean,
+        val currentBar: Int,
+        val hasGenerated: Boolean,
+        val progressionCount: Int,
+    )
+
+    private var carSaved: CarSaved? = null
+
     fun enterCarMode() {
+        // Borrow the progression view, remembering everything an exercise will clobber.
+        carSaved = CarSaved(
+            prog = progProgression,
+            resolved = progResolved,
+            key = progKey,
+            mode = progMode,
+            transpose = progTranspose,
+            advProg = advProg,
+            advRevealed = advRevealed,
+            barRevealed = progBarRevealed.toSet(),
+            keyRevealed = keyRevealed,
+            modeRevealed = modeRevealed,
+            currentBar = currentBar,
+            hasGenerated = hasGenerated,
+            progressionCount = progressionCount,
+        )
         earMode = EarMode.Car
         carPhase = CarPhase.Idle
         carRound = 0
@@ -1692,6 +1731,23 @@ class EarTrainingState(
 
     fun exitCarMode() {
         stopCarExercise()
+        carSaved?.let { sv ->
+            progProgression = sv.prog
+            progResolved = sv.resolved
+            progKey = sv.key
+            progMode = sv.mode
+            progTranspose = sv.transpose
+            advProg = sv.advProg
+            advRevealed = sv.advRevealed
+            progBarRevealed = sv.barRevealed
+            keyRevealed = sv.keyRevealed
+            modeRevealed = sv.modeRevealed
+            currentBar = sv.currentBar
+            hasGenerated = sv.hasGenerated
+            // Car exercises are not practice: they must not inflate the practice counter.
+            progressionCount = sv.progressionCount
+            carSaved = null
+        }
         earMode = EarMode.Challenge
     }
 
