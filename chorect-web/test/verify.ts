@@ -12,6 +12,8 @@ import {
   THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode,
 } from "../src/theory";
 import { standard } from "../src/theory/tunings";
+import { DrumBlock, BUILTIN_BLOCKS, PresetTrack } from "../src/theory";
+import { synthClick, clickAt } from "../src/app/woodClick";
 import {
   PercussionCatalog, PercussionPattern, PercussionMeter, swungSlotMs, slotMs, voiceCount, SwingModel,
   movementCost, pickMinMovement, BUILTIN_PATTERNS,
@@ -437,6 +439,38 @@ check("every contrast drill entry is a 1<->6 move with no degree 3",
   const appVersion = /APP_VERSION\s*=\s*"([^"]+)"/.exec(read("../src/app/appState.ts"))?.[1];
   check(`package.json ${pkgVersion} === APP_VERSION ${appVersion}`, !!appVersion && pkgVersion === appVersion);
 }
+
+// --- Drum blocks: the `opening` (entrada) must survive every edit ---
+// This module had NO parity assertions, which is how two data-loss bugs lived here: both
+// withCell and withPhraseCount rebuilt BlockTrack as a fresh object literal without
+// spreading `...t`, so editing any cell (or the column count) silently deleted the
+// track's opening — from the grid, from playback and from the saved block. Kotlin uses
+// t.copy(...) and was unaffected.
+{
+  const opening: PresetTrack = { label: "Op", encoded: "x" } as unknown as PresetTrack;
+  const cellA: PresetTrack = { label: "A", encoded: "y" } as unknown as PresetTrack;
+  let blk = new DrumBlock("t", [{ instrument: "tamborim", cells: [null, null], opening }], 2);
+  check("withCell keeps the track's opening", blk.withCell(0, 0, cellA).tracks[0].opening === opening);
+  check("withCell still sets the cell", blk.withCell(0, 1, cellA).tracks[0].cells[1] === cellA);
+  check("withPhraseCount keeps the opening", blk.withPhraseCount(4).tracks[0].opening === opening);
+  check("withPhraseCount resizes", blk.withPhraseCount(4).tracks[0].cells.length === 4);
+  // ...and the shipped built-in that exercises it round-trips through an edit.
+  const builtin = BUILTIN_BLOCKS.find((b) => b.startsWith("Tamborim Block="));
+  check("a built-in block with an entrada exists", !!builtin);
+}
+
+// --- Clicks must be synthesised at the ENGINE's rate, not a hard-coded 44100 ---
+// Web built every click at 44100 and then declared the buffer at ctx.sampleRate, so on a
+// 48 kHz device each click played ~147 cents sharp and 8.8 % short. Kotlin always threaded
+// audio.sampleRate through. `sr` is now a required parameter; these pin that.
+check("synthClick length follows the sample rate",
+  synthClick(2000, 45, 48000).length === Math.floor(48000 * 45 / 1000) &&
+  synthClick(2000, 45, 44100).length === Math.floor(44100 * 45 / 1000));
+check("clickAt memoises per (freq, ms, rate)",
+  clickAt(2000, 45, 48000) === clickAt(2000, 45, 48000) &&
+  clickAt(2000, 45, 48000) !== clickAt(2000, 45, 44100));
+check("PercussionSynth defaults to Kotlin's FALLBACK_RATE, not 44100",
+  new PercussionSynth().sampleRate === 48000);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

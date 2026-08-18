@@ -3,6 +3,7 @@
 // downbeats accented), and publishes currentSlot for the notation + grid playheads.
 
 import { WebAudioEngine } from "../audio";
+import { clickAt } from "./woodClick";
 import {
   RhythmPhrase, generatePhrase, phraseOnsets, phraseTotalSlots, SLOTS_PER_BEAT,
   PHRASE_MIN_BARS, PHRASE_MAX_BARS, PHRASE_TIME_SIGNATURES,
@@ -30,17 +31,13 @@ export class RhythmPhraseState {
 
   private token = 0;
   private onsetAccent = new Map<number, boolean>();
-  private readonly click: Float32Array;
-  private readonly accentClick: Float32Array;
-  private readonly mClick: Float32Array;
-  private readonly mAccent: Float32Array;
+  constructor(private deps: RhythmPhraseDeps) {}
 
-  constructor(private deps: RhythmPhraseDeps) {
-    this.click = synthClick(2000, 45);
-    this.accentClick = synthClick(2800, 45);
-    this.mClick = synthClick(1000, 45);
-    this.mAccent = synthClick(1400, 45);
-  }
+  /** Clicks are built lazily at the ENGINE's rate — see clickAt(). */
+  private get click(): Float32Array { return clickAt(2000, 45, this.deps.audio.sampleRate); }
+  private get accentClick(): Float32Array { return clickAt(2800, 45, this.deps.audio.sampleRate); }
+  private get mClick(): Float32Array { return clickAt(1000, 45, this.deps.audio.sampleRate); }
+  private get mAccent(): Float32Array { return clickAt(1400, 45, this.deps.audio.sampleRate); }
 
   generate(): void {
     this.stop();
@@ -108,14 +105,3 @@ export class RhythmPhraseState {
   }
 }
 
-function synthClick(freqHz: number, ms: number): Float32Array {
-  const sr = 44100;
-  const n = Math.floor((sr * ms) / 1000);
-  const buf = new Float32Array(n);
-  const w = (2 * Math.PI * freqHz) / sr;
-  for (let i = 0; i < n; i++) {
-    const env = Math.exp((-6 * i) / n);
-    buf[i] = Math.sin(w * i) * env * 0.7;
-  }
-  return buf;
-}

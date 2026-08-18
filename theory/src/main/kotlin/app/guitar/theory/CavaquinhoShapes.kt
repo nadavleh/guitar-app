@@ -59,18 +59,18 @@ internal object CavaquinhoTemplates {
 
         // ---- Dominant 7: R, 3, 5, ♭7 (drop-2 inversions) ----
         val dom7 = listOf(
-            CavaqVoicing("7 root-pos (5-R-3-♭7)",      rootString = 1,
+            CavaqVoicing("7 root-pos (5-R-3-b7)",      rootString = 1,
                 offsets = listOf( 0,  0,  0, +1)),
-            CavaqVoicing("7 1st-inv (♭7-3-5-R)",       rootString = 3,
+            CavaqVoicing("7 1st-inv (b7-3-5-R)",       rootString = 3,
                 offsets = listOf( 0, +1,  0,  0)),
-            CavaqVoicing("7 2nd-inv (R-5-♭7-3)",       rootString = 0,
+            CavaqVoicing("7 2nd-inv (R-5-b7-3)",       rootString = 0,
                 offsets = listOf( 0, +2, +1, +2)),
-            CavaqVoicing("7 3rd-inv (3-♭7-R-5)",       rootString = 2,
+            CavaqVoicing("7 3rd-inv (3-b7-R-5)",       rootString = 2,
                 offsets = listOf(+1, +2,  0, +2)),
             // Rootless: 3-♭7-3-5 with the root dropped.
             //   For C7 at X=5 (G-5=C):  2 3 5 3
             //     D-2=E(3) · G-3=B♭(♭7) · B-5=E(3 oct) · e-3=G(5) — every note is a C7 chord tone.
-            CavaqVoicing("7 rootless (3-♭7-3-5)",      rootString = 1,
+            CavaqVoicing("7 rootless (3-b7-3-5)",      rootString = 1,
                 offsets = listOf(-3, -2,  0, -2)),
         )
 
@@ -93,36 +93,36 @@ internal object CavaquinhoTemplates {
 
         // ---- Minor 7: R, ♭3, 5, ♭7 ----
         val m7 = listOf(
-            CavaqVoicing("m7 root-pos (5-R-♭3-♭7)",    rootString = 1,
+            CavaqVoicing("m7 root-pos (5-R-b3-b7)",    rootString = 1,
                 offsets = listOf( 0,  0, -1, +1)),
             // Freddie-Green box — all four strings on the same fret.
-            CavaqVoicing("m7 Freddie-Green (♭7-♭3-5-R)", rootString = 3,
+            CavaqVoicing("m7 Freddie-Green (b7-b3-5-R)", rootString = 3,
                 offsets = listOf( 0,  0,  0,  0)),
-            CavaqVoicing("m7 2nd-inv (R-5-♭7-♭3)",     rootString = 0,
+            CavaqVoicing("m7 2nd-inv (R-5-b7-b3)",     rootString = 0,
                 offsets = listOf( 0, +2, +1, +1)),
-            CavaqVoicing("m7 3rd-inv (♭3-♭7-R-5)",     rootString = 2,
+            CavaqVoicing("m7 3rd-inv (b3-b7-R-5)",     rootString = 2,
                 offsets = listOf( 0, +2,  0, +2)),
             // Rootless: ♭3-♭7-♭3-5 with the root dropped.
             //   For Cm7 at X=5 (G-5=C):  1 3 4 3
             //     D-1=E♭(♭3) · G-3=B♭(♭7) · B-4=E♭(♭3 oct) · e-3=G(5) — all Cm7 chord tones.
-            CavaqVoicing("m7 rootless (♭3-♭7-♭3-5)",   rootString = 1,
+            CavaqVoicing("m7 rootless (b3-b7-b3-5)",   rootString = 1,
                 offsets = listOf(-4, -2, -1, -2)),
         )
 
         // ---- Half-diminished m7♭5: R, ♭3, ♭5, ♭7 ----
         val m7b5 = listOf(
-            CavaqVoicing("m7♭5 root-pos (♭5-R-♭3-♭7)", rootString = 1,
+            CavaqVoicing("m7b5 root-pos (b5-R-b3-b7)", rootString = 1,
                 offsets = listOf(-1,  0, -1, +1)),
-            CavaqVoicing("m7♭5 1st-inv (♭7-♭3-♭5-R)",  rootString = 3,
+            CavaqVoicing("m7b5 1st-inv (b7-b3-b5-R)",  rootString = 3,
                 offsets = listOf( 0,  0, -1,  0)),
-            CavaqVoicing("m7♭5 2nd-inv (R-♭5-♭7-♭3)",  rootString = 0,
+            CavaqVoicing("m7b5 2nd-inv (R-b5-b7-b3)",  rootString = 0,
                 offsets = listOf( 0, +1, +1, +1)),
-            CavaqVoicing("m7♭5 3rd-inv (♭3-♭7-R-♭5)",  rootString = 2,
+            CavaqVoicing("m7b5 3rd-inv (b3-b7-R-b5)",  rootString = 2,
                 offsets = listOf( 0, +2,  0, +1)),
             // 5-fret stretch with root on the low D string (the user's example):
             //   Am7♭5 = 7 5 4 3. D-7=A(R), G-5=C(♭3), B-4=E♭(♭5), e-3=G(♭7).
             //   Anchor: rootString=0 (D), X=7 for A. Offsets: 0, -2, -3, -4.
-            CavaqVoicing("m7♭5 (5-fret stretch, R-♭3-♭5-♭7)", rootString = 0,
+            CavaqVoicing("m7b5 (5-fret stretch, R-b3-b5-b7)", rootString = 0,
                 offsets = listOf( 0, -2, -3, -4)),
         )
 
@@ -134,7 +134,7 @@ internal object CavaquinhoTemplates {
             // counterpart of the m7♭5 voicing above (♭♭7 instead of ♭7).
             //   Adim7 = 7 5 4 2. D-7=A(R), G-5=C(♭3), B-4=E♭(♭5), e-2=F♯(♭♭7).
             //   Anchor: rootString=0 (D), X=7 for A. Offsets: 0, -2, -3, -5.
-            CavaqVoicing("dim7 (5-fret stretch, R-♭3-♭5-♭♭7)", rootString = 0,
+            CavaqVoicing("dim7 (5-fret stretch, R-b3-b5-bb7)", rootString = 0,
                 offsets = listOf( 0, -2, -3, -5)),
         )
 
@@ -152,13 +152,13 @@ internal object CavaquinhoTemplates {
 
         // ---- m6: R, ♭3, 5, 6 ----
         val minor6 = listOf(
-            CavaqVoicing("m6 root-pos (5-R-♭3-6)",     rootString = 1,
+            CavaqVoicing("m6 root-pos (5-R-b3-6)",     rootString = 1,
                 offsets = listOf( 0,  0, -1,  0)),
-            CavaqVoicing("m6 1st-inv (6-♭3-5-R)",      rootString = 3,
+            CavaqVoicing("m6 1st-inv (6-b3-5-R)",      rootString = 3,
                 offsets = listOf(-1,  0,  0,  0)),
-            CavaqVoicing("m6 2nd-inv (R-5-6-♭3)",      rootString = 0,
+            CavaqVoicing("m6 2nd-inv (R-5-6-b3)",      rootString = 0,
                 offsets = listOf( 0, +2,  0, +1)),
-            CavaqVoicing("m6 3rd-inv (♭3-6-R-5)",      rootString = 2,
+            CavaqVoicing("m6 3rd-inv (b3-6-R-5)",      rootString = 2,
                 offsets = listOf( 0, +1,  0, +2)),
         )
 
@@ -235,9 +235,9 @@ fun cavaquinhoVoicingPool(
     }
     if (candidates.any { it.isEmpty() }) return emptyList()
 
-    val complete = HashMap<List<Int>, ChordShape>()
-    val rootless = HashMap<List<Int>, ChordShape>()
-    val shell = HashMap<List<Int>, ChordShape>()
+    val complete = LinkedHashMap<List<Int>, ChordShape>()
+    val rootless = LinkedHashMap<List<Int>, ChordShape>()
+    val shell = LinkedHashMap<List<Int>, ChordShape>()
 
     fun consider(frets: List<Int>) {
         val notes = frets.mapIndexed { s, f -> Fretboard.noteAt(tuning, FretPosition(s, f)) }

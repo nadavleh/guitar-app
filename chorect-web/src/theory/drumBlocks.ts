@@ -44,7 +44,7 @@ export class DrumBlock {
   withPhraseCount(n: number): DrumBlock {
     const c = Math.min(Math.max(n, 1), MAX_BLOCK_PHRASES);
     return new DrumBlock(this.name, this.tracks.map((t) => ({
-      instrument: t.instrument,
+      ...t,   // MUST spread: rebuilding the literal dropped `opening` on EVERY track
       cells: Array.from({ length: c }, (_, i) => t.cells[i] ?? null),
     })), c);
   }
@@ -69,7 +69,7 @@ export class DrumBlock {
   withCell(track: number, col: number, phrase: PresetTrack | null): DrumBlock {
     if (track < 0 || track >= this.tracks.length || col < 0 || col >= this.phraseCount) return this;
     const tracks = this.tracks.map((t, i) => i !== track ? t : {
-      instrument: t.instrument,
+      ...t,   // MUST spread: rebuilding the literal dropped `opening` (Kotlin uses t.copy)
       cells: t.cells.map((c, j) => (j === col ? phrase : c)),
     });
     return new DrumBlock(this.name, tracks, this.phraseCount);

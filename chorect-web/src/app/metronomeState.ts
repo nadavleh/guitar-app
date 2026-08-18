@@ -4,7 +4,7 @@
 // counter cancels the async loop (same pattern as RhythmUnitState).
 
 import { WebAudioEngine } from "../audio";
-import { synthClick, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
+import { clickAt, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -28,13 +28,12 @@ export class MetronomeState {
   currentBeat = -1;
 
   private token = 0;
-  private readonly click: Float32Array;
-  private readonly accent: Float32Array;
 
-  constructor(private deps: MetronomeDeps) {
-    this.click = synthClick(BEAT_CLICK_HZ, 45);
-    this.accent = synthClick(ACCENT_CLICK_HZ, 45);
-  }
+  constructor(private deps: MetronomeDeps) {}
+
+  /** Clicks are built lazily at the ENGINE's rate — see clickAt(). */
+  private get click(): Float32Array { return clickAt(BEAT_CLICK_HZ, 45, this.deps.audio.sampleRate); }
+  private get accent(): Float32Array { return clickAt(ACCENT_CLICK_HZ, 45, this.deps.audio.sampleRate); }
 
   toggle(): void { if (this.isPlaying) this.stop(); else this.start(); }
 

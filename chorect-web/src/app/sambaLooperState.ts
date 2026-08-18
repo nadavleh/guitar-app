@@ -9,7 +9,7 @@ import {
   renderPercussion, encodeWavMono16, PercussionRenderResult,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
-import { synthClick, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
+import { clickAt, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
 import { pandeiroEq } from "./pandeiroEq";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -135,8 +135,9 @@ export class SambaLooperState {
   }
   /** Overlay a wood-click metronome on the loop (higher click on each bar's "1"). */
   metronomeOn = false;
-  private readonly mClick = synthClick(BEAT_CLICK_HZ, 45);
-  private readonly mAccent = synthClick(ACCENT_CLICK_HZ, 45);
+  /** Clicks are built lazily at the ENGINE's rate — see clickAt(). */
+  private get mClick(): Float32Array { return clickAt(BEAT_CLICK_HZ, 45, this.deps.audio.sampleRate); }
+  private get mAccent(): Float32Array { return clickAt(ACCENT_CLICK_HZ, 45, this.deps.audio.sampleRate); }
   toggleMetronome() { this.metronomeOn = !this.metronomeOn; this.notify(); }
 
   // ---- track selection + voice brush (the bottom palette) ----
@@ -225,7 +226,9 @@ export class SambaLooperState {
     for (const s of buf) { const a = Math.abs(s); if (a > peak) peak = a; }
     let i = 0;
     if (peak > 0) { const th = peak * 0.9; while (i < buf.length && Math.abs(buf[i]) < th) i++; }
-    const sec = i / 44100;
+    // Kotlin's peakOffsetFrames stays in frames and compares against sr/50; using a
+    // fixed 44100 here overestimated the crescendo pre-roll by 8.8 % on a 48 kHz engine.
+    const sec = i / this.deps.audio.sampleRate;
     this.peakOffsetCache.set(k, sec);
     return sec;
   }
@@ -236,7 +239,14 @@ export class SambaLooperState {
   volumes = new Map<string, number>();
 
   private token = 0;
-  private synth = new PercussionSynth();
+  // Lazily built at the ENGINE's rate (Kotlin: PercussionSynth(audio.sampleRate)). The
+  // default made the synthesised fallback voices 8.8 % sharp on a 48 kHz context.
+  private synthAt: { sr: number; synth: PercussionSynth } | null = null;
+  private get synth(): PercussionSynth {
+    const sr = this.deps.audio.sampleRate;
+    if (!this.synthAt || this.synthAt.sr !== sr) this.synthAt = { sr, synth: new PercussionSynth(sr) };
+    return this.synthAt.synth;
+  }
   private synthCache = new Map<string, Float32Array>();
   private loadedSamples = new Map<string, Float32Array>();
   private requestedSampleKits = new Set<string>();

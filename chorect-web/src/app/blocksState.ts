@@ -17,7 +17,7 @@ import {
   PERCUSSION_ACCENT, PERCUSSION_DYN, PERCUSSION_DYN_FACTORS, voiceCount,
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
-import { synthClick, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
+import { clickAt, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -56,13 +56,21 @@ export class BlocksState {
   metronomeOn = false;
   /** Play a 2-beat count-in (16th ticks, downbeats accented) before the loop starts. */
   countIn = false;
-  private readonly mClick = synthClick(BEAT_CLICK_HZ, 45);
-  private readonly mAccent = synthClick(ACCENT_CLICK_HZ, 45);
+  /** Clicks are built lazily at the ENGINE's rate — see clickAt(). */
+  private get mClick(): Float32Array { return clickAt(BEAT_CLICK_HZ, 45, this.deps.audio.sampleRate); }
+  private get mAccent(): Float32Array { return clickAt(ACCENT_CLICK_HZ, 45, this.deps.audio.sampleRate); }
   toggleMetronome() { this.metronomeOn = !this.metronomeOn; this.notify(); }
   toggleCountIn() { this.countIn = !this.countIn; this.notify(); }
 
   private token = 0;
-  private synth = new PercussionSynth();
+  // Lazily built at the ENGINE's rate (Kotlin: PercussionSynth(audio.sampleRate)). The
+  // default 44100 made the synthesised fallback voices 8.8 % sharp on a 48 kHz context.
+  private synthAt: { sr: number; synth: PercussionSynth } | null = null;
+  private get synth(): PercussionSynth {
+    const sr = this.deps.audio.sampleRate;
+    if (!this.synthAt || this.synthAt.sr !== sr) this.synthAt = { sr, synth: new PercussionSynth(sr) };
+    return this.synthAt.synth;
+  }
   private synthCache = new Map<string, Float32Array>();
   private loadedSamples = new Map<string, Float32Array>();
   private requestedSampleKits = new Set<string>();

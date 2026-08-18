@@ -874,7 +874,7 @@ object EarWorkout {
             listOf(
                 ses(53, "A whole tune out of one cell", sg("Take the 'A' Train", "Duke Ellington"),
                     "One bright chromatic chord inside an otherwise plain A section — find it and name its target.",
-                    "Diatonic ii7 against a chromatic II7 (the famous one). This is the same discrimination bossa will need.",
+                    "Diatonic ii7 against a chromatic II7 (the famous one). The same discrimination bossa will need.",
                     "A-section melody; it outlines the chromatic chord for you.",
                     "Harmonize the A section diatonically, then insert the chromatic dominant.",
                     "The chromatic chord located and named by target, in time.",

@@ -18,7 +18,10 @@ function mulberry32(seed: number): () => number {
 const TAU = Math.PI * 2;
 
 export class PercussionSynth {
-  constructor(public readonly sampleRate = 44100) {}
+  // Mirrors Kotlin `PercussionSynth(sampleRate: Int = AudioRates.FALLBACK_RATE)` — 48000,
+  // not 44100. Every real call site passes the live engine rate; this default only
+  // applies to tests, and it must match Kotlin's so their output is comparable.
+  constructor(public readonly sampleRate = 48000) {}
 
   synthesize(instrument: PercussionInstrument, voiceIndex: number): Float32Array {
     // Duplicated tracks ("surdo#2") synthesize like their base instrument.
