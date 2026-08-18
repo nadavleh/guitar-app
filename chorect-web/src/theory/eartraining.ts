@@ -5,6 +5,11 @@ import { Rng, defaultRng } from "./random";
 
 export enum TrainingMode { Major = "Major", Minor = "Minor" }
 
+/** Which pool the progression generator draws from. `None` is the standard diatonic
+ *  library; the others are focused recognition drills that stay in the SAME diatonic
+ *  multiple-choice flow and only swap the draw pool. Mirrors Kotlin ProgFocus. */
+export enum ProgFocus { None = "None", Iiii = "Iiii", ThirdVsSixth = "ThirdVsSixth" }
+
 export enum ChordTypeLevel { Triads = "Triads", Sevenths = "Sevenths", Extended = "Extended" }
 
 export const ChordTypeLevelName: Record<ChordTypeLevel, string> = {
@@ -236,8 +241,81 @@ export const III_FOCUS_PROGRESSIONS: Progression[] = [
   { mode: TrainingMode.Major, degrees: [1, 3, 1, 4] },   // I–iii–I–IV
 ];
 
-export function randomProgression(mode: TrainingMode, rng: Rng = defaultRng, focusIiii = false, includeHarmonicMinor = true): Progression {
-  if (focusIiii) return III_FOCUS_PROGRESSIONS[rng.int(III_FOCUS_PROGRESSIONS.length)];
+/** Drill-only progressions for telling the 3rd degree from the 6th: every entry puts
+ *  degree 3 and degree 6 on ADJACENT bars (iii↔vi in major, bIII↔bVI in minor) so the
+ *  two get compared back-to-back in a single hearing. They share the tonic's 3rd
+ *  (iii = 3-5-7, vi = 6-1-3), which is exactly why they blur together. NOT part of
+ *  MAJOR_PROGRESSIONS / MINOR_PROGRESSIONS — a drill needs no song examples. */
+export const THIRD_SIXTH_DRILL_PROGRESSIONS: Progression[] = [
+  { mode: TrainingMode.Major, degrees: [1, 3, 6, 4] },   // I–iii–vi–IV
+  { mode: TrainingMode.Major, degrees: [1, 6, 3, 4] },   // I–vi–iii–IV
+  { mode: TrainingMode.Major, degrees: [1, 3, 6, 1] },   // I–iii–vi–I
+  { mode: TrainingMode.Major, degrees: [1, 6, 3, 5] },   // I–vi–iii–V
+  { mode: TrainingMode.Major, degrees: [4, 3, 6, 1] },   // IV–iii–vi–I
+  { mode: TrainingMode.Major, degrees: [1, 3, 6, 5] },   // I–iii–vi–V
+  { mode: TrainingMode.Minor, degrees: [1, 3, 6, 4] },   // i–bIII–bVI–iv
+  { mode: TrainingMode.Minor, degrees: [1, 6, 3, 5] },   // i–bVI–bIII–v
+  { mode: TrainingMode.Minor, degrees: [1, 3, 6, 7] },   // i–bIII–bVI–bVII
+  { mode: TrainingMode.Minor, degrees: [1, 6, 3, 4] },   // i–bVI–bIII–iv
+];
+
+/** Percent of ProgFocus.ThirdVsSixth draws taken from the CONTRAST pool (a 1↔6 move
+ *  and no degree 3) rather than the degree-3 pool. Integer percent, not a float, so
+ *  the draw uses `rng.int` and matches Kotlin bit-for-bit on a shared seed. */
+export const THIRD_SIXTH_CONTRAST_PERCENT = 30;
+
+/** Every diatonic progression `mode` can draw, drill entries included. */
+function diatonicUniverse(mode: TrainingMode, includeHarmonicMinor: boolean): Progression[] {
+  if (mode === TrainingMode.Major) return [...MAJOR_PROGRESSIONS, ...III_FOCUS_PROGRESSIONS];
+  return includeHarmonicMinor ? [...MINOR_PROGRESSIONS, ...MINOR_HARMONIC_PROGRESSIONS] : MINOR_PROGRESSIONS;
+}
+
+/** True when `degrees` steps between degree 1 and degree 6 in either direction on
+ *  consecutive bars. The last→first bar counts: the progression loops, so that step
+ *  is heard just as often as the interior ones. */
+export function hasOneSixStep(degrees: number[]): boolean {
+  return degrees.some((a, i) => {
+    const b = degrees[(i + 1) % degrees.length];
+    return (a === 1 && b === 6) || (a === 6 && b === 1);
+  });
+}
+
+function dedupeProgressions(ps: Progression[]): Progression[] {
+  const seen = new Map<string, Progression>();
+  for (const p of ps) {
+    const key = `${p.mode}|${p.degrees.join(",")}|${[...(p.dominantBars ?? [])].sort((a, b) => a - b).join(",")}`;
+    if (!seen.has(key)) seen.set(key, p);
+  }
+  return [...seen.values()];
+}
+
+/** PRIMARY pool of the 3rd-vs-6th drill: everything in `mode` containing degree 3
+ *  (iii / bIII), with the adjacent-3↔6 drill entries prepended. */
+export function thirdSixthPrimaryPool(mode: TrainingMode, includeHarmonicMinor = true): Progression[] {
+  return dedupeProgressions([
+    ...THIRD_SIXTH_DRILL_PROGRESSIONS.filter((p) => p.mode === mode),
+    ...diatonicUniverse(mode, includeHarmonicMinor).filter((p) => p.degrees.includes(3)),
+  ]);
+}
+
+/** CONTRAST pool of the 3rd-vs-6th drill: library progressions that make the I↔vi
+ *  (i↔bVI) move and contain NO degree 3 — the "is that the 6th or the 3rd?" foil. */
+export function thirdSixthContrastPool(mode: TrainingMode, includeHarmonicMinor = true): Progression[] {
+  return dedupeProgressions(diatonicUniverse(mode, includeHarmonicMinor)
+    .filter((p) => !p.degrees.includes(3) && hasOneSixStep(p.degrees)));
+}
+
+/** Pick a random progression for `mode`, using `rng`. `focus` swaps the draw pool:
+ *  ProgFocus.Iiii draws the I→iii drill (always major); ProgFocus.ThirdVsSixth draws
+ *  degree-3 progressions with a THIRD_SIXTH_CONTRAST_PERCENT slice of 1↔6 foils mixed in. */
+export function randomProgression(mode: TrainingMode, rng: Rng = defaultRng, focus: ProgFocus = ProgFocus.None, includeHarmonicMinor = true): Progression {
+  if (focus === ProgFocus.Iiii) return III_FOCUS_PROGRESSIONS[rng.int(III_FOCUS_PROGRESSIONS.length)];
+  if (focus === ProgFocus.ThirdVsSixth) {
+    const contrast = thirdSixthContrastPool(mode, includeHarmonicMinor);
+    const pool = contrast.length > 0 && rng.int(100) < THIRD_SIXTH_CONTRAST_PERCENT
+      ? contrast : thirdSixthPrimaryPool(mode, includeHarmonicMinor);
+    return pool[rng.int(pool.length)];
+  }
   const pool =
     mode === TrainingMode.Major ? MAJOR_PROGRESSIONS :
     includeHarmonicMinor ? [...MINOR_PROGRESSIONS, ...MINOR_HARMONIC_PROGRESSIONS] : MINOR_PROGRESSIONS;

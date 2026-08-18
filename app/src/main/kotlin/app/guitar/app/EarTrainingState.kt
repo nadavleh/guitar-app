@@ -16,6 +16,7 @@ import app.guitar.theory.IntervalDirection
 import app.guitar.theory.IntervalTrainer
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
+import app.guitar.theory.ProgFocus
 import app.guitar.theory.Progression
 import app.guitar.theory.ResolvedChord
 import app.guitar.theory.TrainingMode
@@ -264,10 +265,11 @@ class EarTrainingState(
             if (includeMajor) add(TrainingMode.Major)
             if (includeMinor) add(TrainingMode.Minor)
         }.ifEmpty { listOf(TrainingMode.Major) }
-        // The I→iii drill is major-only; otherwise honor the Major/Minor include flags.
+        // The I→iii drill is major-only; otherwise honor the Major/Minor include flags
+        // (the 3rd-vs-6th drill has both major and minor entries, so it honors them too).
         val mode = if (iiiFocusMode) TrainingMode.Major else candidates[rng.nextInt(candidates.size)]
         val key = fixedKey ?: PitchClass(rng.nextInt(12))
-        val prog = EarTraining.randomProgression(mode, rng, focusIiii = iiiFocusMode, includeHarmonicMinor = earHarmonicMinor)
+        val prog = EarTraining.randomProgression(mode, rng, focus = progFocus, includeHarmonicMinor = earHarmonicMinor)
         progKey = key
         progMode = mode
         progProgression = prog
@@ -1021,10 +1023,11 @@ class EarTrainingState(
             if (includeMajor) add(TrainingMode.Major)
             if (includeMinor) add(TrainingMode.Minor)
         }.ifEmpty { listOf(TrainingMode.Major) }
-        // The I→iii drill is major-only; otherwise honor the Major/Minor include flags.
+        // The I→iii drill is major-only; otherwise honor the Major/Minor include flags
+        // (the 3rd-vs-6th drill has both major and minor entries, so it honors them too).
         val mode = if (iiiFocusMode) TrainingMode.Major else candidates[rng.nextInt(candidates.size)]
         val key = fixedKey ?: PitchClass(rng.nextInt(12))
-        val prog = EarTraining.randomProgression(mode, rng, focusIiii = iiiFocusMode, includeHarmonicMinor = earHarmonicMinor)
+        val prog = EarTraining.randomProgression(mode, rng, focus = progFocus, includeHarmonicMinor = earHarmonicMinor)
         return QState(key, mode, prog, resolveCurrent(prog, key),
             List(4) { null }, List(4) { null }, List(4) { null }, List(4) { false })
     }
@@ -1560,6 +1563,18 @@ class EarTrainingState(
      *  advanced/circle, this stays in the DIATONIC multiple-choice flow (best for ear
      *  recognition) — it just swaps the draw pool to [EarTraining.III_FOCUS_PROGRESSIONS]. */
     var iiiFocusMode by mutableStateOf(false)
+    /** Whether the Progression sub-mode is running the 3rd-vs-6th discrimination drill.
+     *  Like [iiiFocusMode] it stays in the DIATONIC multiple-choice flow and only swaps
+     *  the draw pool — see [EarTraining.thirdSixthPrimaryPool]. */
+    var third6FocusMode by mutableStateOf(false)
+
+    /** The draw pool the diatonic generator should use, from the focus-drill flags. */
+    val progFocus: ProgFocus get() = when {
+        iiiFocusMode -> ProgFocus.Iiii
+        third6FocusMode -> ProgFocus.ThirdVsSixth
+        else -> ProgFocus.None
+    }
+
     /** True when a "special" generator (advanced or circle) is active — both use the
      *  advanced-style self-marked views. The I→iii drill is NOT special (diatonic view). */
     val specialProgMode: Boolean get() = advancedMode || circleMode
@@ -1571,16 +1586,24 @@ class EarTrainingState(
 
     /** Enter an advanced category (sets [advancedMode]); [cat] picks the draw pool. */
     fun chooseAdvancedCategory(cat: String) {
-        advCategory = cat; advancedMode = true; circleMode = false; iiiFocusMode = false; stopLoop()
+        advCategory = cat; advancedMode = true; circleMode = false; iiiFocusMode = false; third6FocusMode = false; stopLoop()
     }
 
-    fun chooseAdvancedMode(on: Boolean) { advancedMode = on; if (on) { advCategory = "advanced"; circleMode = false; iiiFocusMode = false }; stopLoop() }
-    fun chooseCircleMode(on: Boolean) { circleMode = on; if (on) { advancedMode = false; iiiFocusMode = false }; stopLoop() }
+    fun chooseAdvancedMode(on: Boolean) { advancedMode = on; if (on) { advCategory = "advanced"; circleMode = false; iiiFocusMode = false; third6FocusMode = false }; stopLoop() }
+    fun chooseCircleMode(on: Boolean) { circleMode = on; if (on) { advancedMode = false; iiiFocusMode = false; third6FocusMode = false }; stopLoop() }
     /** Enter/leave the I→iii drill; clears the special generators and returns to the
      *  diatonic view. */
     fun chooseIiiFocusMode(on: Boolean) {
         iiiFocusMode = on
-        if (on) { advancedMode = false; circleMode = false }
+        if (on) { advancedMode = false; circleMode = false; third6FocusMode = false }
+        stopLoop()
+    }
+
+    /** Enter/leave the 3rd-vs-6th drill; clears the other generators and returns to the
+     *  diatonic view. */
+    fun chooseThird6FocusMode(on: Boolean) {
+        third6FocusMode = on
+        if (on) { advancedMode = false; circleMode = false; iiiFocusMode = false }
         stopLoop()
     }
 

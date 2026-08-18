@@ -9,7 +9,7 @@ import {
   parseChord, QUALITIES, spellPc,
   TrainingMode, ChordTypeLevel, Progression, ResolvedChord, NamedProgression,
   EarTrainingDegrees, degreeRoot, degreeRefMidi, resolve as resolveDegree, resolveProgression,
-  randomProgression, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
+  randomProgression, ProgFocus, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
   MINOR_DOMINANT, romanModeTag, romanIsModeAmbiguous, progressionKey, progressionFromKey,
   majorRelativeDegree, degreeFromMajorRelative,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow, importedSongsForDiatonic, CIRCLE_WINDOWS, namedRomanLine,
@@ -188,7 +188,7 @@ export class EarTrainingState {
     // The I→iii drill is major-only; otherwise honor the Major/Minor include flags.
     const mode = this.iiiFocusMode ? TrainingMode.Major : candidates[this.rng.int(candidates.length)];
     const key = this.fixedKey ?? this.rng.int(12);
-    const prog = randomProgression(mode, this.rng, this.iiiFocusMode, this.earHarmonicMinor);
+    const prog = randomProgression(mode, this.rng, this.progFocus, this.earHarmonicMinor);
     this.progKey = key;
     this.progMode = mode;
     this.progProgression = prog;
@@ -868,7 +868,7 @@ export class EarTrainingState {
     // The I→iii drill is major-only; otherwise honor the Major/Minor include flags.
     const mode = this.iiiFocusMode ? TrainingMode.Major : candidates[this.rng.int(candidates.length)];
     const key = this.fixedKey ?? this.rng.int(12);
-    const prog = randomProgression(mode, this.rng, this.iiiFocusMode, this.earHarmonicMinor);
+    const prog = randomProgression(mode, this.rng, this.progFocus, this.earHarmonicMinor);
     return {
       key, mode, prog, resolved: this.resolveCurrent(prog, key),
       guessDeg: [null, null, null, null],
@@ -1316,6 +1316,15 @@ export class EarTrainingState {
   /** I→iii recognition drill — stays in the DIATONIC multiple-choice flow, just swaps
    *  the draw pool to III_FOCUS_PROGRESSIONS. NOT "special". */
   iiiFocusMode = false;
+  /** 3rd-vs-6th discrimination drill — like iiiFocusMode it stays in the DIATONIC
+   *  multiple-choice flow and only swaps the draw pool (thirdSixthPrimaryPool +
+   *  a 30% slice of 1↔6 foils). NOT "special". */
+  third6FocusMode = false;
+
+  /** The draw pool the diatonic generator should use, from the focus-drill flags. */
+  get progFocus(): ProgFocus {
+    return this.iiiFocusMode ? ProgFocus.Iiii : this.third6FocusMode ? ProgFocus.ThirdVsSixth : ProgFocus.None;
+  }
   advProg: NamedProgression | null = null;
   advRevealed = false;
 
@@ -1348,11 +1357,12 @@ export class EarTrainingState {
   }
   /** Which advanced pool advancedMode draws from: "advanced" | "sus" | "advanced2". */
   advCategory: "advanced" | "sus" | "advanced2" = "advanced";
-  setAdvancedMode(v: boolean) { this.advancedMode = v; if (v) { this.advCategory = "advanced"; this.circleMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
+  setAdvancedMode(v: boolean) { this.advancedMode = v; if (v) { this.advCategory = "advanced"; this.circleMode = false; this.iiiFocusMode = false; this.third6FocusMode = false; } this.stopLoop(); this.notify(); }
   /** Enter an advanced category (sets advancedMode); cat picks the draw pool. */
-  setAdvancedCategory(cat: "advanced" | "sus" | "advanced2") { this.advCategory = cat; this.advancedMode = true; this.circleMode = false; this.iiiFocusMode = false; this.stopLoop(); this.notify(); }
-  setCircleMode(v: boolean) { this.circleMode = v; if (v) { this.advancedMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
-  setIiiFocusMode(v: boolean) { this.iiiFocusMode = v; if (v) { this.advancedMode = false; this.circleMode = false; } this.stopLoop(); this.notify(); }
+  setAdvancedCategory(cat: "advanced" | "sus" | "advanced2") { this.advCategory = cat; this.advancedMode = true; this.circleMode = false; this.iiiFocusMode = false; this.third6FocusMode = false; this.stopLoop(); this.notify(); }
+  setCircleMode(v: boolean) { this.circleMode = v; if (v) { this.advancedMode = false; this.iiiFocusMode = false; this.third6FocusMode = false; } this.stopLoop(); this.notify(); }
+  setIiiFocusMode(v: boolean) { this.iiiFocusMode = v; if (v) { this.advancedMode = false; this.circleMode = false; this.third6FocusMode = false; } this.stopLoop(); this.notify(); }
+  setThird6FocusMode(v: boolean) { this.third6FocusMode = v; if (v) { this.advancedMode = false; this.circleMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
 
   // ← Previous history for the advanced/circle practice view (mirrors the diatonic one).
   private advHistory: { np: NamedProgression; key: PitchClass; resolved: ResolvedChord[] }[] = [];

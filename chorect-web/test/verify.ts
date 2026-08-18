@@ -8,6 +8,8 @@ import {
   TrainingMode, ChordTypeLevel, resolve as resolveDegree, degreeRoot, romanLabel,
   ADVANCED_PROGRESSIONS, resolveNamed, QUALITIES, inversionMidis, randomN2c, n2cAnswerLabel,
   romanIsModeAmbiguous, MAJOR_DEGREES, MINOR_DEGREES,
+  ProgFocus, randomProgression, hasOneSixStep, thirdSixthPrimaryPool, thirdSixthContrastPool,
+  THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_PERCENT, Progression,
 } from "../src/theory";
 import { standard } from "../src/theory/tunings";
 import {
@@ -262,6 +264,66 @@ check("every decomposition has a root shell + stacked-thirds upper triad", decOk
 const maj7 = decompositionFor("maj7")!;
 const maj7pcs = new Set([...maj7.shell, ...maj7.upper].map((x) => ((x % 12) + 12) % 12));
 check("Cmaj7 decomposes to C + Em", [0, 4, 7, 11].every((p) => maj7pcs.has(p)) && upperRootInterval(maj7) === 4);
+
+// --- 3rd-vs-6th drill pools: must match the Kotlin pools EXACTLY (same entries,
+//     same order) or the two platforms drill different progressions. The expected
+//     lists below were dumped from EarTraining.thirdSixthPrimaryPool/ContrastPool. ---
+const poolKey = (p: Progression): string =>
+  `${p.degrees.join(",")}|${[...(p.dominantBars ?? [])].sort((a, b) => a - b).join(",")}`;
+const poolKeys = (ps: Progression[]): string => ps.map(poolKey).join(" / ");
+
+check("3rd-vs-6th primary pool (major) matches Kotlin", poolKeys(thirdSixthPrimaryPool(TrainingMode.Major)) ===
+  "1,3,6,4| / 1,6,3,4| / 1,3,6,1| / 1,6,3,5| / 4,3,6,1| / 1,3,6,5| / 1,3,4,5| / 4,5,3,6| / 1,3,4,1| / 1,3,2,5| / 1,3,1,4|");
+check("3rd-vs-6th contrast pool (major) matches Kotlin", poolKeys(thirdSixthContrastPool(TrainingMode.Major)) ===
+  "1,6,4,5| / 1,6,2,5| / 6,2,5,1| / 1,2,5,6|");
+check("3rd-vs-6th primary pool (minor, harmonic on) matches Kotlin", poolKeys(thirdSixthPrimaryPool(TrainingMode.Minor)) ===
+  "1,3,6,4| / 1,6,3,5| / 1,3,6,7| / 1,6,3,4| / 1,6,3,7| / 1,4,7,3| / 1,3,7,4| / 1,6,3,5|3 / 1,3,6,5|3");
+check("3rd-vs-6th contrast pool (minor, harmonic on) matches Kotlin", poolKeys(thirdSixthContrastPool(TrainingMode.Minor)) ===
+  "1,6,7,1| / 1,6,2,5|3 / 1,6,4,5|3");
+check("3rd-vs-6th primary pool (minor, harmonic off) matches Kotlin", poolKeys(thirdSixthPrimaryPool(TrainingMode.Minor, false)) ===
+  "1,3,6,4| / 1,6,3,5| / 1,3,6,7| / 1,6,3,4| / 1,6,3,7| / 1,4,7,3| / 1,3,7,4|");
+check("3rd-vs-6th contrast pool (minor, harmonic off) matches Kotlin", poolKeys(thirdSixthContrastPool(TrainingMode.Minor, false)) ===
+  "1,6,7,1|");
+
+check("1<->6 step counts the loop wrap", hasOneSixStep([1, 6, 4, 5]) && hasOneSixStep([1, 2, 5, 6]) &&
+  hasOneSixStep([6, 2, 5, 1]) && !hasOneSixStep([1, 5, 6, 4]) && !hasOneSixStep([1, 4, 6, 5]));
+check("every drill entry has an adjacent 3<->6 pair", THIRD_SIXTH_DRILL_PROGRESSIONS.every((p) =>
+  p.degrees.some((a, i) => { const b = p.degrees[(i + 1) % p.degrees.length]; return (a === 3 && b === 6) || (a === 6 && b === 3); })));
+check("primary pools are all degree-3, contrast pools none", [TrainingMode.Major, TrainingMode.Minor].every((m) =>
+  thirdSixthPrimaryPool(m).every((p) => p.degrees.includes(3)) &&
+  thirdSixthContrastPool(m).every((p) => !p.degrees.includes(3) && hasOneSixStep(p.degrees))));
+
+// The weighted draw: ~THIRD_SIXTH_CONTRAST_PERCENT % of questions are 1<->6 foils.
+for (const m of [TrainingMode.Major, TrainingMode.Minor]) {
+  let seed = 20260818;
+  const rng = { int: (b: number) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % b; }, bool: () => false };
+  const n = 4000;
+  let foils = 0;
+  let inAPool = true;
+  const contrastKeys = new Set(thirdSixthContrastPool(m).map(poolKey));
+  for (let i = 0; i < n; i++) {
+    const p = randomProgression(m, rng, ProgFocus.ThirdVsSixth);
+    if (!p.degrees.includes(3) && !contrastKeys.has(poolKey(p))) inAPool = false;
+    if (!p.degrees.includes(3)) foils++;
+  }
+  const share = (foils / n) * 100;
+  check(`3rd-vs-6th draw (${m}) stays inside the two pools`, inAPool);
+  check(`3rd-vs-6th draw (${m}) is ~${THIRD_SIXTH_CONTRAST_PERCENT}% foils (got ${share.toFixed(1)}%)`,
+    share > THIRD_SIXTH_CONTRAST_PERCENT - 4 && share < THIRD_SIXTH_CONTRAST_PERCENT + 4);
+}
+
+// The I->iii drill must be untouched by the focus refactor.
+{
+  let seed = 7;
+  const rng = { int: (b: number) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % b; }, bool: () => false };
+  let ok = true;
+  for (let i = 0; i < 200; i++) {
+    const p = randomProgression(TrainingMode.Minor, rng, ProgFocus.Iiii);
+    if (p.mode !== TrainingMode.Major || p.degrees[0] !== 1 || p.degrees[1] !== 3) ok = false;
+  }
+  check("I->iii drill still draws major I-iii openers", ok);
+}
+
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

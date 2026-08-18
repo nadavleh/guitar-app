@@ -198,7 +198,8 @@ export class EarTrainingUI {
   private generatorLabel(): string {
     const ear = this.ear;
     if (ear.advancedMode) return ear.advCategory === "sus" ? "Sus chords" : ear.advCategory === "advanced2" ? "Advanced II" : "Advanced";
-    return ear.circleMode ? "Circle of 5ths" : ear.iiiFocusMode ? "I → iii focus" : "Diatonic";
+    return ear.circleMode ? "Circle of 5ths" : ear.iiiFocusMode ? "I → iii focus"
+      : ear.third6FocusMode ? "3rd vs 6th focus" : "Diatonic";
   }
 
   /** One-line teaching caption for the current progression generator. */
@@ -212,6 +213,8 @@ export class EarTrainingUI {
       ? "Circle-of-fifths windows built around secondary dominants (V7 of the next chord)."
       : ear.iiiFocusMode
       ? "Drill for hearing the I→iii move — every progression opens with I then iii (major)."
+      : ear.third6FocusMode
+      ? "Drill for telling the 3rd from the 6th — progressions with iii/bIII, mixed with ~30% I→vi (i→bVI) foils."
       : "Standard diatonic progressions in the chosen key & mode.";
   }
 
@@ -219,11 +222,13 @@ export class EarTrainingUI {
     const ear = this.ear;
     const gen = ear.advancedMode
       ? (ear.advCategory === "sus" ? "sus" : ear.advCategory === "advanced2" ? "advanced2" : "advanced")
-      : ear.circleMode ? "circle" : ear.iiiFocusMode ? "iiifocus" : "diatonic";
+      : ear.circleMode ? "circle" : ear.iiiFocusMode ? "iiifocus"
+      : ear.third6FocusMode ? "third6" : "diatonic";
     return select(
       [
         { value: "diatonic", label: "Generator: Diatonic" },
         { value: "iiifocus", label: "Generator: I → iii focus" },
+        { value: "third6", label: "Generator: 3rd vs 6th focus" },
         { value: "advanced", label: "Generator: Advanced (non-diatonic)" },
         { value: "advanced2", label: "Generator: Advanced II (maj7 / min9 / modal)" },
         { value: "sus", label: "Generator: Sus chords" },
@@ -236,7 +241,8 @@ export class EarTrainingUI {
         else if (v === "sus") ear.setAdvancedCategory("sus");
         else if (v === "circle") ear.setCircleMode(true);
         else if (v === "iiifocus") ear.setIiiFocusMode(true);
-        else { ear.setAdvancedMode(false); ear.setCircleMode(false); ear.setIiiFocusMode(false); }
+        else if (v === "third6") ear.setThird6FocusMode(true);
+        else { ear.setAdvancedMode(false); ear.setCircleMode(false); ear.setIiiFocusMode(false); ear.setThird6FocusMode(false); }
       },
     );
   }

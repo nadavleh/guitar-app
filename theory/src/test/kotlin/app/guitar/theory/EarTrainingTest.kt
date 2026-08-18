@@ -371,4 +371,106 @@ class EarTrainingTest {
         assertEquals("E7", minorV7.symbol)
         assertEquals("G7", majorV7.symbol)       // ...but different chords entirely
     }
+
+    // ----- 3rd-vs-6th discrimination drill -----
+
+    @Test fun `every 3rd-vs-6th primary entry contains degree 3`() {
+        for (mode in TrainingMode.entries) {
+            val pool = EarTraining.thirdSixthPrimaryPool(mode)
+            assertTrue(pool.isNotEmpty(), "$mode primary pool is empty")
+            for (p in pool) {
+                assertEquals(mode, p.mode)
+                assertTrue(3 in p.degrees, "$mode ${p.degrees} has no degree 3")
+            }
+        }
+    }
+
+    @Test fun `every 3rd-vs-6th contrast entry makes a 1-6 move and has no degree 3`() {
+        for (mode in TrainingMode.entries) {
+            val pool = EarTraining.thirdSixthContrastPool(mode)
+            assertTrue(pool.isNotEmpty(), "$mode contrast pool is empty")
+            for (p in pool) {
+                assertEquals(mode, p.mode)
+                assertTrue(3 !in p.degrees, "$mode ${p.degrees} should not contain degree 3")
+                assertTrue(EarTraining.hasOneSixStep(p.degrees), "$mode ${p.degrees} has no 1↔6 step")
+            }
+        }
+    }
+
+    @Test fun `the 1-6 step counts the loop wrap from the last bar back to the first`() {
+        assertTrue(EarTraining.hasOneSixStep(listOf(1, 6, 4, 5)))        // interior 1→6
+        assertTrue(EarTraining.hasOneSixStep(listOf(6, 1, 4, 5)))        // interior 6→1
+        assertTrue(EarTraining.hasOneSixStep(listOf(1, 2, 5, 6)))        // wrap 6→1 (I-ii-V-vi)
+        assertTrue(EarTraining.hasOneSixStep(listOf(6, 2, 5, 1)))        // wrap 1→6 (vi-ii-V-I)
+        assertTrue(!EarTraining.hasOneSixStep(listOf(1, 5, 6, 4)))       // 1 and 6 never adjacent
+        assertTrue(!EarTraining.hasOneSixStep(listOf(1, 4, 6, 5)))
+    }
+
+    @Test fun `the drill entries put degree 3 and degree 6 on adjacent bars`() {
+        // The whole point of the hand-written pool: the two confusable chords are
+        // compared back-to-back inside one hearing, not across separate questions.
+        for (p in EarTraining.THIRD_SIXTH_DRILL_PROGRESSIONS) {
+            val adjacent = p.degrees.indices.any { i ->
+                val a = p.degrees[i]
+                val b = p.degrees[(i + 1) % p.degrees.size]
+                (a == 3 && b == 6) || (a == 6 && b == 3)
+            }
+            assertTrue(adjacent, "${p.mode} ${p.degrees} has no adjacent 3↔6 pair")
+        }
+        // Both modes are drilled (iii↔vi and bIII↔bVI).
+        assertTrue(EarTraining.THIRD_SIXTH_DRILL_PROGRESSIONS.any { it.mode == TrainingMode.Major })
+        assertTrue(EarTraining.THIRD_SIXTH_DRILL_PROGRESSIONS.any { it.mode == TrainingMode.Minor })
+    }
+
+    @Test fun `3rd-vs-6th pools are deduped and disjoint`() {
+        for (mode in TrainingMode.entries) {
+            val primary = EarTraining.thirdSixthPrimaryPool(mode)
+            val contrast = EarTraining.thirdSixthContrastPool(mode)
+            val key = { p: Progression -> "${p.degrees.joinToString(",")}|${p.dominantBars.sorted()}" }
+            assertEquals(primary.size, primary.map(key).toSet().size, "$mode primary has duplicates")
+            assertEquals(contrast.size, contrast.map(key).toSet().size, "$mode contrast has duplicates")
+            // Degree 3 present vs absent — the two pools can never overlap.
+            assertTrue(primary.map(key).toSet().intersect(contrast.map(key).toSet()).isEmpty())
+        }
+    }
+
+    @Test fun `turning harmonic minor off drops its entries from both 3rd-vs-6th pools`() {
+        val onP = EarTraining.thirdSixthPrimaryPool(TrainingMode.Minor, includeHarmonicMinor = true)
+        val offP = EarTraining.thirdSixthPrimaryPool(TrainingMode.Minor, includeHarmonicMinor = false)
+        assertTrue(onP.any { it.dominantBars.isNotEmpty() }, "harmonic entries missing when the toggle is on")
+        assertTrue(offP.none { it.dominantBars.isNotEmpty() }, "harmonic entries survived the toggle")
+        assertTrue(offP.size < onP.size)
+        val onC = EarTraining.thirdSixthContrastPool(TrainingMode.Minor, includeHarmonicMinor = true)
+        val offC = EarTraining.thirdSixthContrastPool(TrainingMode.Minor, includeHarmonicMinor = false)
+        assertTrue(onC.any { it.dominantBars.isNotEmpty() })
+        assertTrue(offC.none { it.dominantBars.isNotEmpty() })
+    }
+
+    @Test fun `the 3rd-vs-6th draw mixes in roughly 30 percent contrast foils`() {
+        for (mode in TrainingMode.entries) {
+            val rng = kotlin.random.Random(20260818)
+            val contrastKeys = EarTraining.thirdSixthContrastPool(mode)
+                .map { it.degrees.joinToString(",") + "|" + it.dominantBars.sorted() }.toSet()
+            val n = 4000
+            var foils = 0
+            repeat(n) {
+                val p = EarTraining.randomProgression(mode, rng, ProgFocus.ThirdVsSixth)
+                val k = p.degrees.joinToString(",") + "|" + p.dominantBars.sorted()
+                // Every draw is one of the two pools, nothing else.
+                assertTrue(3 in p.degrees || k in contrastKeys, "$mode ${p.degrees} is in neither pool")
+                if (3 !in p.degrees) foils++
+            }
+            val share = foils.toDouble() / n
+            assertTrue(share > 0.26 && share < 0.34, "$mode contrast share was $share, expected ~0.30")
+        }
+    }
+
+    @Test fun `the I-iii drill is unaffected by the new focus enum`() {
+        val rng = kotlin.random.Random(7)
+        repeat(200) {
+            val p = EarTraining.randomProgression(TrainingMode.Minor, rng, ProgFocus.Iiii)
+            assertEquals(TrainingMode.Major, p.mode)      // the drill is major-only
+            assertEquals(listOf(1, 3), p.degrees.take(2)) // and always opens I–iii
+        }
+    }
 }

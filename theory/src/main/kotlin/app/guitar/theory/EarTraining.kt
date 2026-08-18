@@ -14,6 +14,11 @@ package app.guitar.theory
  */
 enum class TrainingMode { Major, Minor }
 
+/** Which pool the progression generator draws from. [None] is the standard diatonic
+ *  library; the others are focused recognition drills that stay in the SAME diatonic
+ *  multiple-choice flow and only swap the draw pool. */
+enum class ProgFocus { None, Iiii, ThirdVsSixth }
+
 enum class ChordTypeLevel(val displayName: String) {
     Triads("Triads"),
     Sevenths("7th chords"),
@@ -285,15 +290,80 @@ object EarTraining {
         Progression(TrainingMode.Major, listOf(1, 3, 1, 4)),   // I–iii–I–IV (back-and-forth)
     )
 
-    /** Pick a random progression for [mode], using [rng]. When [focusIiii] is set,
-     *  draw from the [III_FOCUS_PROGRESSIONS] drill (always major) instead. */
+    /** Drill-only progressions for telling the 3rd degree from the 6th: every entry puts
+     *  degree 3 and degree 6 on ADJACENT bars (iii↔vi in major, bIII↔bVI in minor) so the
+     *  two get compared back-to-back in a single hearing. They share the tonic's 3rd
+     *  (iii = 3-5-7, vi = 6-1-3), which is exactly why they blur together. NOT part of
+     *  [MAJOR_PROGRESSIONS] / [MINOR_PROGRESSIONS] — a drill needs no song examples. */
+    val THIRD_SIXTH_DRILL_PROGRESSIONS: List<Progression> = listOf(
+        Progression(TrainingMode.Major, listOf(1, 3, 6, 4)),   // I–iii–vi–IV
+        Progression(TrainingMode.Major, listOf(1, 6, 3, 4)),   // I–vi–iii–IV
+        Progression(TrainingMode.Major, listOf(1, 3, 6, 1)),   // I–iii–vi–I
+        Progression(TrainingMode.Major, listOf(1, 6, 3, 5)),   // I–vi–iii–V
+        Progression(TrainingMode.Major, listOf(4, 3, 6, 1)),   // IV–iii–vi–I
+        Progression(TrainingMode.Major, listOf(1, 3, 6, 5)),   // I–iii–vi–V
+        Progression(TrainingMode.Minor, listOf(1, 3, 6, 4)),   // i–bIII–bVI–iv
+        Progression(TrainingMode.Minor, listOf(1, 6, 3, 5)),   // i–bVI–bIII–v
+        Progression(TrainingMode.Minor, listOf(1, 3, 6, 7)),   // i–bIII–bVI–bVII
+        Progression(TrainingMode.Minor, listOf(1, 6, 3, 4)),   // i–bVI–bIII–iv
+    )
+
+    /** Percent of [ProgFocus.ThirdVsSixth] draws taken from the CONTRAST pool (a 1↔6
+     *  move and no degree 3) rather than the degree-3 pool. Integer percent, not a
+     *  float, so the draw uses `nextInt` and matches the web port on a shared seed. */
+    const val THIRD_SIXTH_CONTRAST_PERCENT = 30
+
+    /** Every diatonic progression [mode] can draw, drill entries included. */
+    private fun diatonicUniverse(mode: TrainingMode, includeHarmonicMinor: Boolean): List<Progression> =
+        if (mode == TrainingMode.Major) MAJOR_PROGRESSIONS + III_FOCUS_PROGRESSIONS
+        else if (includeHarmonicMinor) MINOR_PROGRESSIONS + MINOR_HARMONIC_PROGRESSIONS
+        else MINOR_PROGRESSIONS
+
+    /** True when [degrees] steps between degree 1 and degree 6 in either direction on
+     *  consecutive bars. The last→first bar counts: the progression loops, so that step
+     *  is heard just as often as the interior ones. */
+    fun hasOneSixStep(degrees: List<Int>): Boolean =
+        degrees.indices.any { i ->
+            val a = degrees[i]
+            val b = degrees[(i + 1) % degrees.size]
+            (a == 1 && b == 6) || (a == 6 && b == 1)
+        }
+
+    private fun dedupe(ps: List<Progression>): List<Progression> {
+        val seen = LinkedHashMap<String, Progression>()
+        for (p in ps) seen.putIfAbsent("${p.mode}|${p.degrees.joinToString(",")}|${p.dominantBars.sorted().joinToString(",")}", p)
+        return seen.values.toList()
+    }
+
+    /** PRIMARY pool of the 3rd-vs-6th drill: everything in [mode] containing degree 3
+     *  (iii / bIII), with the adjacent-3↔6 drill entries prepended. */
+    fun thirdSixthPrimaryPool(mode: TrainingMode, includeHarmonicMinor: Boolean = true): List<Progression> =
+        dedupe(THIRD_SIXTH_DRILL_PROGRESSIONS.filter { it.mode == mode } +
+            diatonicUniverse(mode, includeHarmonicMinor).filter { 3 in it.degrees })
+
+    /** CONTRAST pool of the 3rd-vs-6th drill: library progressions that make the I↔vi
+     *  (i↔bVI) move and contain NO degree 3 — the "is that the 6th or the 3rd?" foil. */
+    fun thirdSixthContrastPool(mode: TrainingMode, includeHarmonicMinor: Boolean = true): List<Progression> =
+        dedupe(diatonicUniverse(mode, includeHarmonicMinor)
+            .filter { 3 !in it.degrees && hasOneSixStep(it.degrees) })
+
+    /** Pick a random progression for [mode], using [rng]. [focus] swaps the draw pool:
+     *  [ProgFocus.Iiii] draws the I→iii drill (always major); [ProgFocus.ThirdVsSixth]
+     *  draws degree-3 progressions with a [THIRD_SIXTH_CONTRAST_PERCENT] slice of
+     *  1↔6 foils mixed in. */
     fun randomProgression(
         mode: TrainingMode,
         rng: kotlin.random.Random,
-        focusIiii: Boolean = false,
+        focus: ProgFocus = ProgFocus.None,
         includeHarmonicMinor: Boolean = true,
     ): Progression {
-        if (focusIiii) return III_FOCUS_PROGRESSIONS[rng.nextInt(III_FOCUS_PROGRESSIONS.size)]
+        if (focus == ProgFocus.Iiii) return III_FOCUS_PROGRESSIONS[rng.nextInt(III_FOCUS_PROGRESSIONS.size)]
+        if (focus == ProgFocus.ThirdVsSixth) {
+            val contrast = thirdSixthContrastPool(mode, includeHarmonicMinor)
+            val pool = if (contrast.isNotEmpty() && rng.nextInt(100) < THIRD_SIXTH_CONTRAST_PERCENT) contrast
+                       else thirdSixthPrimaryPool(mode, includeHarmonicMinor)
+            return pool[rng.nextInt(pool.size)]
+        }
         val pool = when {
             mode == TrainingMode.Major -> MAJOR_PROGRESSIONS
             includeHarmonicMinor -> MINOR_PROGRESSIONS + MINOR_HARMONIC_PROGRESSIONS
