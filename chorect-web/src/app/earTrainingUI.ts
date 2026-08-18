@@ -331,8 +331,14 @@ export class EarTrainingUI {
     for (let i = 0; i < slots; i++) {
       const sounding = ear.currentBar === i && ear.carPhase === CarPhase.Playing;
       const revealed = i < ear.carRevealedSlots;
+      // "(minor)"/"(major)" only for a V that reads the same in both keys — a small
+      // second line, so it can never crowd the number you are actually glancing at.
+      const tag = ear.carSlotTag(i);
       const cell = el("div", { class: "car-slot" + (sounding ? " sounding" : "") }, [
-        el("span", { class: "lab" + (revealed ? "" : " hidden") }, [ear.carSlotLabel(i)]),
+        el("div", { class: "car-slot-inner" }, [
+          el("span", { class: "lab" + (revealed ? "" : " hidden") }, [ear.carSlotLabel(i)]),
+          ...(tag ? [el("span", { class: "tag" }, [tag])] : []),
+        ]),
       ]);
       row.appendChild(cell);
     }
@@ -1257,6 +1263,19 @@ export class EarTrainingUI {
     ));
     pop.appendChild(el("div", { class: "v-gap-8" }));
     pop.appendChild(this.subModeChipRow());
+    if (ear.progSubMode === EarSubMode.Progression) {
+      // The second way into car mode: behind a deliberate fold tap, so it stays
+      // unreachable by a stray jab at the answer pad. Leaves the challenge untouched —
+      // car mode is never graded.
+      const carBtn = btn("Car mode — hands-free", () => {
+        this.modeFoldOpen = false;
+        ear.enterCarMode();
+        this.rerender();
+      }, "btn");
+      carBtn.style.cssText = "width:100%;margin-top:8px";
+      carBtn.prepend(icon("car", 18));
+      pop.appendChild(carBtn);
+    }
     if (!ear.specialProgMode && ear.challengeActive) {
       pop.appendChild(el("div", { style: "border-top:1px solid var(--divider);margin:8px 0" }));
       const refToggle = chip(ear.degreeRefChords ? "♪ chords" : "♪ notes", true,

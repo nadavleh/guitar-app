@@ -13,7 +13,7 @@ import {
 } from "../src/theory";
 import { standard } from "../src/theory/tunings";
 import {
-  PercussionCatalog, PercussionPattern, PercussionMeter, swungSlotMs, slotMs, voiceCount,
+  PercussionCatalog, PercussionPattern, PercussionMeter, swungSlotMs, slotMs, voiceCount, SwingModel,
   movementCost, pickMinMovement, BUILTIN_PATTERNS,
   INTERVAL_CHOICES, intervalTargetMidi, CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
 } from "../src/theory";
@@ -156,7 +156,9 @@ check("random N2C produces a known label", n2cAnswerLabel(n2c) !== "?");
 // --- Percussion: dynamic kit, add/remove, pattern round-trip ---
 const M = PercussionMeter.DEFAULT;
 const empty = PercussionPattern.empty();
-check("default kit is the original four", empty.instruments.map((i) => i.id).join(",") === "surdo,tamborim,pandeiro,agogo");
+check("default kit is surdo, tamborim, bongo",
+  empty.instruments.map((i) => i.id).join(",") === "surdo,tamborim,bongo" &&
+  empty.instruments.map((i) => i.id).join(",") === PercussionCatalog.DEFAULT_KIT.map((i) => i.id).join(","));
 // cycle: null → 0 → 1 → 2 → null for Surdo (3 voices)
 let p = empty;
 const cy: (number | null)[] = [];
@@ -166,7 +168,8 @@ check("Surdo has 3 voices, Pandeiro 8 (recorded articulations)", voiceCount(Perc
 // add an instrument → silent row appended; round-trips through encode/decode
 const cuica = PercussionCatalog.byId("cuica")!;
 const withCuica = empty.addInstrument(cuica).cycled(cuica, 2).cycled(PercussionCatalog.Surdo, 0);
-check("addInstrument appends a row", withCuica.hasInstrument(cuica) && withCuica.instruments.length === 5);
+check("addInstrument appends a row", withCuica.hasInstrument(cuica) &&
+  withCuica.instruments.length === PercussionCatalog.DEFAULT_KIT.length + 1);
 const rt2 = PercussionPattern.decode(withCuica.encode());
 check("pattern with added instrument round-trips", rt2 !== null && rt2.encode() === withCuica.encode());
 check("removeInstrument drops the row", !withCuica.removeInstrument(cuica).hasInstrument(cuica));
@@ -193,13 +196,30 @@ const straightSum = Array.from({ length: 16 }, (_, i) => swungSlotMs(i, 100, 0, 
 const swungSum = Array.from({ length: 16 }, (_, i) => swungSlotMs(i, 100, 60, M)).reduce((a, b) => a + b, 0);
 check("straight slot = base slotMs", Math.abs(swungSlotMs(0, 100, 0, M) - slotMs(100)) < 1.5);
 check("swing preserves total loop length (±a few ms rounding)", Math.abs(straightSum - swungSum) <= 16);
-// at 100%: 2nd 16th stays on the grid, 3rd comes early, 4th earlier still; beat length intact
-const g0 = swungSlotMs(0, 100, 100, M), g1 = swungSlotMs(1, 100, 100, M), g2 = swungSlotMs(2, 100, 100, M), g3 = swungSlotMs(3, 100, 100, M);
-const onset2 = g0 + g1, onset3 = g0 + g1 + g2;
-check("full swing: 2nd anchored, 3rd/4th anticipated (4th more), beat length intact",
-  g0 === slotMs(100) && onset2 < 2 * slotMs(100) && onset3 < 3 * slotMs(100) &&
-  (2 * slotMs(100) - onset2) < (3 * slotMs(100) - onset3) &&
-  g0 + g1 + g2 + g3 === slotMs(100) * 4);
+// At 100 % the feel is HEMIOLA-based (SwingModel), not the retired "2nd anchored"
+// model: the 2nd 16th is DELAYED toward 1/3 of the beat, the 3rd stays at 1/2, and the
+// 4th is pulled back to 2/3. Mirrors the two live Kotlin tests in PercussionPatternTest
+// (`full Hemiola swing delays the 2nd...` and `...onsets sit at the hemiola positions`).
+// bpm 120 makes the base slot exactly 125 ms, so the onsets are checkable to the ms.
+{
+  const base = slotMs(120);          // 125 ms
+  const hem = SwingModel.Hemiola;
+  const d = [0, 1, 2, 3].map((i) => swungSlotMs(i, 120, 100, M, hem));
+  check("hemiola swing: 1st→2nd stretches, 2nd→3rd shrinks, 4th→beat stretches",
+    d[0] > base && d[1] < base && d[3] > base);
+  check("hemiola swing keeps the beat length intact", d[0] + d[1] + d[2] + d[3] === base * 4);
+  // Absolute onsets, in slot units: [0, 4/3, 2, 8/3] of the beat.
+  const onset = (slot: number) => d.slice(0, slot).reduce((a, b) => a + b, 0);
+  check("hemiola onsets sit at 0, 1/3, 1/2, 2/3 of the beat",
+    onset(0) === 0 && onset(1) === Math.round((4 / 3) * base) &&
+    onset(2) === 2 * base && onset(3) === Math.round((8 / 3) * base));
+  // The DEFAULT model differs only in that it also nudges the 1st 16th (+d/2) and
+  // pulls the 4th half as far — so onset(0) is NOT on the beat there.
+  const dd = [0, 1, 2, 3].map((i) => swungSlotMs(i, 120, 100, M, SwingModel.Default));
+  check("default model also preserves the beat length", dd[0] + dd[1] + dd[2] + dd[3] === base * 4);
+  check("default model nudges the 1st 16th, hemiola does not",
+    swungSlotMs(0, 120, 100, M, SwingModel.Default) !== swungSlotMs(0, 120, 100, M, hem));
+}
 // non-1/16 grids ignore swing entirely
 const eighths = new PercussionMeter(2, 2, 4, 8);
 check("swing does nothing off a 1/16 grid", swungSlotMs(1, 100, 100, eighths) === slotMs(100, 8));
@@ -365,6 +385,14 @@ check("exerciseMs doubles with the bars and clamps a nonsense bpm",
     renderCueBeep(CarMode.BEEP_HZ, 0, 44100, CarMode.BEEP_PEAK, CarMode.BEEP_ATTACK_MS).length === 0);
 }
 
+
+// The bare Roman "V" reads identically in a major key and in harmonic minor, so car
+// mode (which never shows the key) has to mark which one it is - same rule the
+// challenge answer line uses. Everything else is separated by case or an accidental.
+check("only the V family needs a mode tag in car mode",
+  romanIsModeAmbiguous("V") && romanIsModeAmbiguous("V7") && romanIsModeAmbiguous("V9") &&
+  !romanIsModeAmbiguous("v") && !romanIsModeAmbiguous("iii") && !romanIsModeAmbiguous("bIII") &&
+  !romanIsModeAmbiguous("IV") && !romanIsModeAmbiguous("iv") && !romanIsModeAmbiguous("bVII"));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

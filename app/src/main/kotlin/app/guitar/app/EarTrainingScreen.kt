@@ -325,6 +325,20 @@ private fun ChallengeModeFold(state: AppState, ear: EarTrainingState) {
                 )
                 Spacer(Modifier.height(8.dp))
                 SubModeChipRow(ear)
+                if (ear.progSubMode == EarSubMode.Progression) {
+                    // The second way into car mode: behind a deliberate fold tap, so it
+                    // stays unreachable by a stray jab at the answer pad. Leaves the
+                    // challenge untouched — car mode is never graded.
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { open = false; ear.enterCarMode() },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.DirectionsCar, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Car mode — hands-free")
+                    }
+                }
                 if (!ear.specialProgMode && ear.challengeActive) {
                     HorizontalDivider()
                     Spacer(Modifier.height(8.dp))
@@ -3146,17 +3160,30 @@ private fun CarModeView(state: AppState, ear: EarTrainingState) {
                                 ),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(
-                                ear.carSlotLabel(i),
-                                fontSize = labelSp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                color = if (revealed) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-                                },
-                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    ear.carSlotLabel(i),
+                                    fontSize = labelSp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    color = if (revealed) {
+                                        MaterialTheme.colorScheme.onSurface
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                    },
+                                )
+                                // "(minor)" / "(major)" only for a V that reads the same
+                                // in both keys — a small second line, so it can never
+                                // crowd the number you are actually glancing at.
+                                val tag = ear.carSlotTag(i)
+                                if (tag.isNotEmpty()) {
+                                    Text(
+                                        tag,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
                         }
                     }
                 }

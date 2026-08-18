@@ -1404,6 +1404,17 @@ export class EarTrainingState {
     return this.progResolved[i]?.romanLabel ?? "—";
   }
 
+  /** "(minor)" / "(major)" for a revealed slot whose Roman reads the same in both keys
+   *  — the V family. Empty otherwise. Car mode never shows the key, so a bare "V" is
+   *  even more ambiguous here than on the challenge pad, where this marker was added
+   *  (v2.69.2). Rendered as a small second line so it can't crowd the big label. */
+  carSlotTag(i: number): string {
+    if (i >= this.carRevealedSlots) return "";
+    const roman = this.progResolved[i]?.romanLabel;
+    if (!roman || !romanIsModeAmbiguous(roman)) return "";
+    return romanModeTag(this.challengeBarIsDominant(i));
+  }
+
   /** Seconds one exercise takes at the current tempo, for the on-screen estimate. */
   get carExerciseSeconds(): number {
     const slots = this.progResolved.length || 4;

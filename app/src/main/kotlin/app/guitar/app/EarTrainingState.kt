@@ -1652,6 +1652,17 @@ class EarTrainingState(
         return progResolved.getOrNull(i)?.romanLabel ?: "—"
     }
 
+    /** "(minor)" / "(major)" for a revealed slot whose Roman reads the same in both keys
+     *  — the V family. Empty otherwise. Car mode never shows the key, so a bare "V" is
+     *  even more ambiguous here than on the challenge pad, where this marker was added
+     *  (v2.69.2). Rendered as a small second line so it can't crowd the big label. */
+    fun carSlotTag(i: Int): String {
+        if (i >= carRevealedSlots) return ""
+        val roman = progResolved.getOrNull(i)?.romanLabel ?: return ""
+        if (!EarTraining.romanIsModeAmbiguous(roman)) return ""
+        return EarTraining.romanModeTag(minorReading = challengeBarIsDominant(i))
+    }
+
     /** Seconds one exercise takes at the current tempo, for the on-screen estimate. */
     val carExerciseSeconds: Int
         get() {
