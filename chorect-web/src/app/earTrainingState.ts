@@ -1415,6 +1415,13 @@ export class EarTrainingState {
     return romanModeTag(this.challengeBarIsDominant(i));
   }
 
+  /** Longest Roman label in the CURRENT progression (min 1). The car view sizes every
+   *  slot off this, not off each label, so the type stays put as reveals come in — and
+   *  so an "Imaj13" at the extended level is scaled to fit instead of being clipped. */
+  get carLongestLabel(): number {
+    return Math.max(1, ...this.progResolved.map((rc) => rc.romanLabel.length));
+  }
+
   /** Seconds one exercise takes at the current tempo, for the on-screen estimate. */
   get carExerciseSeconds(): number {
     const slots = this.progResolved.length || 4;

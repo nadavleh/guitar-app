@@ -3137,11 +3137,16 @@ private fun CarModeView(state: AppState, ear: EarTrainingState) {
             // ---- the slots: the only thing you should need to see while driving ----
             val slots = ear.progResolved.size.coerceAtLeast(1)
             BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                // Size the label off the SHORTER edge of the space a slot gets, so
-                // portrait and landscape both stay legible without a second layout.
+                // Size the label so the LONGEST label in this progression fits the slot
+                // width (a bold glyph is ~0.62 em wide), capped by the slot height. Both
+                // orientations are handled by one layout: landscape just raises the
+                // height cap. Sizing off the longest label (not each one) keeps the type
+                // from jumping as reveals come in, and stops "Imaj13" being clipped.
                 val perSlot = maxWidth / slots
-                val shorter = if (perSlot < maxHeight) perSlot else maxHeight
-                val labelSp = (shorter.value * 0.42f).sp
+                val chars = ear.carLongestLabel.coerceAtLeast(1)
+                val byWidth = perSlot.value * 0.80f / (0.62f * chars)
+                val byHeight = maxHeight.value * 0.5f
+                val labelSp = minOf(byWidth, byHeight).coerceIn(16f, 132f).sp
                 Row(
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),

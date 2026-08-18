@@ -328,6 +328,12 @@ export class EarTrainingUI {
     // ---- the slots ----
     const slots = Math.max(ear.progResolved.length, 1);
     const row = el("div", { class: "car-slot-row" });
+    // Size the label so the LONGEST label in this progression fits the slot width (a
+    // bold glyph is ~0.62 em wide), capped by 13vmin so landscape stays sane. Sizing off
+    // the longest label rather than each one keeps the type from jumping as reveals come
+    // in, and stops "Imaj13" at the extended level being clipped by overflow:hidden.
+    const byWidth = (80 / slots) / (0.62 * ear.carLongestLabel);   // in vw
+    row.style.setProperty("--car-lab", `min(34vh, ${byWidth.toFixed(2)}vw)`);
     for (let i = 0; i < slots; i++) {
       const sounding = ear.currentBar === i && ear.carPhase === CarPhase.Playing;
       const revealed = i < ear.carRevealedSlots;
