@@ -35,7 +35,8 @@ export type IconName =
   | "add"
   | "mic"
   | "sun"
-  | "moon";
+  | "moon"
+  | "car";
 
 const PATH: Record<IconName, string> = {
   // Fretboard board — mirrors Android ShellIcons.Fretboard (board outline +
@@ -63,6 +64,7 @@ const PATH: Record<IconName, string> = {
   play: '<polygon points="7 4 20 12 7 20 7 4"/>',
   stop: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
   // Tone chip / small tune buttons (Fretboard, Tuner, Decompose, Options).
+  car: '<path d="M3 13l2-5a2 2 0 0 1 1.9-1.4h10.2A2 2 0 0 1 19 8l2 5"/><path d="M3 13h18v4H3z"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/>',
   tune: '<line x1="6" y1="21" x2="6" y2="3"/><circle cx="6" cy="14" r="2"/><line x1="12" y1="21" x2="12" y2="3"/><circle cx="12" cy="8" r="2"/><line x1="18" y1="21" x2="18" y2="3"/><circle cx="18" cy="17" r="2"/>',
   // Tone sheet row icons.
   eq: '<line x1="5" y1="21" x2="5" y2="10"/><line x1="12" y1="21" x2="12" y2="4"/><line x1="19" y1="21" x2="19" y2="14"/><circle cx="5" cy="7" r="1.6"/><circle cx="12" cy="14" r="1.6"/><circle cx="19" cy="10" r="1.6"/>',

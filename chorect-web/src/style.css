@@ -1245,3 +1245,74 @@ select.et-select {
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) { --workout-month-tint: rgba(246, 217, 228, 0.14); }
 }
+
+/* ---------- Ear Training: Car mode (hands-free) ----------
+   Sized to be read at a glance from a dash mount. One layout for both
+   orientations: the slot row eats all remaining height, and the label scales
+   off the SHORTER viewport edge (vmin) so landscape just makes it taller.
+   Existing tokens only — both themes work with no new palette entries. */
+.car-screen {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 8px;
+}
+.car-topbar { display: flex; align-items: center; gap: 10px; }
+.car-topbar .car-title { font-weight: 700; color: var(--act); letter-spacing: 0.04em; }
+.car-topbar .car-where { flex: 1; font-size: 13px; color: var(--muted); }
+.car-gen { font-size: 12px; }
+
+/* Idle: one big Start plus the time estimate. */
+.car-idle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.car-start { min-width: 60%; height: 72px; font-size: 24px; }
+.car-est { text-align: center; max-width: 34ch; }
+
+/* The slots — the only thing you should need to see while driving. */
+.car-slot-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 6px;
+}
+.car-slot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: var(--surface2);
+  overflow: hidden;
+}
+.car-slot.sounding {
+  background: color-mix(in srgb, var(--act) 22%, var(--surface2));
+  box-shadow: inset 0 0 0 2px var(--act);
+}
+.car-slot .lab {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  font-size: clamp(40px, 13vmin, 132px);
+  white-space: nowrap;
+}
+.car-slot .lab.hidden { opacity: 0.45; }
+
+/* Round dots: the only progress affordance. */
+.car-dots { display: flex; justify-content: center; gap: 8px; }
+.car-dots .dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--surface2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.car-dots .dot.on { background: var(--act); box-shadow: none; }
+
+/* Thumb-sized actions — hittable without looking. */
+.car-actions { display: flex; gap: 8px; }
+.car-actions > .btn { flex: 1; height: 56px; font-size: 17px; }

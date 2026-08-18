@@ -8,3 +8,4 @@ export * from "./percussionSynth";
 export * from "./panner";
 export * from "./reverbIR";
 export * from "./sampleInstrument";
+export * from "./cueBeep";

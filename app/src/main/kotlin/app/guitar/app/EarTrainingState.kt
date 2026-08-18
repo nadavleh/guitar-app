@@ -5,7 +5,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.guitar.audio.AudioEngine
+import app.guitar.audio.CueBeep
 import app.guitar.audio.Timbre
+import app.guitar.theory.CarMode
 import app.guitar.theory.ChordLibrary
 import app.guitar.theory.ChordShapeGenerator
 import app.guitar.theory.ChordTypeLevel
@@ -530,10 +532,19 @@ class EarTrainingState(
         }
     }
 
+    /** The SINGLE cancellation point for both the practice looper and the Car-mode
+     *  driver. Everything that already calls this — [switchTab], [release], the
+     *  transport dock's Stop, `applyChallengeQuestion`, the generator setters —
+     *  therefore cancels a running car exercise for free, with no new call sites. */
     fun stopLoop() {
         isLooping = false
         loopJob?.cancel()
         loopJob = null
+        carJob?.cancel()
+        carJob = null
+        // A cancelled exercise FREEZES its reveals (carRound is kept) rather than
+        // spoiling the rest — nothing is graded, so there is nothing to lose.
+        if (carPhase == CarPhase.Beeps || carPhase == CarPhase.Playing) carPhase = CarPhase.Idle
         currentPlayingShape = null
         audio.stop()
     }
@@ -1607,6 +1618,139 @@ class EarTrainingState(
         stopLoop()
     }
 
+    // ---------- Car mode (hands-free progression drill) ----------
+    // One exercise: CarMode.BEEPS lead-in beeps, then the progression sounds
+    // CarMode.ROUNDS times, revealing one more chord slot per round from the 2nd on.
+    // NEVER graded — it touches none of the challenge scoring state, so a half-finished
+    // challenge survives a drive intact.
+
+    var carPhase by mutableStateOf(CarPhase.Idle)
+        private set
+
+    /** 0 = not started; 1..[CarMode.ROUNDS] while running. */
+    var carRound by mutableStateOf(0)
+        private set
+
+    /** Exercises drawn this car session (header readout only). */
+    var carExerciseCount by mutableStateOf(0)
+        private set
+
+    var carAutoAdvance by mutableStateOf(true)
+        private set
+
+    private var carJob: Job? = null
+    private var carBeep: FloatArray? = null
+    private var carBeepRate = 0
+
+    /** Slots revealed right now — DERIVED, never stored, so it cannot go stale. */
+    val carRevealedSlots: Int get() = CarMode.revealedSlots(carRound, progResolved.size)
+
+    /** The big glanceable slot label: a Roman-numeral FUNCTION once revealed, else "?".
+     *  Never a chord symbol and never the key — the drill is function recognition. */
+    fun carSlotLabel(i: Int): String {
+        if (i >= carRevealedSlots) return "?"
+        return progResolved.getOrNull(i)?.romanLabel ?: "—"
+    }
+
+    /** Seconds one exercise takes at the current tempo, for the on-screen estimate. */
+    val carExerciseSeconds: Int
+        get() {
+            val slots = if (progResolved.isEmpty()) 4 else progResolved.size
+            return ((CarMode.exerciseMs(progBpm, slots) + CarMode.GAP_MS) / 1000).toInt()
+        }
+
+    fun enterCarMode() {
+        earMode = EarMode.Car
+        carPhase = CarPhase.Idle
+        carRound = 0
+        carExerciseCount = 0
+        stopLoop()
+    }
+
+    fun exitCarMode() {
+        stopCarExercise()
+        earMode = EarMode.Challenge
+    }
+
+    fun startCarExercise() = beginCarExercise(draw = true, cancelExisting = true)
+    fun replayCarExercise() = beginCarExercise(draw = false, cancelExisting = true)
+    fun chooseCarAutoAdvance(v: Boolean) { carAutoAdvance = v }
+
+    fun stopCarExercise() {
+        stopLoop()              // cancels carJob → the driver unwinds at its next delay
+        carPhase = CarPhase.Idle
+    }
+
+    private fun cachedCarBeep(): FloatArray {
+        val sr = audio.sampleRate
+        val cached = carBeep
+        if (cached == null || carBeepRate != sr) {
+            val fresh = CueBeep.render(
+                CarMode.BEEP_HZ, CarMode.BEEP_MS, sr, CarMode.BEEP_PEAK, CarMode.BEEP_ATTACK_MS,
+            )
+            carBeep = fresh
+            carBeepRate = sr
+            return fresh
+        }
+        return cached
+    }
+
+    /** Draw (or keep) a progression and run one exercise.
+     *  [cancelExisting] is FALSE only on the auto-advance chain, which is called from
+     *  inside the driver — cancelling there would cancel the very coroutine making the
+     *  call at its next suspension point. */
+    private fun beginCarExercise(draw: Boolean, cancelExisting: Boolean) {
+        if (cancelExisting) stopLoop() else audio.stop()
+        if (draw) {
+            if (specialProgMode) nextAdvancedProgression() else nextProgression()
+            carExerciseCount++
+        }
+        carRound = 0
+        carPhase = CarPhase.Beeps
+        isLooping = true        // keeps the playhead + "is playing" chrome truthful
+        carJob = scope.launch { runCarExercise() }
+    }
+
+    private suspend fun runCarExercise() {
+        ensureProgShapes()
+        val slots = progResolved.size
+        if (slots == 0) { carPhase = CarPhase.Idle; isLooping = false; return }
+
+        // Lead-in: the beeps are scheduled on the AUDIO clock via delayFrames, not with
+        // three delays, so the 500 ms spacing is sample-accurate despite render jitter.
+        val beep = cachedCarBeep()
+        val sr = audio.sampleRate
+        for (k in 0 until CarMode.BEEPS) {
+            audio.playSamplesAt(beep, 0.9f, delayFrames = k * CarMode.BEEP_GAP_MS * sr / 1000)
+        }
+        delay(CarMode.LEAD_IN_MS.toLong())   // chord 1 lands one gap after beep 3
+        if (earMode != EarMode.Car) return
+
+        for (round in 1..CarMode.ROUNDS) {
+            carRound = round          // round 1 → 0 revealed … round 5 → 4 revealed
+            carPhase = CarPhase.Playing
+            // Re-read the tempo each round so a BPM edit applies from the next round.
+            val barMs = (60_000L / progBpm.coerceAtLeast(10)) * 4
+            val sustain = (barMs * 0.9).toInt().coerceAtLeast(200)
+            for (i in 0 until slots) {
+                if (earMode != EarMode.Car) return
+                currentBar = i
+                audio.cutReverb()
+                soundBar(i, sustain)   // the SAME voicing path the looper uses
+                delay(barMs)
+            }
+        }
+
+        carRound = CarMode.ROUNDS     // keep the full reveal on screen
+        carPhase = CarPhase.Between
+        isLooping = false
+        currentPlayingShape = null
+        if (!carAutoAdvance) return
+        delay(CarMode.GAP_MS.toLong())   // silent self-assessment gap
+        if (earMode != EarMode.Car) return
+        beginCarExercise(draw = true, cancelExisting = false)   // chain
+    }
+
     /** The currently-drawn advanced progression (null until generated). */
     var advProg by mutableStateOf<app.guitar.theory.EarTraining.NamedProgression?>(null)
         private set
@@ -1666,7 +1810,8 @@ class EarTrainingState(
         hasGenerated = true
         // In a CHALLENGE the loop always stops on a new progression — you play each
         // question explicitly. Practice keeps looping so you can browse hands-free.
-        if (earMode == EarMode.Challenge) stopLoop()
+        // Challenge AND Car stop; only Practice carries a running loop over.
+        if (earMode != EarMode.Practice) stopLoop()
         else if (isLooping) { stopLoop(); startLoop() }
     }
 
@@ -2194,4 +2339,8 @@ enum class EarSubMode { Progression, Note2Chord, Flavor, Inversions, AugDim, Int
 enum class ChallengeSource { Generator, DrillList }
 
 /** Within any tab: free Practice or scored Challenge rounds. */
-enum class EarMode { Practice, Challenge }
+enum class EarMode { Practice, Challenge, Car }
+
+/** Where a Car-mode exercise is: [Idle] (nothing running), [Beeps] (lead-in),
+ *  [Playing] (a round is sounding), [Between] (finished, awaiting replay / auto-advance). */
+enum class CarPhase { Idle, Beeps, Playing, Between }

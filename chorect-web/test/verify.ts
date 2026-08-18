@@ -9,7 +9,7 @@ import {
   ADVANCED_PROGRESSIONS, resolveNamed, QUALITIES, inversionMidis, randomN2c, n2cAnswerLabel,
   romanIsModeAmbiguous, MAJOR_DEGREES, MINOR_DEGREES,
   ProgFocus, randomProgression, hasOneSixStep, thirdSixthPrimaryPool, thirdSixthContrastPool,
-  THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_PERCENT, Progression,
+  THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode,
 } from "../src/theory";
 import { standard } from "../src/theory/tunings";
 import {
@@ -17,7 +17,7 @@ import {
   movementCost, pickMinMovement, BUILTIN_PATTERNS,
   INTERVAL_CHOICES, intervalTargetMidi, CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
 } from "../src/theory";
-import { PluckedSynth, PitchDetector, analyzePitch, PercussionSynth, panGains, nearestRoot, pitchRate } from "../src/audio";
+import { PluckedSynth, PitchDetector, analyzePitch, PercussionSynth, panGains, nearestRoot, pitchRate, renderCueBeep } from "../src/audio";
 
 let passed = 0;
 let failed = 0;
@@ -322,6 +322,47 @@ for (const m of [TrainingMode.Major, TrainingMode.Minor]) {
     if (p.mode !== TrainingMode.Major || p.degrees[0] !== 1 || p.degrees[1] !== 3) ok = false;
   }
   check("I->iii drill still draws major I-iii openers", ok);
+}
+
+
+// --- Car mode: the reveal/timing schedule must match Kotlin CarMode exactly ---
+check("CarMode constants match Kotlin", CarMode.ROUNDS === 5 && CarMode.BEEPS === 3 &&
+  CarMode.BEEP_GAP_MS === 500 && CarMode.LEAD_IN_MS === 1500 && CarMode.GAP_MS === 4000 &&
+  CarMode.BEEP_HZ === 880 && CarMode.BEEP_MS === 140 && CarMode.BEEP_PEAK === 0.55 &&
+  CarMode.BEEP_ATTACK_MS === 5);
+check("round 1 reveals nothing, round 5 reveals every slot",
+  CarMode.revealedSlots(1, 4) === 0 && CarMode.revealedSlots(5, 4) === 4);
+// Indexed by round 0..5 — pinned as a literal so nobody "optimises" the clamp away.
+check("reveal ramp is exactly [0,0,1,2,3,4] over rounds 0..5",
+  [0, 1, 2, 3, 4, 5].map((r) => CarMode.revealedSlots(r, 4)).join(",") === "0,0,1,2,3,4");
+check("reveal count clamps to the slot count and never goes negative",
+  CarMode.revealedSlots(4, 3) === 3 && CarMode.revealedSlots(5, 3) === 3 &&
+  CarMode.revealedSlots(0, 4) === 0 && CarMode.revealedSlots(-1, 4) === 0);
+check("exercise at 140bpm over 4 bars is ~36s",
+  CarMode.exerciseMs(140, 4) >= 35_000 && CarMode.exerciseMs(140, 4) <= 37_000);
+check("exerciseMs matches Kotlin integer division exactly", CarMode.exerciseMs(140, 4) === 35780);
+check("exerciseMs doubles with the bars and clamps a nonsense bpm",
+  (CarMode.exerciseMs(140, 8) - CarMode.LEAD_IN_MS) === 2 * (CarMode.exerciseMs(140, 4) - CarMode.LEAD_IN_MS) &&
+  CarMode.exerciseMs(0, 4) > 0);
+
+// --- Car-mode cue beep: same envelope as Kotlin CueBeep ---
+{
+  const beep = renderCueBeep(CarMode.BEEP_HZ, CarMode.BEEP_MS, 44100, CarMode.BEEP_PEAK, CarMode.BEEP_ATTACK_MS);
+  check("cue beep length is the requested duration", beep.length === Math.trunc(44100 * 140 / 1000));
+  check("cue beep stays finite and within peak",
+    beep.every((s) => Number.isFinite(s) && Math.abs(s) <= CarMode.BEEP_PEAK + 1e-6));
+  check("cue beep attacks from silence (no onset click)", Math.abs(beep[0]) < 0.02);
+  check("cue beep decays away", Math.abs(beep[beep.length - 1]) < 0.05 * CarMode.BEEP_PEAK);
+  let loudest = 0;
+  for (let i = 1; i < beep.length; i++) if (Math.abs(beep[i]) > Math.abs(beep[loudest])) loudest = i;
+  check("cue beep peaks early (attack then decay)", loudest < beep.length * 0.15);
+  let crossings = 0;
+  for (let i = 1; i < beep.length; i++) if ((beep[i - 1] < 0) !== (beep[i] < 0)) crossings++;
+  const expected = Math.trunc(2 * CarMode.BEEP_HZ * CarMode.BEEP_MS / 1000);
+  check(`cue beep really is ${CarMode.BEEP_HZ}Hz (${crossings} crossings, expected ~${expected})`,
+    Math.abs(crossings - expected) <= 4);
+  check("cue beep of zero length is empty, not a throw",
+    renderCueBeep(CarMode.BEEP_HZ, 0, 44100, CarMode.BEEP_PEAK, CarMode.BEEP_ATTACK_MS).length === 0);
 }
 
 

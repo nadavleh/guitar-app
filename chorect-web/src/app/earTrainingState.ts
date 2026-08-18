@@ -9,7 +9,7 @@ import {
   parseChord, QUALITIES, spellPc,
   TrainingMode, ChordTypeLevel, Progression, ResolvedChord, NamedProgression,
   EarTrainingDegrees, degreeRoot, degreeRefMidi, resolve as resolveDegree, resolveProgression,
-  randomProgression, ProgFocus, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
+  randomProgression, ProgFocus, CarMode, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
   MINOR_DOMINANT, romanModeTag, romanIsModeAmbiguous, progressionKey, progressionFromKey,
   majorRelativeDegree, degreeFromMajorRelative,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow, importedSongsForDiatonic, CIRCLE_WINDOWS, namedRomanLine,
@@ -19,7 +19,7 @@ import {
   pickMinMovement, defaultRng,
   IntervalDirection, INTERVAL_CHOICES, intervalTargetMidi,
 } from "../theory";
-import { WebAudioEngine, Timbres } from "../audio";
+import { WebAudioEngine, Timbres, renderCueBeep } from "../audio";
 
 const DISPLAY_FRETS = 14;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -30,7 +30,11 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const EAR_BASS_BOOST = 0.4;
 
 export enum EarSubMode { Progression = "Progression", Note2Chord = "Note2Chord", Flavor = "Flavor", Inversions = "Inversions", AugDim = "AugDim", Intervals = "Intervals", Drill = "Drill", Workout = "Workout" }
-export enum EarMode { Practice = "Practice", Challenge = "Challenge" }
+export enum EarMode { Practice = "Practice", Challenge = "Challenge", Car = "Car" }
+
+/** Where a Car-mode exercise is: Idle (nothing running), Beeps (lead-in), Playing
+ *  (a round is sounding), Between (finished, awaiting replay / auto-advance). */
+export enum CarPhase { Idle = "Idle", Beeps = "Beeps", Playing = "Playing", Between = "Between" }
 
 export interface EarDeps {
   audio: WebAudioEngine;
@@ -342,9 +346,17 @@ export class EarTrainingState {
     })();
   }
 
+  /** The SINGLE cancellation point for both the practice looper and the Car-mode
+   *  driver. Everything that already calls this — switchTab, release, the transport
+   *  dock's Stop, applyChallengeQuestion, the generator setters — therefore cancels a
+   *  running car exercise for free, with no new call sites to remember. */
   stopLoop() {
     this.isLooping = false;
     this.loopToken++;
+    this.carToken++;
+    // A cancelled exercise FREEZES its reveals (carRound is kept) rather than
+    // spoiling the rest — nothing is graded, so there is nothing to lose.
+    if (this.carPhase === CarPhase.Beeps || this.carPhase === CarPhase.Playing) this.carPhase = CarPhase.Idle;
     this.currentPlayingShape = null;
     this.deps.audio.stop();
     this.notify();
@@ -1364,6 +1376,141 @@ export class EarTrainingState {
   setIiiFocusMode(v: boolean) { this.iiiFocusMode = v; if (v) { this.advancedMode = false; this.circleMode = false; this.third6FocusMode = false; } this.stopLoop(); this.notify(); }
   setThird6FocusMode(v: boolean) { this.third6FocusMode = v; if (v) { this.advancedMode = false; this.circleMode = false; this.iiiFocusMode = false; } this.stopLoop(); this.notify(); }
 
+  // ---------- Car mode (hands-free progression drill) ----------
+  // One exercise: CarMode.BEEPS lead-in beeps, then the progression sounds
+  // CarMode.ROUNDS times, revealing one more chord slot per round from the 2nd on.
+  // NEVER graded — it touches none of the challenge scoring state, so you can leave a
+  // half-finished challenge, drive, and come back to it intact.
+
+  carPhase: CarPhase = CarPhase.Idle;
+  /** 0 = not started; 1..CarMode.ROUNDS while running. */
+  carRound = 0;
+  /** Exercises drawn this car session (header readout only). */
+  carExerciseCount = 0;
+  carAutoAdvance = true;
+  private carToken = 0;
+  private carBeep: Float32Array | null = null;
+  private carBeepRate = 0;
+
+  /** Slots revealed right now — DERIVED, never stored, so it cannot go stale. */
+  get carRevealedSlots(): number {
+    return CarMode.revealedSlots(this.carRound, this.progResolved.length);
+  }
+
+  /** The big glanceable slot label: a Roman-numeral FUNCTION once revealed, else "?".
+   *  Never a chord symbol and never the key — the drill is function recognition. */
+  carSlotLabel(i: number): string {
+    if (i >= this.carRevealedSlots) return "?";
+    return this.progResolved[i]?.romanLabel ?? "—";
+  }
+
+  /** Seconds one exercise takes at the current tempo, for the on-screen estimate. */
+  get carExerciseSeconds(): number {
+    const slots = this.progResolved.length || 4;
+    return Math.round((CarMode.exerciseMs(this.progBpm, slots) + CarMode.GAP_MS) / 1000);
+  }
+
+  enterCarMode() {
+    this.earMode = EarMode.Car;
+    this.carPhase = CarPhase.Idle;
+    this.carRound = 0;
+    this.carExerciseCount = 0;
+    this.stopLoop();
+    this.notify();
+  }
+
+  exitCarMode() {
+    this.stopCarExercise();
+    this.earMode = EarMode.Challenge;
+    this.notify();
+  }
+
+  startCarExercise() { this.beginCarExercise(true, true); }
+  replayCarExercise() { this.beginCarExercise(false, true); }
+  setCarAutoAdvance(v: boolean) { this.carAutoAdvance = v; this.notify(); }
+
+  stopCarExercise() {
+    this.stopLoop();          // bumps carToken → the driver unwinds at its next check
+    this.carPhase = CarPhase.Idle;
+    this.notify();
+  }
+
+  private cachedCarBeep(): Float32Array {
+    const sr = this.deps.audio.sampleRate;
+    if (!this.carBeep || this.carBeepRate !== sr) {
+      this.carBeep = renderCueBeep(CarMode.BEEP_HZ, CarMode.BEEP_MS, sr, CarMode.BEEP_PEAK, CarMode.BEEP_ATTACK_MS);
+      this.carBeepRate = sr;
+    }
+    return this.carBeep;
+  }
+
+  /** Draw (or keep) a progression and run one exercise.
+   *  `cancelExisting` is FALSE only on the auto-advance chain, which is called from
+   *  inside the driver — cancelling there would bump the token out from under the
+   *  still-executing frame that made the call. */
+  private beginCarExercise(draw: boolean, cancelExisting: boolean) {
+    if (cancelExisting) this.stopLoop();
+    else this.deps.audio.stop();
+    if (draw) {
+      if (this.specialProgMode) this.nextAdvancedProgression();
+      else this.nextProgression();
+      this.carExerciseCount++;
+    }
+    this.carRound = 0;
+    this.carPhase = CarPhase.Beeps;
+    this.isLooping = true;      // keeps the playhead + "is playing" chrome truthful
+    this.notify();
+    this.carToken++;
+    void this.runCarExercise(this.carToken);
+  }
+
+  private carCancelled(token: number): boolean {
+    return token !== this.carToken || this.earMode !== EarMode.Car;
+  }
+
+  private async runCarExercise(token: number): Promise<void> {
+    this.ensureProgShapes();
+    const slots = this.progResolved.length;
+    if (slots === 0) { this.carPhase = CarPhase.Idle; this.isLooping = false; this.notify(); return; }
+
+    // Lead-in: the beeps are scheduled on the AUDIO clock, not with three sleeps, so
+    // the 500 ms spacing is sample-accurate and immune to render jitter.
+    const beep = this.cachedCarBeep();
+    const t0 = this.deps.audio.now();
+    for (let k = 0; k < CarMode.BEEPS; k++) {
+      this.deps.audio.playSamples(beep, 0.9, t0 + k * CarMode.BEEP_GAP_MS / 1000);
+    }
+    await sleep(CarMode.LEAD_IN_MS);   // chord 1 lands one gap after beep 3
+    if (this.carCancelled(token)) return;
+
+    for (let round = 1; round <= CarMode.ROUNDS; round++) {
+      this.carRound = round;            // round 1 → 0 revealed … round 5 → 4 revealed
+      this.carPhase = CarPhase.Playing;
+      this.notify();
+      // Re-read the tempo each round so a BPM edit applies from the next round.
+      const barMs = (60000 / Math.max(this.progBpm, 10)) * 4;
+      const sustain = Math.max(Math.floor(barMs * 0.9), 200);
+      for (let i = 0; i < slots; i++) {
+        if (this.carCancelled(token)) return;
+        this.currentBar = i;
+        this.deps.audio.cutReverb();
+        this.soundBar(i, sustain);       // the SAME voicing path the looper uses
+        this.notify();
+        await sleep(barMs);
+      }
+    }
+
+    this.carRound = CarMode.ROUNDS;      // keep the full reveal on screen
+    this.carPhase = CarPhase.Between;
+    this.isLooping = false;
+    this.currentPlayingShape = null;
+    this.notify();
+    if (!this.carAutoAdvance) return;
+    await sleep(CarMode.GAP_MS);         // silent self-assessment gap
+    if (this.carCancelled(token)) return;
+    this.beginCarExercise(true, false);  // chain — see the comment on beginCarExercise
+  }
+
   // ← Previous history for the advanced/circle practice view (mirrors the diatonic one).
   private advHistory: { np: NamedProgression; key: PitchClass; resolved: ResolvedChord[] }[] = [];
   get canGoPrevAdvanced(): boolean { return this.advHistory.length > 0; }
@@ -1404,7 +1551,8 @@ export class EarTrainingState {
     this.hasGenerated = true;
     // In a CHALLENGE the loop always stops on a new progression — you play each
     // question explicitly. Practice keeps looping so you can browse hands-free.
-    if (this.earMode === EarMode.Challenge) this.stopLoop();
+    // Challenge AND Car stop; only Practice carries a running loop over.
+    if (this.earMode !== EarMode.Practice) this.stopLoop();
     else if (this.isLooping) { this.stopLoop(); this.startLoop(); }
     this.notify();
   }

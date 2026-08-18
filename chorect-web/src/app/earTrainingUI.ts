@@ -3,7 +3,8 @@
 // state change. Native <select> replaces the Compose dropdowns.
 
 import { AppState, ChallengeScore, CHALLENGE_SCORE_ORDER } from "./appState";
-import { EarTrainingState, EarSubMode, EarMode } from "./earTrainingState";
+import { EarTrainingState, EarSubMode, EarMode, CarPhase } from "./earTrainingState";
+import { acquireWakeLock, releaseWakeLock, WakeLockHandle } from "./wakeLock";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { shapeMarks } from "./marks";
 import { el, btn, segmented, switchRow, labelSm, songLinkRow, externalSongRow, slider } from "./dom";
@@ -16,7 +17,7 @@ import {
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
   parseChord, ChordShapeGenerator, CagedShape, notesFrom, midiPitchClass, fp, fpKey,
   IntervalDirection, INTERVAL_CHOICES, intervalChoiceFor,
-  Progression,
+  Progression, CarMode,
   MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, MINOR_HARMONIC_PROGRESSIONS, ADVANCED_PROGRESSIONS, ADVANCED2_PROGRESSIONS,
   SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor, progressionFromKey, progressionLacksTonic,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow,
@@ -247,6 +248,120 @@ export class EarTrainingUI {
     );
   }
 
+  // ---------- Car mode (hands-free progression drill) ----------
+
+  private carWake: WakeLockHandle | null = null;
+  private carVisListener: (() => void) | null = null;
+
+  /** Hold a screen wake lock while car mode is on screen, and release it when it
+   *  isn't. Also registers the visibility handler that stops an exercise when the
+   *  tab is hidden: background tabs clamp setTimeout to >=1s, which would smear the
+   *  bar grid into nonsense. */
+  private applyCarWakeLock(on: boolean): void {
+    if (on) {
+      if (!this.carWake) void acquireWakeLock().then((h) => { this.carWake = h; });
+      if (!this.carVisListener) {
+        const onVis = () => {
+          if (document.hidden) {
+            this.ear.stopCarExercise();
+            void releaseWakeLock(this.carWake);
+            this.carWake = null;
+            this.rerender();
+          } else if (this.ear.earMode === EarMode.Car && !this.carWake) {
+            void acquireWakeLock().then((h) => { this.carWake = h; });
+          }
+        };
+        this.carVisListener = onVis;
+        document.addEventListener("visibilitychange", onVis);
+      }
+      return;
+    }
+    if (this.carWake) { void releaseWakeLock(this.carWake); this.carWake = null; }
+    if (this.carVisListener) {
+      document.removeEventListener("visibilitychange", this.carVisListener);
+      this.carVisListener = null;
+    }
+  }
+
+  /**
+   * The whole content column while EarMode.Car is active: a read-only generator line,
+   * one huge row of chord slots, round dots, three thumb-sized buttons.
+   *
+   * Everything is sized to be read at a glance from a dash mount, and NOTHING is
+   * graded - the reveals are the feedback. Labels are Roman-numeral functions, never
+   * chord symbols, and the key is never shown (per the ear-training digest: work
+   * directly in function, start each exercise guitarless).
+   */
+  private carModeView(screen: HTMLElement): void {
+    const ear = this.ear;
+    const wrap = el("div", { class: "car-screen" });
+
+    // ---- top bar ----
+    const where = ear.carExerciseCount === 0 ? ""
+      : `Exercise ${ear.carExerciseCount}` +
+        (ear.carRound > 0 ? ` \u00b7 play ${ear.carRound}/${CarMode.ROUNDS}` : "");
+    wrap.appendChild(el("div", { class: "car-topbar" }, [
+      el("span", { class: "car-title" }, ["CAR MODE"]),
+      el("span", { class: "car-where" }, [where]),
+      btn("Exit", () => { ear.exitCarMode(); this.rerender(); }),
+    ]));
+
+    // Read-only: car mode honours the challenge config, but opens no sheets.
+    wrap.appendChild(el("div", { class: "et-muted car-gen" },
+      [`${this.generatorLabel()}  \u00b7  ${this.levelLabel()}`]));
+
+    if (ear.carPhase === CarPhase.Idle && ear.carRound === 0) {
+      // ---- idle: one big Start ----
+      const start = btn("Start \u25b6", () => { ear.startCarExercise(); this.rerender(); }, "btn primary");
+      start.classList.add("car-start");
+      wrap.appendChild(el("div", { class: "car-idle" }, [
+        start,
+        el("div", { class: "et-muted car-est" }, [
+          `\u2248${ear.carExerciseSeconds}s per exercise \u00b7 ${CarMode.ROUNDS} plays \u00b7 ` +
+          "one more chord revealed each play",
+        ]),
+      ]));
+      screen.appendChild(wrap);
+      return;
+    }
+
+    // ---- the slots ----
+    const slots = Math.max(ear.progResolved.length, 1);
+    const row = el("div", { class: "car-slot-row" });
+    for (let i = 0; i < slots; i++) {
+      const sounding = ear.currentBar === i && ear.carPhase === CarPhase.Playing;
+      const revealed = i < ear.carRevealedSlots;
+      const cell = el("div", { class: "car-slot" + (sounding ? " sounding" : "") }, [
+        el("span", { class: "lab" + (revealed ? "" : " hidden") }, [ear.carSlotLabel(i)]),
+      ]);
+      row.appendChild(cell);
+    }
+    wrap.appendChild(row);
+
+    // ---- round dots ----
+    const dots = el("div", { class: "car-dots" });
+    for (let r = 1; r <= CarMode.ROUNDS; r++) {
+      dots.appendChild(el("span", { class: "dot" + (r <= ear.carRound ? " on" : "") }));
+    }
+    wrap.appendChild(dots);
+
+    // ---- the three thumb-sized actions ----
+    wrap.appendChild(el("div", { class: "car-actions" }, [
+      btn(`Replay ${CarMode.ROUNDS}\u00d7`, () => { ear.replayCarExercise(); this.rerender(); }, "btn primary"),
+      btn("Next \u2192", () => { ear.startCarExercise(); this.rerender(); }, "btn primary"),
+      btn("Stop", () => { ear.stopCarExercise(); this.rerender(); }),
+    ]));
+
+    wrap.appendChild(switchRow(
+      ear.carAutoAdvance ? `Auto-advance (${CarMode.GAP_MS / 1000}s gap)` : "Auto-advance off",
+      null,
+      ear.carAutoAdvance,
+      (v) => { ear.setCarAutoAdvance(v); this.rerender(); },
+    ));
+
+    screen.appendChild(wrap);
+  }
+
   /** Short label for the current chord-type/level pool ("Mix" when Mix-all is on). */
   private levelLabel(): string {
     const ear = this.ear;
@@ -464,6 +579,18 @@ export class EarTrainingUI {
       btn("Back", () => { ear.release(); this.onBack(); }),
     );
     screen.appendChild(el("div", { class: "tool-topbar" }, topbarChildren));
+
+    // Car mode owns the whole content column: no mode picker, no sub-mode chips, no
+    // answer pad, no transport dock - just huge glanceable slots. Returning here is
+    // what guarantees the dispatch below and the dock never run in Car mode (they
+    // would fall into their Practice branches). Progressions only, for now.
+    if (ear.earMode === EarMode.Car && ear.progSubMode === EarSubMode.Progression) {
+      this.carModeView(screen);
+      container.appendChild(screen);
+      this.applyCarWakeLock(true);
+      return;
+    }
+    this.applyCarWakeLock(false);
 
     // Practice/Challenge segmented control (Signal move — replaces the mode
     // <select>) + sub-mode chip row (replaces the sub-mode <select>). Drill and
@@ -1020,6 +1147,16 @@ export class EarTrainingUI {
       parent.appendChild(this.generatorSummaryCard(() => this.openSettingsSheet()));
       parent.appendChild(el("div", { class: "v-gap-12" }));
       parent.appendChild(btn("Start challenge ▶", () => ear.startChallenge(), "btn primary"));
+      // Hands-free car mode. Deliberately HERE and not in the transport dock or the
+      // mode picker: this is the screen you sit on before driving, it honours the
+      // generator settings shown just above, and it cannot be mis-tapped while you
+      // are jabbing at Roman numerals mid-question.
+      const carBtn = btn("Car mode — hands-free", () => { ear.enterCarMode(); this.rerender(); }, "btn");
+      carBtn.style.cssText = "width:100%;margin-top:12px";
+      carBtn.prepend(icon("car", 18));
+      parent.appendChild(carBtn);
+      parent.appendChild(el("div", { class: "et-muted", style: "font-size:12px;margin-top:4px" },
+        ["5 plays per progression, revealing one more chord each play. Not graded."]));
       return;
     }
     if (ear.challengeIndex >= ear.challengeTotal) {

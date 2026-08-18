@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -21,9 +23,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.RestartAlt
@@ -62,12 +66,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.guitar.theory.ChordTypeLevel
+import app.guitar.theory.CarMode
 import app.guitar.theory.EarTraining
 import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
@@ -111,6 +118,16 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
             .background(MaterialTheme.colorScheme.background)
             .padding(12.dp),
     ) {
+        // Car mode owns the whole content column: no sub-mode chips, no Practice/
+        // Challenge picker, no answer pad, no transport dock — just huge glanceable
+        // slots. Returning here is what guarantees the dispatch `when` below and the
+        // TransportDock never run in Car mode (they would fall into their else/Practice
+        // branches). Only Progressions has a car mode for now.
+        if (ear.earMode == EarMode.Car && ear.progSubMode == EarSubMode.Progression) {
+            CarModeView(state, ear)
+            return@Column
+        }
+
         // Title row: title + (while a Progression challenge is in flight) pinned
         // Restart/Quit icons + Stats + Tune + Back.
         val progChallengeInFlight = ear.progSubMode == EarSubMode.Progression &&
@@ -163,7 +180,9 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
         } else {
             if (ear.progSubMode != EarSubMode.Drill && ear.progSubMode != EarSubMode.Workout) {
                 SegmentedRow(
-                    options = EarMode.entries,
+                    // NOT EarMode.entries — Car is entered from the challenge config
+                    // screen, never from this picker (it would read as "Challenge").
+                    options = listOf(EarMode.Practice, EarMode.Challenge),
                     selected = ear.earMode,
                     onSelect = { ear.earMode = it },
                     label = { if (it == EarMode.Practice) "Practice" else "Challenge" },
@@ -299,7 +318,7 @@ private fun ChallengeModeFold(state: AppState, ear: EarTrainingState) {
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             Column(Modifier.width(300.dp).padding(horizontal = 10.dp, vertical = 4.dp)) {
                 SegmentedRow(
-                    options = EarMode.entries,
+                    options = listOf(EarMode.Practice, EarMode.Challenge),
                     selected = ear.earMode,
                     onSelect = { ear.earMode = it },
                     label = { if (it == EarMode.Practice) "Practice" else "Challenge" },
@@ -1473,6 +1492,27 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                     Text("Start challenge ▶", style = MaterialTheme.typography.titleMedium)
                 }
             }
+
+            Spacer(Modifier.height(12.dp))
+
+            // Hands-free car mode. Deliberately HERE and not in the transport dock or
+            // the mode picker: this is the screen you sit on before driving, it honours
+            // the generator settings shown just above, and it cannot be mis-tapped
+            // while you are jabbing at Roman numerals mid-question.
+            OutlinedButton(
+                onClick = { ear.enterCarMode() },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Outlined.DirectionsCar, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Car mode — hands-free")
+            }
+            Text(
+                "5 plays per progression, revealing one more chord each play. Not graded.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
             if (settingsOpen) GeneratorSettingsSheet(state, ear, onDismiss = { settingsOpen = false })
             return@Column
         }
@@ -2996,6 +3036,185 @@ private fun LibraryRow(
             } else {
                 Text("No song examples for this one.", style = MaterialTheme.typography.bodySmall,
                     fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+
+// ---------------------------------------------------------------------------------
+// Car mode - hands-free progression drill
+// ---------------------------------------------------------------------------------
+
+/**
+ * The whole content column while [EarMode.Car] is active: a read-only generator line,
+ * one huge row of chord slots, round dots, and three thumb-sized buttons.
+ *
+ * Everything here is sized to be read at a glance from a dash mount, and NOTHING here
+ * is graded - the reveals are the feedback. The labels are Roman-numeral functions,
+ * never chord symbols, and the key is never shown (see the ear-training digest: work
+ * directly in function, start each exercise guitarless).
+ */
+@Composable
+private fun CarModeView(state: AppState, ear: EarTrainingState) {
+    // Never let the screen sleep mid-exercise. keepScreenOn needs no permission (that
+    // is only for PowerManager wake locks), and the DisposableEffect releases it on
+    // exit - including the dispose+recreate a rotation causes, which re-applies it.
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // ---- top bar: what/where + Exit ----
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "CAR MODE",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.width(10.dp))
+            val where = if (ear.carExerciseCount == 0) {
+                ""
+            } else {
+                val play = if (ear.carRound > 0) " - play " + ear.carRound + "/" + CarMode.ROUNDS else ""
+                "Exercise " + ear.carExerciseCount + play
+            }
+            Text(
+                where,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = { ear.exitCarMode() }) { Text("Exit") }
+        }
+
+        // Read-only: car mode honours whatever the challenge config screen was set to,
+        // but nothing here opens a sheet - no settings while driving.
+        Text(
+            generatorLabel(ear) + "  -  " + levelLabel(ear),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        if (ear.carPhase == CarPhase.Idle && ear.carRound == 0) {
+            // ---- idle: one big Start ----
+            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Button(
+                        onClick = { ear.startCarExercise() },
+                        modifier = Modifier.height(72.dp).fillMaxWidth(0.7f),
+                    ) { Text("Start", style = MaterialTheme.typography.headlineSmall) }
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "about " + ear.carExerciseSeconds + " s per exercise  -  " +
+                            CarMode.ROUNDS + " plays  -  one more chord revealed each play",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        } else {
+            // ---- the slots: the only thing you should need to see while driving ----
+            val slots = ear.progResolved.size.coerceAtLeast(1)
+            BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                // Size the label off the SHORTER edge of the space a slot gets, so
+                // portrait and landscape both stay legible without a second layout.
+                val perSlot = maxWidth / slots
+                val shorter = if (perSlot < maxHeight) perSlot else maxHeight
+                val labelSp = (shorter.value * 0.42f).sp
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    for (i in 0 until slots) {
+                        val sounding = ear.currentBar == i && ear.carPhase == CarPhase.Playing
+                        val revealed = i < ear.carRevealedSlots
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    if (sounding) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                ear.carSlotLabel(i),
+                                fontSize = labelSp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                color = if (revealed) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // ---- round dots: the only progress affordance ----
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                for (r in 1..CarMode.ROUNDS) {
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (r <= ear.carRound) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // ---- the three thumb-sized actions ----
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(
+                    onClick = { ear.replayCarExercise() },
+                    modifier = Modifier.weight(1f).height(56.dp),
+                ) { Text("Replay " + CarMode.ROUNDS + "x") }
+                Button(
+                    onClick = { ear.startCarExercise() },
+                    modifier = Modifier.weight(1f).height(56.dp),
+                ) { Text("Next") }
+                OutlinedButton(
+                    onClick = { ear.stopCarExercise() },
+                    modifier = Modifier.weight(1f).height(56.dp),
+                ) { Text("Stop") }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Switch(checked = ear.carAutoAdvance, onCheckedChange = { ear.chooseCarAutoAdvance(it) })
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (ear.carAutoAdvance) {
+                        "Auto-advance (" + (CarMode.GAP_MS / 1000) + " s gap)"
+                    } else {
+                        "Auto-advance off"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
         }
     }
