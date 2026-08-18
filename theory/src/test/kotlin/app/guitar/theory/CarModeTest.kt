@@ -68,4 +68,33 @@ class CarModeTest {
     @Test fun `there is a silent self-assessment gap before auto-advance`() {
         assertTrue(CarMode.GAP_MS >= 2000, "too short to say the answer to yourself")
     }
+
+    @Test fun `the last round always shows the whole progression`() {
+        // The advanced library has 6-, 7- and 8-chord entries. Stepping the reveal by one
+        // per round left Pachelbel's Canon (8 chords) showing only 4 when the exercise
+        // ended, so the answer was never actually given.
+        for (slots in 1..8) {
+            assertEquals(slots, CarMode.revealedSlots(CarMode.ROUNDS, slots),
+                "a $slots-chord progression must be fully revealed on the last round")
+        }
+    }
+
+    @Test fun `the reveal ramp never goes backwards and never overshoots`() {
+        for (slots in 1..8) {
+            var prev = 0
+            for (r in 1..CarMode.ROUNDS) {
+                val n = CarMode.revealedSlots(r, slots)
+                assertTrue(n >= prev, "slots=$slots round=$r revealed $n after $prev")
+                assertTrue(n <= slots, "slots=$slots round=$r revealed $n of $slots")
+                prev = n
+            }
+        }
+    }
+
+    @Test fun `a long progression reveals more than one slot per round`() {
+        // 8 chords over 4 revealing rounds: 2, 4, 6, 8.
+        assertEquals(listOf(0, 2, 4, 6, 8), (1..CarMode.ROUNDS).map { CarMode.revealedSlots(it, 8) })
+        // 3 chords still steps by one and then holds (nothing left to show).
+        assertEquals(listOf(0, 1, 2, 3, 3), (1..CarMode.ROUNDS).map { CarMode.revealedSlots(it, 3) })
+    }
 }

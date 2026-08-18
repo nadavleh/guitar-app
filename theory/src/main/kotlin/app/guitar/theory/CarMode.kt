@@ -41,15 +41,23 @@ object CarMode {
 
     /**
      * How many chord slots are revealed while [round] (1-based) is sounding.
-     * Round 1 reveals nothing (guess blind), each later round reveals one more,
-     * capped at [slotCount]. Round 0 — idle, nothing started — reveals nothing.
+     * Round 1 reveals nothing (guess blind); for the canonical 4-chord progression each
+     * later round reveals exactly one more, and the last round always shows everything.
+     * Round 0 — idle, nothing started — reveals nothing.
      *
      * This is the ONLY source of the reveal count: the state layers expose it as a
      * derived getter rather than storing a set, so there is no "forgot to clear it"
      * bug to have.
      */
-    fun revealedSlots(round: Int, slotCount: Int): Int =
-        (round - 1).coerceIn(0, slotCount)
+    fun revealedSlots(round: Int, slotCount: Int): Int {
+        if (round <= 1 || slotCount <= 0) return 0
+        if (round >= ROUNDS) return slotCount
+        // One more slot per round for the canonical 4-bar progression. Spread instead of
+        // stepping by 1 so a LONGER progression still reaches a full reveal by the last
+        // round: the advanced library has 6-, 7- and 8-chord entries, and stepping by one
+        // left Pachelbel's Canon showing only 4 of its 8 chords when the exercise ended.
+        return minOf(slotCount, Math.ceil((round - 1).toDouble() * slotCount / (ROUNDS - 1)).toInt())
+    }
 
     /**
      * Wall-clock ms of one exercise at [bpm] over [slotCount] bars, excluding the

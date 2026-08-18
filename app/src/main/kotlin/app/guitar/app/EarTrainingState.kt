@@ -1660,7 +1660,13 @@ class EarTrainingState(
         if (i >= carRevealedSlots) return ""
         val roman = progResolved.getOrNull(i)?.romanLabel ?: return ""
         if (!EarTraining.romanIsModeAmbiguous(roman)) return ""
-        return EarTraining.romanModeTag(minorReading = challengeBarIsDominant(i))
+        // Advanced/circle progressions carry no dominantBars (progProgression is null),
+        // so fall back to the progression's own tonic mode — otherwise the Andalusian
+        // Cadence's minor V reads "(major)". Diatonic keeps the per-bar predicate.
+        val minorReading =
+            if (progProgression != null) challengeBarIsDominant(i)
+            else progMode == TrainingMode.Minor
+        return EarTraining.romanModeTag(minorReading = minorReading)
     }
 
     /** Longest Roman label in the CURRENT progression (min 1). The car view sizes every

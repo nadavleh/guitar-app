@@ -1412,7 +1412,13 @@ export class EarTrainingState {
     if (i >= this.carRevealedSlots) return "";
     const roman = this.progResolved[i]?.romanLabel;
     if (!roman || !romanIsModeAmbiguous(roman)) return "";
-    return romanModeTag(this.challengeBarIsDominant(i));
+    // Advanced/circle progressions carry no dominantBars (progProgression is null), so
+    // fall back to the progression's own tonic mode — otherwise the Andalusian Cadence's
+    // minor V reads "(major)". Diatonic keeps the challenge's per-bar predicate.
+    const minorReading = this.progProgression
+      ? this.challengeBarIsDominant(i)
+      : this.progMode === TrainingMode.Minor;
+    return romanModeTag(minorReading);
   }
 
   /** Longest Roman label in the CURRENT progression (min 1). The car view sizes every

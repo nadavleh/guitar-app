@@ -352,9 +352,26 @@ check("CarMode constants match Kotlin", CarMode.ROUNDS === 5 && CarMode.BEEPS ==
   CarMode.BEEP_ATTACK_MS === 5);
 check("round 1 reveals nothing, round 5 reveals every slot",
   CarMode.revealedSlots(1, 4) === 0 && CarMode.revealedSlots(5, 4) === 4);
-// Indexed by round 0..5 — pinned as a literal so nobody "optimises" the clamp away.
+// Indexed by round 0..5 — pinned as a literal so nobody "optimises" the ramp away.
+// This is the shape the spec asks for: one more chord per play, on a 4-chord progression.
 check("reveal ramp is exactly [0,0,1,2,3,4] over rounds 0..5",
   [0, 1, 2, 3, 4, 5].map((r) => CarMode.revealedSlots(r, 4)).join(",") === "0,0,1,2,3,4");
+// The advanced library has 6-, 7- and 8-chord entries; stepping by one left Pachelbel's
+// Canon showing 4 of 8 when the exercise ended, so the answer was never given.
+check("the last round always shows the whole progression",
+  [1, 2, 3, 4, 5, 6, 7, 8].every((n) => CarMode.revealedSlots(CarMode.ROUNDS, n) === n));
+check("a long progression reveals more than one slot per round",
+  [1, 2, 3, 4, 5].map((r) => CarMode.revealedSlots(r, 8)).join(",") === "0,2,4,6,8" &&
+  [1, 2, 3, 4, 5].map((r) => CarMode.revealedSlots(r, 3)).join(",") === "0,1,2,3,3");
+check("the reveal ramp never goes backwards", [1, 2, 3, 4, 5, 6, 7, 8].every((n) => {
+  let prev = 0;
+  for (let r = 1; r <= CarMode.ROUNDS; r++) {
+    const v = CarMode.revealedSlots(r, n);
+    if (v < prev || v > n) return false;
+    prev = v;
+  }
+  return true;
+}));
 check("reveal count clamps to the slot count and never goes negative",
   CarMode.revealedSlots(4, 3) === 3 && CarMode.revealedSlots(5, 3) === 3 &&
   CarMode.revealedSlots(0, 4) === 0 && CarMode.revealedSlots(-1, 4) === 0);
