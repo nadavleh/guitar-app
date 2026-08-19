@@ -1,0 +1,112 @@
+{
+  "_readme": [
+    "Hand-maintained chord data for the Songs tab, merged into the generated song",
+    "library by tools/build_song_library.py. Keyed by 'Artist|Title', matching",
+    "docs/songs/bookmarks.json exactly (case-insensitive).",
+    "",
+    "chords are SOUNDING chord symbols (what the ear hears), parsed by ChordLibrary,",
+    "so the engine can derive Roman numerals, transpose, and drive the looper.",
+    "'capo' is informational: the fret the common arrangement uses.",
+    "'source': 'seed' = written from common musical knowledge as a starting point,",
+    "'user' = entered/corrected by Nadav. Seeds are meant to be corrected in-app.",
+    "NO LYRICS in this file - the app carries a per-song lyrics field the owner fills in."
+  ],
+
+  "The Beatles|Hey Jude": {
+    "key": "F", "mode": "major", "capo": 0, "source": "seed",
+    "sections": [
+      { "label": "Verse", "chords": ["F", "C", "C7", "F", "Bb", "F", "C", "F"] },
+      { "label": "Bridge", "chords": ["Bb", "Gm", "Gm7", "C7", "F"] },
+      { "label": "Outro vamp", "chords": ["F", "Eb", "Bb", "F"] }
+    ]
+  },
+  "The Beatles (Free)|Here Comes The Sun": {
+    "key": "A", "mode": "major", "capo": 7, "source": "seed",
+    "sections": [
+      { "label": "Intro / Verse", "chords": ["A", "D", "E7"] },
+      { "label": "Chorus", "chords": ["A", "D", "E7", "A"] }
+    ]
+  },
+  "The Beatles|In My Life": {
+    "key": "A", "mode": "major", "capo": 0, "source": "seed",
+    "sections": [
+      { "label": "Verse", "chords": ["A", "E", "F#m", "A7", "D", "Dm", "A"] }
+    ]
+  },
+  "Bob Dylan|The Times They Are A-Changin": {
+    "key": "G", "mode": "major", "capo": 0, "source": "seed",
+    "sections": [
+      { "label": "Verse", "chords": ["G", "Em", "C", "G"] },
+      { "label": "Refrain", "chords": ["G", "C", "D", "G"] }
+    ]
+  },
+  "Bob Dylan|Dont Think Twice Its All Right": {
+    "key": "C", "mode": "major", "capo": 4, "source": "seed",
+    "sections": [
+      { "label": "Verse", "chords": ["C", "G", "Am", "F", "C", "G", "C"] },
+      { "label": "Turnaround", "chords": ["C", "E7", "A7", "D7", "G7", "C"] }
+    ]
+  },
+  "Janis Joplin|Me And Bobby Mcgee": {
+    "key": "G", "mode": "major", "capo": 0, "source": "seed",
+    "sections": [
+      { "label": "Verse", "chords": ["G", "D", "G"] },
+      { "label": "Chorus", "chords": ["C", "G", "D", "G"] }
+    ]
+  },
+  "Louis Armstrong|St James Infirmary": {
+    "key": "Dm", "mode": "minor", "capo": 0, "source": "seed",
+    "sections": [
+      { "label": "Verse", "chords": ["Dm", "Gm", "Am", "Dm"] }
+    ]
+  },
+  "Gloria Gaynor|I Will Survive": {
+    "key": "Am", "mode": "minor", "capo": 0, "source": "seed",
+    "sections": [
+      { "label": "Main cycle", "chords": ["Am", "Dm", "G", "C", "F", "Bm7b5", "E7", "Am"] }
+    ]
+  },
+  "Chris Stapleton|Tennessee Whiskey": {
+    "key": "A", "mode": "major", "capo": 0, "source": "seed",
+    "sections": [
+      { "label": "Vamp", "chords": ["A", "Bm", "A"] }
+    ]
+  },
+  "John Denver|Take Me Home Country Roads": {
+    "key": "A", "mode": "major", "capo": 2, "source": "seed",
+    "sections": [
+      { "label": "Verse", "chords": ["A", "F#m", "E", "D", "A"] },
+      { "label": "Chorus", "chords": ["D", "A", "E", "F#m", "D", "A", "E", "A"] }
+    ]
+  },
+  "Roger Miller|King Of The Road": {
+    "key": "C", "mode": "major", "capo": 0, "source": "seed",
+    "sections": [
+      { "label": "Verse", "chords": ["C", "F", "G7", "C"] }
+    ]
+  },
+  "Willie Nelson|Blue Eyes Crying In The Rain": {
+    "key": "G", "mode": "major", "capo": 0, "source": "seed",
+    "sections": [
+      { "label": "Verse", "chords": ["G", "C", "G", "D", "G"] }
+    ]
+  },
+  "Hank Williams|I Saw The Light": {
+    "key": "G", "mode": "major", "capo": 0, "source": "seed",
+    "sections": [
+      { "label": "Verse", "chords": ["G", "C", "G", "D", "G"] }
+    ]
+  },
+  "George Gershwin|Summertime": {
+    "key": "Am", "mode": "minor", "capo": 0, "source": "seed",
+    "sections": [
+      { "label": "A section", "chords": ["Am", "E7", "Am", "Dm", "Am", "E7", "Am"] }
+    ]
+  },
+  "Etta James|At Last": {
+    "key": "F", "mode": "major", "capo": 0, "source": "seed",
+    "sections": [
+      { "label": "Verse", "chords": ["F", "Dm", "Gm", "C7", "F"] }
+    ]
+  }
+}

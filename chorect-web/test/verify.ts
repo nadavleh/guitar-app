@@ -12,6 +12,10 @@ import {
   THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode,
 } from "../src/theory";
 import { standard } from "../src/theory/tunings";
+import {
+  SONGS, SONGS_WITH_CHORDS, SONG_ARTISTS, SONG_LIBRARY_DIGEST, Song,
+  songHasChords, songChordVocabulary, searchSongs,
+} from "../src/theory/songLibrary";
 import { DrumBlock, BUILTIN_BLOCKS, PresetTrack } from "../src/theory";
 import { synthClick, clickAt } from "../src/app/woodClick";
 import {
@@ -495,6 +499,52 @@ check("clickAt memoises per (freq, ms, rate)",
   clickAt(2000, 45, 48000) !== clickAt(2000, 45, 44100));
 check("PercussionSynth defaults to Kotlin's FALLBACK_RATE, not 44100",
   new PercussionSynth().sampleRate === 48000);
+
+// --- Songs library: one generator writes both ports, so they must agree exactly ---
+// Digest and counts are copied from the generated Kotlin SongLibrary; regenerate
+// with tools/build_song_library.py after changing either JSON input.
+check("song library digest matches Kotlin", SONG_LIBRARY_d3e6ba15f25d8d7c === "d3e6ba15f25d8d7c");
+check("song count matches Kotlin", SONGS.length === 229);
+check("songs with chord data matches Kotlin", SONGS_WITH_CHORDS.length === 15);
+check("every song row is usable (title, http url, sane capo)",
+  SONGS.every((s) => s.title.trim().length > 0 && s.url.startsWith("http") &&
+    s.site.trim().length > 0 && s.capo >= 0 && s.capo <= 12));
+check("no song appears twice", (() => {
+  const keys = SONGS.map((s) => (s.artist + "|" + s.title).toLowerCase());
+  return new Set(keys).size === keys.length;
+})());
+check("songs are sorted by artist then title", (() => {
+  const key = (s: Song) => s.artist.toLowerCase() + "|" + s.title.toLowerCase();
+  for (let i = 1; i < SONGS.length; i++) if (key(SONGS[i - 1]) > key(SONGS[i])) return false;
+  return true;
+})());
+// Storing SOUNDING symbols only pays off if the engine can resolve them - an
+// unparseable symbol would render as a dead row in the tab.
+check("every chord symbol in the library parses", SONGS_WITH_CHORDS.every((s) =>
+  s.sections.every((sec) => sec.chords.length > 0 && sec.chords.every((c) => parseChord(c) !== null))));
+check("every song with chords names a key that parses",
+  SONGS_WITH_CHORDS.every((s) => s.key !== null && parseChord(s.key) !== null));
+check("a song without chords is still a valid row", (() => {
+  const bare = SONGS.filter((s) => !songHasChords(s));
+  return bare.length > 0 && bare.every((s) => s.sections.length === 0 && s.key === null &&
+    songChordVocabulary(s).length === 0);
+})());
+check("chord vocabulary de-dupes in first-seen order", (() => {
+  const s = SONGS_WITH_CHORDS.find((x) => x.sections.reduce((n, sec) => n + sec.chords.length, 0) > 3)!;
+  const v = songChordVocabulary(s);
+  return new Set(v).size === v.length && v[0] === s.sections[0].chords[0];
+})());
+check("search matches title and artist; blank returns everything",
+  searchSongs("   ").length === SONGS.length &&
+  searchSongs("beatles").length > 0 &&
+  searchSongs("beatles").every((s) => s.artist.toLowerCase().includes("beatles")) &&
+  searchSongs("zzzznotasong").length === 0);
+check("artists are distinct and never blank",
+  new Set(SONG_ARTISTS).size === SONG_ARTISTS.length && SONG_ARTISTS.every((a) => a.trim().length > 0));
+// Seeds come from common musical knowledge, not from Nadav's own sheets; the tab
+// marks them so nothing poses as his transcription.
+check("the shipped library is seeds only", SONGS_WITH_CHORDS.every((s) => s.seeded));
+
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
