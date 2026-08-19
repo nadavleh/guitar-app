@@ -116,7 +116,7 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(12.dp),
+            .padding(8.dp),
     ) {
         // Car mode owns the whole content column: no sub-mode chips, no Practice/
         // Challenge picker, no answer pad, no transport dock — just huge glanceable
@@ -187,7 +187,7 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                     onSelect = { ear.earMode = it },
                     label = { if (it == EarMode.Practice) "Practice" else "Challenge" },
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
             }
             SubModeChipRow(ear)
         }
@@ -226,7 +226,7 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
         // in both Practice and Challenge. progBpm is captured once when startLoop()
         // launches its coroutine, so a live BPM edit restarts the loop to take effect.
         if (ear.progSubMode == EarSubMode.Progression) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             TransportDock(
                 playing = ear.isLooping,
                 onPlayStop = { if (ear.isLooping) ear.stopLoop() else ear.startLoop() },
@@ -254,6 +254,10 @@ private fun subModeLabel(s: EarSubMode): String = when (s) {
     EarSubMode.Workout     -> "Workout"
 }
 
+/** Height of one sub-mode chip. They wrap to two rows on a phone, so the stock
+ *  32dp chip cost two rows' worth of slack above every single ear sub-mode. */
+private val SUBMODE_CHIP_H = 30.dp
+
 /** Sub-mode chip row (Signal move — replaces the SubModeDropdown): Progressions,
  *  Intervals and Note→Chord are always-visible chips; Flavor/Inversions/AugDim live
  *  behind a "More ▾" overflow chip (which shows the current sub-mode's name when
@@ -267,13 +271,14 @@ private fun SubModeChipRow(ear: EarTrainingState) {
     val overflowChips = listOf(EarSubMode.Flavor, EarSubMode.Inversions, EarSubMode.AugDim, EarSubMode.Drill)
     var moreOpen by remember { mutableStateOf(false) }
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
     ) {
         for (s in primaryChips) {
             FilterChip(
                 selected = ear.progSubMode == s,
+                modifier = Modifier.height(SUBMODE_CHIP_H),
                 onClick = { ear.switchTab(s) },
                 label = { Text(subModeLabel(s)) },
             )
@@ -282,6 +287,7 @@ private fun SubModeChipRow(ear: EarTrainingState) {
             val inOverflow = ear.progSubMode in overflowChips
             FilterChip(
                 selected = inOverflow,
+                modifier = Modifier.height(SUBMODE_CHIP_H),
                 onClick = { moreOpen = true },
                 label = { Text((if (inOverflow) subModeLabel(ear.progSubMode) else "More") + "  ▾") },
             )
@@ -1489,14 +1495,13 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         if (!ear.challengeActive) {
             // ---- title / config screen ----
             Text(
-                "A challenge is ${ear.challengeTotal} progressions in a row. Listen, then tap the correct " +
-                    "Roman numeral for each bar (and its extension when shown). Each " +
-                    "question auto-scores; your total appears at the end.",
-                style = MaterialTheme.typography.bodyMedium,
+                "${ear.challengeTotal} progressions in a row. Listen, then tap the Roman numeral for " +
+                    "each bar (and its extension when shown) — every question auto-scores.",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
 
             Text(
                 "Draw questions from",
@@ -1505,11 +1510,11 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                 modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
             )
             ChallengeSourceRow(ear)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
 
             GeneratorSummaryCard(ear, onClick = { settingsOpen = true })
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(14.dp))
 
             Box(
                 modifier = Modifier.fillMaxWidth(),
@@ -1520,7 +1525,7 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
 
             // Hands-free car mode. Deliberately HERE and not in the transport dock or
             // the mode picker: this is the screen you sit on before driving, it honours

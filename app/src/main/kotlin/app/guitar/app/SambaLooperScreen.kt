@@ -148,7 +148,7 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(12.dp),
+            .padding(8.dp),
     ) {
         // ----- Header -----
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -163,25 +163,27 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             OutlinedButton(
                 onClick = { landscape = !landscape; applyOrientation() },
                 contentPadding = STEP_PAD,
+                modifier = STEP_MOD,
             ) {
                 Icon(ShellIcons.Rotate, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(if (landscape) "Portrait" else "Rotate")
             }
             Spacer(Modifier.width(6.dp))
-            OutlinedButton(onClick = { samba.stop(); blocks.stop(); onBack() }, contentPadding = STEP_PAD) { Text("Back") }
+            OutlinedButton(onClick = { samba.stop(); blocks.stop(); onBack() }, contentPadding = STEP_PAD,
+                modifier = STEP_MOD) { Text("Back") }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
 
         // [Beat | Blocks] toggle.
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = !blocksMode,
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FilterChip(selected = !blocksMode, modifier = STEP_MOD,
                 onClick = { blocksMode = false; blocks.stop() }, label = { Text("Beat") })
-            FilterChip(selected = blocksMode,
+            FilterChip(selected = blocksMode, modifier = STEP_MOD,
                 onClick = { blocksMode = true; samba.stop() }, label = { Text("Blocks") })
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
 
         // ----- Scrollable body: the pattern grid + its controls. (On the phone a
         // permanent side panel squeezes the grid, so beats load from a scrolling
@@ -357,7 +359,7 @@ private fun PatternSection(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
         ) {
             Text(
                 samba.loadedName ?: "Untitled beat",
@@ -381,7 +383,8 @@ private fun PatternSection(
             if (samba.opening == null) {
                 var openingMenu by remember { mutableStateOf(false) }
                 Box {
-                    OutlinedButton(onClick = { openingMenu = true }, contentPadding = STEP_PAD) { Text("＋ Opening ▾") }
+                    OutlinedButton(onClick = { openingMenu = true }, contentPadding = STEP_PAD,
+                        modifier = STEP_MOD) { Text("＋ Opening ▾") }
                     DropdownMenu(expanded = openingMenu, onDismissRequest = { openingMenu = false }) {
                         DropdownMenuItem(
                             text = { Text("(empty opening)") },
@@ -401,7 +404,7 @@ private fun PatternSection(
             }
         }
     }
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(6.dp))
 
     // ----- Notes: free text saved + exported with the beat; auto-shown when the
     // loaded beat carries notes. -----
@@ -423,7 +426,7 @@ private fun PatternSection(
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         ToolToggle("Erase", eraseMode) { onEraseMode(!eraseMode); onAccentMode(false); onDynMode(false) }
         ToolToggle("Accent", accentMode) { onAccentMode(!accentMode); onEraseMode(false); onDynMode(false) }
@@ -437,7 +440,7 @@ private fun PatternSection(
         // Add an instrument / preset track to the kit.
         var addMenu by remember { mutableStateOf(false) }
         Box {
-            Button(onClick = { addMenu = true }, contentPadding = STEP_PAD) { Text("＋ Add ▾") }
+            Button(onClick = { addMenu = true }, contentPadding = STEP_PAD, modifier = STEP_MOD) { Text("＋ Add ▾") }
             DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
                 DropdownMenuItem(text = { Text("Track presets",
                     style = MaterialTheme.typography.labelSmall,
@@ -464,7 +467,7 @@ private fun PatternSection(
 
         // Overflow: everything secondary, so the toolbar stays one line.
         Box {
-            OutlinedButton(onClick = { moreMenu = true }, contentPadding = STEP_PAD) { Text("⋯ More") }
+            OutlinedButton(onClick = { moreMenu = true }, contentPadding = STEP_PAD, modifier = STEP_MOD) { Text("⋯ More") }
             DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                 DropdownMenuItem(text = { Text("💾 Save beat…") },
                     onClick = { saveName = samba.loadedName ?: ""; saveDialog = true; moreMenu = false })
@@ -822,6 +825,11 @@ private const val LONG_PRESS_CLEAR_MS = 1500L  // hold this long on a cell to cl
 
 private val STEP_PAD = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp)
 
+/** Height for every STEP_PAD button. Material defaults a Button to a 40dp minimum,
+ *  which no contentPadding can undo — and this screen stacks four rows of them
+ *  above the pattern grid, so the default cost ~40dp of pure chrome. */
+private val STEP_MOD = Modifier.height(32.dp)
+
 /** Walk the ContextWrapper chain to the hosting Activity (Compose's LocalContext is
  *  usually a themed wrapper, so a plain `as? Activity` cast returns null). */
 private tailrec fun android.content.Context.findActivity(): android.app.Activity? = when (this) {
@@ -833,8 +841,8 @@ private tailrec fun android.content.Context.findActivity(): android.app.Activity
 /** Compact filled(on)/outlined(off) toggle for the Erase / Accent / Dyn cell tools. */
 @Composable
 private fun ToolToggle(label: String, on: Boolean, onToggle: () -> Unit) {
-    if (on) Button(onClick = onToggle, contentPadding = STEP_PAD) { Text("$label ✓") }
-    else OutlinedButton(onClick = onToggle, contentPadding = STEP_PAD) { Text(label) }
+    if (on) Button(onClick = onToggle, contentPadding = STEP_PAD, modifier = STEP_MOD) { Text("$label ✓") }
+    else OutlinedButton(onClick = onToggle, contentPadding = STEP_PAD, modifier = STEP_MOD) { Text(label) }
 }
 
 /** Bars / time-signature / division pickers plus the loop-translate control. */

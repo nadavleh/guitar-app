@@ -153,7 +153,7 @@ fun TunerScreen(state: AppState, onBack: () -> Unit) {
         // compact aspect and center it so it isn't a tiny ring floating in space.
         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             Box(
-                modifier = if (portrait) Modifier.fillMaxWidth().aspectRatio(1.5f)
+                modifier = if (portrait) Modifier.fillMaxWidth().aspectRatio(1.1f)
                            else Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
@@ -259,7 +259,11 @@ private fun DrawScope.drawDial(cents: Float?, ringColor: Color, needleColor: Col
     // Place the arc center BELOW the visible area so the quarter ring fills the top.
     val cx = size.width / 2f
     val cy = size.height * 0.74f
-    val radius = minOf(size.width * 0.46f, size.height * 0.62f)
+    val radius = minOf(size.width * 0.66f, size.height * 0.72f)
+    // Every stroke/tick below was authored against a ~450px radius; scale them with
+    // the dial so a bigger gauge keeps the same proportions instead of growing a
+    // wide ring with hairline ticks.
+    val k = radius / 450f
 
     // Quarter-ring arc: 90° sweep centered on north (270° in Canvas conventions).
     drawArc(
@@ -269,21 +273,21 @@ private fun DrawScope.drawDial(cents: Float?, ringColor: Color, needleColor: Col
         useCenter = false,
         topLeft = Offset(cx - radius, cy - radius),
         size = Size(radius * 2, radius * 2),
-        style = Stroke(width = 4f),
+        style = Stroke(width = 4f * k),
     )
 
     // Cent ticks: every 1¢ is a 1° spacing (90° / 100 cents = 0.9° per cent — we'll use 0.9°).
     // Major ticks every 10¢, minor ticks every 5¢, micro ticks every 1¢.
     for (c in -50..50) {
         val theta = (c / 50.0) * 45.0   // degrees from north, + = right
-        val (sx, sy) = polar(cx, cy, radius - tickLengthFor(c), theta)
-        val (ex, ey) = polar(cx, cy, radius + 2f, theta)
+        val (sx, sy) = polar(cx, cy, radius - tickLengthFor(c) * k, theta)
+        val (ex, ey) = polar(cx, cy, radius + 2f * k, theta)
         val color = when {
             c == 0 -> tunedColor
             abs(c) <= 10 -> tunedColor.copy(alpha = 0.5f)
             else -> ringColor
         }
-        val w = when {
+        val w = k * when {
             c == 0 -> 4f
             c % 10 == 0 -> 3f
             c % 5 == 0 -> 1.8f
@@ -300,17 +304,17 @@ private fun DrawScope.drawDial(cents: Float?, ringColor: Color, needleColor: Col
     val c = cents
     if (c != null) {
         val theta = (c.coerceIn(-50f, 50f) / 50.0) * 45.0
-        val (nx, ny) = polar(cx, cy, radius - 8f, theta)
+        val (nx, ny) = polar(cx, cy, radius - 8f * k, theta)
         drawLine(
             color = needleColor,
             start = Offset(cx, cy),
             end = Offset(nx, ny),
-            strokeWidth = 6f,
+            strokeWidth = 6f * k,
         )
         // Pivot circle at the center
         drawCircle(
             color = needleColor,
-            radius = 10f,
+            radius = 10f * k,
             center = Offset(cx, cy),
         )
     }
