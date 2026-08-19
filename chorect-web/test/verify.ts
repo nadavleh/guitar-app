@@ -503,7 +503,7 @@ check("PercussionSynth defaults to Kotlin's FALLBACK_RATE, not 44100",
 // --- Songs library: one generator writes both ports, so they must agree exactly ---
 // Digest and counts are copied from the generated Kotlin SongLibrary; regenerate
 // with tools/build_song_library.py after changing either JSON input.
-check("song library digest matches Kotlin", SONG_LIBRARY_d3e6ba15f25d8d7c === "d3e6ba15f25d8d7c");
+check("song library digest matches Kotlin", SONG_LIBRARY_DIGEST === "d3e6ba15f25d8d7c");
 check("song count matches Kotlin", SONGS.length === 229);
 check("songs with chord data matches Kotlin", SONGS_WITH_CHORDS.length === 15);
 check("every song row is usable (title, http url, sane capo)",
