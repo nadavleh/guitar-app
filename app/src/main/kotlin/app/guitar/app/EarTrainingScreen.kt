@@ -1456,6 +1456,19 @@ private fun SimpleDoneCard(score: Int, total: Int, onRestart: () -> Unit, onExit
 
 // -------- Progression Challenge view --------
 
+// Compact density for the three blocks touched on EVERY question (v2.72.1). Stock
+// Material sizes (40dp buttons, 32dp chips, 54dp squares) pushed the answer pad below
+// the fold on a phone, so answering meant scrolling between the squares and the
+// keyboard on every single bar. These sit deliberately below the 48dp touch-target
+// guidance: they form a dense grid you are looking at while you tap, and scrolling
+// mid-question costs far more accuracy than a slightly smaller target does.
+private val CHALLENGE_REF_H = 30.dp          // the play + degree-reference row
+private val CHALLENGE_SQUARE_H = 44.dp       // the bar square itself
+private val CHALLENGE_SQUARE_PLAY_H = 26.dp  // its own play button
+private val CHALLENGE_CHIP_H = 28.dp         // one degree/extension key
+private val CHALLENGE_SHIFT_CHIP_H = 30.dp   // the Major/Minor shift, tapped far less
+
+
 /**
  * Auto-scored quiz of [EarTrainingState.challengeTotal] questions. Each question is a
  * fresh random progression generated under the same settings as the Progressions
@@ -1586,13 +1599,13 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
             Button(
                 onClick = { if (ear.isLooping) ear.stopLoop() else ear.startLoop() },
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                modifier = Modifier.height(34.dp),
+                modifier = Modifier.height(CHALLENGE_REF_H),
             ) { Text(if (ear.isLooping) "■ Stop" else "▶ Play", maxLines = 1) }
             for ((deg, label) in ear.challengeReferenceLabels()) {
                 OutlinedButton(
                     onClick = { ear.auditionProgDegree(deg) },
                     contentPadding = PaddingValues(0.dp),
-                    modifier = Modifier.weight(1f).height(34.dp),
+                    modifier = Modifier.weight(1f).height(CHALLENGE_REF_H),
                 ) { Text(label, maxLines = 1) }
             }
         }
@@ -1602,7 +1615,7 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         // The four bar squares: tap one to target it, answer from the pad below.
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             for (i in 0 until 4) {
                 val verdict = ear.challengeBarCorrect(i)
@@ -1665,10 +1678,10 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         ChallengeAnswerPad(ear, bar = selectedBar)
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
 
         // Single nav row — the old duplicated top+bottom nav cost a screen of height.
         // #4: advancing is always allowed — unanswered bars are credited as correct.
@@ -1701,7 +1714,7 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
             modifier = Modifier.padding(top = 2.dp),
         )
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(12.dp))
     }
     if (settingsOpen) GeneratorSettingsSheet(state, ear, onDismiss = { settingsOpen = false })
 }
@@ -1761,7 +1774,7 @@ private fun BarSquare(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(54.dp)
+                .height(CHALLENGE_SQUARE_H)
                 .clip(RoundedCornerShape(8.dp))
                 .background(
                     when {
@@ -1777,7 +1790,7 @@ private fun BarSquare(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     label ?: "?",
-                    fontSize = 22.sp,
+                    fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     color = if (label == null) MaterialTheme.colorScheme.onSurfaceVariant
@@ -1800,7 +1813,8 @@ private fun BarSquare(
         OutlinedButton(
             onClick = onPlay,
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-        ) { Text("▶") }
+            modifier = Modifier.height(CHALLENGE_SQUARE_PLAY_H),
+        ) { Text("▶", fontSize = 13.sp, maxLines = 1) }
         if (verdict != null) {
             Text(
                 if (verdict) "✔" else "✘ ${answer ?: ""}",
@@ -1848,7 +1862,7 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(6.dp)) {
             // Major/Minor shift sits on the LEFT; the bar label + Clear fill the rest,
             // right-aligned (v2.64: Clear moved up here — its own bottom row cost a
             // full row of height). The chosen side fills SOLID with the primary color —
@@ -1857,6 +1871,7 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
                 FilterChip(
                     selected = !ear.keyboardMinor,
                     onClick = { if (ear.keyboardMinor) ear.toggleKeyboardShift() },
+                    modifier = Modifier.height(CHALLENGE_SHIFT_CHIP_H),
                     label = { Text("Major", fontWeight = if (!ear.keyboardMinor) FontWeight.Bold else FontWeight.Normal) },
                     colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -1867,6 +1882,7 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
                 FilterChip(
                     selected = ear.keyboardMinor,
                     onClick = { if (!ear.keyboardMinor) ear.toggleKeyboardShift() },
+                    modifier = Modifier.height(CHALLENGE_SHIFT_CHIP_H),
                     label = { Text("Minor", fontWeight = if (ear.keyboardMinor) FontWeight.Bold else FontWeight.Normal) },
                     colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -1881,17 +1897,18 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                 ) { Text("Clear") }
             }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
             // Degree grid — 4 columns (I ii iii IV / V vi vii° / …), plus the
             // extensions key when this level needs one.
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
                 maxItemsInEachRow = 4,
             ) {
                 for ((majDeg, roman) in ear.keyboardKeys()) {
                     FilterChip(
                         selected = pickedDeg == majDeg && !pickedDominant,
+                        modifier = Modifier.height(CHALLENGE_CHIP_H),
                         onClick = {
                             // Changing the degree invalidates the chosen extension.
                             if (pickedDeg != majDeg || pickedDominant) { pickedExt = null; extOpen = false }
@@ -1908,6 +1925,7 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
                     val domLabel = ear.harmonicDominantLabel()
                     FilterChip(
                         selected = pickedDeg == domMajDeg && pickedDominant,
+                        modifier = Modifier.height(CHALLENGE_CHIP_H),
                         onClick = {
                             if (pickedDeg != domMajDeg || !pickedDominant) { pickedExt = null; extOpen = false }
                             pickedDeg = domMajDeg; pickedRoman = domLabel; pickedDominant = true
@@ -1919,25 +1937,27 @@ private fun ChallengeAnswerPad(ear: EarTrainingState, bar: Int) {
                 if (needsExt) {
                     FilterChip(
                         selected = extOpen,
+                        modifier = Modifier.height(CHALLENGE_CHIP_H),
                         onClick = { extOpen = !extOpen },
                         label = { Text("7th ▾") },
                     )
                 }
             }
             if (needsExt && extOpen) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 if (pickedDeg == null) {
                     Text("Pick a degree first — its valid extensions appear here.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         for (ext in extOptions) {
                             FilterChip(
                                 selected = pickedExt == ext,
+                                modifier = Modifier.height(CHALLENGE_CHIP_H),
                                 onClick = { pickedExt = ext; commit(ext) },
                                 label = { Text(if (ext.isEmpty()) "triad" else ext) },
                             )
