@@ -513,9 +513,16 @@ check("no song appears twice", (() => {
   const keys = SONGS.map((s) => (s.artist + "|" + s.title).toLowerCase());
   return new Set(keys).size === keys.length;
 })());
+// Compare the two keys SEPARATELY, the way the generator (Python tuple sort) and
+// SongLibraryTest (compareBy) both do. Joining them with "|" is NOT equivalent:
+// 0x7C sorts after space, so "Bob|x" > "Bob Dylan|y" while ("bob","x") < ("bob dylan","y").
 check("songs are sorted by artist then title", (() => {
-  const key = (s: Song) => s.artist.toLowerCase() + "|" + s.title.toLowerCase();
-  for (let i = 1; i < SONGS.length; i++) if (key(SONGS[i - 1]) > key(SONGS[i])) return false;
+  for (let i = 1; i < SONGS.length; i++) {
+    const a = SONGS[i - 1], b = SONGS[i];
+    const aa = a.artist.toLowerCase(), ba = b.artist.toLowerCase();
+    if (aa > ba) return false;
+    if (aa === ba && a.title.toLowerCase() > b.title.toLowerCase()) return false;
+  }
   return true;
 })());
 // Storing SOUNDING symbols only pays off if the engine can resolve them - an
