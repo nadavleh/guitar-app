@@ -52,6 +52,25 @@ export const CarMode = {
   },
 
   /**
+   * How many leading slots are revealed at this instant, given the playhead is on
+   * `playheadSlot` (0-based; negative during the lead-in) of `round`.
+   *
+   * `revealedSlots` says how many slots this round is ALLOWED to give away; this says
+   * how many it has given away SO FAR. A round's newly-earned slots appear one at a
+   * time, as the playhead reaches them — hearing the chord and reading its function at
+   * the same instant is the whole point, and dumping the new slot at the top of the
+   * round let you read ahead of the sound. Slots earned in EARLIER rounds stay up (the
+   * `held` floor), so nothing ever un-reveals mid-exercise. Still derived, never stored.
+   */
+  revealedSlotsAt(round: number, playheadSlot: number, slotCount: number): number {
+    if (round <= 1 || slotCount <= 0) return 0;
+    const target = CarMode.revealedSlots(round, slotCount);
+    const held = CarMode.revealedSlots(round - 1, slotCount);   // already given away
+    const reached = Math.min(Math.max(playheadSlot + 1, 0), slotCount);
+    return Math.min(target, Math.max(held, reached));
+  },
+
+  /**
    * Wall-clock ms of one exercise at `bpm` over `slotCount` bars, excluding the
    * trailing GAP_MS. Drives the "≈40 s per exercise" caption; `bpm` is clamped so
    * a nonsense tempo can't divide by zero. Integer-truncating division matches

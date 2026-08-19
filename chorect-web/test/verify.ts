@@ -378,6 +378,30 @@ check("the reveal ramp never goes backwards", [1, 2, 3, 4, 5, 6, 7, 8].every((n)
 check("reveal count clamps to the slot count and never goes negative",
   CarMode.revealedSlots(4, 3) === 3 && CarMode.revealedSlots(5, 3) === 3 &&
   CarMode.revealedSlots(0, 4) === 0 && CarMode.revealedSlots(-1, 4) === 0);
+// A round's newly-earned slot must wait for the playhead: reading the answer before
+// hearing the chord defeats the drill. Mirrors CarModeTest's playhead cases exactly.
+check("a round's new slot appears only when the playhead reaches it",
+  CarMode.revealedSlots(3, 4) === 2 &&
+  CarMode.revealedSlotsAt(3, 0, 4) === 1 &&
+  CarMode.revealedSlotsAt(3, 1, 4) === 2 &&
+  CarMode.revealedSlotsAt(3, 3, 4) === 2);
+check("the lead-in and round 1 reveal nothing wherever the playhead is",
+  [-1, 0, 1, 2, 3].every((p) => CarMode.revealedSlotsAt(0, p, 4) === 0 && CarMode.revealedSlotsAt(1, p, 4) === 0) &&
+  CarMode.revealedSlotsAt(2, -5, 4) === 0 &&
+  CarMode.revealedSlotsAt(CarMode.ROUNDS, 99, 4) === 4);
+check("playhead-gated reveals never un-reveal and never outrun the schedule", (() => {
+  let prev = 0;
+  for (let r = 1; r <= CarMode.ROUNDS; r++) {
+    for (let p = 0; p < 4; p++) {
+      const now = CarMode.revealedSlotsAt(r, p, 4);
+      if (now < prev || now > CarMode.revealedSlots(r, 4)) return false;
+      prev = now;
+    }
+  }
+  return prev === 4;
+})());
+check("a long progression still reaches a full reveal on its last bar",
+  [1, 2, 3, 4, 5, 6, 7, 8].every((n) => CarMode.revealedSlotsAt(CarMode.ROUNDS, n - 1, n) === n));
 check("exercise at 140bpm over 4 bars is ~36s",
   CarMode.exerciseMs(140, 4) >= 35_000 && CarMode.exerciseMs(140, 4) <= 37_000);
 check("exerciseMs matches Kotlin integer division exactly", CarMode.exerciseMs(140, 4) === 35740);

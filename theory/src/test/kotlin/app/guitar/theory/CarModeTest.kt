@@ -30,6 +30,51 @@ class CarModeTest {
         assertEquals(0, CarMode.revealedSlots(-1, 4))
     }
 
+    @Test fun `a round's new slot appears only when the playhead reaches it`() {
+        // Round 3 of a 4-chord progression is ALLOWED 2 slots, but slot 2 (index 1) must
+        // stay hidden until the playhead is actually sounding it — reading the answer
+        // before hearing the chord defeats the drill.
+        assertEquals(2, CarMode.revealedSlots(3, 4))
+        assertEquals(1, CarMode.revealedSlotsAt(3, 0, 4))
+        assertEquals(2, CarMode.revealedSlotsAt(3, 1, 4))
+        assertEquals(2, CarMode.revealedSlotsAt(3, 3, 4))
+    }
+
+    @Test fun `slots earned in earlier rounds never un-reveal`() {
+        // Walking the whole exercise bar by bar, the count only ever grows.
+        var prev = 0
+        for (r in 1..CarMode.ROUNDS) {
+            for (p in 0 until 4) {
+                val now = CarMode.revealedSlotsAt(r, p, 4)
+                assertTrue(now >= prev, "round $r bar $p dropped from $prev to $now")
+                assertTrue(now <= CarMode.revealedSlots(r, 4), "round $r bar $p ran ahead of the schedule")
+                prev = now
+            }
+        }
+        // The last bar of the last round has handed over the whole progression.
+        assertEquals(4, prev)
+    }
+
+    @Test fun `the lead-in and round 1 reveal nothing wherever the playhead is`() {
+        for (p in -1 until 4) {
+            assertEquals(0, CarMode.revealedSlotsAt(0, p, 4))
+            assertEquals(0, CarMode.revealedSlotsAt(1, p, 4))
+        }
+        // A playhead left over from the previous exercise cannot leak a reveal, and an
+        // out-of-range one cannot overshoot the slot count.
+        assertEquals(0, CarMode.revealedSlotsAt(2, -5, 4))
+        assertEquals(4, CarMode.revealedSlotsAt(CarMode.ROUNDS, 99, 4))
+    }
+
+    @Test fun `a long progression still reaches a full reveal on its last bar`() {
+        // 8-chord entries jump several slots per round; each jump is still paced by the
+        // playhead, and the exercise must end with everything showing.
+        for (slots in 1..8) {
+            assertEquals(slots, CarMode.revealedSlotsAt(CarMode.ROUNDS, slots - 1, slots),
+                "a $slots-chord progression must be fully revealed on its last bar")
+        }
+    }
+
     @Test fun `lead-in is three beeps half a second apart`() {
         assertEquals(3, CarMode.BEEPS)
         assertEquals(500, CarMode.BEEP_GAP_MS)

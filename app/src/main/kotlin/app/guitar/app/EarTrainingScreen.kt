@@ -3126,7 +3126,8 @@ private fun CarModeView(state: AppState, ear: EarTrainingState) {
                     Spacer(Modifier.height(12.dp))
                     Text(
                         "about " + ear.carExerciseSeconds + " s per exercise  -  " +
-                            CarMode.ROUNDS + " plays  -  one more chord revealed each play",
+                            CarMode.ROUNDS + " plays  -  one more chord revealed each play" +
+                            "\ntap a slot to peek at it early",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -3156,7 +3157,7 @@ private fun CarModeView(state: AppState, ear: EarTrainingState) {
                 ) {
                     for (i in 0 until slots) {
                         val sounding = ear.currentBar == i && ear.carPhase == CarPhase.Playing
-                        val revealed = i < ear.carRevealedSlots
+                        val revealed = ear.carSlotRevealed(i)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -3165,7 +3166,10 @@ private fun CarModeView(state: AppState, ear: EarTrainingState) {
                                 .background(
                                     if (sounding) MaterialTheme.colorScheme.primaryContainer
                                     else MaterialTheme.colorScheme.surfaceVariant
-                                ),
+                                )
+                                // Tap to peek: the whole slot is the target, because at
+                                // arm's length in a car nothing smaller is hittable.
+                                .clickable { ear.toggleCarSlot(i) },
                             contentAlignment = Alignment.Center,
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {

@@ -65,6 +65,46 @@ class VoiceMixerTest {
     }
 
     @Test
+    fun `releaseGroup fades only the tagged bus and leaves the rest ringing`() {
+        // The chord bus: a new chord damps the previous one, but the drums under it
+        // (untagged) must keep playing. A sampled voicing ignores its sustain argument,
+        // so this is the ONLY thing stopping the last chord ringing over the next.
+        val m = VoiceMixer(sampleRate = 48000)
+        val chord = MixVoice(BufferSource(FloatArray(48000) { 1f }),
+            envelope = AmpEnvelope(48000, 0.0, 1.0), group = AudioEngine.PITCHED_GROUP)
+        val drum = MixVoice(BufferSource(FloatArray(48000) { 1f }),
+            envelope = AmpEnvelope(48000, 0.0, 1.0))
+        m.add(chord); m.add(drum)
+        val l = FloatArray(48); val r = FloatArray(48)
+        m.mixBlock(l, r, 48)
+        m.releaseGroup(AudioEngine.PITCHED_GROUP)
+        val l2 = FloatArray(96); val r2 = FloatArray(96)
+        m.mixBlock(l2, r2, 96)
+        assertEquals(1, m.activeCount, "only the tagged voice should have been released")
+        // What is left is the drum, still at full pre-master amplitude (the master
+        // limiter pulls the summed OUTPUT down, so assert on the voice's own peak).
+        val l3 = FloatArray(48); val r3 = FloatArray(48)
+        m.mixBlock(l3, r3, 48)
+        assertEquals(1f, drum.lastPeak, 1e-4f, "the untagged voice must be untouched")
+        assertTrue(l3.any { it > 0.4f }, "the drum should still be audible")
+    }
+
+    @Test
+    fun `releaseGroup ignores an unknown group and never touches chokeKey voices`() {
+        val m = VoiceMixer(sampleRate = 48000)
+        val v = MixVoice(BufferSource(FloatArray(4800) { 1f }),
+            envelope = AmpEnvelope(48000, 0.0, 1.0), chokeKey = "pandeiro")
+        m.add(v)
+        val l = FloatArray(48); val r = FloatArray(48)
+        m.mixBlock(l, r, 48)
+        m.releaseGroup(AudioEngine.PITCHED_GROUP)   // percussion carries a chokeKey, not a group
+        val l2 = FloatArray(48); val r2 = FloatArray(48)
+        m.mixBlock(l2, r2, 48)
+        assertEquals(0.70710678f, l2[47], 1e-4f, "an untagged voice must keep sounding")
+        assertEquals(1, m.activeCount)
+    }
+
+    @Test
     fun `lastPeak is per-block and a fresh voice is not the steal target`() {
         val m = VoiceMixer(sampleRate = 48000)
         val loud = MixVoice(BufferSource(FloatArray(1000) { 0.9f }))

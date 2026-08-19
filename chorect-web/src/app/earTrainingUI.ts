@@ -338,7 +338,7 @@ export class EarTrainingUI {
         start,
         el("div", { class: "et-muted car-est" }, [
           `\u2248${ear.carExerciseSeconds}s per exercise \u00b7 ${CarMode.ROUNDS} plays \u00b7 ` +
-          "one more chord revealed each play",
+          "one more chord revealed each play \u00b7 tap a slot to peek at it early",
         ]),
       ]));
       screen.appendChild(wrap);
@@ -356,7 +356,7 @@ export class EarTrainingUI {
     row.style.setProperty("--car-lab", `min(34vh, ${byWidth.toFixed(2)}vw)`);
     for (let i = 0; i < slots; i++) {
       const sounding = ear.currentBar === i && ear.carPhase === CarPhase.Playing;
-      const revealed = i < ear.carRevealedSlots;
+      const revealed = ear.carSlotRevealed(i);
       // "(minor)"/"(major)" only for a V that reads the same in both keys — a small
       // second line, so it can never crowd the number you are actually glancing at.
       const tag = ear.carSlotTag(i);
@@ -366,6 +366,9 @@ export class EarTrainingUI {
           ...(tag ? [el("span", { class: "tag" }, [tag])] : []),
         ]),
       ]);
+      // Tap to peek: the whole slot is the target, because at arm's length in a car
+      // nothing smaller is hittable.
+      cell.onclick = () => { ear.toggleCarSlot(i); this.rerender(); };
       row.appendChild(cell);
     }
     wrap.appendChild(row);

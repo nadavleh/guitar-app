@@ -1290,6 +1290,8 @@ select.et-select {
   border-radius: 14px;
   background: var(--surface2);
   overflow: hidden;
+  cursor: pointer;              /* the whole slot is a tap-to-peek target */
+  -webkit-tap-highlight-color: transparent;
 }
 .car-slot.sounding {
   background: color-mix(in srgb, var(--act) 22%, var(--surface2));

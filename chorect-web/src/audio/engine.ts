@@ -29,6 +29,10 @@ interface ActiveVoice {
   /** Release time (ms) for the stop() ramp — set for MODERN voices only,
    *  mirrors the owning Timbre's releaseMs. */
   releaseMs?: number;
+  /** True for note/chord voices — the bus `chokeChords()` damps. Drums, cue beeps
+   *  and every other one-shot sample leave it unset. Mirrors the Kotlin
+   *  AudioEngine.PITCHED_GROUP tag on MixVoice. */
+  pitched?: boolean;
 }
 
 export class WebAudioEngine {
@@ -278,7 +282,7 @@ export class WebAudioEngine {
     panner.connect(send);
     send.connect(this.reverbBus!);
 
-    const entry: ActiveVoice = { src, env, releaseMs };
+    const entry: ActiveVoice = { src, env, releaseMs, pitched: true };
     src.onended = () => {
       this.active.delete(entry);
       src.disconnect();
@@ -325,7 +329,7 @@ export class WebAudioEngine {
     panner.connect(send);
     send.connect(this.reverbBus!);
 
-    const entry: ActiveVoice = { src, env, releaseMs };
+    const entry: ActiveVoice = { src, env, releaseMs, pitched: true };
     src.onended = () => {
       this.active.delete(entry);
       src.disconnect();
@@ -511,34 +515,59 @@ export class WebAudioEngine {
    *  cutoff doesn't click — mirrors AudioTrackEngine.stop() -> VoiceMixer.releaseAll(). */
   stop(): void {
     const now = this.ctx ? this.ctx.currentTime : 0;
-    for (const v of this.active) {
-      if (v.env) {
-        const rel = (v.releaseMs ?? 20) / 1000;
-        try {
-          const g = v.env.gain;
-          const current = g.value;
-          g.cancelScheduledValues(now);
-          g.setValueAtTime(current, now);
-          g.linearRampToValueAtTime(0, now + rel);
-        } catch {
-          /* already stopped */
-        }
-        try {
-          v.src.stop(now + rel + 0.005);
-        } catch {
-          /* already stopped */
-        }
-      } else {
-        try {
-          v.src.stop();
-        } catch {
-          /* already stopped */
-        }
-        v.src.disconnect();
-      }
-    }
+    for (const v of this.active) this.silenceVoice(v, now);
     this.active.clear();
     this.chokeTails.clear();
+  }
+
+  /** Damp whatever is still ringing on the PITCHED bus — every note/chord voice —
+   *  leaving drums, the metronome and any other sample voice untouched.
+   *
+   *  Needed because `sustainMillis` is only honoured by the synthesized voices: a
+   *  sampled instrument plays its buffer to the end, so the previous chord of a
+   *  progression rings straight through the next one and smears the harmony you are
+   *  trying to identify. Sequencers call this at each new chord onset; a caller that
+   *  WANTS layering (a test note over a held triad) simply doesn't.
+   *
+   *  Fades out, never hard-cuts. Mirrors AudioTrackEngine.chokeChords() ->
+   *  VoiceMixer.releaseGroup(PITCHED_GROUP). */
+  chokeChords(): void {
+    const now = this.ctx ? this.ctx.currentTime : 0;
+    for (const v of this.active) {
+      if (!v.pitched) continue;
+      this.silenceVoice(v, now);
+      this.active.delete(v);
+    }
+  }
+
+  /** Ramp one voice to silence: MODERN voices (which carry an envelope) get a short
+   *  release so the cutoff doesn't click; legacy and dry drum voices are hard-stopped.
+   *  Mirrors AudioTrackEngine.stop() -> VoiceMixer.releaseAll(). */
+  private silenceVoice(v: ActiveVoice, now: number): void {
+    if (v.env) {
+      const rel = (v.releaseMs ?? 20) / 1000;
+      try {
+        const g = v.env.gain;
+        const current = g.value;
+        g.cancelScheduledValues(now);
+        g.setValueAtTime(current, now);
+        g.linearRampToValueAtTime(0, now + rel);
+      } catch {
+        /* already stopped */
+      }
+      try {
+        v.src.stop(now + rel + 0.005);
+      } catch {
+        /* already stopped */
+      }
+    } else {
+      try {
+        v.src.stop();
+      } catch {
+        /* already stopped */
+      }
+      v.src.disconnect();
+    }
   }
 
   private ensureSynth(): PluckedSynth {

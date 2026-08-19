@@ -1076,6 +1076,11 @@ class AppState(
                         StrumPattern.Arpeggio -> (strumMs * 4).coerceAtLeast(100)
                         StrumPattern.Sustain -> 0
                     }
+                    // Damp the previous slot's chord before striking this one: a sampled
+                    // instrument ignores `sustainMillis` and would ring straight through.
+                    // Only struck slots get here — a Sustain slot deliberately lets the
+                    // chord before it ring on.
+                    audio.chokeChords()
                     audio.playChord(ordered, strumDelayMillis = strumDelay,
                         sustainMillis = (slotMs * 0.9).toInt().coerceAtLeast(150),
                         timbre = timbre)

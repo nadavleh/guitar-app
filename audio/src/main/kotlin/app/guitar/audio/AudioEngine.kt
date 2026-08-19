@@ -67,10 +67,26 @@ interface AudioEngine {
      *  the next one. Default no-op for engines without a reverb bus. */
     fun cutReverb() {}
 
+    /** Damp whatever is still ringing on the PITCHED bus — every note/chord voice —
+     *  leaving drums, the metronome and any other sample voice untouched.
+     *
+     *  Needed because `sustainMillis` is only honoured by the synthesized voices: a
+     *  sampled instrument plays its buffer to the end, so the previous chord of a
+     *  progression rings straight through the next one and smears the harmony you are
+     *  trying to identify. Sequencers call this at each new chord onset; a caller that
+     *  WANTS layering (a test note over a held triad) simply doesn't.
+     *
+     *  Fades out, never hard-cuts. Default no-op for engines without a voice mixer. */
+    fun chokeChords() {}
+
     /** Release all audio resources. Must be called when the engine is no longer needed. */
     fun close()
 
     companion object {
+        /** Bus label carried by every pitched (note/chord) voice — the group
+         *  [chokeChords] releases. Drums and cue beeps never carry it. */
+        const val PITCHED_GROUP = "pitched"
+
         /** A no-op engine for previews and tests. */
         val Silent: AudioEngine = object : AudioEngine {
             override val sampleRate = AudioRates.FALLBACK_RATE

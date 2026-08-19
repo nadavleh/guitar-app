@@ -197,6 +197,11 @@ class EarTrainingState(
      *  strummed chord) so the root is clearly audible above the other strings. */
     private fun playEarChord(midis: List<Int>, rootPc: Int, sustainMillis: Int) {
         if (midis.isEmpty()) return
+        // Damp the previous chord first. `sustainMillis` is honoured only by the
+        // synthesized voices — a sampled instrument rings its whole buffer out — so
+        // without this the last chord of a progression bleeds into the next one and
+        // smears the very harmony the drill asks you to name.
+        audio.chokeChords()
         if (earBoostTonic) {
             val tonic = midis.filter { ((it % 12) + 12) % 12 == rootPc }.minOrNull()
             if (tonic != null) {
@@ -753,6 +758,7 @@ class EarTrainingState(
                     ?: shapes.firstOrNull() ?: return@launch
                 val midis = shape.notes.mapNotNull { it?.midi?.value }
                 val sustain = sustainProvider()
+                audio.chokeChords()   // only here: the test note below is MEANT to ring over the triad
                 audio.playChord(midis, strumDelayMillis = 0, sustainMillis = sustain)
                 delay(800)
                 // Pick the test note in a useful octave: the closest tuning string fret
@@ -779,7 +785,9 @@ class EarTrainingState(
     /** #2: play just the triad (no test note). */
     fun playN2cChord() {
         val midis = n2cShapeMidis()
-        if (midis.isNotEmpty()) audio.playChord(midis, strumDelayMillis = 0, sustainMillis = sustainProvider())
+        if (midis.isEmpty()) return
+        audio.chokeChords()
+        audio.playChord(midis, strumDelayMillis = 0, sustainMillis = sustainProvider())
     }
 
     /** #2: play just the test note (placed above the triad's register). */
@@ -1642,13 +1650,34 @@ class EarTrainingState(
     private var carBeep: FloatArray? = null
     private var carBeepRate = 0
 
-    /** Slots revealed right now — DERIVED, never stored, so it cannot go stale. */
-    val carRevealedSlots: Int get() = CarMode.revealedSlots(carRound, progResolved.size)
+    /** Slots the driver peeked at by TAPPING, for this exercise only. Cleared by every
+     *  [beginCarExercise] — draw, replay and the auto-advance chain all go through it —
+     *  so a peek can never leak into the next progression. */
+    var carTappedSlots by mutableStateOf(emptySet<Int>())
+        private set
+
+    /** Slots the SCHEDULE has revealed right now — DERIVED, never stored, so it cannot
+     *  go stale. Gated on the playhead: a round's new slot lights up when the chord
+     *  under it actually sounds, not at the top of the round. */
+    val carRevealedSlots: Int
+        get() = CarMode.revealedSlotsAt(carRound, currentBar, progResolved.size)
+
+    /** Is slot [i] showing its function — either the schedule reached it, or you tapped
+     *  it to peek early? */
+    fun carSlotRevealed(i: Int): Boolean = i < carRevealedSlots || i in carTappedSlots
+
+    /** Tap a slot to peek at its function before the schedule gets there. Tapping a
+     *  peeked slot again hides it, so a stray thumb on the wheel is undoable; a slot the
+     *  schedule has already revealed is not tappable — that answer is spent. */
+    fun toggleCarSlot(i: Int) {
+        if (i < 0 || i >= progResolved.size || i < carRevealedSlots) return
+        carTappedSlots = if (i in carTappedSlots) carTappedSlots - i else carTappedSlots + i
+    }
 
     /** The big glanceable slot label: a Roman-numeral FUNCTION once revealed, else "?".
      *  Never a chord symbol and never the key — the drill is function recognition. */
     fun carSlotLabel(i: Int): String {
-        if (i >= carRevealedSlots) return "?"
+        if (!carSlotRevealed(i)) return "?"
         return progResolved.getOrNull(i)?.romanLabel ?: "—"
     }
 
@@ -1657,7 +1686,7 @@ class EarTrainingState(
      *  even more ambiguous here than on the challenge pad, where this marker was added
      *  (v2.69.2). Rendered as a small second line so it can't crowd the big label. */
     fun carSlotTag(i: Int): String {
-        if (i >= carRevealedSlots) return ""
+        if (!carSlotRevealed(i)) return ""
         val roman = progResolved.getOrNull(i)?.romanLabel ?: return ""
         if (!EarTraining.romanIsModeAmbiguous(roman)) return ""
         // Advanced/circle progressions carry no dominantBars (progProgression is null),
@@ -1726,6 +1755,7 @@ class EarTrainingState(
         carPhase = CarPhase.Idle
         carRound = 0
         carExerciseCount = 0
+        carTappedSlots = emptySet()
         stopLoop()
     }
 
@@ -1785,6 +1815,7 @@ class EarTrainingState(
             carExerciseCount++
         }
         carRound = 0
+        carTappedSlots = emptySet()   // a peek belongs to ONE exercise
         carPhase = CarPhase.Beeps
         isLooping = true        // keeps the playhead + "is playing" chrome truthful
         carJob = scope.launch { runCarExercise() }
@@ -2015,6 +2046,7 @@ class EarTrainingState(
         invPlaying = true
         invJob = scope.launch {
             try {
+                audio.chokeChords()
                 audio.playChord(midis, strumDelayMillis = strumProvider(),
                     sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
             } finally { invPlaying = false }
@@ -2026,6 +2058,7 @@ class EarTrainingState(
         val midis = invMidis(k)
         if (midis.isNotEmpty()) {
             scope.launch {
+                audio.chokeChords()
                 audio.playChord(midis, strumDelayMillis = strumProvider(),
                     sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
             }
@@ -2140,6 +2173,7 @@ class EarTrainingState(
         if (midis.isEmpty()) return
         adJob?.cancel()
         adJob = scope.launch {
+            audio.chokeChords()
             audio.playChord(midis, strumDelayMillis = strumProvider(),
                 sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
         }
@@ -2149,6 +2183,7 @@ class EarTrainingState(
         val midis = adMidis(sym)
         if (midis.isNotEmpty()) {
             scope.launch {
+                audio.chokeChords()
                 audio.playChord(midis, strumDelayMillis = strumProvider(),
                     sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
             }
@@ -2260,6 +2295,7 @@ class EarTrainingState(
         intervalPreviewId = id
         intervalPreviewJob = scope.launch {
             try {
+                audio.chokeChords()   // start of a phrase; the notes inside it may overlap
                 val base = 60                                   // C4
                 val target = if (ascending) base + semitones else base - semitones
                 audio.playNote(base, durationMillis = sustainProvider())
@@ -2294,6 +2330,7 @@ class EarTrainingState(
         intervalPlaying = true
         intervalJob = scope.launch {
             try {
+                audio.chokeChords()   // start of a phrase; the notes inside it may overlap
                 val tonic = intervalTonicMidi()
                 val target = IntervalTrainer.targetMidi(tonic, intervalSemitones, intervalAscending)
                 if (intervalHarmonic) {
@@ -2335,6 +2372,7 @@ class EarTrainingState(
                     delay(650)
                 }
                 delay(300)
+                audio.chokeChords()   // the anchoring cadence must stop before the question
                 val tonic = intervalTonicMidi()
                 val target = IntervalTrainer.targetMidi(tonic, intervalSemitones, intervalAscending)
                 if (intervalHarmonic) {
@@ -2390,6 +2428,7 @@ class EarTrainingState(
             ?: shapes.firstOrNull() ?: return
         val midis = shape.notes.mapNotNull { it?.midi?.value }
         if (midis.isEmpty()) return
+        audio.chokeChords()      // one chord at a time — see playEarChord
         audio.playChord(midis, strumDelayMillis = strumProvider(), sustainMillis = sustainMs, timbre = Timbre.Clarity)
     }
 

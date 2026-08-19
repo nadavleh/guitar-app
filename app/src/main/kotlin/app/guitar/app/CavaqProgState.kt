@@ -168,6 +168,7 @@ class CavaqProgState(
                     currentShape = sh
                     val midis = sh?.notes?.mapNotNull { it?.midi?.value } ?: emptyList()
                     if (midis.isNotEmpty()) {
+                        audio.chokeChords()   // one bar's chord must not ring into the next
                         audio.playChord(midis, strumDelayMillis = strumProvider(),
                             sustainMillis = sustain, timbre = timbreProvider())
                     }
@@ -194,6 +195,7 @@ class CavaqProgState(
         val midis = sh.notes.mapNotNull { it?.midi?.value }
         if (midis.isEmpty()) return
         scope.launch {
+            audio.chokeChords()
             audio.playChord(midis, strumDelayMillis = strumProvider(),
                 sustainMillis = sustainProvider(), timbre = timbreProvider())
         }

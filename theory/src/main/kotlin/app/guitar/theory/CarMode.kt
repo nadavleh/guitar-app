@@ -60,6 +60,27 @@ object CarMode {
     }
 
     /**
+     * How many leading slots are revealed at this instant, given the playhead is on
+     * [playheadSlot] (0-based; negative during the lead-in) of [round].
+     *
+     * [revealedSlots] says how many slots round [round] is ALLOWED to give away; this
+     * says how many it has given away SO FAR. A round's newly-earned slots appear one
+     * at a time, as the playhead reaches them — hearing the chord and reading its
+     * function at the same instant is the whole point, and dumping the new slot at the
+     * top of the round let you read ahead of the sound. Slots earned in EARLIER rounds
+     * stay up (the `held` floor), so nothing ever un-reveals mid-exercise.
+     *
+     * Still derived, never stored: round + playhead are the only inputs.
+     */
+    fun revealedSlotsAt(round: Int, playheadSlot: Int, slotCount: Int): Int {
+        if (round <= 1 || slotCount <= 0) return 0
+        val target = revealedSlots(round, slotCount)
+        val held = revealedSlots(round - 1, slotCount)   // already given away, stays up
+        val reached = (playheadSlot + 1).coerceIn(0, slotCount)
+        return minOf(target, maxOf(held, reached))
+    }
+
+    /**
      * Wall-clock ms of one exercise at [bpm] over [slotCount] bars, excluding the
      * trailing [GAP_MS]. Drives the "≈40 s per exercise" caption; [bpm] is clamped
      * so a nonsense tempo can't divide by zero.

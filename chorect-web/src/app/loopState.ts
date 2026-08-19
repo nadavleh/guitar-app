@@ -227,6 +227,11 @@ export class LoopState {
           const ordered = s.strum === StrumPattern.Up ? midis.slice().reverse() : midis;
           // Sustain is already excluded by the guard above; only Down/Up/Arpeggio reach here.
           const strumDelay = s.strum === StrumPattern.Arpeggio ? Math.max(this.deps.strumProvider() * 4, 100) : this.deps.strumProvider();
+          // Damp the previous slot's chord before striking this one: a sampled
+          // instrument ignores the sustain argument and would ring straight through.
+          // Only struck slots get here — a Sustain slot deliberately lets the chord
+          // before it ring on.
+          this.deps.audio.chokeChords();
           this.deps.audio.playChord(ordered, strumDelay, Math.max(Math.round(slotMs * 0.9), 150), this.deps.timbreProvider());
         }
       }

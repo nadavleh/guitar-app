@@ -14,6 +14,11 @@ class MixVoice(
     /** Self-choke group: adding a new voice with the same key schedules this
      *  voice's release at the new one's start (see [VoiceMixer.addAndCap]). */
     val chokeKey: String? = null,
+    /** Bus label for [VoiceMixer.releaseGroup] — "which voices are these?" — with
+     *  NO behaviour of its own on add. Distinct from [chokeKey] on purpose: a chord
+     *  is many voices that must all sound together, so they cannot self-choke each
+     *  other; the caller damps the whole group explicitly when the next chord lands. */
+    val group: String? = null,
 ) {
     /** Frames still to wait before this voice starts sounding (mixer clock). */
     var remainingDelay: Int = delayFrames.coerceAtLeast(0)
@@ -53,6 +58,14 @@ class VoiceMixer(val sampleRate: Int) {
     /** Release every active voice (fade-out) instead of hard-cutting. Voices
      *  self-remove from [mixBlock] once their envelope reaches silence. */
     @Synchronized fun releaseAll() { for (v in voices) v.envelope.release() }
+
+    /** Release (fade out) every voice tagged [group], leaving every other voice alone.
+     *  The chord bus uses this so a new chord damps the previous one without touching
+     *  the drums or the metronome — a sampled voicing ignores `sustainMillis` and would
+     *  otherwise ring straight through the next chord of a progression. */
+    @Synchronized fun releaseGroup(group: String) {
+        for (v in voices) if (v.group == group) v.envelope.release()
+    }
 
     @Synchronized fun setEq(bassDb: Float, midDb: Float, trebleDb: Float) = eq.setGainsDb(bassDb, midDb, trebleDb)
 

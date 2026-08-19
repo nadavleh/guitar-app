@@ -410,6 +410,10 @@ The beep is an 880 Hz sine, 140 ms, 5 ms linear attack then exponential decay �
 
 **Reveal ramp.** Round 1 reveals nothing (guess blind); each later round reveals one more slot. For a 4-chord progression: `? ? ? ?` → `I ? ? ?` → `I V ? ?` → `I V vi ?` → `I V vi IV`. Three-chord advanced/circle progressions clamp. The count is **derived** (`CarMode.revealedSlots(round, slotCount)`), never stored, so it cannot go stale.
 
+**The reveal waits for the playhead.** A round's newly-earned slot lights up **when the chord under it sounds**, not at the top of the round — you hear the chord and read its function in the same instant, instead of reading ahead of the sound. Slots earned in earlier rounds stay up, so nothing ever un-reveals mid-exercise. Still derived, from round *and* playhead: `CarMode.revealedSlotsAt(round, playheadSlot, slotCount)`.
+
+**Tap a slot to peek.** Any still-hidden slot is a tap target for its whole area (nothing smaller is hittable at arm's length in a car) and shows its function immediately, ahead of the schedule — for when you have committed to an answer and want it now. Tapping a peeked slot again re-hides it, so a stray thumb is undoable; a slot the schedule has already revealed is not tappable, because that answer is spent. Peeks belong to **one exercise**: every draw, replay and auto-advance clears them.
+
 **Layout.** Car mode owns the whole content column — the tab bar (portrait) / tab rail (landscape) stays, per the Studio invariant, but the sub-mode chips, mode picker, answer pad, degree-reference row, fretboard, transport dock and generator card are all gone:
 
 ```
@@ -425,8 +429,8 @@ Diatonic  -  7th chords                          (read-only)
 
 - Slot labels are sized off the **shorter** viewport edge (`clamp(40px, 13vmin, 132px)` web; `min(width/slots, height) * 0.42` on Android), so **one layout serves both orientations** — landscape simply makes the slots taller.
 - The sounding slot takes the accent fill + inset ring, so a glance shows *where* in the bar cycle you are.
-- Hidden slots show `?` at 45% opacity. Labels are **Roman-numeral functions only** — never chord symbols, and the key is **never** shown (per the ear-training digest: work directly in function).
-- Idle state: one 72dp `Start ▶` plus an "≈N s per exercise" estimate from `CarMode.exerciseMs`.
+- Hidden slots show `?` at 45% opacity, and are tappable (see the peek rule above). Labels are **Roman-numeral functions only** — never chord symbols, and the key is **never** shown (per the ear-training digest: work directly in function).
+- Idle state: one 72dp `Start ▶` plus an "≈N s per exercise" estimate from `CarMode.exerciseMs`, and the line "tap a slot to peek at it early".
 - Existing tokens only (`--surface2`, `--act`, `--line`, `--muted`), so both themes work with no new palette entries.
 
 **Not graded.** Car mode never touches `challengeActive`, `challengeLog`, the guess arrays or `reportChallengeDone`, so a half-finished challenge survives a drive intact. The reveals *are* the feedback; you self-assess during the gap.

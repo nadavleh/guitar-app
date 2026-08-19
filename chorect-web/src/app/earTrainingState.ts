@@ -392,6 +392,11 @@ export class EarTrainingState {
    *  chord) so the root is clearly audible above the other strings. */
   private playEarChord(midis: number[], rootPc: number, sustainMs: number) {
     if (midis.length === 0) return;
+    // Damp the previous chord first. `sustainMs` is honoured only by the synthesized
+    // voices — a sampled instrument rings its whole buffer out — so without this the
+    // last chord of a progression bleeds into the next one and smears the very harmony
+    // the drill asks you to name.
+    this.deps.audio.chokeChords();
     if (this.earBoostTonic) {
       const tonics = midis.filter((m) => ((m % 12) + 12) % 12 === rootPc);
       if (tonics.length > 0) {
@@ -662,6 +667,8 @@ export class EarTrainingState {
       try {
         const midis = this.n2cShapeMidis();
         const sustain = this.deps.sustainProvider();
+        // Only here: the test note below is MEANT to ring over the triad.
+        this.deps.audio.chokeChords();
         if (midis.length) this.deps.audio.playChord(midis, 0, sustain, Timbres.Clarity);
         await sleep(800);
         if (token !== this.n2cToken) return;
@@ -688,7 +695,9 @@ export class EarTrainingState {
 
   playN2cChord() {
     const midis = this.n2cShapeMidis();
-    if (midis.length) this.deps.audio.playChord(midis, 0, this.deps.sustainProvider(), Timbres.Clarity);
+    if (midis.length === 0) return;
+    this.deps.audio.chokeChords();
+    this.deps.audio.playChord(midis, 0, this.deps.sustainProvider(), Timbres.Clarity);
   }
   playN2cNote() {
     const c = this.n2cChallenge;
@@ -1392,15 +1401,38 @@ export class EarTrainingState {
   private carBeep: Float32Array | null = null;
   private carBeepRate = 0;
 
-  /** Slots revealed right now — DERIVED, never stored, so it cannot go stale. */
+  /** Slots the driver peeked at by TAPPING, for this exercise only. Cleared by every
+   *  `beginCarExercise` — draw, replay and the auto-advance chain all go through it —
+   *  so a peek can never leak into the next progression. */
+  carTappedSlots = new Set<number>();
+
+  /** Slots the SCHEDULE has revealed right now — DERIVED, never stored, so it cannot go
+   *  stale. Gated on the playhead: a round's new slot lights up when the chord under it
+   *  actually sounds, not at the top of the round. */
   get carRevealedSlots(): number {
-    return CarMode.revealedSlots(this.carRound, this.progResolved.length);
+    return CarMode.revealedSlotsAt(this.carRound, this.currentBar, this.progResolved.length);
+  }
+
+  /** Is slot `i` showing its function — either the schedule reached it, or you tapped it
+   *  to peek early? */
+  carSlotRevealed(i: number): boolean {
+    return i < this.carRevealedSlots || this.carTappedSlots.has(i);
+  }
+
+  /** Tap a slot to peek at its function before the schedule gets there. Tapping a peeked
+   *  slot again hides it, so a stray thumb is undoable; a slot the schedule has already
+   *  revealed is not tappable — that answer is spent. */
+  toggleCarSlot(i: number) {
+    if (i < 0 || i >= this.progResolved.length || i < this.carRevealedSlots) return;
+    if (this.carTappedSlots.has(i)) this.carTappedSlots.delete(i);
+    else this.carTappedSlots.add(i);
+    this.notify();
   }
 
   /** The big glanceable slot label: a Roman-numeral FUNCTION once revealed, else "?".
    *  Never a chord symbol and never the key — the drill is function recognition. */
   carSlotLabel(i: number): string {
-    if (i >= this.carRevealedSlots) return "?";
+    if (!this.carSlotRevealed(i)) return "?";
     return this.progResolved[i]?.romanLabel ?? "—";
   }
 
@@ -1409,7 +1441,7 @@ export class EarTrainingState {
    *  even more ambiguous here than on the challenge pad, where this marker was added
    *  (v2.69.2). Rendered as a small second line so it can't crowd the big label. */
   carSlotTag(i: number): string {
-    if (i >= this.carRevealedSlots) return "";
+    if (!this.carSlotRevealed(i)) return "";
     const roman = this.progResolved[i]?.romanLabel;
     if (!roman || !romanIsModeAmbiguous(roman)) return "";
     // Advanced/circle progressions carry no dominantBars (progProgression is null), so
@@ -1460,6 +1492,7 @@ export class EarTrainingState {
     this.carPhase = CarPhase.Idle;
     this.carRound = 0;
     this.carExerciseCount = 0;
+    this.carTappedSlots.clear();
     this.stopLoop();
     this.notify();
   }
@@ -1520,6 +1553,7 @@ export class EarTrainingState {
       this.carExerciseCount++;
     }
     this.carRound = 0;
+    this.carTappedSlots.clear();   // a peek belongs to ONE exercise
     this.carPhase = CarPhase.Beeps;
     this.isLooping = true;      // keeps the playhead + "is playing" chrome truthful
     this.notify();
@@ -1715,13 +1749,18 @@ export class EarTrainingState {
     this.invPlaying = true;
     this.notify();
     void (async () => {
-      try { this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), Timbres.Clarity); }
+      try {
+        this.deps.audio.chokeChords();
+        this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), Timbres.Clarity);
+      }
       finally { this.invPlaying = false; this.notify(); }
     })();
   }
   auditionInversion(k: number) {
     const midis = this.invMidis(k);
-    if (midis.length) this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), Timbres.Clarity);
+    if (midis.length === 0) return;
+    this.deps.audio.chokeChords();
+    this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), Timbres.Clarity);
   }
   setInvGuess(k: number) { this.invGuess = k; this.auditionInversion(k); this.notify(); }
   toggleInvReveal() { this.invRevealed = !this.invRevealed; this.notify(); }
@@ -1807,11 +1846,14 @@ export class EarTrainingState {
     const midis = this.adMidis(this.adQuality);
     if (midis.length === 0) return;
     this.adToken++;
+    this.deps.audio.chokeChords();
     this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), Timbres.Clarity);
   }
   auditionAugDim(sym: string) {
     const midis = this.adMidis(sym);
-    if (midis.length) this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), Timbres.Clarity);
+    if (midis.length === 0) return;
+    this.deps.audio.chokeChords();
+    this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), Timbres.Clarity);
   }
   setAdGuess(sym: string) { this.adGuess = sym; this.auditionAugDim(sym); this.notify(); }
   toggleAugDimReveal() { this.adRevealed = !this.adRevealed; this.notify(); }
@@ -1861,6 +1903,7 @@ export class EarTrainingState {
   intervalHarmonic = false;
   setIntervalHarmonic(v: boolean) { this.intervalHarmonic = v; this.notify(); }
   private playIntervalPair(tonic: number, target: number): Promise<void> {
+    this.deps.audio.chokeChords();   // start of a phrase; the notes inside it may overlap
     if (this.intervalHarmonic) {
       this.deps.audio.playChord([tonic, target], 0, this.deps.sustainProvider(), Timbres.Clarity);
       return Promise.resolve();
@@ -1918,6 +1961,7 @@ export class EarTrainingState {
       const target = ascending ? base + semitones : base - semitones;
       const sustain = this.deps.sustainProvider();
       const live = () => token === this.intervalPreviewToken;
+      this.deps.audio.chokeChords();   // start of a phrase; the notes inside it may overlap
       this.deps.audio.playNote(base, sustain);
       await sleep(700);
       if (!live()) return;
@@ -2027,6 +2071,7 @@ export class EarTrainingState {
     if (!shape) return;
     const midis = shape.notes.filter((n) => n !== null).map((n) => n!.midi);
     if (midis.length === 0) return;
+    this.deps.audio.chokeChords();      // one chord at a time — see playEarChord
     this.deps.audio.playChord(midis, this.deps.strumProvider(), sustainMs, Timbres.Clarity);
   }
 

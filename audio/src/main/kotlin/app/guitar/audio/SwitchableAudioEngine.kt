@@ -62,6 +62,11 @@ class SwitchableAudioEngine(
 
     override fun cutReverb() = active.cutReverb()
 
+    /** Only the modern engine layers voices per note, so only it can leave a chord
+     *  ringing under the next one; the legacy engine renders a whole chord as one
+     *  buffer that already honours `sustainMillis`, so its no-op default is correct. */
+    override fun chokeChords() = active.chokeChords()
+
     override fun close() {
         modern.close()
         legacy.close()

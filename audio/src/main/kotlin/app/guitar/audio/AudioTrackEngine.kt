@@ -244,6 +244,7 @@ class AudioTrackEngine(
                     pan = Panner.forMidi(midiNote),
                     reverbSend = voiceReverbSend,
                     releaseMs = timbre.releaseMs,
+                    group = AudioEngine.PITCHED_GROUP,
                 )
                 return@execute
             }
@@ -263,6 +264,7 @@ class AudioTrackEngine(
                 pan = Panner.forMidi(midiNote),
                 reverbSend = voiceReverbSend,
                 releaseMs = timbre.releaseMs,
+                group = AudioEngine.PITCHED_GROUP,
             )
             val tAdded = System.nanoTime()
             lastQueueMs = (tStart - tCall) / 1_000_000
@@ -288,7 +290,8 @@ class AudioTrackEngine(
             if (inst != null) {
                 val midi = Math.round(69 + 12 * (Math.log(freqHz.toDouble() / 440.0) / Math.log(2.0))).toInt().coerceIn(0, 127)
                 addVoiceSource(SampleSource(inst, midi), gain = (timbre.amplitude / 0.6).toFloat() * voiceLevel,
-                    reverbSend = voiceReverbSend, releaseMs = timbre.releaseMs)
+                    reverbSend = voiceReverbSend, releaseMs = timbre.releaseMs,
+                    group = AudioEngine.PITCHED_GROUP)
                 return@execute
             }
             val samples = synth.synthesizeFrequency(
@@ -299,7 +302,8 @@ class AudioTrackEngine(
                 amplitude = timbre.amplitude,
                 brightnessDecay = GUITAR_BRIGHTNESS_DECAY,
             )
-            addVoice(samples, gain = voiceLevel, reverbSend = voiceReverbSend, releaseMs = timbre.releaseMs)
+            addVoice(samples, gain = voiceLevel, reverbSend = voiceReverbSend, releaseMs = timbre.releaseMs,
+                group = AudioEngine.PITCHED_GROUP)
         }
     }
 
@@ -332,6 +336,7 @@ class AudioTrackEngine(
                         strumFrames * i,
                         AmpEnvelope(sampleRate, 3.0, timbre.releaseMs.toDouble()),
                         reverbSend = voiceReverbSend,
+                        group = AudioEngine.PITCHED_GROUP,
                     ).also { it.pan = Panner.forMidi(midi) },
                     MAX_VOICES,
                 )
@@ -357,10 +362,11 @@ class AudioTrackEngine(
         pan: Double = 0.0,
         reverbSend: Float = 0f,
         releaseMs: Int = 20,
+        group: String? = null,
     ) {
         mixer.addAndCap(
             MixVoice(source, gain, delayFrames, AmpEnvelope(sampleRate, 3.0, releaseMs.toDouble()),
-                reverbSend = reverbSend).also { it.pan = pan },
+                reverbSend = reverbSend, group = group).also { it.pan = pan },
             MAX_VOICES,
         )
     }
@@ -374,6 +380,7 @@ class AudioTrackEngine(
         pan: Double = 0.0,
         reverbSend: Float = 0f,
         chokeKey: String? = null,
+        group: String? = null,
     ) {
         if (samples.isEmpty()) return
         mixer.addAndCap(
@@ -385,6 +392,7 @@ class AudioTrackEngine(
                 pan,
                 reverbSend,
                 chokeKey,
+                group,
             ),
             MAX_VOICES,
         )
@@ -397,6 +405,14 @@ class AudioTrackEngine(
     override fun stop() { mixer.releaseAll() }
 
     override fun cutReverb() { mixer.clearReverb() }
+
+    // Damp the pitched bus only: drums, the metronome and cue beeps carry no group tag
+    // and keep ringing. Queued on the synthesizer thread so it cannot overtake a chord
+    // that was handed to `synthesizer.execute` a moment earlier and choke IT instead.
+    override fun chokeChords() {
+        if (!running.get()) return
+        synthesizer.execute { mixer.releaseGroup(AudioEngine.PITCHED_GROUP) }
+    }
 
     /** Set the modern-bus tone EQ gains (dB). */
     fun setEq(bassDb: Float, midDb: Float, trebleDb: Float) = mixer.setEq(bassDb, midDb, trebleDb)
