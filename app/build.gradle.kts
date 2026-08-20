@@ -72,6 +72,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.datastore.preferences)
+    // SAF folder access for the sideloaded song pack (SongPackStore).
+    implementation(libs.androidx.documentfile)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

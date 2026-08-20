@@ -46,7 +46,7 @@ enum class DisplayMode { None, Chord, Scale, Pick }
 
 /** Which bottom sheet (or full-screen route) is currently open (null = none).
  *  Loop and Tuner are full-screen; the others are bottom sheets. */
-enum class Sheet { Fretboard, Options, Loop, Tuner, EarTraining, SambaLooper, Decompose, CavaqProgressions, RhythmUnits, Metronome, ScalesTriads, Theory }
+enum class Sheet { Fretboard, Options, Loop, Tuner, EarTraining, SambaLooper, Decompose, CavaqProgressions, RhythmUnits, Metronome, ScalesTriads, Theory, Songs }
 
 /** UI theme mode (Settings → Personalize). Auto follows the system light/dark
  *  setting (resolved in MainActivity via `isSystemInDarkTheme()`); Dark/Light
@@ -866,6 +866,7 @@ class AppState(
             Sheet.RhythmUnits -> {} // rhythmic-units trainer; plays its own click loop
             Sheet.Metronome -> {}   // metronome; plays its own click loop
             Sheet.Theory -> {}      // static reference sheets; no audio
+            Sheet.Songs -> {}       // chord sheets are read-only; no audio
         }
     }
 
