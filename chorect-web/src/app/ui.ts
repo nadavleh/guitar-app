@@ -30,6 +30,7 @@ import { RhythmUnitsUI } from "./rhythmUnitsUI";
 import { MetronomeState } from "./metronomeState";
 import { MetronomeUI } from "./metronomeUI";
 import { TheoryUI } from "./theoryUI";
+import { SongsUI } from "./songsUI";
 import { loadDrumSample } from "./drumSamples";
 import { Timbres } from "../audio";
 import { Colors, withAlpha } from "./theme";
@@ -63,12 +64,13 @@ const TAB_SHEET: Record<TabDestName, Sheet> = {
   Metronome: Sheet.Metronome,
   ScalesTriads: Sheet.ScalesTriads,
   Theory: Sheet.Theory,
+  Songs: Sheet.Songs,
 };
 const TAB_ICON: Record<TabDestName, IconName> = {
-  Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose", CavaqProgressions: "note", RhythmUnits: "rhythmNotes", Metronome: "timer", ScalesTriads: "neck", Theory: "note",
+  Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose", CavaqProgressions: "note", RhythmUnits: "rhythmNotes", Metronome: "timer", ScalesTriads: "neck", Theory: "note", Songs: "note",
 };
 const TAB_LABEL: Record<TabDestName, string> = {
-  Neck: "Fretboard", Ear: "Ear", Rhythm: "DrumLoop", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose", CavaqProgressions: "Progressions", RhythmUnits: "Rhythm", Metronome: "Metronome", ScalesTriads: "Scales", Theory: "Theory",
+  Neck: "Fretboard", Ear: "Ear", Rhythm: "DrumLoop", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose", CavaqProgressions: "Progressions", RhythmUnits: "Rhythm", Metronome: "Metronome", ScalesTriads: "Scales", Theory: "Theory", Songs: "Songs",
 };
 /** One-line description shown under each destination's title in the More sheet. */
 const TAB_SUBTITLE: Record<TabDestName, string> = {
@@ -83,6 +85,7 @@ const TAB_SUBTITLE: Record<TabDestName, string> = {
   Metronome: "Click track with selectable time signatures",
   ScalesTriads: "Guitar CAGED scales & triad practice",
   Theory: "Interval song references & reference sheets — expanding",
+  Songs: "Your chord sheets — view, transpose, show degrees",
 };
 
 /** Whether a tab destination is available for the current instrument (mirrors
@@ -183,6 +186,7 @@ export class App {
   private metronome: MetronomeState;
   private metronomeUI: MetronomeUI;
   private theoryUI: TheoryUI;
+  private songsUI: SongsUI;
 
   constructor(private state: AppState, root: HTMLElement) {
     this.fretboard = new FretboardCanvas(this.fretCanvasEl);
@@ -257,6 +261,7 @@ export class App {
     this.metronome = new MetronomeState({ audio: state.audio, onChange: () => this.scheduleRender() });
     this.metronomeUI = new MetronomeUI(this.metronome, () => state.closeSheet(), () => this.scheduleRender());
     this.theoryUI = new TheoryUI(this.ear, () => state.closeSheet(), () => this.scheduleRender());
+    this.songsUI = new SongsUI();
     this.decomposeUI = new DecomposeUI(state, this.ear, () => state.closeSheet(), (symbols) => {
       this.loop.loadProgressionIntoLoop(symbols);
       state.openSheet(Sheet.Loop);
@@ -625,6 +630,7 @@ export class App {
     else if (route === Sheet.Metronome) this.metronomeUI.render(this.contentEl);
     else if (route === Sheet.ScalesTriads) this.cagedUI.render(this.contentEl);
     else if (route === Sheet.Theory) this.theoryUI.render(this.contentEl);
+    else if (route === Sheet.Songs) this.songsUI.render(this.contentEl);
     else this.renderFretboardView();
 
     const newScroll = this.contentEl.querySelector(".et-scroll");
@@ -1558,6 +1564,7 @@ export class App {
       case Sheet.Metronome: return "Metronome";
       case Sheet.ScalesTriads: return "Scales & Triads";
       case Sheet.Theory: return "Theory";
+      case Sheet.Songs: return "Songs";
     }
   }
 }
