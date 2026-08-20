@@ -9,6 +9,7 @@
 // glyphs and the per-screen 🎚 popup with SVG throughout.
 
 export type IconName =
+  | "book"
   | "neck"
   | "ear"
   | "rhythm"
@@ -77,6 +78,7 @@ const PATH: Record<IconName, string> = {
   // Beamed sixteenth-note group ("1 e a") — the Rhythm-units tab glyph (replaces
   // the clock/timer). Three noteheads + stems under a double beam.
   rhythmNotes: '<line x1="7.8" y1="17" x2="7.8" y2="6"/><line x1="13" y1="17" x2="13" y2="6"/><line x1="18.2" y1="17" x2="18.2" y2="6"/><line x1="7.4" y1="6.4" x2="18.6" y2="6.4" stroke-width="2.6"/><line x1="7.4" y1="9.4" x2="18.6" y2="9.4" stroke-width="2.6"/><ellipse cx="6.1" cy="17.2" rx="2.4" ry="1.9" fill="currentColor" stroke="none"/><ellipse cx="11.3" cy="17.2" rx="2.4" ry="1.9" fill="currentColor" stroke="none"/><ellipse cx="16.5" cy="17.2" rx="2.4" ry="1.9" fill="currentColor" stroke="none"/>',
+  book: '<path d="M3 5.5A1.5 1.5 0 0 1 4.5 4H10a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4.5A1.5 1.5 0 0 1 3 15.5z"/><path d="M21 5.5A1.5 1.5 0 0 0 19.5 4H14a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h5.5a1.5 1.5 0 0 0 1.5-1.5z"/>',
   note: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
   flask: '<path d="M9 2h6"/><path d="M10 2v6.5l-6 10.5a1.5 1.5 0 0 0 1.3 2.2h13.4a1.5 1.5 0 0 0 1.3-2.2l-6-10.5V2"/><line x1="7.5" y1="15" x2="16.5" y2="15"/>',
   // Ear Training Signal restructure (T9): pinned header Restart/Quit icons for

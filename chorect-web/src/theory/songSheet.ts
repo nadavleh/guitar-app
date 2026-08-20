@@ -4,7 +4,7 @@
 // This is what the Songs tab needs and all it needs: no voicings, no playback. The
 // sheet shows chords over lyrics, transposes them, and can relabel them by degree.
 
-import { PitchClass, spellPc, parsePitchClass, pcPlus, pcInterval } from "./core";
+import { PitchClass, spellPc, pcPlus, pcInterval } from "./core";
 import { parseChordFull, inversionOf } from "./chords";
 
 /** A key: its tonic, and whether the song is in a minor mode. */
@@ -13,17 +13,19 @@ export interface SongKey {
   readonly minor: boolean;
 }
 
-/** Parse a key written as a chord symbol — "G", "Am", "Bb", "F#m". */
+/**
+ * Parse a key written as a chord symbol — "G", "Am", "Bb", "F#m", "Cmaj7".
+ *
+ * Runs through `parseChordFull` rather than splitting the text by hand: that
+ * already knows every quality and its shorthand, so "Cmaj" reads as major and
+ * "Am7" as minor without this needing its own suffix rules.
+ */
 export function parseKey(text: string): SongKey | null {
-  const t = text.trim();
-  if (t.length === 0) return null;
-  const minor = /m$/.test(t) && !/maj$/i.test(t);
-  const rootText = minor ? t.substring(0, t.length - 1) : t;
-  try {
-    return { tonic: parsePitchClass(rootText), minor };
-  } catch {
-    return null;
-  }
+  const c = parseChordFull(text.trim());
+  if (c === null) return null;
+  const q = c.quality.symbol;
+  const minor = /^(m|min)(?!aj)/.test(q) || q === "dim" || q === "dim7";
+  return { tonic: c.root, minor };
 }
 
 /** How a transposed symbol should be spelled. Sheets in flat keys read badly in

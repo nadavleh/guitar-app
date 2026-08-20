@@ -4,6 +4,7 @@
 
 import {
   parseChord, parseChordFull, inversionOf, isInversion, effectiveQuality, impliesTone,
+  parseKey, prefersFlats, transposeSymbol, transposeKey, degreeLabel, degreeLabels,
   ChordShapeGenerator, cagedShapesFor, VoicingStyle, notesFrom,
   scalePositionsFor, scaleNotesFrom, SCALES, parsePitchClass, midiPitchClass,
   TrainingMode, ChordTypeLevel, resolve as resolveDegree, degreeRoot, romanLabel,
@@ -629,6 +630,70 @@ check("every symbol in the captured corpus parses", [
   "F/C", "F7/Eb", "Fm/Ab", "G/B", "G/D", "G7/B", "Gm/Bb", "Ebmmaj7/Gb",
   "A4", "B4", "D2", "E5", "AM7", "A+", "C7sus4", "D7b9", "Eb7b5", "Abm13",
 ].every((s) => parseChord(s) !== null && parseChordFull(s) !== null));
+
+
+// --- Song sheet: transposition and degrees ---
+// Mirrors SongSheetTest.kt. If these two drift, the same song shows different
+// degree labels on the phone and on the web.
+check("a key parses from a chord symbol", (() => {
+  const g = parseKey("G"), am = parseKey("Am"), fsm = parseKey("F#m");
+  return g?.tonic === 7 && !g.minor && am?.tonic === 9 && am.minor &&
+    fsm?.tonic === 6 && fsm.minor;
+})());
+check("a major-seventh key is not mistaken for minor", parseKey("Cmaj")?.minor === false);
+check("nonsense is not a key", parseKey("") === null && parseKey("H") === null);
+check("flat keys prefer flat spelling",
+  prefersFlats(parseKey("F")) && prefersFlats(parseKey("Bb")) &&
+  !prefersFlats(parseKey("G")) && !prefersFlats(null));
+check("transposing keeps the quality",
+  transposeSymbol("C", 2) === "D" && transposeSymbol("Cm7", 2) === "Dm7" &&
+  transposeSymbol("Cmaj7", 2) === "Dmaj7");
+check("transposing moves the slash bass with the chord",
+  transposeSymbol("D/F#", 2) === "E/G#" && transposeSymbol("G/B", 5) === "C/E");
+check("transposing can spell flat",
+  transposeSymbol("A", 1, true) === "Bb" && transposeSymbol("A", 1, false) === "A#" &&
+  transposeSymbol("D/F#", 1, true) === "Eb/G");
+check("transposing wraps the octave and accepts negatives",
+  transposeSymbol("C", 12) === "C" && transposeSymbol("C", -1) === "B" &&
+  transposeSymbol("C", 11) === "B");
+check("an unparseable symbol transposes to itself",
+  transposeSymbol("N.C.", 3) === "N.C." && transposeSymbol("%", 3) === "%");
+check("the key transposes with the chords",
+  transposeKey(parseKey("G")!, 2) === "A" && transposeKey(parseKey("Am")!, 2) === "Bm" &&
+  transposeKey(parseKey("Am")!, 1, true) === "Bbm");
+check("diatonic chords get their Roman numerals in a major key", (() => {
+  const c = parseKey("C")!;
+  return degreeLabel("C", c) === "I" && degreeLabel("Dm", c) === "ii" &&
+    degreeLabel("Em", c) === "iii" && degreeLabel("F", c) === "IV" &&
+    degreeLabel("G", c) === "V" && degreeLabel("Am", c) === "vi";
+})());
+check("the quality rides along with the numeral", (() => {
+  const c = parseKey("C")!;
+  return degreeLabel("G7", c) === "V7" && degreeLabel("Cmaj7", c) === "Imaj7" &&
+    degreeLabel("Dm7", c) === "ii7" && degreeLabel("Bm7b5", c) === "viiø7";
+})());
+check("chromatic chords keep their accidental", (() => {
+  const c = parseKey("C")!;
+  return degreeLabel("Bb", c) === "bVII" && degreeLabel("Eb", c) === "bIII" &&
+    degreeLabel("D7", c) === "II7";
+})());
+check("an inversion names the bass degree", (() => {
+  const c = parseKey("C")!;
+  return degreeLabel("C/E", c) === "I/3" && degreeLabel("C/G", c) === "I/5" &&
+    degreeLabel("G/B", c) === "V/7";
+})());
+check("a minor key labels its own diatonic set", (() => {
+  const am = parseKey("Am")!;
+  return degreeLabel("Am", am) === "i" && degreeLabel("Dm", am) === "iv" &&
+    degreeLabel("Em", am) === "v" && degreeLabel("G", am) === "VII" &&
+    degreeLabel("C", am) === "III";
+})());
+check("degrees are invariant under transposition", (() => {
+  const prog = ["C", "Am", "F", "G7", "C/E"];
+  const inC = degreeLabels(prog, parseKey("C")!);
+  const inD = degreeLabels(prog.map((s) => transposeSymbol(s, 2)), parseKey("D")!);
+  return JSON.stringify(inC) === JSON.stringify(inD);
+})());
 
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -51,6 +51,13 @@ export class SongsUI {
     }
   }
 
+  /** Back to the song list. Called when the Songs tab itself is tapped, so the tab
+   *  reopens on the list rather than on whatever song was last read. */
+  showList(): void {
+    this.selected = null;
+    this.rerender();
+  }
+
   private rerender(): void {
     if (this.host !== null) this.paint();
   }

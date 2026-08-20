@@ -67,7 +67,7 @@ const TAB_SHEET: Record<TabDestName, Sheet> = {
   Songs: Sheet.Songs,
 };
 const TAB_ICON: Record<TabDestName, IconName> = {
-  Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose", CavaqProgressions: "note", RhythmUnits: "rhythmNotes", Metronome: "timer", ScalesTriads: "neck", Theory: "note", Songs: "note",
+  Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose", CavaqProgressions: "note", RhythmUnits: "rhythmNotes", Metronome: "timer", ScalesTriads: "neck", Theory: "book", Songs: "note",
 };
 const TAB_LABEL: Record<TabDestName, string> = {
   Neck: "Fretboard", Ear: "Ear", Rhythm: "DrumLoop", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose", CavaqProgressions: "Progressions", RhythmUnits: "Rhythm", Metronome: "Metronome", ScalesTriads: "Scales", Theory: "Theory", Songs: "Songs",
@@ -675,7 +675,10 @@ export class App {
       this.tabbarEl.appendChild(this.navItem(icon, label, active, onClick));
     };
     for (const dest of ordered) {
-      add(TAB_ICON[dest], TAB_LABEL[dest], this.isTabSelected(dest), () => this.state.openSheet(TAB_SHEET[dest]));
+      add(TAB_ICON[dest], TAB_LABEL[dest], this.isTabSelected(dest), () => {
+        if (dest === "Songs") this.songsUI.showList();
+        this.state.openSheet(TAB_SHEET[dest]);
+      });
     }
     add("stats", "Stats", false, () => { this.moreStatsOpen = true; this.render(); });
     add("settings", "Settings", this.state.currentSheet === Sheet.Options, () => this.state.openSheet(Sheet.Options));
