@@ -3,7 +3,7 @@
 // the browser uses. Mirrors a handful of the Kotlin JUnit assertions.
 
 import {
-  parseChord, parseChordFull, inversionOf, isInversion,
+  parseChord, parseChordFull, inversionOf, isInversion, effectiveQuality, impliesSeventh,
   ChordShapeGenerator, cagedShapesFor, VoicingStyle, notesFrom,
   scalePositionsFor, scaleNotesFrom, SCALES, parsePitchClass, midiPitchClass,
   TrainingMode, ChordTypeLevel, resolve as resolveDegree, degreeRoot, romanLabel,
@@ -571,6 +571,24 @@ check("a chord tone in the bass is an inversion numbered by chord tone",
   inversionOf(parseChordFull("C/E")!) === 1 &&
   inversionOf(parseChordFull("C/G")!) === 2 &&
   inversionOf(parseChordFull("Bb7/Ab")!) === 3);
+// A 7th in the bass implies the 7th chord — "Bb/Ab" is Bb7/Ab, a 3rd inversion,
+// not a pedal. Both ports must agree or the degree display would differ per device.
+check("a 7th in the bass implies the 7th chord and inverts it", (() => {
+  const c = parseChordFull("Bb/Ab")!;
+  return impliesSeventh(c) && effectiveQuality(c).symbol === "7" &&
+    inversionOf(c) === 3 && isInversion(c);
+})());
+check("a major 7th in the bass implies maj7", (() => {
+  const c = parseChordFull("Eb/D")!;
+  return effectiveQuality(c).symbol === "maj7" && inversionOf(c) === 3;
+})());
+check("a minor triad with a 7th in the bass implies m7",
+  effectiveQuality(parseChordFull("Am/G")!).symbol === "m7" &&
+  effectiveQuality(parseChordFull("Am/G#")!).symbol === "mMaj7");
+check("a written 7th chord is never re-implied", (() => {
+  const c = parseChordFull("Bb7/Ab")!;
+  return effectiveQuality(c).symbol === "7" && inversionOf(c) === 3 && !impliesSeventh(c);
+})());
 check("a non-chord-tone bass is a pedal, not an inversion", (() => {
   const c = parseChordFull("C/D")!;
   return inversionOf(c) === null && !isInversion(c);

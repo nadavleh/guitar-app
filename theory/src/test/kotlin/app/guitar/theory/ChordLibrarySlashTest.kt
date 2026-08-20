@@ -40,6 +40,36 @@ class ChordLibrarySlashTest {
         assertEquals(3, ChordLibrary.parseFull("Bb7/Ab")!!.inversion)
     }
 
+    @Test fun `a 7th in the bass implies the 7th chord and inverts it`() {
+        // Sheets write "Bb/Ab" for Bb7 with its own b7 in the bass. That is a valid
+        // 3rd inversion, not a pedal — the 7th is implied by the bass.
+        val c = ChordLibrary.parseFull("Bb/Ab")
+        assertNotNull(c)
+        assertTrue(c.impliesSeventh)
+        assertEquals("7", c.effectiveQuality.symbol)
+        assertEquals(3, c.inversion)
+        assertTrue(c.isInversion)
+    }
+
+    @Test fun `a major 7th in the bass implies maj7`() {
+        val c = ChordLibrary.parseFull("Eb/D")!!
+        assertEquals("maj7", c.effectiveQuality.symbol)
+        assertEquals(3, c.inversion)
+    }
+
+    @Test fun `a minor triad with a 7th in the bass implies m7`() {
+        assertEquals("m7", ChordLibrary.parseFull("Am/G")!!.effectiveQuality.symbol)
+        assertEquals("mMaj7", ChordLibrary.parseFull("Am/G#")!!.effectiveQuality.symbol)
+    }
+
+    @Test fun `a written 7th chord is never re-implied`() {
+        // The bass is already a chord tone, so the quality must pass through intact.
+        val c = ChordLibrary.parseFull("Bb7/Ab")!!
+        assertEquals("7", c.effectiveQuality.symbol)
+        assertEquals(3, c.inversion)
+        assertFalse(c.impliesSeventh)
+    }
+
     @Test fun `a non-chord-tone bass is a pedal, not an inversion`() {
         // C major is C E G — D is not in it, so "C/D" is a pedal/added bass. The
         // engine must say "unknown inversion" rather than invent an index.

@@ -89,18 +89,64 @@ object ChordLibrary {
         /** The note written after the slash; null when the symbol had none. */
         val bass: PitchClass?,
     ) {
+        /**
+         * The quality once a 7th in the bass is accounted for.
+         *
+         * Chord sheets routinely write "Bb/Ab" for what is really Bb7 with its own
+         * b7 in the bass — a valid 3rd inversion, not a pedal. When the written
+         * quality carries no 7th and the bass sits a 7th above the root, the 7th is
+         * implied and folded in here, so [inversion] can resolve it properly.
+         */
+        val effectiveQuality: ChordQuality
+            get() {
+                val b = bass ?: return quality
+                if (quality.notesFrom(root).contains(b)) return quality
+                val iv = b - root
+                if (iv != Interval.min7 && iv != Interval.maj7) return quality
+                if (quality.intervals.contains(Interval.min7) ||
+                    quality.intervals.contains(Interval.maj7)) return quality
+                val named = SEVENTH_OF[quality.symbol to iv]
+                return qualities[named]
+                    ?: ChordQuality(quality.symbol + iv.seventhSuffix(), quality.intervals + iv)
+            }
+
         /** Chord-tone index of [bass] (0 = root position), or null when the bass is
-         *  not a chord tone — i.e. a pedal/added bass rather than an inversion. */
+         *  not a chord tone at all — a true pedal/added bass, e.g. "C/D". */
         val inversion: Int?
             get() {
                 val b = bass ?: return 0
-                val idx = quality.notesFrom(root).indexOf(b)
+                val idx = effectiveQuality.notesFrom(root).indexOf(b)
                 return if (idx >= 0) idx else null
             }
 
         /** True when the bass is a genuine chord tone below the root. */
         val isInversion: Boolean get() = (inversion ?: 0) > 0
+
+        /** True when the 7th was inferred from the bass rather than written. */
+        val impliesSeventh: Boolean get() = effectiveQuality !== quality
     }
+
+    private fun Interval.seventhSuffix(): String =
+        if (this == Interval.maj7) "maj7" else "7"
+
+    /** Canonical name for "<triad> with a 7th in the bass", so the implied chord is
+     *  reported with the symbol a musician would write rather than a synthetic one. */
+    private val SEVENTH_OF: Map<Pair<String, Interval>, String> = mapOf(
+        ("" to Interval.min7) to "7",
+        ("" to Interval.maj7) to "maj7",
+        ("maj" to Interval.min7) to "7",
+        ("maj" to Interval.maj7) to "maj7",
+        ("m" to Interval.min7) to "m7",
+        ("m" to Interval.maj7) to "mMaj7",
+        ("min" to Interval.min7) to "min7",
+        ("min" to Interval.maj7) to "mMaj7",
+        ("sus4" to Interval.min7) to "7sus4",
+        ("dim" to Interval.min7) to "m7b5",
+        ("aug" to Interval.min7) to "7#5",
+        ("aug" to Interval.maj7) to "maj7#5",
+        ("5" to Interval.min7) to "7",
+        ("5" to Interval.maj7) to "maj7",
+    )
 
     /** Root + quality, ignoring any slash bass. Kept at this signature because the
      *  fretboard, looper and ear-training callers only ever want the chord itself. */
