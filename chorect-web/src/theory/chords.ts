@@ -54,14 +54,104 @@ export const QUALITIES: ReadonlyMap<string, ChordQuality> = new Map([
   ["mMaj7", q("mMaj7", [IV.P1, IV.min3, IV.P5, IV.maj7])],
   ["7#5", q("7#5", [IV.P1, IV.maj3, IV.min6, IV.min7])],
   ["maj7#5", q("maj7#5", [IV.P1, IV.maj3, IV.min6, IV.maj7])],
+  // Power chord — root and 5th, deliberately NO third, so it is neither major nor
+  // minor. Common in the transcriptions as "E5".
+  ["5", q("5", [IV.P1, IV.P5])],
+  // Suspended dominant: the 3rd is replaced by the 4th, the 7th stays.
+  ["7sus4", q("7sus4", [IV.P1, IV.P4, IV.P5, IV.min7])],
+  // Altered dominants that turn up in the jazz/bossa transcriptions.
+  ["7b5", q("7b5", [IV.P1, IV.maj3, IV.TT, IV.min7])],
+  ["7b9", q("7b9", [IV.P1, IV.maj3, IV.P5, IV.min7, IV.b9])],
+  ["6add9", q("6add9", [IV.P1, IV.maj3, IV.P5, IV.maj6, IV.maj9])],
+  ["m13", q("m13", [IV.P1, IV.min3, IV.min7, IV.maj9, IV.maj13])],
+]);
+
+/**
+ * Chord-sheet shorthand that means an existing quality. Transcription sites write
+ * the same chord several ways: "A4" for Asus4, "D2" for Dsus2, "AM7" (capital M)
+ * for Amaj7. These are notation variants, not new harmony, so they map onto the
+ * canonical qualities rather than duplicating them.
+ *
+ * Case matters and is the reason this is an explicit table rather than a lowercase
+ * compare: "m" is minor and "M" is major.
+ */
+const ALIASES: ReadonlyMap<string, string> = new Map([
+  ["4", "sus4"],
+  ["2", "sus2"],
+  ["M7", "maj7"],
+  ["Maj7", "maj7"],
+  ["mmaj7", "mMaj7"],
+  ["mMAJ7", "mMaj7"],
+  ["minmaj7", "mMaj7"],
+  ["sus", "sus4"],
+  ["7sus", "7sus4"],
+  ["4add9", "sus4"],
+  ["M", ""],
+  ["+", "aug"],
+  ["aug7", "7#5"],
 ]);
 
 /** Parse a chord symbol like "Cmaj7" → [root, quality], or null. */
 export function parseChord(symbol: string): [PitchClass, ChordQuality] | null {
+  const full = parseChordFull(symbol);
+  return full === null ? null : [full.root, full.quality];
+}
+
+/**
+ * A parsed chord symbol, including the slash bass when one was written.
+ *
+ * A slash chord is almost always an INVERSION — the same chord with a different
+ * chord tone in the bass ("D/F#" is D major over its own 3rd). Occasionally the
+ * bass is not a chord tone at all ("C/D", a pedal), which is why `bass` is kept as
+ * a plain pitch class and the inversion index is derived, not assumed:
+ * `inversionOf` returns null for the pedal case rather than inventing a number.
+ */
+export interface ParsedChord {
+  readonly root: PitchClass;
+  readonly quality: ChordQuality;
+  /** The note written after the slash; null when the symbol had none. */
+  readonly bass: PitchClass | null;
+}
+
+/** Chord-tone index of the bass (0 = root position), or null when the bass is not
+ *  a chord tone — i.e. a pedal/added bass rather than an inversion. */
+export function inversionOf(chord: ParsedChord): number | null {
+  if (chord.bass === null) return 0;
+  const idx = notesFrom(chord.quality, chord.root).indexOf(chord.bass);
+  return idx >= 0 ? idx : null;
+}
+
+/** True when the bass is a genuine chord tone below the root. */
+export function isInversion(chord: ParsedChord): boolean {
+  return (inversionOf(chord) ?? 0) > 0;
+}
+
+/** Full parse, preserving the slash bass. */
+export function parseChordFull(symbol: string): ParsedChord | null {
   const trimmed = symbol.trim();
   if (trimmed.length === 0) return null;
-  for (let rootLen = Math.min(2, trimmed.length); rootLen >= 1; rootLen--) {
-    const rootText = trimmed.substring(0, rootLen);
+  let core = trimmed;
+  let bass: PitchClass | null = null;
+  const slash = trimmed.indexOf("/");
+  if (slash > 0) {
+    // A slash with an unreadable bass makes the whole symbol invalid rather than
+    // silently degrading to the base chord — that would hide bad data.
+    try {
+      bass = parsePitchClass(trimmed.substring(slash + 1));
+    } catch {
+      return null;
+    }
+    core = trimmed.substring(0, slash).trim();
+  }
+  const base = parseCore(core);
+  if (base === null) return null;
+  return { root: base[0], quality: base[1], bass };
+}
+
+function parseCore(text: string): [PitchClass, ChordQuality] | null {
+  if (text.length === 0) return null;
+  for (let rootLen = Math.min(2, text.length); rootLen >= 1; rootLen--) {
+    const rootText = text.substring(0, rootLen);
     let rootPc: PitchClass | null;
     try {
       rootPc = parsePitchClass(rootText);
@@ -69,8 +159,9 @@ export function parseChord(symbol: string): [PitchClass, ChordQuality] | null {
       rootPc = null;
     }
     if (rootPc !== null) {
-      const qualitySymbol = trimmed.substring(rootLen);
-      const quality = QUALITIES.get(qualitySymbol);
+      const qualitySymbol = text.substring(rootLen);
+      const alias = ALIASES.get(qualitySymbol);
+      const quality = QUALITIES.get(qualitySymbol) ?? (alias !== undefined ? QUALITIES.get(alias) : undefined);
       if (quality) return [rootPc, quality];
     }
   }

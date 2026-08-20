@@ -3,7 +3,8 @@
 // the browser uses. Mirrors a handful of the Kotlin JUnit assertions.
 
 import {
-  parseChord, ChordShapeGenerator, cagedShapesFor, VoicingStyle, notesFrom,
+  parseChord, parseChordFull, inversionOf, isInversion,
+  ChordShapeGenerator, cagedShapesFor, VoicingStyle, notesFrom,
   scalePositionsFor, scaleNotesFrom, SCALES, parsePitchClass, midiPitchClass,
   TrainingMode, ChordTypeLevel, resolve as resolveDegree, degreeRoot, romanLabel,
   ADVANCED_PROGRESSIONS, resolveNamed, QUALITIES, inversionMidis, randomN2c, n2cAnswerLabel,
@@ -551,6 +552,52 @@ check("artists are distinct and never blank",
 // Seeds come from common musical knowledge, not from Nadav's own sheets; the tab
 // marks them so nothing poses as his transcription.
 check("the shipped library is seeds only", SONGS_WITH_CHORDS.every((s) => s.seeded));
+
+// --- Slash chords and chord-sheet shorthand ---
+// Mirrors ChordLibrarySlashTest.kt. These pin the TS port against the Kotlin one:
+// a slash chord is an INVERSION when the bass is a chord tone, and a pedal when it
+// is not — the ports must agree on which, or the degree display would disagree
+// across platforms for the same song.
+check("slash bass parses and keeps the base chord", (() => {
+  const c = parseChordFull("D/F#");
+  return c !== null && c.root === 2 && c.quality.symbol === "" && c.bass === 6;
+})());
+check("parseChord ignores the bass so existing callers are unaffected",
+  JSON.stringify(parseChord("D")) === JSON.stringify(parseChord("D/F#")) &&
+  JSON.stringify(parseChord("Am7")) === JSON.stringify(parseChord("Am7/G")));
+check("a chord tone in the bass is an inversion numbered by chord tone",
+  inversionOf(parseChordFull("D/F#")!) === 1 &&
+  inversionOf(parseChordFull("D/A")!) === 2 &&
+  inversionOf(parseChordFull("C/E")!) === 1 &&
+  inversionOf(parseChordFull("C/G")!) === 2 &&
+  inversionOf(parseChordFull("Bb7/Ab")!) === 3);
+check("a non-chord-tone bass is a pedal, not an inversion", (() => {
+  const c = parseChordFull("C/D")!;
+  return inversionOf(c) === null && !isInversion(c);
+})());
+check("no slash means root position", (() => {
+  const c = parseChordFull("Cmaj7")!;
+  return c.bass === null && inversionOf(c) === 0 && !isInversion(c);
+})());
+check("an unreadable bass rejects the whole symbol",
+  parseChordFull("C/H") === null && parseChord("C/H") === null);
+check("site shorthand maps onto the canonical qualities",
+  JSON.stringify(parseChord("Asus4")) === JSON.stringify(parseChord("A4")) &&
+  JSON.stringify(parseChord("Dsus2")) === JSON.stringify(parseChord("D2")) &&
+  JSON.stringify(parseChord("Amaj7")) === JSON.stringify(parseChord("AM7")) &&
+  JSON.stringify(parseChord("Aaug")) === JSON.stringify(parseChord("A+")));
+check("capital M is major and lowercase m is minor",
+  parseChord("AM7")![1].symbol === "maj7" && parseChord("Am7")![1].symbol === "m7");
+check("the power chord has no third", (() => {
+  const q = parseChord("E5")![1];
+  return JSON.stringify(q.intervals) === JSON.stringify([0, 7]);
+})());
+check("every symbol in the captured corpus parses", [
+  "A/C#", "A/E", "Am/C", "Am7/D", "B7/F#", "Bb7/Ab", "C/E", "C/G", "Cm/G",
+  "D/A", "D/F#", "D9/F#", "Dm7/C", "E/G#", "E7/B", "Eb/G", "Em/G", "F/A",
+  "F/C", "F7/Eb", "Fm/Ab", "G/B", "G/D", "G7/B", "Gm/Bb", "Ebmmaj7/Gb",
+  "A4", "B4", "D2", "E5", "AM7", "A+", "C7sus4", "D7b9", "Eb7b5", "Abm13",
+].every((s) => parseChord(s) !== null && parseChordFull(s) !== null));
 
 
 console.log(`\n${passed} passed, ${failed} failed`);

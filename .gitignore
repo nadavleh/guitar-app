@@ -34,3 +34,7 @@ __pycache__/
 
 # Raw CC0 guitar sample sources (processed into assets/guitar by build_guitar_samples.py)
 tools/_guitar_src/
+
+# Captured lyric text — rights-encumbered, must never reach the public repo/site.
+# See tools/import_song_captures.py. Regenerate locally; do not commit.
+docs/songs/captured-lyrics.json
