@@ -4,8 +4,8 @@
 // This is what the Songs tab needs and all it needs: no voicings, no playback. The
 // sheet shows chords over lyrics, transposes them, and can relabel them by degree.
 
-import { PitchClass, Interval, spellPc, parsePitchClass, pcPlus, pcInterval } from "./core";
-import { parseChordFull, effectiveQuality, inversionOf, ParsedChord } from "./chords";
+import { PitchClass, spellPc, parsePitchClass, pcPlus, pcInterval } from "./core";
+import { parseChordFull, inversionOf } from "./chords";
 
 /** A key: its tonic, and whether the song is in a minor mode. */
 export interface SongKey {
