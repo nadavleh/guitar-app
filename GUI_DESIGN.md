@@ -471,3 +471,54 @@ A full-screen route — a step-sequencer drum machine. The **whole page is verti
   - **Clear all** empties the grid.
 
 ---
+
+## 12. Songs screen (`SongsScreen.kt` / `songsUI.ts`)
+
+A full-screen route showing the **sideloaded chord sheets**. The pack is a folder the
+device owner keeps themselves — it is never in the APK, the repo, or the deployed
+site — so the screen has two distinct states and both must read well.
+
+- **Header**: `SONGS` title, `Back`.
+- **Pack bar** (always visible, above everything): `Open song folder…` (or
+  `Change folder…` once loaded), then `Refresh` and `Forget` once a pack exists. A
+  small muted status line sits under the row and carries the only feedback the
+  screen gives — `104 songs loaded and cached`, `the folder is not reachable —
+  showing the cached copy`, `cache cleared`. A cancelled picker says **nothing**: an
+  aborted file dialog is a normal action, not an error worth shouting about.
+- **Empty state**: muted body text explaining where the folder comes from and that
+  the songs are cached afterwards. The web variant additionally explains that a
+  local folder needs desktop Chrome/Edge; on a browser that cannot do it at all,
+  that is stated plainly rather than showing a button that fails.
+- **List**: a search field (title or artist), then one row per song — title in
+  semibold, and a muted second line of `artist · key · capo N · chords only`. The
+  metadata parts are omitted when absent rather than shown empty. Tapping a row
+  opens the sheet and **resets transposition to 0**.
+- **Sheet view**:
+  - Back-to-list button reading `← Songs`, then title and muted artist.
+  - A muted key line: `Key G · capo 2 · transposed +3`, each part present only when
+    it applies.
+  - **Controls row**: `−` / `+` (transpose by a semitone, wrapping at the octave),
+    `Reset`, and a `Degrees` toggle which reads `Chords` while degrees are showing.
+    When a song has no detected key the toggle is still present but a muted note
+    reads `no key detected — degrees unavailable` — the control never silently
+    does nothing.
+  - **The sheet itself** is **monospace** (13sp / 13px), because the chords are
+    positioned by column over the lyric beneath them and any proportional font
+    destroys that alignment. Section labels (`Verse`, `Chorus`) are bold in the
+    accent colour; chord lines are in the accent colour, lyric lines in the body
+    colour. Each line pair scrolls **horizontally on its own** so a long line never
+    forces the whole page sideways.
+  - **Hebrew sheets** (`rtl: true` in the pack) are laid out right-aligned; the
+    source sheets pad the chord line to the lyric line's exact width, so the
+    alignment carries over as long as the font stays monospace.
+
+**Transposition redraws the chord line rather than reusing it.** A symbol changes
+width when transposed (`C` → `C#m7`) or relabelled as a degree, so each chord is
+re-placed at its recorded column when there is room and pushed right by a single
+space when it would otherwise collide. Reusing the original spacing would let one
+chord swallow the next.
+
+**Deliberately absent**: playback, chord shapes, and fretboard positions. The screen
+shows, transposes, and relabels — nothing sounds.
+
+---
