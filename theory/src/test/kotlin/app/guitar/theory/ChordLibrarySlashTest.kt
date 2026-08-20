@@ -13,6 +13,10 @@ import kotlin.test.assertFalse
  * The captured transcriptions are full of "D/F#" and site shorthand like "A4".
  * Before this, [ChordLibrary.parse] returned null for 131 of the 272 distinct
  * symbols in that corpus, which would have rendered them as dead rows.
+ *
+ * The model: a slash chord is an INVERSION. The bass is a tone of the chord that
+ * the symbol did not bother to spell, so it is folded in and the inversion index
+ * always resolves — "C/D" is Cadd9 with the 9th in the bass, not a special case.
  */
 class ChordLibrarySlashTest {
 
@@ -41,11 +45,10 @@ class ChordLibrarySlashTest {
     }
 
     @Test fun `a 7th in the bass implies the 7th chord and inverts it`() {
-        // Sheets write "Bb/Ab" for Bb7 with its own b7 in the bass. That is a valid
-        // 3rd inversion, not a pedal — the 7th is implied by the bass.
+        // Sheets write "Bb/Ab" for Bb7 with its own b7 in the bass — a 3rd inversion.
         val c = ChordLibrary.parseFull("Bb/Ab")
         assertNotNull(c)
-        assertTrue(c.impliesSeventh)
+        assertTrue(c.impliesTone)
         assertEquals("7", c.effectiveQuality.symbol)
         assertEquals(3, c.inversion)
         assertTrue(c.isInversion)
@@ -62,21 +65,36 @@ class ChordLibrarySlashTest {
         assertEquals("mMaj7", ChordLibrary.parseFull("Am/G#")!!.effectiveQuality.symbol)
     }
 
+    @Test fun `a 9th in the bass implies add9`() {
+        // The bass is just a note of the chord: D over C is the 9th, so it is Cadd9
+        // in 3rd inversion. No separate "pedal" concept is needed for this.
+        val c = ChordLibrary.parseFull("C/D")!!
+        assertTrue(c.impliesTone)
+        assertEquals("add9", c.effectiveQuality.symbol)
+        assertEquals(3, c.inversion)
+        assertTrue(c.isInversion)
+    }
+
+    @Test fun `a 6th in the bass implies the 6 chord`() {
+        // Dm/B — B is the 6th of Dm, so Dm6, which is a rootless Bm7b5.
+        assertEquals("m6", ChordLibrary.parseFull("Dm/B")!!.effectiveQuality.symbol)
+        assertEquals("6", ChordLibrary.parseFull("C/A")!!.effectiveQuality.symbol)
+    }
+
+    @Test fun `an 11th in the bass appends the tone`() {
+        // F over C is the 11th. No stock quality is named for it, so the tone is
+        // appended rather than the chord being silently renamed.
+        val c = ChordLibrary.parseFull("C/F")!!
+        assertEquals("add11", c.effectiveQuality.symbol)
+        assertTrue(c.effectiveQuality.intervals.contains(Interval.P4))
+    }
+
     @Test fun `a written 7th chord is never re-implied`() {
         // The bass is already a chord tone, so the quality must pass through intact.
         val c = ChordLibrary.parseFull("Bb7/Ab")!!
         assertEquals("7", c.effectiveQuality.symbol)
         assertEquals(3, c.inversion)
-        assertFalse(c.impliesSeventh)
-    }
-
-    @Test fun `a non-chord-tone bass is a pedal, not an inversion`() {
-        // C major is C E G — D is not in it, so "C/D" is a pedal/added bass. The
-        // engine must say "unknown inversion" rather than invent an index.
-        val c = ChordLibrary.parseFull("C/D")
-        assertNotNull(c)
-        assertNull(c.inversion)
-        assertFalse(c.isInversion)
+        assertFalse(c.impliesTone)
     }
 
     @Test fun `no slash means root position`() {
@@ -85,6 +103,7 @@ class ChordLibrarySlashTest {
         assertNull(c.bass)
         assertEquals(0, c.inversion)
         assertFalse(c.isInversion)
+        assertFalse(c.impliesTone)
     }
 
     @Test fun `an unreadable bass rejects the whole symbol`() {
@@ -103,10 +122,8 @@ class ChordLibrarySlashTest {
     @Test fun `capital M is major and lowercase m is minor`() {
         // The alias table is case-sensitive on purpose; a lowercase compare would
         // collapse these two into one chord.
-        val major = ChordLibrary.parse("AM7")!!
-        val minor = ChordLibrary.parse("Am7")!!
-        assertEquals("maj7", major.second.symbol)
-        assertEquals("m7", minor.second.symbol)
+        assertEquals("maj7", ChordLibrary.parse("AM7")!!.second.symbol)
+        assertEquals("m7", ChordLibrary.parse("Am7")!!.second.symbol)
     }
 
     @Test fun `the power chord has no third`() {
@@ -116,7 +133,7 @@ class ChordLibrarySlashTest {
         assertFalse(q.intervals.contains(Interval.min3))
     }
 
-    @Test fun `every symbol in the captured corpus parses`() {
+    @Test fun `every symbol in the captured corpus parses and inverts`() {
         // A representative slice of the 272 distinct symbols extracted from the
         // saved chord sheets — the shapes that used to fail.
         val corpus = listOf(
@@ -124,19 +141,22 @@ class ChordLibrarySlashTest {
             "D/A", "D/F#", "D9/F#", "Dm7/C", "E/G#", "E7/B", "Eb/G", "Em/G", "F/A",
             "F/C", "F7/Eb", "Fm/Ab", "G/B", "G/D", "G7/B", "Gm/Bb", "Ebmmaj7/Gb",
             "A4", "B4", "D2", "E5", "AM7", "A+", "C7sus4", "D7b9", "Eb7b5", "Abm13",
+            "F/G", "G/A", "C/D", "Dm/B", "C/F", "Gb/Ab",
         )
         for (s in corpus) {
-            assertNotNull(ChordLibrary.parse(s), "'$s' does not parse")
-            assertNotNull(ChordLibrary.parseFull(s), "'$s' does not parse in full")
+            val c = ChordLibrary.parseFull(s)
+            assertNotNull(c, "'$s' does not parse")
+            // Every slash chord resolves to an inversion index inside the chord.
+            assertTrue(c.inversion < c.effectiveQuality.intervals.size,
+                "$s: inversion ${c.inversion} out of range")
         }
     }
 
-    @Test fun `inversion index never exceeds the chord tone count`() {
-        for (s in listOf("D/F#", "C/G", "Bb7/Ab", "Dm7/C", "E7/B")) {
+    @Test fun `the bass is always a tone of the effective chord`() {
+        for (s in listOf("D/F#", "C/G", "Bb/Ab", "C/D", "Dm/B", "C/F", "G/A")) {
             val c = ChordLibrary.parseFull(s)!!
-            val inv = c.inversion
-            assertNotNull(inv)
-            assertTrue(inv < c.quality.intervals.size, "$s: inversion $inv out of range")
+            assertTrue(c.effectiveQuality.notesFrom(c.root).contains(c.bass),
+                "$s: bass is not a tone of ${c.effectiveQuality.symbol}")
         }
     }
 }

@@ -3,7 +3,7 @@
 // the browser uses. Mirrors a handful of the Kotlin JUnit assertions.
 
 import {
-  parseChord, parseChordFull, inversionOf, isInversion, effectiveQuality, impliesSeventh,
+  parseChord, parseChordFull, inversionOf, isInversion, effectiveQuality, impliesTone,
   ChordShapeGenerator, cagedShapesFor, VoicingStyle, notesFrom,
   scalePositionsFor, scaleNotesFrom, SCALES, parsePitchClass, midiPitchClass,
   TrainingMode, ChordTypeLevel, resolve as resolveDegree, degreeRoot, romanLabel,
@@ -571,11 +571,11 @@ check("a chord tone in the bass is an inversion numbered by chord tone",
   inversionOf(parseChordFull("C/E")!) === 1 &&
   inversionOf(parseChordFull("C/G")!) === 2 &&
   inversionOf(parseChordFull("Bb7/Ab")!) === 3);
-// A 7th in the bass implies the 7th chord — "Bb/Ab" is Bb7/Ab, a 3rd inversion,
-// not a pedal. Both ports must agree or the degree display would differ per device.
+// The bass is a tone OF the chord that the symbol did not spell. Both ports must
+// agree on which tone, or the degree display would differ per device.
 check("a 7th in the bass implies the 7th chord and inverts it", (() => {
   const c = parseChordFull("Bb/Ab")!;
-  return impliesSeventh(c) && effectiveQuality(c).symbol === "7" &&
+  return impliesTone(c) && effectiveQuality(c).symbol === "7" &&
     inversionOf(c) === 3 && isInversion(c);
 })());
 check("a major 7th in the bass implies maj7", (() => {
@@ -585,14 +585,27 @@ check("a major 7th in the bass implies maj7", (() => {
 check("a minor triad with a 7th in the bass implies m7",
   effectiveQuality(parseChordFull("Am/G")!).symbol === "m7" &&
   effectiveQuality(parseChordFull("Am/G#")!).symbol === "mMaj7");
+check("a 9th in the bass implies add9", (() => {
+  const c = parseChordFull("C/D")!;
+  return impliesTone(c) && effectiveQuality(c).symbol === "add9" &&
+    inversionOf(c) === 3 && isInversion(c);
+})());
+check("a 6th in the bass implies the 6 chord",
+  effectiveQuality(parseChordFull("Dm/B")!).symbol === "m6" &&
+  effectiveQuality(parseChordFull("C/A")!).symbol === "6");
+check("an 11th in the bass appends the tone", (() => {
+  const c = parseChordFull("C/F")!;
+  return effectiveQuality(c).symbol === "add11" && effectiveQuality(c).intervals.includes(5);
+})());
 check("a written 7th chord is never re-implied", (() => {
   const c = parseChordFull("Bb7/Ab")!;
-  return effectiveQuality(c).symbol === "7" && inversionOf(c) === 3 && !impliesSeventh(c);
+  return effectiveQuality(c).symbol === "7" && inversionOf(c) === 3 && !impliesTone(c);
 })());
-check("a non-chord-tone bass is a pedal, not an inversion", (() => {
-  const c = parseChordFull("C/D")!;
-  return inversionOf(c) === null && !isInversion(c);
-})());
+check("the bass is always a tone of the effective chord",
+  ["D/F#", "C/G", "Bb/Ab", "C/D", "Dm/B", "C/F", "G/A"].every((s) => {
+    const c = parseChordFull(s)!;
+    return notesFrom(effectiveQuality(c), c.root).includes(c.bass!);
+  }));
 check("no slash means root position", (() => {
   const c = parseChordFull("Cmaj7")!;
   return c.bass === null && inversionOf(c) === 0 && !isInversion(c);

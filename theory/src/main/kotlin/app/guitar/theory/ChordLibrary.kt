@@ -90,62 +90,81 @@ object ChordLibrary {
         val bass: PitchClass?,
     ) {
         /**
-         * The quality once a 7th in the bass is accounted for.
+         * The quality once the bass note is accounted for.
          *
-         * Chord sheets routinely write "Bb/Ab" for what is really Bb7 with its own
-         * b7 in the bass — a valid 3rd inversion, not a pedal. When the written
-         * quality carries no 7th and the bass sits a 7th above the root, the 7th is
-         * implied and folded in here, so [inversion] can resolve it properly.
+         * A slash chord is an inversion: the bass is a tone OF the chord, and the
+         * symbol simply did not spell it. "Bb/Ab" is Bb7 with its b7 in the bass;
+         * "C/D" is Cadd9 with its 9th in the bass. So whatever interval the bass
+         * sits at, it is folded in as a chord tone — there is no separate category
+         * of "bass note that isn't part of the chord".
+         *
+         * Where that produces a chord a musician already has a name for, the named
+         * quality is used ([IMPLIED]); otherwise the tone is appended as "addN".
          */
         val effectiveQuality: ChordQuality
             get() {
                 val b = bass ?: return quality
                 if (quality.notesFrom(root).contains(b)) return quality
                 val iv = b - root
-                if (iv != Interval.min7 && iv != Interval.maj7) return quality
-                if (quality.intervals.contains(Interval.min7) ||
-                    quality.intervals.contains(Interval.maj7)) return quality
-                val named = SEVENTH_OF[quality.symbol to iv]
+                val named = IMPLIED[quality.symbol to iv]
                 return qualities[named]
-                    ?: ChordQuality(quality.symbol + iv.seventhSuffix(), quality.intervals + iv)
+                    ?: ChordQuality(quality.symbol + "add" + degreeName(iv), quality.intervals + iv)
             }
 
-        /** Chord-tone index of [bass] (0 = root position), or null when the bass is
-         *  not a chord tone at all — a true pedal/added bass, e.g. "C/D". */
-        val inversion: Int?
+        /** Chord-tone index of [bass]; 0 = root position. Always resolves, because
+         *  [effectiveQuality] has already folded the bass in as a chord tone. */
+        val inversion: Int
             get() {
                 val b = bass ?: return 0
-                val idx = effectiveQuality.notesFrom(root).indexOf(b)
-                return if (idx >= 0) idx else null
+                return effectiveQuality.notesFrom(root).indexOf(b).coerceAtLeast(0)
             }
 
-        /** True when the bass is a genuine chord tone below the root. */
-        val isInversion: Boolean get() = (inversion ?: 0) > 0
+        /** True when the bass is some tone other than the root. */
+        val isInversion: Boolean get() = inversion > 0
 
-        /** True when the 7th was inferred from the bass rather than written. */
-        val impliesSeventh: Boolean get() = effectiveQuality !== quality
+        /** True when the bass added a tone the written symbol did not spell. */
+        val impliesTone: Boolean get() = effectiveQuality !== quality
     }
 
-    private fun Interval.seventhSuffix(): String =
-        if (this == Interval.maj7) "maj7" else "7"
+    /** Degree name for an interval above the root, as a musician would write it. */
+    private fun degreeName(iv: Interval): String = when (iv.semitones) {
+        1 -> "b9"; 2 -> "9"; 3 -> "#9"; 4 -> "3"; 5 -> "11"; 6 -> "#11"
+        7 -> "5"; 8 -> "b13"; 9 -> "13"; 10 -> "7"; 11 -> "maj7"
+        else -> "1"
+    }
 
-    /** Canonical name for "<triad> with a 7th in the bass", so the implied chord is
-     *  reported with the symbol a musician would write rather than a synthetic one. */
-    private val SEVENTH_OF: Map<Pair<String, Interval>, String> = mapOf(
+    /**
+     * Canonical name for "<written quality> + this tone in the bass", so the implied
+     * chord reports with the symbol a musician would write rather than a synthetic
+     * one — "Bb/Ab" as Bb7, not as Bbadd7.
+     */
+    private val IMPLIED: Map<Pair<String, Interval>, String> = mapOf(
         ("" to Interval.min7) to "7",
         ("" to Interval.maj7) to "maj7",
+        ("" to Interval.maj2) to "add9",
+        ("" to Interval.maj6) to "6",
         ("maj" to Interval.min7) to "7",
         ("maj" to Interval.maj7) to "maj7",
+        ("maj" to Interval.maj2) to "add9",
+        ("maj" to Interval.maj6) to "6",
         ("m" to Interval.min7) to "m7",
         ("m" to Interval.maj7) to "mMaj7",
+        ("m" to Interval.maj6) to "m6",
         ("min" to Interval.min7) to "min7",
         ("min" to Interval.maj7) to "mMaj7",
+        ("min" to Interval.maj6) to "m6",
         ("sus4" to Interval.min7) to "7sus4",
         ("dim" to Interval.min7) to "m7b5",
         ("aug" to Interval.min7) to "7#5",
         ("aug" to Interval.maj7) to "maj7#5",
         ("5" to Interval.min7) to "7",
         ("5" to Interval.maj7) to "maj7",
+        ("5" to Interval.maj3) to "",
+        ("5" to Interval.min3) to "m",
+        ("7" to Interval.maj9) to "9",
+        ("m7" to Interval.maj9) to "m9",
+        ("maj7" to Interval.maj9) to "maj9",
+        ("6" to Interval.maj9) to "6add9",
     )
 
     /** Root + quality, ignoring any slash bass. Kept at this signature because the

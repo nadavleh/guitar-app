@@ -113,57 +113,77 @@ export interface ParsedChord {
   readonly bass: PitchClass | null;
 }
 
-/** Canonical name for "<triad> with a 7th in the bass", so the implied chord is
- *  reported with the symbol a musician would write rather than a synthetic one. */
-const SEVENTH_OF: ReadonlyMap<string, string> = new Map([
-  ["|10", "7"], ["|11", "maj7"],
-  ["maj|10", "7"], ["maj|11", "maj7"],
-  ["m|10", "m7"], ["m|11", "mMaj7"],
-  ["min|10", "min7"], ["min|11", "mMaj7"],
+/**
+ * Canonical name for "<written quality> + this tone in the bass", so the implied
+ * chord reports with the symbol a musician would write rather than a synthetic one
+ * — "Bb/Ab" as Bb7, not as Bbadd7. Keyed "<quality>|<semitones>".
+ */
+const IMPLIED: ReadonlyMap<string, string> = new Map([
+  ["|10", "7"], ["|11", "maj7"], ["|2", "add9"], ["|9", "6"],
+  ["maj|10", "7"], ["maj|11", "maj7"], ["maj|2", "add9"], ["maj|9", "6"],
+  ["m|10", "m7"], ["m|11", "mMaj7"], ["m|9", "m6"],
+  ["min|10", "min7"], ["min|11", "mMaj7"], ["min|9", "m6"],
   ["sus4|10", "7sus4"],
   ["dim|10", "m7b5"],
   ["aug|10", "7#5"], ["aug|11", "maj7#5"],
-  ["5|10", "7"], ["5|11", "maj7"],
+  ["5|10", "7"], ["5|11", "maj7"], ["5|4", ""], ["5|3", "m"],
+  ["7|14", "9"], ["m7|14", "m9"], ["maj7|14", "maj9"], ["6|14", "6add9"],
 ]);
 
+/** Degree name for an interval above the root, as a musician would write it. */
+function degreeName(iv: Interval): string {
+  switch (iv) {
+    case 1: return "b9";
+    case 2: return "9";
+    case 3: return "#9";
+    case 4: return "3";
+    case 5: return "11";
+    case 6: return "#11";
+    case 7: return "5";
+    case 8: return "b13";
+    case 9: return "13";
+    case 10: return "7";
+    case 11: return "maj7";
+    default: return "1";
+  }
+}
+
 /**
- * The quality once a 7th in the bass is accounted for.
+ * The quality once the bass note is accounted for.
  *
- * Chord sheets routinely write "Bb/Ab" for what is really Bb7 with its own b7 in
- * the bass — a valid 3rd inversion, not a pedal. When the written quality carries
- * no 7th and the bass sits a 7th above the root, the 7th is implied and folded in
- * here, so `inversionOf` can resolve it properly.
+ * A slash chord is an inversion: the bass is a tone OF the chord, and the symbol
+ * simply did not spell it. "Bb/Ab" is Bb7 with its b7 in the bass; "C/D" is Cadd9
+ * with its 9th in the bass. So whatever interval the bass sits at, it is folded in
+ * as a chord tone — there is no separate category of "bass note that isn't part of
+ * the chord".
  */
 export function effectiveQuality(chord: ParsedChord): ChordQuality {
   const b = chord.bass;
   if (b === null) return chord.quality;
   if (notesFrom(chord.quality, chord.root).includes(b)) return chord.quality;
-  const iv = pcInterval(chord.root, b);
-  if (iv !== IV.min7 && iv !== IV.maj7) return chord.quality;
-  if (chord.quality.intervals.includes(IV.min7) ||
-      chord.quality.intervals.includes(IV.maj7)) return chord.quality;
-  const named = SEVENTH_OF.get(`${chord.quality.symbol}|${iv}`);
+  // pcInterval takes (to, from) — the bass is the target, measured from the root.
+  const iv = pcInterval(b, chord.root);
+  const named = IMPLIED.get(`${chord.quality.symbol}|${iv}`);
   const canonical = named !== undefined ? QUALITIES.get(named) : undefined;
-  return canonical ?? q(chord.quality.symbol + (iv === IV.maj7 ? "maj7" : "7"),
+  return canonical ?? q(chord.quality.symbol + "add" + degreeName(iv),
                         [...chord.quality.intervals, iv]);
 }
 
-/** True when the 7th was inferred from the bass rather than written. */
-export function impliesSeventh(chord: ParsedChord): boolean {
+/** True when the bass added a tone the written symbol did not spell. */
+export function impliesTone(chord: ParsedChord): boolean {
   return effectiveQuality(chord) !== chord.quality;
 }
 
-/** Chord-tone index of the bass (0 = root position), or null when the bass is not
- *  a chord tone at all — a true pedal/added bass, e.g. "C/D". */
-export function inversionOf(chord: ParsedChord): number | null {
+/** Chord-tone index of the bass; 0 = root position. Always resolves, because
+ *  `effectiveQuality` has already folded the bass in as a chord tone. */
+export function inversionOf(chord: ParsedChord): number {
   if (chord.bass === null) return 0;
-  const idx = notesFrom(effectiveQuality(chord), chord.root).indexOf(chord.bass);
-  return idx >= 0 ? idx : null;
+  return Math.max(0, notesFrom(effectiveQuality(chord), chord.root).indexOf(chord.bass));
 }
 
-/** True when the bass is a genuine chord tone below the root. */
+/** True when the bass is some tone other than the root. */
 export function isInversion(chord: ParsedChord): boolean {
-  return (inversionOf(chord) ?? 0) > 0;
+  return inversionOf(chord) > 0;
 }
 
 /** Full parse, preserving the slash bass. */
