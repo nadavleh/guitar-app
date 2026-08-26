@@ -1445,7 +1445,9 @@ export class EarTrainingState {
   /** Level of the spoken label, 0..1. A slider rather than a constant: "under the music"
    *  and "audible in a moving car" are not the same level, and which one you want depends
    *  on the car. */
-  carSpeechVolume = CarMode.SPEECH_VOLUME;
+  // Explicitly `number`: CarMode is `as const`, so SPEECH_VOLUME's inferred type is the
+  // literal 0.9 and the field would reject every other value the slider produces.
+  carSpeechVolume: number = CarMode.SPEECH_VOLUME;
 
   /** Slots already spoken in THIS exercise, so a label is voiced once as it appears and
    *  not again on every following bar. Cleared by `beginCarExercise` along with the
