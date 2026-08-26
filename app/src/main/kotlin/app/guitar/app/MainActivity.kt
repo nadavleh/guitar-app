@@ -92,6 +92,15 @@ class MainActivity : ComponentActivity() {
     // output rate off AudioManager, which needs an attached Context.
     private lateinit var audioEngine: AudioEngine
 
+    /** Car-mode chord voice. Held by the Activity because TextToSpeech binds a service
+     *  that must be shut down in [onDestroy]; AppState only ever sees the (String) -> Unit.
+     *  Null until the first thing actually asks to speak. */
+    var speaker: Speaker? = null
+        private set
+
+    /** The voice, starting the TTS engine on first ask. */
+    fun orCreateSpeaker(): Speaker = speaker ?: Speaker(this).also { speaker = it }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Run at the device's native rate so Android grants the low-latency output path
@@ -130,6 +139,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         if (::audioEngine.isInitialized) audioEngine.close()
+        speaker?.close()
+        speaker = null
         super.onDestroy()
     }
 }
@@ -162,7 +173,16 @@ fun App(audio: AudioEngine) {
             }
         }
     }
-    val state = remember { AppState(repo, scope, audio, drumSampleLoader, guitarBankLoader) }
+    // Car-mode chord voice. Created lazily on first use so a device with no TTS engine
+    // pays nothing, and remembered per-Activity — MainActivity.onDestroy shuts it down.
+    val speak = remember(context) {
+        { text: String ->
+            val activity = context as? MainActivity
+            if (text.isEmpty()) activity?.speaker?.stop() else activity?.orCreateSpeaker()?.say(text)
+            Unit
+        }
+    }
+    val state = remember { AppState(repo, scope, audio, drumSampleLoader, guitarBankLoader, speak) }
 
     val customTunings by state.customTunings.collectAsState(initial = emptyMap())
     val savedSelected by state.savedSelectedName.collectAsState(initial = "Standard")

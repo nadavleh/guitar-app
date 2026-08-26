@@ -737,6 +737,42 @@ object EarTraining {
      *  anchoring the key, so it's harder to place by ear — the UI marks these as
      *  "difficult" in the library, the drill list and on reveal. */
     fun progressionLacksTonic(prog: Progression): Boolean = 1 !in prog.degrees
+
+    /**
+     * The RELATIVE key a tonic-less progression actually resolves in, or null when it
+     * has no such reading.
+     *
+     * A major key and its relative minor share all seven chords, so a progression with
+     * no I of its own may still land on a tonic when renumbered from the other tonic:
+     * IV–V–iii–vi is bVI–bVII–v–i in the relative minor, which resolves perfectly.
+     * That reading only counts when the progression ENDS on the relative tonic — a
+     * progression that merely passes through it and finishes elsewhere (vi–V–IV–V ends
+     * hanging on V) is genuinely unresolved and keeps the plain no-tonic warning.
+     *
+     * Major → the relative minor's tonic is degree 6; minor → the relative major's is
+     * degree 3 ([majorRelativeDegree]).
+     */
+    fun progressionRelativeTonicMode(prog: Progression): TrainingMode? {
+        if (!progressionLacksTonic(prog)) return null
+        val last = prog.degrees.lastOrNull() ?: return null
+        return when (prog.mode) {
+            TrainingMode.Major -> if (last == 6) TrainingMode.Minor else null
+            TrainingMode.Minor -> if (last == 3) TrainingMode.Major else null
+        }
+    }
+
+    /** [prog] renumbered from its relative tonic, or null when it has no such reading.
+     *  [dominantBars] are dropped: they name a HARMONIC-minor V, which has no meaning
+     *  once the same chords are read from the other tonic. */
+    fun progressionInRelativeKey(prog: Progression): Progression? {
+        val mode = progressionRelativeTonicMode(prog) ?: return null
+        return Progression(mode, prog.degrees.map { degreeFromMajorRelative(majorRelativeDegree(it, prog.mode), mode) })
+    }
+
+    /** Roman line of [prog] read from its relative tonic, e.g. "bVI  –  bVII  –  v  –  i"
+     *  for a major IV–V–iii–vi. Empty when it has no relative-tonic reading. */
+    fun relativeRomanLineFor(prog: Progression): String =
+        progressionInRelativeKey(prog)?.let { romanLineFor(it) } ?: ""
 }
 
 /** Direction an interval is played in the interval-ID trainer. */

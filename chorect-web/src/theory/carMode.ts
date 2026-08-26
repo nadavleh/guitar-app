@@ -15,6 +15,16 @@ export const CAR_BEEPS = 3;
 /** Beep onset-to-onset spacing, and also beep-3 → chord-1, giving "3-2-1-go". */
 export const CAR_BEEP_GAP_MS = 500;
 
+/** Roman numerals 1..7, longest-first so "VII" wins over "V" / "VI". */
+const CAR_NUMERALS: ReadonlyArray<readonly [string, number]> = [
+  ["VII", 7], ["VI", 6], ["IV", 4], ["V", 5], ["III", 3], ["II", 2], ["I", 1],
+];
+
+/** Chord-suffix numbers that make an UPPERCASE numeral a dominant rather than a plain
+ *  major: V7, V9, V11, V13. "I6" / "Iadd9" stay major — a 6th or an add9 is colour,
+ *  not a dominant. */
+const CAR_DOMINANT_SUFFIXES = new Set(["7", "9", "11", "13"]);
+
 export const CarMode = {
   ROUNDS: CAR_ROUNDS,
   BEEPS: CAR_BEEPS,
@@ -79,5 +89,76 @@ export const CarMode = {
   exerciseMs(bpm: number, slotCount: number): number {
     const barQuarter = Math.trunc(60_000 / Math.max(bpm, 10));
     return CarMode.LEAD_IN_MS + CAR_ROUNDS * slotCount * barQuarter * 4;
+  },
+
+  /**
+   * Playback volume of the spoken chord label, 0..1.
+   *
+   * Deliberately well under the progression: the voice is an overdub ON TOP of the
+   * looper, not a replacement for it. Neither platform ducks the music — the point of
+   * the drill is to hear the chord, and a label loud enough to mask it would train the
+   * wrong thing. Shared so both platforms sit at the same level.
+   */
+  SPEECH_VOLUME: 0.35,
+
+  /**
+   * Spoken form of a Roman-numeral FUNCTION label, for the car-mode voice.
+   *
+   * The numeral becomes a spoken degree number and the case becomes a spoken quality,
+   * because "four minor" is unambiguous over road noise where "iv" and "IV" sound
+   * identical — that ambiguity is the whole reason this exists:
+   *
+   *   IV → "4 major"      iv      → "4 minor"       vii°  → "7 diminished"
+   *   i7 → "1 minor 7"    bVImaj7 → "flat 6 major 7"
+   *   V7 → "5 dominant 7" #IV°7   → "sharp 4 diminished 7"
+   *
+   * Pure string work with no speechSynthesis dependency, so both platforms speak the
+   * same words and the mapping is unit-testable. Returns "" for a label it cannot
+   * parse (the caller then says nothing rather than reading gibberish aloud).
+   */
+  speechFor(roman: string): string {
+    let rest = roman.trim();
+    if (!rest) return "";
+    let out = "";
+
+    // Leading accidental — bVI, #IV.
+    if (rest[0] === "b") { out += "flat "; rest = rest.slice(1); }
+    else if (rest[0] === "#") { out += "sharp "; rest = rest.slice(1); }
+
+    const numeral = CAR_NUMERALS.find((n) => rest.toUpperCase().startsWith(n[0]));
+    if (!numeral) return "";
+    const upper = rest[0] === rest[0].toUpperCase();
+    rest = rest.slice(numeral[0].length);
+    out += String(numeral[1]);
+
+    // Quality: from the case, unless the suffix declares one of its own.
+    let quality = upper ? "major" : "minor";
+    if (rest.startsWith("°") || rest.startsWith("dim")) {
+      quality = "diminished";
+      rest = rest.startsWith("°") ? rest.slice(1) : rest.slice(3);
+    } else if (rest.startsWith("ø")) { quality = "half diminished"; rest = rest.slice(1); }
+    else if (rest.startsWith("+")) { quality = "augmented"; rest = rest.slice(1); }
+    else if (rest.startsWith("aug")) { quality = "augmented"; rest = rest.slice(3); }
+    else if (rest.startsWith("maj")) { quality = "major"; rest = rest.slice(3); }
+    else if (rest.startsWith("sus")) { quality = "suspended"; rest = rest.slice(3); }
+    else if (upper && CAR_DOMINANT_SUFFIXES.has(rest)) quality = "dominant";
+    out += " " + quality;
+
+    // Whatever is left is colour: numbers, accidentals, "add".
+    let i = 0;
+    while (i < rest.length) {
+      const c = rest[i];
+      if (c >= "0" && c <= "9") {
+        let j = i;
+        while (j < rest.length && rest[j] >= "0" && rest[j] <= "9") j++;
+        out += " " + rest.slice(i, j); i = j;
+      } else if (c === "b") { out += " flat"; i++; }
+      else if (c === "#") { out += " sharp"; i++; }
+      else if (rest.startsWith("add", i)) { out += " add"; i += 3; }
+      else if (rest.startsWith("sus", i)) { out += " suspended"; i += 3; }
+      else if (c === "°") { out += " diminished"; i++; }
+      else i++;   // punctuation / anything unspeakable
+    }
+    return out;
   },
 } as const;

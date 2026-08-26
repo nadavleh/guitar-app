@@ -596,6 +596,44 @@ export function progressionLacksTonic(p: Progression): boolean {
   return !p.degrees.includes(1);
 }
 
+/**
+ * The RELATIVE key a tonic-less progression actually resolves in, or null when it has
+ * no such reading.
+ *
+ * A major key and its relative minor share all seven chords, so a progression with no I
+ * of its own may still land on a tonic when renumbered from the other tonic: IV–V–iii–vi
+ * is bVI–bVII–v–i in the relative minor, which resolves perfectly. That reading only
+ * counts when the progression ENDS on the relative tonic — one that merely passes through
+ * it and finishes elsewhere (vi–V–IV–V ends hanging on V) is genuinely unresolved and
+ * keeps the plain no-tonic warning.
+ *
+ * Major → the relative minor's tonic is degree 6; minor → the relative major's is
+ * degree 3 (see [majorRelativeDegree]).
+ */
+export function progressionRelativeTonicMode(p: Progression): TrainingMode | null {
+  if (!progressionLacksTonic(p)) return null;
+  const last = p.degrees[p.degrees.length - 1];
+  if (last === undefined) return null;
+  if (p.mode === TrainingMode.Major) return last === 6 ? TrainingMode.Minor : null;
+  return last === 3 ? TrainingMode.Major : null;
+}
+
+/** [p] renumbered from its relative tonic, or null when it has no such reading.
+ *  `dominantBars` are dropped: they name a HARMONIC-minor V, which has no meaning once
+ *  the same chords are read from the other tonic. */
+export function progressionInRelativeKey(p: Progression): Progression | null {
+  const mode = progressionRelativeTonicMode(p);
+  if (mode === null) return null;
+  return { mode, degrees: p.degrees.map((d) => degreeFromMajorRelative(majorRelativeDegree(d, p.mode), mode)) };
+}
+
+/** Roman line of [p] read from its relative tonic, e.g. "bVI  –  bVII  –  v  –  i" for a
+ *  major IV–V–iii–vi. Empty when it has no relative-tonic reading. */
+export function relativeRomanLineFor(p: Progression): string {
+  const rel = progressionInRelativeKey(p);
+  return rel ? romanLineFor(rel) : "";
+}
+
 /** Inverse of [progressionKey]; null if [key] is not a valid diatonic key. */
 export function progressionFromKey(key: string): Progression | null {
   const m = /^(maj|min):(\d+(?:,\d+)*)(?:@(\d+(?:,\d+)*))?$/.exec(key);

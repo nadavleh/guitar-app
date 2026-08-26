@@ -87,4 +87,88 @@ object CarMode {
      */
     fun exerciseMs(bpm: Int, slotCount: Int): Long =
         LEAD_IN_MS + ROUNDS.toLong() * slotCount * (60_000L / bpm.coerceAtLeast(10)) * 4
+
+    /**
+     * Playback volume of the spoken chord label, 0..1.
+     *
+     * Deliberately well under the progression: the voice is an overdub ON TOP of the
+     * looper, not a replacement for it. Neither platform ducks the music — the point of
+     * the drill is to hear the chord, and a label loud enough to mask it would train the
+     * wrong thing. Shared so both platforms sit at the same level.
+     */
+    const val SPEECH_VOLUME = 0.35f
+
+    /** Roman numerals 1..7, longest-first so "VII" wins over "V" / "VI". */
+    private val NUMERALS = listOf("VII" to 7, "VI" to 6, "IV" to 4, "V" to 5, "III" to 3, "II" to 2, "I" to 1)
+
+    /** Chord-suffix numbers that make an UPPERCASE numeral a dominant rather than a plain
+     *  major: V7, V9, V11, V13. "I6" / "Iadd9" stay major — a 6th or an add9 is colour,
+     *  not a dominant. */
+    private val DOMINANT_SUFFIXES = setOf("7", "9", "11", "13")
+
+    /**
+     * Spoken form of a Roman-numeral FUNCTION label, for the car-mode voice.
+     *
+     * The numeral becomes a spoken degree number and the case becomes a spoken quality,
+     * because "four minor" is unambiguous over road noise where "iv" and "IV" sound
+     * identical — that ambiguity is the whole reason this exists:
+     *
+     *   IV -> "4 major"      iv       -> "4 minor"       vii deg -> "7 diminished"
+     *   i7 -> "1 minor 7"    bVImaj7  -> "flat 6 major 7"
+     *   V7 -> "5 dominant 7" #IV(deg)7 -> "sharp 4 diminished 7"
+     *
+     * Pure string work with no TTS dependency, so both platforms speak the same words
+     * and the mapping is unit-testable. Returns "" for a label it cannot parse (the
+     * caller then says nothing rather than reading gibberish aloud).
+     */
+    fun speechFor(roman: String): String {
+        var rest = roman.trim()
+        if (rest.isEmpty()) return ""
+        val out = StringBuilder()
+
+        // Leading accidental — bVI, #IV.
+        when (rest.firstOrNull()) {
+            'b' -> { out.append("flat "); rest = rest.substring(1) }
+            '#' -> { out.append("sharp "); rest = rest.substring(1) }
+        }
+
+        val numeral = NUMERALS.firstOrNull { rest.startsWith(it.first, ignoreCase = true) } ?: return ""
+        val upper = rest[0].isUpperCase()
+        rest = rest.substring(numeral.first.length)
+        out.append(numeral.second)
+
+        // Quality: from the case, unless the suffix declares one of its own.
+        var quality = if (upper) "major" else "minor"
+        when {
+            rest.startsWith("°") || rest.startsWith("dim") ->
+                { quality = "diminished"; rest = rest.removePrefix("°").removePrefix("dim") }
+            rest.startsWith("ø") -> { quality = "half diminished"; rest = rest.substring(1) }
+            rest.startsWith("+") || rest.startsWith("aug") ->
+                { quality = "augmented"; rest = rest.removePrefix("+").removePrefix("aug") }
+            rest.startsWith("maj") -> { quality = "major"; rest = rest.substring(3) }
+            rest.startsWith("sus") -> { quality = "suspended"; rest = rest.substring(3) }
+            upper && rest in DOMINANT_SUFFIXES -> quality = "dominant"
+        }
+        out.append(' ').append(quality)
+
+        // Whatever is left is colour: numbers, accidentals, "add".
+        var i = 0
+        while (i < rest.length) {
+            val c = rest[i]
+            when {
+                c.isDigit() -> {
+                    var j = i
+                    while (j < rest.length && rest[j].isDigit()) j++
+                    out.append(' ').append(rest, i, j); i = j
+                }
+                c == 'b' -> { out.append(" flat"); i++ }
+                c == '#' -> { out.append(" sharp"); i++ }
+                rest.startsWith("add", i) -> { out.append(" add"); i += 3 }
+                rest.startsWith("sus", i) -> { out.append(" suspended"); i += 3 }
+                c == '°' -> { out.append(" diminished"); i++ }
+                else -> i++   // punctuation / anything unspeakable
+            }
+        }
+        return out.toString()
+    }
 }

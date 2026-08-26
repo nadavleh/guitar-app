@@ -8,6 +8,7 @@ import {
 } from "./appState";
 import { icon, IconName } from "./icons";
 import { renderChallengeStatsOverlay } from "./statsOverlay";
+import { speak } from "./speech";
 import { FretboardCanvas, FretboardData } from "./fretboardCanvas";
 import { inputDispatchReport } from "./inputLatencyProbe";
 import { computeMarks, scaleInfo, intervalName, shapeMarks } from "./marks";
@@ -203,6 +204,7 @@ export class App {
       onChallengeComplete: (kind, s, t, d) => state.recordChallengeScore(s, t, d, kind),
       onProgressionMistake: (k) => state.recordProgressionMistake(k),
       progressionMistakesProvider: () => state.progressionMistakes,
+      speak,
     });
     this.loop = new LoopState({
       audio: state.audio,
@@ -1225,8 +1227,86 @@ export class App {
 
     sheet.appendChild(el("div", { class: "divider-line" }));
 
+    // ----- Data (the ONLY place recorded practice history can be deleted) -----
+    this.dataSection(sheet);
+
+    sheet.appendChild(el("div", { class: "divider-line" }));
+
     // ----- Look & tabs (collapsed by default; last section on purpose) -----
     sheet.appendChild(this.appearanceFold());
+  }
+
+  /**
+   * Settings → Data: the one place recorded practice history can be erased.
+   *
+   * Deliberately NOT reachable from the stats popup any more. Those buttons sat a
+   * thumb-width from a score you had just set, and hitting one wiped a history that took
+   * weeks to build. Here they are behind a settings sheet AND a confirm.
+   *
+   * The two lists are independent and stay that way: the challenge-score log is a record
+   * of what you did, the Drill list is a curated set of what you still get wrong. Clearing
+   * your scores must not silently throw away the drill queue you've been building — so
+   * each has its own button, and neither touches the other. Mirrors Android's
+   * DataSection (Screens.kt).
+   */
+  private dataSection(sheet: HTMLElement): void {
+    const s = this.state;
+    const scores = s.challengeScores;
+    const mistakes = Object.keys(s.progressionMistakes);
+
+    sheet.appendChild(this.sectionLabel("Data"));
+    sheet.appendChild(el("div", { style: "margin-top:6px" },
+      [`Challenge stats — ${scores.length} recorded run${scores.length === 1 ? "" : "s"}`]));
+    sheet.appendChild(el("div", { class: "et-muted", style: "font-size:12px" }, [
+      "Every finished ear-training challenge. Deleting these does NOT change your Drill list.",
+    ]));
+
+    const runsWrap = el("div", { style: "margin-top:6px" });
+    const listBtn = btn("Delete single runs…", () => {
+      if (runsWrap.childElementCount) { runsWrap.replaceChildren(); listBtn.textContent = "Delete single runs…"; return; }
+      listBtn.textContent = "Hide runs";
+      for (const r of scores) {
+        const row = el("div", { style: "display:flex;align-items:center;gap:8px;padding:2px 0" }, [
+          el("div", { style: "flex:1;font-size:13px" }, [
+            `${r.kind ?? "progression"}  ·  ${r.score}/${r.total}  ·  ${new Date(r.dateMillis).toLocaleDateString()}`,
+          ]),
+          // A single row is small enough to delete without a confirm.
+          btn("✕", () => { s.deleteChallengeScore(r); row.remove(); }, "btn text"),
+        ]);
+        runsWrap.appendChild(row);
+      }
+    }, "btn");
+    (listBtn as HTMLButtonElement).disabled = scores.length === 0;
+
+    const clearAllBtn = btn("Delete all", () => {
+      if (!confirm(`Delete all ${scores.length} recorded runs, every kind, permanently?
+
+` +
+        "Your Drill list is not affected.")) return;
+      s.clearChallengeScores();
+      this.scheduleRender();
+    }, "btn");
+    (clearAllBtn as HTMLButtonElement).disabled = scores.length === 0;
+
+    sheet.appendChild(el("div", { class: "et-row-gap", style: "margin-top:6px" }, [listBtn, clearAllBtn]));
+    sheet.appendChild(runsWrap);
+
+    sheet.appendChild(el("div", { style: "margin-top:12px" },
+      [`Drill list — ${mistakes.length} progression${mistakes.length === 1 ? "" : "s"} tracked`]));
+    sheet.appendChild(el("div", { class: "et-muted", style: "font-size:12px" }, [
+      "The progressions you keep missing, which the Drill-list challenge source draws from. " +
+      "Separate from your stats — clearing one leaves the other alone.",
+    ]));
+    const clearDrill = btn("Clear drill list", () => {
+      if (!confirm(`Clear all ${mistakes.length} tracked progressions and their miss counts?
+
+` +
+        "Your challenge stats are not affected.")) return;
+      s.clearProgressionMistakes();
+      this.scheduleRender();
+    }, "btn");
+    (clearDrill as HTMLButtonElement).disabled = mistakes.length === 0;
+    sheet.appendChild(el("div", { style: "margin-top:6px" }, [clearDrill]));
   }
 
   /** Settings → "Look & tabs": theme mode, accent swatches and the tab picker,

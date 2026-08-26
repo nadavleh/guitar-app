@@ -362,6 +362,13 @@ private fun ChallengeModeFold(state: AppState, ear: EarTrainingState) {
                             onClick = { ear.degreeRefChords = !ear.degreeRefChords },
                             label = { Text(if (ear.degreeRefChords) "♪ chords" else "♪ notes") },
                         )
+                        // Answer pad walks with the playhead while the loop runs. Tapping a
+                        // square by hand still wins for the rest of that question.
+                        FilterChip(
+                            selected = ear.challengeFollowPlayhead,
+                            onClick = { ear.challengeFollowPlayhead = !ear.challengeFollowPlayhead },
+                            label = { Text("Keys follow playhead") },
+                        )
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -569,7 +576,7 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
             contentSizeSp = 15,
         )
 
-        NoTonicBanner(ear)
+        NoTonicBanner(ear, showRelativeLine = true)
 
         Spacer(Modifier.height(12.dp))
 
@@ -1591,6 +1598,12 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         var selectedBar by remember { mutableStateOf(0) }
         // Land back on bar 1 whenever a fresh question starts.
         LaunchedEffect(ear.challengeIndex) { selectedBar = 0 }
+        // Follow-the-playhead: while the progression loops, the answer pad walks to the
+        // bar being played, so you can answer in time instead of tapping a square first.
+        // Disarmed for the rest of the question by any manual square tap.
+        LaunchedEffect(ear.currentBar, ear.challengeFollowingPlayhead) {
+            if (ear.challengeFollowingPlayhead) selectedBar = ear.currentBar
+        }
 
         // ▶ Play + the 7 degree references share ONE compact row (v2.64). The
         // palette plays in the hidden key; its ♪ chords/notes toggle lives in the
@@ -1634,9 +1647,9 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                     answer = if (verdict != null) ear.challengeAnswerLabel(i) else null,
                     selected = selectedBar == i,
                     playhead = ear.isLooping && ear.currentBar == i,   // playing "head"
-                    onTap = { selectedBar = i },
+                    onTap = { selectedBar = i; ear.disarmChallengeFollow() },
                     // Playing a bar also selects it, so it's the target of the answer pad.
-                    onPlay = { selectedBar = i; ear.playBarOnce(i) },
+                    onPlay = { selectedBar = i; ear.disarmChallengeFollow(); ear.playBarOnce(i) },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -1644,7 +1657,7 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
 
         // The no-tonic warning sits directly under the squares being filled — on top it
         // scrolled away from the answering area, which is where it matters.
-        NoTonicBanner(ear)
+        NoTonicBanner(ear, showRelativeLine = ear.challengeAllBarsAnswered)
 
         // Optional fretboard (v2.65: moved up from the bottom of the screen, where
         // checking it meant scrolling down and back up to hit ▶ on the next bar).
@@ -2801,9 +2814,6 @@ internal fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-        dismissButton = {
-            if (scores.isNotEmpty()) TextButton(onClick = { state.clearChallengeScores() }) { Text("Clear all") }
-        },
         title = { Text("Challenge stats") },
         text = {
             Column(
@@ -2823,13 +2833,9 @@ internal fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
                 for ((kind, rows) in scores.groupBy { it.kind }) {
                     val best = rows.first()   // repo stores rows best-first per kind
                     val avg = rows.sumOf { it.score * 100.0 / it.total } / rows.size
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(statsKindLabel(kind), style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.weight(1f))
-                        TextButton(onClick = { state.clearChallengeScoresOfKind(kind) }) { Text("Clear") }
-                    }
+                    Text(statsKindLabel(kind), style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary)
                     Text(
                         "best ${best.score}/${best.total}  ·  avg ${avg.toInt()}%  ·  " +
                             "${rows.size} run${if (rows.size == 1) "" else "s"}",
@@ -2837,19 +2843,25 @@ internal fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     for (r in rows) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            val pct = (r.score * 100.0 / r.total).toInt()
-                            Text(
-                                "${r.score}/${r.total} ($pct%)  ·  ${"%.1f".format(r.durationMs / 1000.0)}s  ·  " +
-                                    fmt.format(java.util.Date(r.dateMillis)),
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.weight(1f),
-                            )
-                            TextButton(onClick = { state.deleteChallengeScore(r) }) { Text("✕") }
-                        }
+                        val pct = (r.score * 100.0 / r.total).toInt()
+                        Text(
+                            "${r.score}/${r.total} ($pct%)  ·  ${"%.1f".format(r.durationMs / 1000.0)}s  ·  " +
+                                fmt.format(java.util.Date(r.dateMillis)),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                     Spacer(Modifier.height(8.dp))
                 }
+                // Read-only on purpose: a stray thumb next to a score you just set should
+                // not be able to erase your history. Deleting lives in Settings → Data,
+                // behind a confirm.
+                Text(
+                    "To delete runs, open Settings → Data.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
         },
     )
@@ -2860,40 +2872,78 @@ internal fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
 // ======================================================================================
 
 /** Marker appended to a progression's Roman line when it has no tonic (no I/i): nothing
- *  anchors the key, so it's harder to place by ear — flagged as "difficult". */
-private fun tonicMark(p: Progression): String =
-    if (EarTraining.progressionLacksTonic(p)) "   ◆ no-tonic (hard)" else ""
+ *  anchors the key, so it's harder to place by ear — flagged as "difficult". A
+ *  progression that lands on its RELATIVE tonic instead (IV–V–iii–vi ends on vi = the
+ *  relative minor's i) is not one of those: it resolves, just in the other key, so it
+ *  gets the calmer marker. */
+private fun tonicMark(p: Progression): String = when {
+    !EarTraining.progressionLacksTonic(p) -> ""
+    EarTraining.progressionRelativeTonicMode(p) != null -> "   ◆ relative minor"
+    else -> "   ◆ no-tonic (hard)"
+}
 
 /**
- * Prominent warning for a progression with no tonic in it (e.g. IV V7 iii7 vi7).
+ * Prominent note about where a progression's home is, when it isn't where the Roman
+ * numbering says.
  *
- * These are the genuinely hard ones: with no I chord to land on, there's no home to measure
- * the other functions against, so a wrong key guess stays wrong for all four bars. It was
- * previously flagged only in the library and drill lists — this is the same fact, stated where
- * you actually meet the progression, in Practice and in Challenge.
+ * Two different situations, and conflating them was a bug: a progression with no I of
+ * its own that ENDS on the relative tonic (IV–V–iii–vi finishes on vi = the relative
+ * minor's i) resolves perfectly well — it is simply a minor-key progression wearing
+ * major numerals, so the card states the minor reading and stops there. Only a
+ * progression that never lands anywhere (vi–V–IV–V hangs on V) gets the hard warning:
+ * with no home to measure the other functions against, a wrong key guess stays wrong
+ * for all four bars. Shown in Practice and in Challenge, where you meet the
+ * progression, not only in the library.
  */
 @Composable
-private fun NoTonicBanner(ear: EarTrainingState) {
+private fun NoTonicBanner(ear: EarTrainingState, showRelativeLine: Boolean) {
     val prog = ear.progProgression ?: return
     if (!EarTraining.progressionLacksTonic(prog)) return
+    val relativeMode = EarTraining.progressionRelativeTonicMode(prog)
+    val relative = relativeMode != null
+    // The relative-tonic reading is information, not a warning — it uses the neutral
+    // surface so it can't read as "you got something wrong".
     Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
+        color = if (relative) MaterialTheme.colorScheme.surfaceVariant
+                else MaterialTheme.colorScheme.errorContainer,
         shape = MaterialTheme.shapes.small,
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
     ) {
+        val fg = if (relative) MaterialTheme.colorScheme.onSurfaceVariant
+                 else MaterialTheme.colorScheme.onErrorContainer
         Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
             Text(
-                "◆  NO TONIC  ◆",
+                if (relative) "◆  READS IN THE RELATIVE MINOR  ◆" else "◆  NO TONIC  ◆",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.onErrorContainer,
+                color = fg,
             )
-            Text(
-                "This progression never lands on the tonic — one of the hard ones. " +
-                    "Don't wait to hear home; judge each chord by its pull instead.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
+            if (relative) {
+                Text(
+                    "No I in this key, but it lands on the relative tonic — so hear it " +
+                        "from the minor, not the major." +
+                        if (showRelativeLine) " Relative to the minor scale it is:" else "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = fg,
+                )
+                // The relative Roman line names every bar, so it is the ANSWER: printed in
+                // Practice and the library, never on an unanswered challenge question.
+                if (showRelativeLine) {
+                    Text(
+                        EarTraining.relativeRomanLineFor(prog),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            } else {
+                Text(
+                    "This progression never lands on the tonic — one of the hard ones. " +
+                        "Don't wait to hear home; judge each chord by its pull instead.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = fg,
+                )
+            }
         }
     }
 }
@@ -3279,6 +3329,26 @@ private fun CarModeView(state: AppState, ear: EarTrainingState) {
                     },
                     style = MaterialTheme.typography.bodyMedium,
                 )
+            }
+
+            // The chord voice. Reads only what the screen already shows, so it never
+            // gives away a slot the schedule is still holding back.
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Switch(checked = ear.carSpeakChords, onCheckedChange = { ear.chooseCarSpeakChords(it) })
+                Spacer(Modifier.width(8.dp))
+                Column {
+                    Text(
+                        if (ear.carSpeakChords) "Speak each chord as it appears" else "Chord voice off",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    if (ear.carSpeakChords) {
+                        Text(
+                            "Quietly, over the music — \"4 minor\" for iv, \"4 major\" for IV.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
     }

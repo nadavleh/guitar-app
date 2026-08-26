@@ -12,6 +12,7 @@ import {
   romanIsModeAmbiguous, MAJOR_DEGREES, MINOR_DEGREES,
   ProgFocus, randomProgression, hasOneSixStep, thirdSixthPrimaryPool, thirdSixthContrastPool,
   THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode,
+  progressionLacksTonic, progressionRelativeTonicMode, relativeRomanLineFor, romanLineFor,
 } from "../src/theory";
 import { standard } from "../src/theory/tunings";
 import {
@@ -391,6 +392,54 @@ check("a round's new slot appears only when the playhead reaches it",
   CarMode.revealedSlotsAt(3, 0, 4) === 1 &&
   CarMode.revealedSlotsAt(3, 1, 4) === 2 &&
   CarMode.revealedSlotsAt(3, 3, 4) === 2);
+
+// --- Car-mode chord voice: the spoken labels must match CarModeTest word for word ---
+check("speechFor turns case into a spoken quality",
+  CarMode.speechFor("IV") === "4 major" && CarMode.speechFor("iv") === "4 minor" &&
+  CarMode.speechFor("I") === "1 major" && CarMode.speechFor("i") === "1 minor");
+check("speechFor maps every numeral to its degree number",
+  ["I", "II", "III", "IV", "V", "VI", "VII"].map((r) => CarMode.speechFor(r)).join("|") ===
+    "1 major|2 major|3 major|4 major|5 major|6 major|7 major");
+check("speechFor speaks accidentals before the degree",
+  CarMode.speechFor("bVI") === "flat 6 major" && CarMode.speechFor("bVII") === "flat 7 major" &&
+  CarMode.speechFor("#IV") === "sharp 4 major");
+check("speechFor lets a suffix quality override the case",
+  CarMode.speechFor("vii°") === "7 diminished" && CarMode.speechFor("ii°") === "2 diminished" &&
+  CarMode.speechFor("vii°7") === "7 diminished 7" && CarMode.speechFor("#IV°7") === "sharp 4 diminished 7" &&
+  CarMode.speechFor("V+") === "5 augmented");
+check("speechFor calls an uppercase bare 7th a dominant, but not a 6th or add9",
+  CarMode.speechFor("V7") === "5 dominant 7" && CarMode.speechFor("bVII7") === "flat 7 dominant 7" &&
+  CarMode.speechFor("V13") === "5 dominant 13" && CarMode.speechFor("I6") === "1 major 6" &&
+  CarMode.speechFor("IVadd9") === "4 major add 9");
+check("speechFor says maj once, not doubled by the uppercase case",
+  CarMode.speechFor("Imaj7") === "1 major 7" && CarMode.speechFor("bVImaj7") === "flat 6 major 7" &&
+  CarMode.speechFor("IVmaj7#11") === "4 major 7 sharp 11");
+check("speechFor keeps a lowercase 7th minor",
+  CarMode.speechFor("i7") === "1 minor 7" && CarMode.speechFor("ii7") === "2 minor 7" &&
+  CarMode.speechFor("vi9") === "6 minor 9");
+check("speechFor is silent on an unparseable label",
+  CarMode.speechFor("") === "" && CarMode.speechFor("—") === "" && CarMode.speechFor("?") === "");
+check("speechFor speaks every Roman the diatonic library can print",
+  [...Object.values(MAJOR_DEGREES), ...Object.values(MINOR_DEGREES)].every((info) =>
+    [info.roman, romanLabel(info.roman, info.seventhQuality), romanLabel(info.roman, info.extendedQuality),
+      ...info.extendedOptions.map(([, suffix]) => info.roman + suffix)]
+      .every((r) => CarMode.speechFor(r).length > 0)));
+
+// --- Relative-tonic reading: a "no tonic" progression that resolves in the other key ---
+const royalRoad: Progression = { mode: TrainingMode.Major, degrees: [4, 5, 3, 6] };
+check("IV-V-iii-vi resolves in the relative minor as bVI-bVII-v-i",
+  progressionLacksTonic(royalRoad) &&
+  progressionRelativeTonicMode(royalRoad) === TrainingMode.Minor &&
+  relativeRomanLineFor(royalRoad) === "bVI  –  bVII  –  v  –  i");
+const hanging: Progression = { mode: TrainingMode.Major, degrees: [6, 5, 4, 5] };
+check("a progression ending away from the relative tonic stays unresolved",
+  progressionLacksTonic(hanging) && progressionRelativeTonicMode(hanging) === null &&
+  relativeRomanLineFor(hanging) === "");
+check("a progression with its own tonic has no relative reading",
+  progressionRelativeTonicMode({ mode: TrainingMode.Major, degrees: [1, 5, 6, 4] }) === null);
+check("a minor progression ending on bIII reads in the relative major",
+  progressionRelativeTonicMode({ mode: TrainingMode.Minor, degrees: [4, 5, 6, 3] }) === TrainingMode.Major &&
+  relativeRomanLineFor({ mode: TrainingMode.Minor, degrees: [4, 5, 6, 3] }) === "ii  –  iii  –  IV  –  I");
 check("the lead-in and round 1 reveal nothing wherever the playhead is",
   [-1, 0, 1, 2, 3].every((p) => CarMode.revealedSlotsAt(0, p, 4) === 0 && CarMode.revealedSlotsAt(1, p, 4) === 0) &&
   CarMode.revealedSlotsAt(2, -5, 4) === 0 &&

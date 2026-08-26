@@ -3,6 +3,7 @@ package app.guitar.theory
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertNull
 
 class EarTrainingTest {
 
@@ -496,5 +497,48 @@ class EarTrainingTest {
         }
         assertTrue(EarTraining.THIRD_SIXTH_CONTRAST_DRILL.any { it.mode == TrainingMode.Major })
         assertTrue(EarTraining.THIRD_SIXTH_CONTRAST_DRILL.any { it.mode == TrainingMode.Minor })
+    }
+
+    // ---- relative-tonic reading (a "no tonic" progression that resolves in the other key) ----
+
+    @Test fun `IV-V-iii-vi resolves in the relative minor as bVI-bVII-v-i`() {
+        // The Royal Road: no I of its own, but it lands on vi, which IS the relative
+        // minor's tonic. Flagging it "no tonic" was wrong — it resolves perfectly.
+        val royalRoad = Progression(TrainingMode.Major, listOf(4, 5, 3, 6))
+        assertTrue(EarTraining.progressionLacksTonic(royalRoad))
+        assertEquals(TrainingMode.Minor, EarTraining.progressionRelativeTonicMode(royalRoad))
+        assertEquals("bVI  –  bVII  –  v  –  i", EarTraining.relativeRomanLineFor(royalRoad))
+    }
+
+    @Test fun `a progression that ends away from the relative tonic stays unresolved`() {
+        // vi-V-IV-V passes through vi but hangs on V, so there is no tonic either way.
+        val hanging = Progression(TrainingMode.Major, listOf(6, 5, 4, 5))
+        assertTrue(EarTraining.progressionLacksTonic(hanging))
+        assertNull(EarTraining.progressionRelativeTonicMode(hanging))
+        assertEquals("", EarTraining.relativeRomanLineFor(hanging))
+    }
+
+    @Test fun `a progression with its own tonic has no relative reading`() {
+        for (p in EarTraining.MAJOR_PROGRESSIONS + EarTraining.MINOR_PROGRESSIONS) {
+            if (!EarTraining.progressionLacksTonic(p)) {
+                assertNull(EarTraining.progressionRelativeTonicMode(p),
+                    "${EarTraining.romanLineFor(p)} already has a tonic")
+            }
+        }
+    }
+
+    @Test fun `the relative reading keeps the same chord roots, only renumbered`() {
+        val royalRoad = Progression(TrainingMode.Major, listOf(4, 5, 3, 6))
+        val rel = EarTraining.progressionInRelativeKey(royalRoad)!!
+        // C major and A minor are the same seven chords: F G Em Am either way.
+        val cMajor = royalRoad.degrees.map { EarTraining.degreeRoot(PitchClass.C, it, TrainingMode.Major) }
+        val aMinor = rel.degrees.map { EarTraining.degreeRoot(PitchClass.A, it, TrainingMode.Minor) }
+        assertEquals(cMajor, aMinor)
+    }
+
+    @Test fun `a minor progression ending on bIII reads in the relative major`() {
+        val p = Progression(TrainingMode.Minor, listOf(4, 5, 6, 3))
+        assertEquals(TrainingMode.Major, EarTraining.progressionRelativeTonicMode(p))
+        assertEquals("ii  –  iii  –  IV  –  I", EarTraining.relativeRomanLineFor(p))
     }
 }

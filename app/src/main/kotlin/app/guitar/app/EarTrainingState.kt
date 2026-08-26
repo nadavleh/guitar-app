@@ -64,6 +64,10 @@ class EarTrainingState(
     /** Snapshot of the tracked mistake counts (progressionKey → times missed) — the pool
      *  the "Drill list" challenge source draws from. */
     private val progressionMistakesProvider: () -> Map<String, Int> = { emptyMap() },
+    /** Speaks a chord label aloud in car mode (see `Speaker`), or does nothing on a
+     *  device with no TTS engine. An EMPTY string means "stop talking now". Injected
+     *  rather than constructed here so this class stays Context-free. */
+    private val speak: (String) -> Unit = { },
 ) {
     /** Per-kind challenge start time, for duration in the recorded stats. */
     private val kindChallengeStart = HashMap<String, Long>()
@@ -975,6 +979,29 @@ class EarTrainingState(
     var challengeGuessDominant by mutableStateOf<List<Boolean>>(List(4) { false })
         private set
 
+    /**
+     * #6: the answer pad follows the PLAYHEAD, so a hand on the keyboard can answer each
+     * bar as it sounds instead of tapping the square first.
+     *
+     * Armed per question and disarmed by the first manual square tap: choosing a slot by
+     * hand says "I want to work this bar", and having the pad walk away mid-answer on the
+     * next bar boundary is exactly the frustration this must not cause. The next question
+     * re-arms it (see [applyChallengeQuestion]), so the disarm never outlives the
+     * progression that caused it.
+     */
+    var challengeFollowPlayhead by mutableStateOf(true)
+
+    /** False once the user has hand-picked a bar in the CURRENT question. */
+    var challengeFollowArmed by mutableStateOf(true)
+        private set
+
+    /** True when the answer pad should currently track [currentBar]. */
+    val challengeFollowingPlayhead: Boolean
+        get() = challengeFollowPlayhead && challengeFollowArmed && isLooping
+
+    /** A manual bar pick — stops the pad following for the rest of this question. */
+    fun disarmChallengeFollow() { challengeFollowArmed = false }
+
     /** #6: answer-keyboard "shift" state — false shows the MAJOR Roman row
      *  (I ii iii IV V vi vii°), true shows the MINOR row (i ii° III iv v VI VII).
      *  Both rows label the same seven shared diatonic chords; see
@@ -1067,6 +1094,7 @@ class EarTrainingState(
         modeRevealed = false
         currentBar = 0
         challengeRevealed = false
+        challengeFollowArmed = true   // a fresh progression re-arms follow-the-playhead
         // A different progression is now loaded, so the loop always STOPS — it used to
         // carry over and start sounding the next question the instant you hit Next,
         // before you were ready to listen. Every question is played on demand.
@@ -1156,6 +1184,15 @@ class EarTrainingState(
         val extOk = !challengeNeedsExt || challengeGuessExt.getOrNull(i) == correctExtLabel(i)
         return degOk && extOk
     }
+
+    /** True once EVERY bar of the current question carries a verdict — i.e. the user has
+     *  committed an answer everywhere, so naming the progression outright can no longer
+     *  spoil it. Gates the relative-minor reading in the tonic banner. */
+    val challengeAllBarsAnswered: Boolean
+        get() {
+            val n = progProgression?.degrees?.size ?: return false
+            return (0 until n).all { challengeBarCorrect(it) != null }
+        }
 
     /** True when bar [i] of the current progression sounds the harmonic-minor dominant
      *  (a major V / V7 in a minor key) rather than a natural diatonic degree. */
@@ -1646,6 +1683,18 @@ class EarTrainingState(
     var carAutoAdvance by mutableStateOf(true)
         private set
 
+    /** Speak each chord's function aloud as it is revealed.
+     *
+     *  TODO(car-voice): default to FALSE once this has been road-tested — it is on now
+     *  only so the feature is exercised without having to find the switch first. */
+    var carSpeakChords by mutableStateOf(true)
+        private set
+
+    /** Slots already spoken in THIS exercise, so a label is voiced once as it appears and
+     *  not again on every following bar. Cleared by [beginCarExercise] along with the
+     *  tapped-slot peeks. */
+    private val carSpokenSlots = HashSet<Int>()
+
     private var carJob: Job? = null
     private var carBeep: FloatArray? = null
     private var carBeepRate = 0
@@ -1672,6 +1721,7 @@ class EarTrainingState(
     fun toggleCarSlot(i: Int) {
         if (i < 0 || i >= progResolved.size || i < carRevealedSlots) return
         carTappedSlots = if (i in carTappedSlots) carTappedSlots - i else carTappedSlots + i
+        if (i in carTappedSlots) speakCarSlot(i) else carSpokenSlots.remove(i)
     }
 
     /** The big glanceable slot label: a Roman-numeral FUNCTION once revealed, else "?".
@@ -1784,10 +1834,25 @@ class EarTrainingState(
     fun startCarExercise() = beginCarExercise(draw = true, cancelExisting = true)
     fun replayCarExercise() = beginCarExercise(draw = false, cancelExisting = true)
     fun chooseCarAutoAdvance(v: Boolean) { carAutoAdvance = v }
+    fun chooseCarSpeakChords(v: Boolean) {
+        carSpeakChords = v
+        if (!v) speak("")   // nothing queued; the Speaker drops empties
+    }
+
+    /** Voice slot [i]'s function, once per exercise. Called the instant the slot becomes
+     *  readable — by the schedule as the playhead lands on it, or by a tap-to-peek — so
+     *  the word and the chord arrive together, which is the whole point of the drill.
+     *  Silent while the slot still reads "?". */
+    private fun speakCarSlot(i: Int) {
+        if (!carSpeakChords || !carSlotRevealed(i)) return
+        if (!carSpokenSlots.add(i)) return
+        speak(CarMode.speechFor(progResolved.getOrNull(i)?.romanLabel ?: return))
+    }
 
     fun stopCarExercise() {
         stopLoop()              // cancels carJob → the driver unwinds at its next delay
         carPhase = CarPhase.Idle
+        speak("")               // a label still in flight would name a bar nothing is playing
     }
 
     private fun cachedCarBeep(): FloatArray {
@@ -1816,6 +1881,7 @@ class EarTrainingState(
         }
         carRound = 0
         carTappedSlots = emptySet()   // a peek belongs to ONE exercise
+        carSpokenSlots.clear()
         carPhase = CarPhase.Beeps
         isLooping = true        // keeps the playhead + "is playing" chrome truthful
         carJob = scope.launch { runCarExercise() }
@@ -1847,6 +1913,10 @@ class EarTrainingState(
                 currentBar = i
                 audio.cutReverb()
                 soundBar(i, sustain)   // the SAME voicing path the looper uses
+                // AFTER currentBar moves: carSlotRevealed reads the playhead, so the
+                // schedule has only just uncovered this slot. Spoken over the chord, not
+                // instead of it — the voice is mixed well under it (CarMode.SPEECH_VOLUME).
+                speakCarSlot(i)
                 delay(barMs)
             }
         }

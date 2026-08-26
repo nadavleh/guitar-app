@@ -77,6 +77,10 @@ class AppState(
     /** Loads a bundled guitar sample bank for a [GuitarSound] id (lowercase name),
      *  or null to fall back to the synth. Supplied by the Activity (needs asset access). */
     private val guitarBankLoader: (String) -> app.guitar.audio.SampleInstrument? = { null },
+    /** Speaks a car-mode chord label aloud (empty string = stop). Supplied by the
+     *  Activity, which owns the `Speaker` because TextToSpeech binds a service that has
+     *  to be shut down with the Activity. */
+    private val speak: (String) -> Unit = { },
 ) {
     var instrument by mutableStateOf(Instrument.Guitar)
     var tuningName by mutableStateOf("Standard")
@@ -478,6 +482,7 @@ class AppState(
             },
             onProgressionMistake = { progKey -> recordProgressionMistake(progKey) },
             progressionMistakesProvider = { progressionMistakesSnapshot.value },
+            speak = speak,
         )
     }
 

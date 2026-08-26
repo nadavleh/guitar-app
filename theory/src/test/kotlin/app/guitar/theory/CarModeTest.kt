@@ -142,4 +142,75 @@ class CarModeTest {
         // 3 chords still steps by one and then holds (nothing left to show).
         assertEquals(listOf(0, 1, 2, 3, 3), (1..CarMode.ROUNDS).map { CarMode.revealedSlots(it, 3) })
     }
+
+    // ---- speechFor: the spoken function label the car-mode voice reads out ----
+
+    @Test fun `case becomes a spoken quality so IV and iv cannot be confused`() {
+        // The whole reason the voice exists: over road noise "four" alone is useless.
+        assertEquals("4 major", CarMode.speechFor("IV"))
+        assertEquals("4 minor", CarMode.speechFor("iv"))
+        assertEquals("1 major", CarMode.speechFor("I"))
+        assertEquals("1 minor", CarMode.speechFor("i"))
+    }
+
+    @Test fun `every numeral maps to its degree number, VII not V plus II`() {
+        assertEquals(listOf("1 major", "2 major", "3 major", "4 major", "5 major", "6 major", "7 major"),
+            listOf("I", "II", "III", "IV", "V", "VI", "VII").map { CarMode.speechFor(it) })
+    }
+
+    @Test fun `accidentals are spoken before the degree`() {
+        assertEquals("flat 6 major", CarMode.speechFor("bVI"))
+        assertEquals("flat 7 major", CarMode.speechFor("bVII"))
+        assertEquals("sharp 4 major", CarMode.speechFor("#IV"))
+    }
+
+    @Test fun `a suffix quality overrides the case`() {
+        assertEquals("7 diminished", CarMode.speechFor("vii°"))
+        assertEquals("2 diminished", CarMode.speechFor("ii°"))
+        assertEquals("7 diminished 7", CarMode.speechFor("vii°7"))
+        assertEquals("sharp 4 diminished 7", CarMode.speechFor("#IV°7"))
+        assertEquals("5 augmented", CarMode.speechFor("V+"))
+    }
+
+    @Test fun `an uppercase bare 7th is a dominant, but a 6th or add9 is not`() {
+        assertEquals("5 dominant 7", CarMode.speechFor("V7"))
+        assertEquals("flat 7 dominant 7", CarMode.speechFor("bVII7"))
+        assertEquals("5 dominant 13", CarMode.speechFor("V13"))
+        assertEquals("1 major 6", CarMode.speechFor("I6"))
+        assertEquals("4 major add 9", CarMode.speechFor("IVadd9"))
+    }
+
+    @Test fun `maj is spoken once, not doubled by the uppercase case`() {
+        assertEquals("1 major 7", CarMode.speechFor("Imaj7"))
+        assertEquals("flat 6 major 7", CarMode.speechFor("bVImaj7"))
+        assertEquals("4 major 7 sharp 11", CarMode.speechFor("IVmaj7#11"))
+    }
+
+    @Test fun `a lowercase 7th keeps its minor quality`() {
+        assertEquals("1 minor 7", CarMode.speechFor("i7"))
+        assertEquals("2 minor 7", CarMode.speechFor("ii7"))
+        assertEquals("6 minor 9", CarMode.speechFor("vi9"))
+    }
+
+    @Test fun `every Roman the diatonic library can print is speakable`() {
+        val romans = (EarTraining.MAJOR_DEGREES.values + EarTraining.MINOR_DEGREES.values)
+            .flatMap { info ->
+                listOf(info.roman,
+                    EarTraining.romanLabel(info.roman, info.seventhQuality),
+                    EarTraining.romanLabel(info.roman, info.extendedQuality)) +
+                    info.extendedOptions.map { info.roman + it.second }
+            }
+        for (r in romans) {
+            val spoken = CarMode.speechFor(r)
+            assertTrue(spoken.isNotEmpty(), "no speech for Roman '$r'")
+            assertTrue(spoken.first().isDigit() || spoken.startsWith("flat") || spoken.startsWith("sharp"),
+                "speech for '$r' should open with the degree or its accidental, got '$spoken'")
+        }
+    }
+
+    @Test fun `an unparseable label is silent rather than gibberish`() {
+        assertEquals("", CarMode.speechFor(""))
+        assertEquals("", CarMode.speechFor("—"))
+        assertEquals("", CarMode.speechFor("?"))
+    }
 }

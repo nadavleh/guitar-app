@@ -18,8 +18,11 @@ const KIND_LABEL: Record<string, string> = {
   intervals: "Intervals",
 };
 
-/** Full-screen scrim + card listing per-kind runs; each run is deletable, and
- *  the whole log can be cleared. The list rebuilds in place after every edit. */
+/** Full-screen scrim + card listing per-kind runs.
+ *
+ *  READ-ONLY on purpose: the delete buttons used to sit a thumb-width from a score you
+ *  had just set, and hitting one wiped a history that took weeks to build. Deleting now
+ *  lives in Settings -> Data, behind a confirm. */
 export function renderChallengeStatsOverlay(state: AppState, onClose: () => void): HTMLElement {
   const body = el("div", { class: "et-card", style: "max-width:460px;max-height:80vh;overflow:auto;margin:auto" });
   body.addEventListener("click", (e) => e.stopPropagation());
@@ -30,11 +33,6 @@ export function renderChallengeStatsOverlay(state: AppState, onClose: () => void
       el("div", { style: "font-weight:700;font-size:16px;flex:1" }, ["Challenge stats"]),
     ]);
     const scores = state.challengeScores;
-    if (scores.length) {
-      header.appendChild(btn("Clear all", () => {
-        if (confirm("Delete ALL recorded challenge stats? (Undo still works afterwards.)")) { state.clearChallengeScores(); rebuild(); }
-      }, "btn text"));
-    }
     body.appendChild(header);
 
     if (!scores.length) {
@@ -49,25 +47,22 @@ export function renderChallengeStatsOverlay(state: AppState, onClose: () => void
       for (const [kind, rows] of byKind) {
         const best = rows[0]; // stored best-first per kind
         const avg = Math.round(rows.reduce((a, r) => a + (r.score * 100) / r.total, 0) / rows.length);
-        const kindRow = el("div", { style: "display:flex;align-items:center;gap:8px;margin-top:10px" }, [
-          el("div", { style: "font-weight:700;color:var(--act);flex:1" }, [KIND_LABEL[kind] ?? kind]),
-          btn("Clear", () => { state.clearChallengeScoresOfKind(kind); rebuild(); }, "btn text"),
-        ]);
-        body.appendChild(kindRow);
+        body.appendChild(el("div", { style: "font-weight:700;color:var(--act);margin-top:10px" },
+          [KIND_LABEL[kind] ?? kind]));
         body.appendChild(el("div", { class: "et-muted", style: "margin-bottom:4px" }, [
           `best ${best.score}/${best.total}  ·  avg ${avg}%  ·  ${rows.length} run${rows.length === 1 ? "" : "s"}`,
         ]));
         for (const r of rows) {
           const pct = Math.round((r.score * 100) / r.total);
           const secs = (r.durationMs / 1000).toFixed(1);
-          body.appendChild(el("div", { style: "display:flex;align-items:center;gap:8px;padding:2px 0" }, [
-            el("div", { style: "flex:1;font-size:13px" }, [
-              `${r.score}/${r.total} (${pct}%)  ·  ${secs}s  ·  ${new Date(r.dateMillis).toLocaleDateString()}`,
-            ]),
-            btn("✕", () => { state.deleteChallengeScore(r); rebuild(); }, "btn text"),
+          body.appendChild(el("div", { style: "font-size:13px;padding:2px 0" }, [
+            `${r.score}/${r.total} (${pct}%)  ·  ${secs}s  ·  ${new Date(r.dateMillis).toLocaleDateString()}`,
           ]));
         }
       }
+      body.appendChild(el("div", { class: "et-muted", style: "font-size:12px;margin-top:8px" }, [
+        "To delete runs, open Settings → Data.",
+      ]));
     }
     body.appendChild(el("div", { style: "margin-top:12px;text-align:right" }, [btn("Close", onClose, "btn primary")]));
   };

@@ -50,6 +50,10 @@ export interface EarDeps {
   /** Snapshot of the tracked mistake counts (progressionKey → times missed) — the pool
    *  the "Drill list" challenge source draws from. */
   progressionMistakesProvider?: () => Record<string, number>;
+  /** Speaks a car-mode chord label aloud (see speech.ts); an EMPTY string means "stop
+   *  talking now". Injected rather than imported so this class stays testable and
+   *  mirrors Android, where the Activity owns the TextToSpeech engine. */
+  speak?: (text: string) => void;
 }
 
 /** Where Progression Challenge questions come from: the generator settings (normal), or
@@ -769,6 +773,39 @@ export class EarTrainingState {
    *  scoring requires it to match whether the bar is a dominantBars bar. */
   challengeGuessDominant: boolean[] = [false, false, false, false];
 
+  /**
+   * The answer pad follows the PLAYHEAD, so a hand on the keyboard can answer each bar
+   * as it sounds instead of tapping the square first.
+   *
+   * Armed per question and disarmed by the first manual square tap: choosing a slot by
+   * hand says "I want to work this bar", and having the pad walk away mid-answer on the
+   * next bar boundary is exactly the frustration this must not cause. The next question
+   * re-arms it (see `applyChallengeQuestion`), so the disarm never outlives the
+   * progression that caused it.
+   */
+  challengeFollowPlayhead = true;
+
+  /** False once the user has hand-picked a bar in the CURRENT question. */
+  challengeFollowArmed = true;
+
+  /** True when the answer pad should currently track `currentBar`. */
+  get challengeFollowingPlayhead(): boolean {
+    return this.challengeFollowPlayhead && this.challengeFollowArmed && this.isLooping;
+  }
+
+  /** A manual bar pick — stops the pad following for the rest of this question. */
+  disarmChallengeFollow(): void { this.challengeFollowArmed = false; }
+
+  /** True once EVERY bar of the current question carries a verdict — i.e. the user has
+   *  committed an answer everywhere, so naming the progression outright can no longer
+   *  spoil it. Gates the relative-minor reading in the tonic banner. */
+  get challengeAllBarsAnswered(): boolean {
+    const n = this.progProgression?.degrees.length;
+    if (!n) return false;
+    for (let i = 0; i < n; i++) if (this.challengeBarCorrect(i) === null) return false;
+    return true;
+  }
+
   /** Answer-keyboard "shift": false shows the MAJOR Roman row, true the MINOR row.
    *  Both label the same seven shared diatonic chords. */
   keyboardMinor = false;
@@ -915,6 +952,7 @@ export class EarTrainingState {
     this.modeRevealed = false;
     this.currentBar = 0;
     this.challengeRevealed = false;
+    this.challengeFollowArmed = true;   // a fresh progression re-arms follow-the-playhead
     // A different progression is now loaded, so the loop always STOPS — it used to
     // carry over and start sounding the next question the instant you hit Next,
     // before you were ready to listen. Every question is played on demand.
@@ -1397,6 +1435,17 @@ export class EarTrainingState {
   /** Exercises drawn this car session (header readout only). */
   carExerciseCount = 0;
   carAutoAdvance = true;
+
+  /** Speak each chord's function aloud as it is revealed.
+   *
+   *  TODO(car-voice): default to FALSE once this has been road-tested — it is on now
+   *  only so the feature is exercised without having to find the switch first. */
+  carSpeakChords = true;
+
+  /** Slots already spoken in THIS exercise, so a label is voiced once as it appears and
+   *  not again on every following bar. Cleared by `beginCarExercise` along with the
+   *  tapped-slot peeks. */
+  private carSpokenSlots = new Set<number>();
   private carToken = 0;
   private carBeep: Float32Array | null = null;
   private carBeepRate = 0;
@@ -1424,8 +1473,8 @@ export class EarTrainingState {
    *  revealed is not tappable — that answer is spent. */
   toggleCarSlot(i: number) {
     if (i < 0 || i >= this.progResolved.length || i < this.carRevealedSlots) return;
-    if (this.carTappedSlots.has(i)) this.carTappedSlots.delete(i);
-    else this.carTappedSlots.add(i);
+    if (this.carTappedSlots.has(i)) { this.carTappedSlots.delete(i); this.carSpokenSlots.delete(i); }
+    else { this.carTappedSlots.add(i); this.speakCarSlot(i); }
     this.notify();
   }
 
@@ -1525,9 +1574,29 @@ export class EarTrainingState {
   replayCarExercise() { this.beginCarExercise(false, true); }
   setCarAutoAdvance(v: boolean) { this.carAutoAdvance = v; this.notify(); }
 
+  setCarSpeakChords(v: boolean) {
+    this.carSpeakChords = v;
+    if (!v) this.deps.speak?.("");
+    this.notify();
+  }
+
+  /** Voice slot `i`'s function, once per exercise. Called the instant the slot becomes
+   *  readable — by the schedule as the playhead lands on it, or by a tap-to-peek — so the
+   *  word and the chord arrive together, which is the whole point of the drill. Silent
+   *  while the slot still reads "?". */
+  private speakCarSlot(i: number): void {
+    if (!this.carSpeakChords || !this.carSlotRevealed(i)) return;
+    if (this.carSpokenSlots.has(i)) return;
+    const roman = this.progResolved[i]?.romanLabel;
+    if (!roman) return;
+    this.carSpokenSlots.add(i);
+    this.deps.speak?.(CarMode.speechFor(roman));
+  }
+
   stopCarExercise() {
     this.stopLoop();          // bumps carToken → the driver unwinds at its next check
     this.carPhase = CarPhase.Idle;
+    this.deps.speak?.("");    // a label still in flight would name a bar nothing is playing
     this.notify();
   }
 
@@ -1554,6 +1623,7 @@ export class EarTrainingState {
     }
     this.carRound = 0;
     this.carTappedSlots.clear();   // a peek belongs to ONE exercise
+    this.carSpokenSlots.clear();
     this.carPhase = CarPhase.Beeps;
     this.isLooping = true;      // keeps the playhead + "is playing" chrome truthful
     this.notify();
@@ -1598,6 +1668,10 @@ export class EarTrainingState {
         this.currentBar = i;
         this.deps.audio.cutReverb();
         this.soundBar(i, sustain);       // the SAME voicing path the looper uses
+        // AFTER currentBar moves: carSlotRevealed reads the playhead, so the schedule has
+        // only just uncovered this slot. Spoken over the chord, not instead of it — the
+        // voice is mixed well under it (CarMode.SPEECH_VOLUME).
+        this.speakCarSlot(i);
         this.notify();
         await sleep(barMs);
       }

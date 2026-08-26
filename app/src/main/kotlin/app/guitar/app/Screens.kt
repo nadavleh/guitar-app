@@ -49,6 +49,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -715,6 +716,13 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
 
         Spacer(Modifier.height(12.dp))
         HorizontalDivider()
+        Spacer(Modifier.height(8.dp))
+
+        // ----- Data (the ONLY place recorded practice history can be deleted) -----
+        DataSection(state)
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider()
         Spacer(Modifier.height(4.dp))
 
         // ----- Look & tabs (collapsed by default; last section on purpose) -----
@@ -724,6 +732,120 @@ fun OptionsSheet(state: AppState, customTunings: Map<String, Tuning>) {
         Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
             TextButton(onClick = { state.closeSheet() }) { Text("Done") }
         }
+    }
+}
+
+/**
+ * Settings → Data: the one place recorded practice history can be erased.
+ *
+ * Deliberately NOT reachable from the stats popup any more. Those buttons sat a
+ * thumb-width from a score you had just set, and hitting one wiped a history that took
+ * weeks to build. Here they are behind a settings sheet AND a confirm dialog.
+ *
+ * The two lists are independent and stay that way: the challenge-score log is a record
+ * of what you did, the Drill list is a curated set of what you still get wrong. Clearing
+ * your scores must not silently throw away the drill queue you've been building — so
+ * each has its own button, and neither touches the other.
+ */
+@Composable
+private fun DataSection(state: AppState) {
+    val scores by state.challengeScores.collectAsState(initial = emptyList())
+    val mistakes by state.progressionMistakes.collectAsState(initial = emptyMap())
+    /** Non-null while a confirm dialog is up: (title, body, action). */
+    var confirm by remember { mutableStateOf<Triple<String, String, () -> Unit>?>(null) }
+    var statsExpanded by remember { mutableStateOf(false) }
+
+    SectionLabel("Data")
+    Spacer(Modifier.height(8.dp))
+
+    Text("Challenge stats — ${scores.size} recorded run${if (scores.size == 1) "" else "s"}",
+        style = MaterialTheme.typography.bodyMedium)
+    Text(
+        "Every finished ear-training challenge. Deleting these does NOT change your Drill list.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(6.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(
+            onClick = { statsExpanded = !statsExpanded },
+            enabled = scores.isNotEmpty(),
+        ) { Text(if (statsExpanded) "Hide runs" else "Delete single runs…") }
+        OutlinedButton(
+            onClick = {
+                confirm = Triple(
+                    "Delete all challenge stats?",
+                    "All ${scores.size} recorded runs, every kind, permanently. Your Drill " +
+                        "list is not affected.",
+                ) { state.clearChallengeScores() }
+            },
+            enabled = scores.isNotEmpty(),
+        ) { Text("Delete all") }
+    }
+
+    if (statsExpanded) {
+        val fmt = remember { java.text.SimpleDateFormat("d MMM", java.util.Locale.getDefault()) }
+        Column(modifier = Modifier.padding(start = 8.dp, top = 6.dp)) {
+            for ((kind, rows) in scores.groupBy { it.kind }) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text(kind, style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                    TextButton(onClick = {
+                        confirm = Triple(
+                            "Delete every \"$kind\" run?",
+                            "${rows.size} run${if (rows.size == 1) "" else "s"} of this kind, permanently.",
+                        ) { state.clearChallengeScoresOfKind(kind) }
+                    }) { Text("Clear kind") }
+                }
+                for (r in rows) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            "${r.score}/${r.total}  ·  ${fmt.format(java.util.Date(r.dateMillis))}",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                        // A single row is small enough to delete without a confirm.
+                        TextButton(onClick = { state.deleteChallengeScore(r) }) { Text("✕") }
+                    }
+                }
+            }
+        }
+    }
+
+    Spacer(Modifier.height(12.dp))
+
+    Text("Drill list — ${mistakes.size} progression${if (mistakes.size == 1) "" else "s"} tracked",
+        style = MaterialTheme.typography.bodyMedium)
+    Text(
+        "The progressions you keep missing, which the Drill-list challenge source draws " +
+            "from. Separate from your stats — clearing one leaves the other alone.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(6.dp))
+    OutlinedButton(
+        onClick = {
+            confirm = Triple(
+                "Clear the Drill list?",
+                "All ${mistakes.size} tracked progressions and their miss counts. Your " +
+                    "challenge stats are not affected.",
+            ) { state.clearProgressionMistakes() }
+        },
+        enabled = mistakes.isNotEmpty(),
+    ) { Text("Clear drill list") }
+
+    confirm?.let { (title, body, action) ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirm = null },
+            title = { Text(title) },
+            text = { Text(body) },
+            confirmButton = {
+                TextButton(onClick = { action(); confirm = null }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirm = null }) { Text("Cancel") } },
+        )
     }
 }
 

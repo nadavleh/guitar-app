@@ -20,6 +20,7 @@ import {
   Progression, CarMode,
   MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, MINOR_HARMONIC_PROGRESSIONS, ADVANCED_PROGRESSIONS, ADVANCED2_PROGRESSIONS,
   SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor, progressionFromKey, progressionLacksTonic,
+  progressionRelativeTonicMode, relativeRomanLineFor,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow,
   ResolvedChord, ChordShape, resolveProgression, resolveNamed, resolveCircleWindow,
   WorkoutSession, WorkoutWeek, WORKOUT_WEEKS, WORKOUT_MONTHS,
@@ -394,6 +395,15 @@ export class EarTrainingUI {
       (v) => { ear.setCarAutoAdvance(v); this.rerender(); },
     ));
 
+    // The chord voice. Reads only what the screen already shows, so it never gives away
+    // a slot the schedule is still holding back.
+    wrap.appendChild(switchRow(
+      ear.carSpeakChords ? "Speak each chord as it appears" : "Chord voice off",
+      ear.carSpeakChords ? "Quietly, over the music — \"4 minor\" for iv, \"4 major\" for IV." : null,
+      ear.carSpeakChords,
+      (v) => { ear.setCarSpeakChords(v); this.rerender(); },
+    ));
+
     screen.appendChild(wrap);
   }
 
@@ -500,6 +510,7 @@ export class EarTrainingUI {
         e.preventDefault();
         const d = e.key === "ArrowLeft" ? -1 : 1;
         this.challengeSelectedBar = Math.min(Math.max(this.challengeSelectedBar + d, 0), 3);
+        ear.disarmChallengeFollow();   // an arrow key is a hand-picked bar, same as a tap
         ear.playBarOnce(this.challengeSelectedBar);
         this.rerender();
       } else if (e.key === "Escape") {
@@ -768,7 +779,10 @@ export class EarTrainingUI {
     const saveScroll = () => { this.libScrollTop = body.scrollTop; };
     // A progression with no tonic (no I/i) has nothing anchoring the key, so it's
     // harder to place by ear — append a marker to its row label.
-    const tonicMark = (p: Progression): string => progressionLacksTonic(p) ? "   ◆ no-tonic (hard)" : "";
+    const tonicMark = (p: Progression): string =>
+      !progressionLacksTonic(p) ? ""
+        : progressionRelativeTonicMode(p) !== null ? "   ◆ relative minor"
+        : "   ◆ no-tonic (hard)";
 
     // Expanded detail: play/stop, fretboard toggle + follow-along board, then songs.
     const detail = (key: string, songs: SongExample[], chords: ResolvedChord[]): HTMLElement => {
@@ -1078,26 +1092,51 @@ export class EarTrainingUI {
   }
 
   /**
-   * Prominent warning for a progression with no tonic in it (e.g. IV V7 iii7 vi7).
+   * Prominent note about where a progression's home is, when it isn't where the Roman
+   * numbering says.
    *
-   * These are the genuinely hard ones: with no I chord to land on there's no home to measure
-   * the other functions against, so a wrong key guess stays wrong for all four bars. Previously
-   * flagged only in the library and drill lists — this states the same fact where you actually
-   * meet the progression, in Practice and in Challenge. Returns null when it doesn't apply.
+   * Two different situations, and conflating them was a bug: a progression with no I of
+   * its own that ENDS on the relative tonic (IV–V–iii–vi finishes on vi = the relative
+   * minor's i) resolves perfectly well — it is simply a minor-key progression wearing
+   * major numerals, so the card states the minor reading and stops there. Only a
+   * progression that never lands anywhere (vi–V–IV–V hangs on V) gets the hard warning:
+   * with no home to measure the other functions against, a wrong key guess stays wrong
+   * for all four bars. Shown in Practice and in Challenge, not only in the library.
+   *
+   * `showRelativeLine` is false on an unanswered challenge question: the relative Roman
+   * line names every bar, so it IS the answer. Returns null when neither case applies.
    */
-  private noTonicBanner(): HTMLElement | null {
+  private noTonicBanner(showRelativeLine: boolean): HTMLElement | null {
     const p = this.ear.progProgression;
     if (!p || !progressionLacksTonic(p)) return null;
-    return el("div", {
-      style: "margin:6px 0;padding:8px 10px;border-radius:8px;background:rgba(211,47,47,0.18);" +
-        "border:1px solid rgba(211,47,47,0.55)",
-    }, [
-      el("div", { style: "font-weight:800;letter-spacing:0.5px" }, ["◆  NO TONIC  ◆"]),
+    const relative = progressionRelativeTonicMode(p) !== null;
+    if (!relative) {
+      return el("div", {
+        style: "margin:6px 0;padding:8px 10px;border-radius:8px;background:rgba(211,47,47,0.18);" +
+          "border:1px solid rgba(211,47,47,0.55)",
+      }, [
+        el("div", { style: "font-weight:800;letter-spacing:0.5px" }, ["◆  NO TONIC  ◆"]),
+        el("div", { style: "font-size:12px;margin-top:2px" }, [
+          "This progression never lands on the tonic — one of the hard ones. " +
+          "Don't wait to hear home; judge each chord by its pull instead.",
+        ]),
+      ]);
+    }
+    // Information, not a warning — neutral surface so it can't read as "you got it wrong".
+    const kids: HTMLElement[] = [
+      el("div", { style: "font-weight:800;letter-spacing:0.5px" }, ["◆  READS IN THE RELATIVE MINOR  ◆"]),
       el("div", { style: "font-size:12px;margin-top:2px" }, [
-        "This progression never lands on the tonic — one of the hard ones. " +
-        "Don't wait to hear home; judge each chord by its pull instead.",
+        "No I in this key, but it lands on the relative tonic — so hear it from the minor, " +
+        "not the major." + (showRelativeLine ? " Relative to the minor scale it is:" : ""),
       ]),
-    ]);
+    ];
+    if (showRelativeLine) {
+      kids.push(el("div", { style: "font-weight:700;margin-top:2px;color:var(--act)" }, [relativeRomanLineFor(p)]));
+    }
+    return el("div", {
+      style: "margin:6px 0;padding:8px 10px;border-radius:8px;background:var(--panel);" +
+        "border:1px solid var(--line)",
+    }, kids);
   }
 
   private progressionView(parent: HTMLElement): void {
@@ -1115,7 +1154,7 @@ export class EarTrainingUI {
     parent.appendChild(this.revealCard("Key & Mode", !ear.keyRevealed,
       spellPc(ear.progKey) + "  " + (ear.progMode === TrainingMode.Major ? "Major" : "Minor"),
       () => ear.toggleKeyModeReveal(), false));
-    const practiceNoTonic = this.noTonicBanner();
+    const practiceNoTonic = this.noTonicBanner(true);
     if (practiceNoTonic) parent.appendChild(practiceNoTonic);
     parent.appendChild(el("div", { class: "v-gap-12" }));
     parent.appendChild(this.chordSlots());
@@ -1234,12 +1273,22 @@ export class EarTrainingUI {
 
     // The four bar squares: tap one to target it, answer from the pad below.
     const sqRow = el("div", { class: "et-slot-row" });
-    for (let i = 0; i < 4; i++) sqRow.appendChild(this.barSquare(i, this.challengeSelectedBar, () => { this.challengeSelectedBar = i; this.rerender(); }));
+    // Follow-the-playhead: while the progression loops, the answer pad walks to the bar
+    // being played, so you can answer in time instead of tapping a square first. Any
+    // manual tap disarms it for the rest of the question (see challengeFollowArmed).
+    if (ear.challengeFollowingPlayhead) this.challengeSelectedBar = ear.currentBar;
+    for (let i = 0; i < 4; i++) {
+      sqRow.appendChild(this.barSquare(i, this.challengeSelectedBar, () => {
+        this.challengeSelectedBar = i;
+        ear.disarmChallengeFollow();
+        this.rerender();
+      }));
+    }
     parent.appendChild(sqRow);
 
     // The no-tonic warning sits directly under the squares being filled — on top it
     // scrolled away from the answering area, which is where it matters.
-    const challengeNoTonic = this.noTonicBanner();
+    const challengeNoTonic = this.noTonicBanner(ear.challengeAllBarsAnswered);
     if (challengeNoTonic) parent.appendChild(challengeNoTonic);
 
     // Optional fretboard (v2.65: moved up from the bottom of the screen, where
@@ -1310,11 +1359,17 @@ export class EarTrainingUI {
       const refToggle = chip(ear.degreeRefChords ? "♪ chords" : "♪ notes", true,
         () => { ear.toggleDegreeRefChords(); this.rerender(); });
       refToggle.title = "What the degree buttons play: the full diatonic chord, or just the bare root note";
+      // Answer pad walks with the playhead while the loop runs. Tapping a square by hand
+      // still wins for the rest of that question.
+      const followToggle = chip("Keys follow playhead", ear.challengeFollowPlayhead,
+        () => { ear.challengeFollowPlayhead = !ear.challengeFollowPlayhead; this.rerender(); });
+      followToggle.title = "While the loop plays, the answer keyboard targets the bar being played";
       pop.appendChild(el("div", { class: "et-row-gap" }, [
         btn(`Hear ${ear.progCadenceLabel()}`, () => ear.playProgKeyCadence()),
         btn("Re-roll", () => ear.rerollChallengeQuestion()),
         this.songsButton(),
         refToggle,
+        followToggle,
       ]));
       pop.appendChild(el("div", { class: "v-gap-8" }));
       pop.appendChild(labelSm("Drawn from  (tap to change — applies to the next question)"));
@@ -1935,7 +1990,10 @@ export class EarTrainingUI {
       const row = el("div", { class: "et-card", style: "margin-bottom:8px" });
       row.appendChild(el("div", { style: "display:flex;align-items:center;gap:8px" }, [
         el("div", { style: "flex:1" }, [
-          el("div", { style: "font-weight:700" }, [romanLineFor(e.prog!) + (progressionLacksTonic(e.prog!) ? "   ◆ no-tonic (hard)" : "")]),
+          el("div", { style: "font-weight:700" }, [romanLineFor(e.prog!) +
+            (!progressionLacksTonic(e.prog!) ? ""
+              : progressionRelativeTonicMode(e.prog!) !== null ? "   ◆ relative minor"
+              : "   ◆ no-tonic (hard)")]),
           el("div", { class: "et-muted", style: "font-size:12px" }, [`${modeName} · missed ${e.count}×`]),
         ]),
         btn(drilling ? "■ Stop" : "▶ Loop", () => { if (drilling) ear.stopDrill(); else ear.startDrill(e.key); this.rerender(); }, drilling ? "btn primary" : "btn"),
