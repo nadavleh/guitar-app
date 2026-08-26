@@ -176,9 +176,9 @@ fun App(audio: AudioEngine) {
     // Car-mode chord voice. Created lazily on first use so a device with no TTS engine
     // pays nothing, and remembered per-Activity — MainActivity.onDestroy shuts it down.
     val speak = remember(context) {
-        { text: String ->
+        { text: String, volume: Float ->
             val activity = context as? MainActivity
-            if (text.isEmpty()) activity?.speaker?.stop() else activity?.orCreateSpeaker()?.say(text)
+            if (text.isEmpty()) activity?.speaker?.stop() else activity?.orCreateSpeaker()?.say(text, volume)
             Unit
         }
     }

@@ -64,10 +64,10 @@ class EarTrainingState(
     /** Snapshot of the tracked mistake counts (progressionKey → times missed) — the pool
      *  the "Drill list" challenge source draws from. */
     private val progressionMistakesProvider: () -> Map<String, Int> = { emptyMap() },
-    /** Speaks a chord label aloud in car mode (see `Speaker`), or does nothing on a
-     *  device with no TTS engine. An EMPTY string means "stop talking now". Injected
-     *  rather than constructed here so this class stays Context-free. */
-    private val speak: (String) -> Unit = { },
+    /** Speaks a chord label aloud in car mode at a 0..1 volume (see `Speaker`), or does
+     *  nothing on a device with no TTS engine. An EMPTY string means "stop talking now".
+     *  Injected rather than constructed here so this class stays Context-free. */
+    private val speak: (String, Float) -> Unit = { _, _ -> },
 ) {
     /** Per-kind challenge start time, for duration in the recorded stats. */
     private val kindChallengeStart = HashMap<String, Long>()
@@ -1690,6 +1690,12 @@ class EarTrainingState(
     var carSpeakChords by mutableStateOf(true)
         private set
 
+    /** Level of the spoken label, 0..1. A slider rather than a constant: "under the
+     *  music" and "audible in a moving car" are not the same level, and which one you
+     *  want depends on the car. */
+    var carSpeechVolume by mutableStateOf(CarMode.SPEECH_VOLUME)
+        private set
+
     /** Slots already spoken in THIS exercise, so a label is voiced once as it appears and
      *  not again on every following bar. Cleared by [beginCarExercise] along with the
      *  tapped-slot peeks. */
@@ -1836,7 +1842,18 @@ class EarTrainingState(
     fun chooseCarAutoAdvance(v: Boolean) { carAutoAdvance = v }
     fun chooseCarSpeakChords(v: Boolean) {
         carSpeakChords = v
-        if (!v) speak("")   // nothing queued; the Speaker drops empties
+        if (!v) speak("", 0f)   // empty = stop, so a label in flight is cut off
+    }
+
+    /** Set the spoken-label level and demo it, so the slider can be set by ear without
+     *  waiting for the next chord to come round. */
+    fun chooseCarSpeechVolume(v: Float) {
+        carSpeechVolume = CarMode.clampSpeechVolume(v)
+    }
+
+    /** Speak a sample label at the current level — the slider's "how loud is that?". */
+    fun previewCarSpeech() {
+        speak(CarMode.speechFor(progResolved.firstOrNull()?.romanLabel ?: "IV"), carSpeechVolume)
     }
 
     /** Voice slot [i]'s function, once per exercise. Called the instant the slot becomes
@@ -1846,13 +1863,13 @@ class EarTrainingState(
     private fun speakCarSlot(i: Int) {
         if (!carSpeakChords || !carSlotRevealed(i)) return
         if (!carSpokenSlots.add(i)) return
-        speak(CarMode.speechFor(progResolved.getOrNull(i)?.romanLabel ?: return))
+        speak(CarMode.speechFor(progResolved.getOrNull(i)?.romanLabel ?: return), carSpeechVolume)
     }
 
     fun stopCarExercise() {
         stopLoop()              // cancels carJob → the driver unwinds at its next delay
         carPhase = CarPhase.Idle
-        speak("")               // a label still in flight would name a bar nothing is playing
+        speak("", 0f)           // a label still in flight would name a bar nothing is playing
     }
 
     private fun cachedCarBeep(): FloatArray {

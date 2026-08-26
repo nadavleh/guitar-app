@@ -89,14 +89,27 @@ object CarMode {
         LEAD_IN_MS + ROUNDS.toLong() * slotCount * (60_000L / bpm.coerceAtLeast(10)) * 4
 
     /**
-     * Playback volume of the spoken chord label, 0..1.
+     * Default playback volume of the spoken chord label, 0..1 — the starting point of a
+     * user-facing slider, not a fixed level.
      *
-     * Deliberately well under the progression: the voice is an overdub ON TOP of the
-     * looper, not a replacement for it. Neither platform ducks the music — the point of
-     * the drill is to hear the chord, and a label loud enough to mask it would train the
-     * wrong thing. Shared so both platforms sit at the same level.
+     * The voice is an overdub ON TOP of the looper, not a replacement for it: neither
+     * platform ducks the music, because the point of the drill is to hear the chord.
+     * It started at 0.35 on that reasoning and was simply inaudible in a moving car, so
+     * the default now sits high and the slider is what trades intelligibility against
+     * masking. Both platforms clamp to the same range, and 1.0 is a hard ceiling on both
+     * (Android KEY_PARAM_VOLUME and SpeechSynthesisUtterance.volume are each capped
+     * there) — a louder voice than this needs the device volume, not a bigger number.
      */
-    const val SPEECH_VOLUME = 0.35f
+    const val SPEECH_VOLUME = 0.9f
+
+    /** Slider bounds for the spoken label. The floor is audible-but-quiet rather than 0:
+     *  silencing the voice is what the toggle is for. */
+    const val SPEECH_VOLUME_MIN = 0.1f
+    const val SPEECH_VOLUME_MAX = 1.0f
+
+    /** [v] clamped into the slider's range. Shared so a persisted or hand-edited value
+     *  can never hand the platform TTS an out-of-range volume. */
+    fun clampSpeechVolume(v: Float): Float = v.coerceIn(SPEECH_VOLUME_MIN, SPEECH_VOLUME_MAX)
 
     /** Roman numerals 1..7, longest-first so "VII" wins over "V" / "VI". */
     private val NUMERALS = listOf("VII" to 7, "VI" to 6, "IV" to 4, "V" to 5, "III" to 3, "II" to 2, "I" to 1)

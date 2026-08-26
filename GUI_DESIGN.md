@@ -434,7 +434,10 @@ Diatonic  -  7th chords                          (read-only)
 [  Replay 5x  ] [   Next    ] [    Stop    ]         56dp, equal flex
 [x] Auto-advance (4 s gap)
 [x] Speak each chord as it appears
-    Quietly, over the music - "4 minor" for iv, "4 major" for IV.
+    Over the music - "4 minor" for iv, "4 major" for IV.
+Voice level: 90%
+[=================o----]                             releasing speaks a sample
+100% is as loud as the voice goes - past that, raise the device volume.
 ```
 
 - Slot labels are sized off the **shorter** viewport edge (`clamp(40px, 13vmin, 132px)` web; `min(width/slots, height) * 0.42` on Android), so **one layout serves both orientations** — landscape simply makes the slots taller.
@@ -445,7 +448,7 @@ Diatonic  -  7th chords                          (read-only)
 
 **Chord voice (v2.74).** A TTS voice reads each slot's function **at the instant that slot appears** — as the playhead-gated schedule uncovers it, or when you tap one to peek — never before. The words come from the pure `CarMode.speechFor`, so both platforms say the same thing and it is unit-tested: the numeral becomes a *degree number* and the case becomes a spoken *quality*, because over road noise "four" alone is useless — `IV` → "4 major", `iv` → "4 minor", `bVImaj7` → "flat 6 major 7", `V7` → "5 dominant 7", `vii°` → "7 diminished".
 
-It is an **overdub, not a replacement**: `CarMode.SPEECH_VOLUME` (0.35) sits it well under the progression, and neither platform ducks or takes audio focus — the point of the drill is to hear the chord, and a label loud enough to mask it would train the wrong thing. Each label is spoken **once per exercise**, and every utterance cancels the previous one, so a fast tempo truncates rather than building a backlog that drifts behind the playhead. A device with no TTS engine simply stays silent. Android: `Speaker.kt` (owned by the Activity, shut down in `onDestroy`); web: `speech.ts` over `speechSynthesis`. Both are injected into the ear state as a `(String) -> Unit` where the **empty string means "stop talking"**, so the state layer stays Context- and DOM-free.
+It is an **overdub, not a replacement**: it plays alongside the chord and neither platform ducks or takes audio focus — the point of the drill is to hear the chord. Its level is a **slider** (`Voice level: N%`, `CarMode.SPEECH_VOLUME_MIN`…`_MAX` = 0.1–1.0, default `CarMode.SPEECH_VOLUME` = **0.9**), not a constant: it shipped at 0.35 on "sit under the music" reasoning and was simply inaudible in a moving car, so the slider is what trades intelligibility against masking. Releasing the slider **speaks a sample** so it can be set by ear without waiting for the next chord. 1.0 is a hard ceiling on both platforms (Android `KEY_PARAM_VOLUME` and `SpeechSynthesisUtterance.volume` are each capped there) — louder than that is a device-volume problem, and the caption says so. Each label is spoken **once per exercise**, and every utterance cancels the previous one, so a fast tempo truncates rather than building a backlog that drifts behind the playhead. A device with no TTS engine simply stays silent. Android: `Speaker.kt` (owned by the Activity, shut down in `onDestroy`); web: `speech.ts` over `speechSynthesis`. Both are injected into the ear state as a `(String) -> Unit` where the **empty string means "stop talking"**, so the state layer stays Context- and DOM-free.
 
 *Default: ON, for road-testing. Flip to OFF before this ships (`TODO(car-voice)` in both state files).*
 

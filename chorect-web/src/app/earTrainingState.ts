@@ -50,10 +50,10 @@ export interface EarDeps {
   /** Snapshot of the tracked mistake counts (progressionKey → times missed) — the pool
    *  the "Drill list" challenge source draws from. */
   progressionMistakesProvider?: () => Record<string, number>;
-  /** Speaks a car-mode chord label aloud (see speech.ts); an EMPTY string means "stop
-   *  talking now". Injected rather than imported so this class stays testable and
-   *  mirrors Android, where the Activity owns the TextToSpeech engine. */
-  speak?: (text: string) => void;
+  /** Speaks a car-mode chord label aloud at a 0..1 volume (see speech.ts); an EMPTY
+   *  string means "stop talking now". Injected rather than imported so this class stays
+   *  testable and mirrors Android, where the Activity owns the TextToSpeech engine. */
+  speak?: (text: string, volume: number) => void;
 }
 
 /** Where Progression Challenge questions come from: the generator settings (normal), or
@@ -1442,6 +1442,11 @@ export class EarTrainingState {
    *  only so the feature is exercised without having to find the switch first. */
   carSpeakChords = true;
 
+  /** Level of the spoken label, 0..1. A slider rather than a constant: "under the music"
+   *  and "audible in a moving car" are not the same level, and which one you want depends
+   *  on the car. */
+  carSpeechVolume = CarMode.SPEECH_VOLUME;
+
   /** Slots already spoken in THIS exercise, so a label is voiced once as it appears and
    *  not again on every following bar. Cleared by `beginCarExercise` along with the
    *  tapped-slot peeks. */
@@ -1576,8 +1581,20 @@ export class EarTrainingState {
 
   setCarSpeakChords(v: boolean) {
     this.carSpeakChords = v;
-    if (!v) this.deps.speak?.("");
+    if (!v) this.deps.speak?.("", 0);   // empty = stop, so a label in flight is cut off
     this.notify();
+  }
+
+  /** Set the spoken-label level. */
+  setCarSpeechVolume(v: number) {
+    this.carSpeechVolume = CarMode.clampSpeechVolume(v);
+    this.notify();
+  }
+
+  /** Speak a sample label at the current level — the slider's "how loud is that?", so it
+   *  can be set by ear without waiting for the next chord to come round. */
+  previewCarSpeech() {
+    this.deps.speak?.(CarMode.speechFor(this.progResolved[0]?.romanLabel ?? "IV"), this.carSpeechVolume);
   }
 
   /** Voice slot `i`'s function, once per exercise. Called the instant the slot becomes
@@ -1590,13 +1607,13 @@ export class EarTrainingState {
     const roman = this.progResolved[i]?.romanLabel;
     if (!roman) return;
     this.carSpokenSlots.add(i);
-    this.deps.speak?.(CarMode.speechFor(roman));
+    this.deps.speak?.(CarMode.speechFor(roman), this.carSpeechVolume);
   }
 
   stopCarExercise() {
     this.stopLoop();          // bumps carToken → the driver unwinds at its next check
     this.carPhase = CarPhase.Idle;
-    this.deps.speak?.("");    // a label still in flight would name a bar nothing is playing
+    this.deps.speak?.("", 0); // a label still in flight would name a bar nothing is playing
     this.notify();
   }
 

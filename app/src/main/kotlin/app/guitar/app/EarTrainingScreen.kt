@@ -3343,12 +3343,32 @@ private fun CarModeView(state: AppState, ear: EarTrainingState) {
                     )
                     if (ear.carSpeakChords) {
                         Text(
-                            "Quietly, over the music — \"4 minor\" for iv, \"4 major\" for IV.",
+                            "Over the music — \"4 minor\" for iv, \"4 major\" for IV.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
+            }
+
+            // Level slider. Releasing it speaks a sample so it can be set by ear without
+            // waiting for the next chord to come round.
+            if (ear.carSpeakChords) {
+                Text(
+                    "Voice level: ${(ear.carSpeechVolume * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Slider(
+                    value = ear.carSpeechVolume,
+                    onValueChange = { ear.chooseCarSpeechVolume(it) },
+                    onValueChangeFinished = { ear.previewCarSpeech() },
+                    valueRange = CarMode.SPEECH_VOLUME_MIN..CarMode.SPEECH_VOLUME_MAX,
+                )
+                Text(
+                    "100% is as loud as the voice goes — past that, raise the device volume.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

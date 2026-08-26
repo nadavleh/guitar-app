@@ -399,10 +399,29 @@ export class EarTrainingUI {
     // a slot the schedule is still holding back.
     wrap.appendChild(switchRow(
       ear.carSpeakChords ? "Speak each chord as it appears" : "Chord voice off",
-      ear.carSpeakChords ? "Quietly, over the music — \"4 minor\" for iv, \"4 major\" for IV." : null,
+      ear.carSpeakChords ? "Over the music — \"4 minor\" for iv, \"4 major\" for IV." : null,
       ear.carSpeakChords,
       (v) => { ear.setCarSpeakChords(v); this.rerender(); },
     ));
+
+    // Level slider. Releasing it speaks a sample so it can be set by ear without waiting
+    // for the next chord to come round.
+    if (ear.carSpeakChords) {
+      const volLabel = labelSm(`Voice level: ${Math.round(ear.carSpeechVolume * 100)}%`);
+      const volSlider = slider(
+        CarMode.SPEECH_VOLUME_MIN * 100, CarMode.SPEECH_VOLUME_MAX * 100,
+        ear.carSpeechVolume * 100,
+        (v) => ear.setCarSpeechVolume(v / 100),
+        1,
+        (v) => { volLabel.textContent = `Voice level: ${Math.round(v)}%`; },
+      );
+      volSlider.addEventListener("change", () => ear.previewCarSpeech());
+      wrap.appendChild(el("div", { style: "margin-top:4px" }, [volLabel]));
+      wrap.appendChild(volSlider);
+      wrap.appendChild(el("div", { class: "et-muted", style: "font-size:12px" }, [
+        "100% is as loud as the voice goes — past that, raise the device volume.",
+      ]));
+    }
 
     screen.appendChild(wrap);
   }

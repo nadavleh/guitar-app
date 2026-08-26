@@ -208,6 +208,18 @@ class CarModeTest {
         }
     }
 
+    @Test fun `the spoken level defaults high and clamps into the slider range`() {
+        // 0.35 was the original "sit under the music" level and was inaudible in a moving
+        // car; the default now starts high and the slider trades intelligibility for
+        // masking. 1.0 is a hard platform ceiling on both sides.
+        assertTrue(CarMode.SPEECH_VOLUME >= 0.8f, "default voice level should be loud")
+        assertEquals(1.0f, CarMode.SPEECH_VOLUME_MAX)
+        assertTrue(CarMode.SPEECH_VOLUME in CarMode.SPEECH_VOLUME_MIN..CarMode.SPEECH_VOLUME_MAX)
+        assertEquals(CarMode.SPEECH_VOLUME_MAX, CarMode.clampSpeechVolume(4f))
+        assertEquals(CarMode.SPEECH_VOLUME_MIN, CarMode.clampSpeechVolume(-1f))
+        assertEquals(0.5f, CarMode.clampSpeechVolume(0.5f))
+    }
+
     @Test fun `an unparseable label is silent rather than gibberish`() {
         assertEquals("", CarMode.speechFor(""))
         assertEquals("", CarMode.speechFor("—"))

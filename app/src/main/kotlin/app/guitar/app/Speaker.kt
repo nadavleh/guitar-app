@@ -19,17 +19,13 @@ import java.util.Locale
  * Every utterance uses QUEUE_FLUSH, so a fast tempo cuts the previous label off
  * instead of building a backlog that drifts further behind the playhead each bar.
  *
- * The voice is an OVERDUB, not a replacement: it goes out on STREAM_MUSIC at
- * [CarMode.SPEECH_VOLUME] alongside the chord instead of ducking it, and no audio focus
- * is requested (which is what would make the looper duck).
+ * The voice is an OVERDUB, not a replacement: it goes out on STREAM_MUSIC alongside the
+ * chord instead of ducking it, and no audio focus is requested (which is what would make
+ * the looper duck). Its level is the caller's [say] argument — a user-facing slider, not
+ * a fixed constant, because "under the music" and "audible in a moving car" turned out
+ * not to be the same level.
  */
 class Speaker(context: Context) {
-    private companion object {
-        /** Quiet enough to sit under the chord it is naming. */
-        val SPEECH_PARAMS = Bundle().apply {
-            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, CarMode.SPEECH_VOLUME)
-        }
-    }
 
     /** Flipped by the init callback, which may run on another thread. */
     @Volatile private var ready = false
@@ -46,9 +42,9 @@ class Speaker(context: Context) {
     /** True when an utterance would actually be heard. */
     val available: Boolean get() = ready
 
-    /** Speak [text], cutting off whatever is still sounding. No-op when empty or when
-     *  the engine is not (yet) usable. */
-    fun say(text: String) {
+    /** Speak [text] at [volume] (0..1, clamped), cutting off whatever is still sounding.
+     *  No-op when empty or when the engine is not (yet) usable. */
+    fun say(text: String, volume: Float) {
         if (text.isEmpty() || !ready) return
         if (!languageSet) {
             languageSet = true
@@ -60,7 +56,11 @@ class Speaker(context: Context) {
                 return
             }
         }
-        runCatching { tts.speak(text, TextToSpeech.QUEUE_FLUSH, SPEECH_PARAMS, "chorect-car") }
+        // A fresh Bundle per utterance: the level can change between two chords.
+        val params = Bundle().apply {
+            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, CarMode.clampSpeechVolume(volume))
+        }
+        runCatching { tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "chorect-car") }
     }
 
     /** Stop any utterance in flight without tearing the engine down. */

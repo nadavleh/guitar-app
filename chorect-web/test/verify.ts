@@ -425,6 +425,13 @@ check("speechFor speaks every Roman the diatonic library can print",
       ...info.extendedOptions.map(([, suffix]) => info.roman + suffix)]
       .every((r) => CarMode.speechFor(r).length > 0)));
 
+check("the spoken level defaults high and clamps into the slider range",
+  CarMode.SPEECH_VOLUME >= 0.8 && CarMode.SPEECH_VOLUME_MAX === 1 &&
+  CarMode.SPEECH_VOLUME >= CarMode.SPEECH_VOLUME_MIN && CarMode.SPEECH_VOLUME <= CarMode.SPEECH_VOLUME_MAX &&
+  CarMode.clampSpeechVolume(4) === CarMode.SPEECH_VOLUME_MAX &&
+  CarMode.clampSpeechVolume(-1) === CarMode.SPEECH_VOLUME_MIN &&
+  CarMode.clampSpeechVolume(0.5) === 0.5);
+
 // --- Relative-tonic reading: a "no tonic" progression that resolves in the other key ---
 const royalRoad: Progression = { mode: TrainingMode.Major, degrees: [4, 5, 3, 6] };
 check("IV-V-iii-vi resolves in the relative minor as bVI-bVII-v-i",
