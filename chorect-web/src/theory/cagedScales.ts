@@ -1,41 +1,24 @@
-// The CAGED 5-position major-scale system for GUITAR (standard tuning), for the
-// "Scales & Triads" trainer. Mirror of theory/.../CagedScales.kt. See
+// The CAGED 5-position system for GUITAR (standard tuning), behind the
+// "Guitar practice" trainer. Mirror of theory/.../CagedScales.kt. See
 // docs/superpowers/specs/2026-07-25-caged-scales-triads-design.md.
 //
-// Each position = every major-scale tone inside a fixed fret window
-// [T+loOffset, T+hiOffset], T = the parent-major tonic's fret on the low-E
-// string (lowest octave that keeps the window on the neck). A fixed window IS
-// the "clean position, no backward reach" fingering convention.
+// Fret placement is NOT computed here any more. Every shape is read verbatim out
+// of cagedShapeTable.ts, which transcribes Nadav's hand-drawn sheet dot for dot.
+// The old fret-window generator ([T+lo, T+hi], sweep up every scale tone inside)
+// approximated those fingerings but never matched them: the real boxes reach a
+// fret back or forward on individual strings, and the pentatonic and triad shapes
+// are hand-picked rather than filtered from the scale.
 
-import { PitchClass, Interval, Tuning, FretPosition, fp, noteAt, midiPitchClass, stringCount } from "./core";
+import { PitchClass, Interval, Tuning, FretPosition, fp, noteAt, midiPitchClass } from "./core";
 import { SCALES, scalePositionsFor, Scale } from "./scales";
+import {
+  CagedBox, CagedMode, ScaleSubset, CAGED_BOXES,
+  shapeDots, patternCount, anchorFor,
+} from "./cagedShapeTable";
 
-export enum CagedBox { POS1 = "POS1", POS2 = "POS2", POS3 = "POS3", POS4 = "POS4", POS5 = "POS5" }
-
-// MAJOR windows match the standard "5 major scale patterns" diagram; MINOR uses
-// separate ROOT-ANCHORED windows (root = lowest note, no reach back below it).
-const BOX_OFFSETS_MAJ: Record<CagedBox, [number, number]> = {
-  [CagedBox.POS1]: [-1, 2],
-  [CagedBox.POS2]: [1, 5],
-  [CagedBox.POS3]: [4, 7],
-  [CagedBox.POS4]: [6, 10],
-  [CagedBox.POS5]: [8, 12],
-};
-const BOX_OFFSETS_MIN: Record<CagedBox, [number, number]> = {
-  [CagedBox.POS1]: [0, 4],
-  [CagedBox.POS2]: [2, 6],
-  [CagedBox.POS3]: [4, 8],
-  [CagedBox.POS4]: [7, 11],
-  [CagedBox.POS5]: [9, 13],
-};
-function boxOffsets(box: CagedBox, mode: CagedMode): [number, number] {
-  return mode === CagedMode.Major ? BOX_OFFSETS_MAJ[box] : BOX_OFFSETS_MIN[box];
-}
-
-export const CAGED_BOXES: CagedBox[] = [CagedBox.POS1, CagedBox.POS2, CagedBox.POS3, CagedBox.POS4, CagedBox.POS5];
-
-export enum ScaleSubset { Triad = "Triad", Pentatonic = "Pentatonic", FullScale = "FullScale" }
-export enum CagedMode { Major = "Major", Minor = "Minor" }
+// CagedBox / CagedMode / ScaleSubset live in cagedShapeTable.ts (to break an
+// import cycle) and reach consumers through theory/index.ts, which re-exports
+// both modules.
 
 export interface CagedNote {
   position: FretPosition;
@@ -43,35 +26,24 @@ export interface CagedNote {
   isRoot: boolean;
 }
 
-// Minor is the PARALLEL minor of tonic (same root, natural minor) — NOT the
-// relative minor — so the box stays in the same position; only the notes change.
-function subsetPcs(tonic: PitchClass, mode: CagedMode, subset: ScaleSubset): Set<PitchClass> {
-  const pc = (semis: number): PitchClass => (((tonic + semis) % 12) + 12) % 12;
-  const degrees = mode === CagedMode.Major
-    ? { [ScaleSubset.FullScale]: [0, 2, 4, 5, 7, 9, 11], [ScaleSubset.Pentatonic]: [0, 2, 4, 7, 9], [ScaleSubset.Triad]: [0, 4, 7] }
-    : { [ScaleSubset.FullScale]: [0, 2, 3, 5, 7, 8, 10], [ScaleSubset.Pentatonic]: [0, 3, 5, 7, 10], [ScaleSubset.Triad]: [0, 3, 7] };
-  return new Set(degrees[subset].map(pc));
+/** One step of the guided Practice run. */
+export interface DrillStep {
+  box: CagedBox;
+  mode: CagedMode;
+  subset: ScaleSubset;
+  pattern: number;
 }
 
+/** Root of the active mode: the SAME tonic for both major and parallel minor. */
 export function rootOf(tonic: PitchClass, _mode: CagedMode): PitchClass {
-  return tonic;   // same root for major and parallel minor
+  return tonic;
 }
 
-// Tonic's lowest fret on the low-E string (0..11). Boxes run up the neck from
-// there; a below-nut POS1 note is clipped at fret 0. Do NOT shift the whole set
-// up an octave — that pushes POS4/POS5 off the neck and drops notes (the neck
-// must simply be long enough — see the 22-fret default).
-function anchorFret(tonic: PitchClass, _box: CagedBox, tuning: Tuning): number {
-  const lowEpc = midiPitchClass(tuning.openStrings[0].midi);
-  return (((tonic - lowEpc) % 12) + 12) % 12;
-}
-
-export function boxWindow(tonic: PitchClass, box: CagedBox, tuning: Tuning, mode: CagedMode = CagedMode.Major): [number, number] {
-  const t = anchorFret(tonic, box, tuning);
-  const [lo, hi] = boxOffsets(box, mode);
-  return [t + lo, t + hi];
-}
-
+/**
+ * The sheet's shape for box × mode × subset × pattern, transposed to `tonic` and
+ * labelled against the active-mode root. Notes that would fall off a `numFrets`
+ * neck are dropped (anchorFor first tries to avoid that by octave).
+ */
 export function resolveBox(
   tonic: PitchClass,
   box: CagedBox,
@@ -79,59 +51,71 @@ export function resolveBox(
   subset: ScaleSubset,
   tuning: Tuning,
   numFrets = 22,
+  pattern = 1,
 ): CagedNote[] {
-  const [lo, hi] = boxWindow(tonic, box, tuning, mode);
-  const pcs = subsetPcs(tonic, mode, subset);
+  const dots = shapeDots(box, mode, subset, pattern);
+  const base = anchorFor(tonic, dots, tuning, numFrets);
   const root = rootOf(tonic, mode);
   const out: CagedNote[] = [];
-  for (let s = 0; s < stringCount(tuning); s++) {
-    for (let f = Math.max(lo, 0); f <= Math.min(hi, numFrets); f++) {
-      const pc = midiPitchClass(noteAt(tuning, fp(s, f)).midi);
-      if (pcs.has(pc)) {
-        out.push({ position: fp(s, f), interval: (((pc - root) % 12) + 12) % 12, isRoot: pc === root });
-      }
-    }
+  for (const d of dots) {
+    const f = base + d.offset;
+    if (f < 0 || f > numFrets || d.string >= tuning.openStrings.length) continue;
+    const pc = midiPitchClass(noteAt(tuning, fp(d.string, f)).midi);
+    out.push({ position: fp(d.string, f), interval: (((pc - root) % 12) + 12) % 12, isRoot: d.isRoot });
   }
+  out.sort((a, b) => a.position.stringIndex - b.position.stringIndex || a.position.fret - b.position.fret);
   return out;
 }
 
-// ---------- 7-position practice (mirrors the Fretboard "scales by position") ----------
+/** The fret span the shape actually occupies — the label under the neck. */
+export function boxWindow(
+  tonic: PitchClass,
+  box: CagedBox,
+  tuning: Tuning,
+  mode: CagedMode = CagedMode.Major,
+  subset: ScaleSubset = ScaleSubset.FullScale,
+  pattern = 1,
+  numFrets = 22,
+): [number, number] {
+  const dots = shapeDots(box, mode, subset, pattern);
+  const base = anchorFor(tonic, dots, tuning, numFrets);
+  const offs = dots.map((d) => d.offset);
+  return [base + Math.min(...offs), base + Math.max(...offs)];
+}
+
+// ---------- The guided Practice run ----------
+
+/** Chord tones first, then the whole scale, then the pentatonic. */
+const SUBSET_ORDER: ScaleSubset[] = [ScaleSubset.Triad, ScaleSubset.FullScale, ScaleSubset.Pentatonic];
+
+/**
+ * The steps drilled at one box: both qualities, the LEAD alternating by box index
+ * — Nadav's rule "if pos == 0 play major then minor; else if the last thing
+ * played was minor, play major, else minor". Where the sheet draws a second
+ * fingering (the scale of boxes 1 and 4) both patterns are drilled, pattern 1
+ * first.
+ */
+export function drillSteps(box: CagedBox): DrillStep[] {
+  const i = CAGED_BOXES.indexOf(box);
+  const lead = i % 2 === 0 ? CagedMode.Major : CagedMode.Minor;
+  const other = lead === CagedMode.Major ? CagedMode.Minor : CagedMode.Major;
+  const forMode = (mode: CagedMode): DrillStep[] => {
+    const steps: DrillStep[] = [];
+    for (const subset of SUBSET_ORDER) {
+      for (let p = 1; p <= patternCount(box, mode, subset); p++) steps.push({ box, mode, subset, pattern: p });
+    }
+    return steps;
+  };
+  return [...forMode(lead), ...forMode(other)];
+}
+
+/** The whole run: 5 boxes low to high, drillSteps at each. */
+export const PRACTICE_RUN: DrillStep[] = CAGED_BOXES.flatMap(drillSteps);
+
+// ---------- Explore tab (free scale/position browser, not part of the drill) ----------
 
 const MAJOR = SCALES.get("major")!;
 const NATURAL_MINOR = SCALES.get("natural minor")!;
-
-/** Practice regions = the fret windows of the key's MAJOR-scale positions (the
- *  same engine the Fretboard "scales by position" uses — 7 for a diatonic key),
- *  but STARTING one box lower than the root position: the first box reaches down
- *  so the major 3rd sits on the next-higher string (e.g. G major: B on the A
- *  string, fret 2). That box's scale is drilled first, then the root-anchored box,
- *  then the rest up the neck. Both major and parallel-minor drills use these windows. */
-export function practiceRegions(tonic: PitchClass, tuning: Tuning, numFrets = 22): [number, number][] {
-  const base = scalePositionsFor(tonic, MAJOR, tuning, numFrets).map((p) => [p.firstFret, p.lastFret] as [number, number]);
-  if (base.length === 0) return base;
-  const lowEpc = midiPitchClass(tuning.openStrings[0].midi);
-  const rootFret = (((tonic - lowEpc) % 12) + 12) % 12;
-  const lo = Math.max(rootFret - 1, 0);
-  const first: [number, number] = [lo, Math.min(lo + 4, numFrets)];
-  // Prepend the 3rd-reaching box; drop any existing window identical to it (dedupe).
-  return [first, ...base.filter(([a, b]) => !(a === first[0] && b === first[1]))];
-}
-
-/** The [subset] notes of [mode] (parallel: minor = natural minor of the SAME
- *  tonic) that fall inside the window [lo,hi], labelled vs the tonic. */
-export function notesInWindow(
-  tonic: PitchClass, lo: number, hi: number, mode: CagedMode, subset: ScaleSubset, tuning: Tuning, numFrets = 22,
-): CagedNote[] {
-  const pcs = subsetPcs(tonic, mode, subset);
-  const out: CagedNote[] = [];
-  for (let s = 0; s < stringCount(tuning); s++) {
-    for (let f = Math.max(lo, 0); f <= Math.min(hi, numFrets); f++) {
-      const pc = midiPitchClass(noteAt(tuning, fp(s, f)).midi);
-      if (pcs.has(pc)) out.push({ position: fp(s, f), interval: (((pc - tonic) % 12) + 12) % 12, isRoot: pc === tonic });
-    }
-  }
-  return out;
-}
 
 /** Positions of an arbitrary scale for the Explore tab's position scroller. */
 export function explorePositions(root: PitchClass, scale: Scale, tuning: Tuning, numFrets = 22) {
@@ -150,8 +134,13 @@ export interface TriadShape {
   inversion: number;                  // 0=root pos, 1=1st, 2=2nd
 }
 
+/**
+ * The 4 adjacent 3-string groups, **top group first** — guitar strings 1-2-3,
+ * then 2-3-4, 3-4-5, 4-5-6. (Indices are 0 = low E, so the lists read high→low.)
+ * This is the order Nadav drills them in.
+ */
 export const TRIAD_GROUPS: [number, number, number][] = [
-  [0, 1, 2], [1, 2, 3], [2, 3, 4], [3, 4, 5],
+  [3, 4, 5], [2, 3, 4], [1, 2, 3], [0, 1, 2],
 ];
 
 /** The 3 close-voiced inversions of a major/minor triad on each 3-string group,
@@ -195,6 +184,20 @@ export function triadInversions(
     out.push(...found);
   }
   return out;
+}
+
+/**
+ * The Triads drill, in Nadav's order: the top 3-string group's 3 inversions, then
+ * 2-3-4, 3-4-5, 4-5-6 — all **major**, then the whole run again **minor**.
+ * 24 voicings.
+ */
+export function triadRun(
+  keyTonic: PitchClass, tuning: Tuning, numFrets = 22,
+): { quality: "maj" | "min"; shape: TriadShape }[] {
+  return [
+    ...triadInversions(keyTonic, "maj", tuning, numFrets).map((shape) => ({ quality: "maj" as const, shape })),
+    ...triadInversions(keyTonic, "min", tuning, numFrets).map((shape) => ({ quality: "min" as const, shape })),
+  ];
 }
 
 /** Smallest fret on [str] whose note is a triad tone with midi strictly above [aboveMidi]. */

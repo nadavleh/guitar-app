@@ -2,6 +2,7 @@ export * from "./core";
 export * from "./tunings";
 export * from "./chords";
 export * from "./songSheet";
+export * from "./cagedShapeTable";
 export * from "./cagedScales";
 export * from "./scales";
 export * from "./overlay";

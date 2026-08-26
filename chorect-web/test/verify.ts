@@ -13,6 +13,8 @@ import {
   ProgFocus, randomProgression, hasOneSixStep, thirdSixthPrimaryPool, thirdSixthContrastPool,
   THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode,
   progressionLacksTonic, progressionRelativeTonicMode, relativeRomanLineFor, romanLineFor,
+  CAGED_SHAPES, CAGED_BOXES, CagedBox, CagedMode, ScaleSubset, patternCount, boxNumber,
+  resolveBox, boxWindow, PRACTICE_RUN, TRIAD_GROUPS, triadRun, noteAt, fp, fpKey,
 } from "../src/theory";
 import { standard } from "../src/theory/tunings";
 import {
@@ -750,6 +752,150 @@ check("degrees are invariant under transposition", (() => {
   const inD = degreeLabels(prog.map((s) => transposeSymbol(s, 2)), parseKey("D")!);
   return JSON.stringify(inC) === JSON.stringify(inD);
 })());
+
+
+// --- CAGED shape table (mirrors theory/.../CagedShapeTableTest.kt + CagedScalesTest.kt) ---
+// The 34 shapes are transcribed from Nadav's sheet; these pin them so a typo in
+// one shape string, or a one-sided edit to either twin, fails CI.
+{
+  const G = 7;
+  const pcsOf = (mode: CagedMode, subset: ScaleSubset): Set<number> => {
+    const deg = mode === CagedMode.Major
+      ? { [ScaleSubset.FullScale]: [0, 2, 4, 5, 7, 9, 11], [ScaleSubset.Pentatonic]: [0, 2, 4, 7, 9], [ScaleSubset.Triad]: [0, 4, 7] }
+      : { [ScaleSubset.FullScale]: [0, 2, 3, 5, 7, 8, 10], [ScaleSubset.Pentatonic]: [0, 3, 5, 7, 10], [ScaleSubset.Triad]: [0, 3, 7] };
+    return new Set(deg[subset].map((i) => (G + i) % 12));
+  };
+  const pcAt = (stringIndex: number, fret: number) => midiPitchClass(noteAt(standard, fp(stringIndex, fret)).midi);
+  const MODES = [CagedMode.Major, CagedMode.Minor];
+  const SUBSETS = [ScaleSubset.Triad, ScaleSubset.Pentatonic, ScaleSubset.FullScale];
+
+  check("the sheet's 34 CAGED diagrams are all present", CAGED_SHAPES.size === 34);
+  check("a 2nd fingering exists only for the scale of boxes 1 and 4", (() => {
+    for (const box of CAGED_BOXES) for (const mode of MODES) for (const subset of SUBSETS) {
+      const want = subset === ScaleSubset.FullScale && (box === CagedBox.POS1 || box === CagedBox.POS4) ? 2 : 1;
+      if (patternCount(box, mode, subset) !== want) return false;
+    }
+    return true;
+  })());
+  check("every dot of every CAGED shape is in the right scale, and roots are roots", (() => {
+    for (const [key, dots] of CAGED_SHAPES) {
+      const [, mode, subset] = key.split("|") as [string, CagedMode, ScaleSubset];
+      const allowed = pcsOf(mode, subset);
+      for (const d of dots) {
+        const pc = pcAt(d.string, 3 + d.offset);
+        if (!allowed.has(pc)) return false;
+        if (d.isRoot !== (pc === G)) return false;
+      }
+    }
+    return true;
+  })());
+  check("every CAGED shape fits a 22-fret neck in all 12 keys, dropping no notes", (() => {
+    for (let k = 0; k < 12; k++) {
+      for (const box of CAGED_BOXES) for (const mode of MODES) for (const subset of SUBSETS) {
+        for (let pat = 1; pat <= patternCount(box, mode, subset); pat++) {
+          const [lo, hi] = boxWindow(k, box, standard, mode, subset, pat);
+          if (lo < 0 || hi > 22) return false;
+          const want = CAGED_SHAPES.get(`${box}|${mode}|${subset}|${pat}`)!.length;
+          if (resolveBox(k, box, mode, subset, standard, 22, pat).length !== want) return false;
+        }
+      }
+    }
+    return true;
+  })());
+  check("the CAGED boxes ascend the neck", (() => {
+    for (const mode of MODES) for (const subset of SUBSETS) {
+      const los = CAGED_BOXES.map((b) => boxWindow(G, b, standard, mode, subset)[0]);
+      for (let i = 1; i < los.length; i++) if (los[i] < los[i - 1]) return false;
+    }
+    return true;
+  })());
+  check("the 5 boxes tile every scale tone between frets 2 and 12", (() => {
+    for (const mode of MODES) {
+      const allowed = pcsOf(mode, ScaleSubset.FullScale);
+      const union = new Set<string>();
+      for (const box of CAGED_BOXES) for (let pat = 1; pat <= patternCount(box, mode, ScaleSubset.FullScale); pat++) {
+        for (const n of resolveBox(G, box, mode, ScaleSubset.FullScale, standard, 22, pat)) union.add(fpKey(n.position));
+      }
+      for (let st = 0; st < 6; st++) for (let f = 2; f <= 12; f++) {
+        if (allowed.has(pcAt(st, f)) && !union.has(fpKey(fp(st, f)))) return false;
+      }
+    }
+    return true;
+  })());
+  // The four corrections applied to the sheet (see cagedShapeTable.ts's header).
+  check("correction 1 - minor scale box 1 pattern 1 is in G, not A minor", (() => {
+    const notes = resolveBox(G, CagedBox.POS1, CagedMode.Minor, ScaleSubset.FullScale, standard, 22, 1);
+    return notes.some((n) => n.isRoot && n.position.stringIndex === 0 && n.position.fret === 3) &&
+      !notes.some((n) => pcAt(n.position.stringIndex, n.position.fret) === 11);
+  })());
+  check("correction 2 - minor pentatonic box 1 has D on the A string, not D#", (() => {
+    const a = resolveBox(G, CagedBox.POS1, CagedMode.Minor, ScaleSubset.Pentatonic, standard)
+      .filter((n) => n.position.stringIndex === 1).map((n) => n.position.fret).sort((x, y) => x - y);
+    return JSON.stringify(a) === JSON.stringify([3, 5]);
+  })());
+  check("corrections 3 and 4 - minor box 4 is not a copy of box 3", (() => {
+    for (const subset of [ScaleSubset.Pentatonic, ScaleSubset.Triad]) {
+      const b3 = resolveBox(G, CagedBox.POS3, CagedMode.Minor, subset, standard).map((n) => n.position.fret);
+      const b4 = resolveBox(G, CagedBox.POS4, CagedMode.Minor, subset, standard).map((n) => n.position.fret);
+      if (JSON.stringify(b3) === JSON.stringify(b4)) return false;
+      if (Math.min(...b4) <= Math.min(...b3)) return false;
+    }
+    const lowE = resolveBox(G, CagedBox.POS4, CagedMode.Minor, ScaleSubset.Triad, standard)
+      .filter((n) => n.position.stringIndex === 0).map((n) => n.position.fret);
+    return JSON.stringify(lowE) === JSON.stringify([10]);
+  })());
+  check("each triad shape contains its own pentatonic shape's chord tones", (() => {
+    for (const box of CAGED_BOXES) for (const mode of MODES) {
+      const triadPcs = pcsOf(mode, ScaleSubset.Triad);
+      const triad = new Set(resolveBox(G, box, mode, ScaleSubset.Triad, standard).map((n) => fpKey(n.position)));
+      for (const n of resolveBox(G, box, mode, ScaleSubset.Pentatonic, standard)) {
+        if (triadPcs.has(pcAt(n.position.stringIndex, n.position.fret)) && !triad.has(fpKey(n.position))) return false;
+      }
+    }
+    return true;
+  })());
+
+  // --- The guided run + the triad drill ---
+  check("the guided run is one step per diagram - 34 in all, none repeated", (() => {
+    const seen = new Set(PRACTICE_RUN.map((s2) => `${s2.box}|${s2.mode}|${s2.subset}|${s2.pattern}`));
+    return PRACTICE_RUN.length === 34 && seen.size === 34 &&
+      [...seen].every((k) => CAGED_SHAPES.has(k));
+  })());
+  check("the run walks the boxes low to high, alternating the leading quality", (() => {
+    const order = [...new Set(PRACTICE_RUN.map((s2) => s2.box))];
+    if (JSON.stringify(order) !== JSON.stringify(CAGED_BOXES)) return false;
+    for (const box of CAGED_BOXES) {
+      const steps = PRACTICE_RUN.filter((s2) => s2.box === box);
+      const lead = (boxNumber(box) - 1) % 2 === 0 ? CagedMode.Major : CagedMode.Minor;
+      if (steps[0].mode !== lead) return false;
+      if (new Set(steps.map((s2) => s2.mode)).size !== 2) return false;
+      // one contiguous block per quality, chord tones first inside each
+      const leadSteps = steps.filter((s2) => s2.mode === lead);
+      if (steps.filter((s2, i) => i < leadSteps.length && s2.mode === lead).length !== leadSteps.length) return false;
+      const subs = [...new Set(leadSteps.map((s2) => s2.subset))];
+      if (JSON.stringify(subs) !== JSON.stringify([ScaleSubset.Triad, ScaleSubset.FullScale, ScaleSubset.Pentatonic])) return false;
+    }
+    const perBox = CAGED_BOXES.map((b) => PRACTICE_RUN.filter((s2) => s2.box === b).length);
+    return JSON.stringify(perBox) === JSON.stringify([8, 6, 6, 8, 6]);
+  })());
+  check("triad groups run top-down: strings 1-2-3, 2-3-4, 3-4-5, 4-5-6", () =>
+    JSON.stringify(TRIAD_GROUPS) === JSON.stringify([[3, 4, 5], [2, 3, 4], [1, 2, 3], [0, 1, 2]]));
+  check("the triad run is all 24 - 12 major then 12 minor", (() => {
+    const run = triadRun(G, standard);
+    if (run.length !== 24) return false;
+    if (!run.slice(0, 12).every((r) => r.quality === "maj")) return false;
+    if (!run.slice(12).every((r) => r.quality === "min")) return false;
+    const groups = [...new Set(run.slice(0, 12).map((r) => JSON.stringify(r.shape.strings)))];
+    return JSON.stringify(groups) === JSON.stringify(TRIAD_GROUPS.map((g) => JSON.stringify(g)));
+  })());
+  check("every triad-run voicing is a chord tone of the key", (() => {
+    for (const { quality, shape } of triadRun(G, standard)) {
+      const want = new Set([G, (G + (quality === "maj" ? 4 : 3)) % 12, (G + 7) % 12]);
+      for (let i = 0; i < 3; i++) if (!want.has(pcAt(shape.strings[i], shape.frets[i]))) return false;
+    }
+    return true;
+  })());
+}
 
 
 console.log(`\n${passed} passed, ${failed} failed`);

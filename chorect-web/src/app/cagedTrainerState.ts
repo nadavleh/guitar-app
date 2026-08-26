@@ -1,24 +1,24 @@
-// State + play loop for the guitar "Scales & Triads" CAGED trainer (web).
-// Four tabs: Practice (7-position guided run), Challenge (random unscored
-// prompts), Triads (24 triad inversions), Explore (scroll scale positions).
+// State + play loop for the guitar "Guitar practice" trainer (web).
+// Two sections, chosen from the dropdown at the top of the screen:
+//   Scales — the CAGED boxes, with tabs Practice (the guided 34-step run),
+//            Challenge (random unscored prompts) and Explore (position browser).
+//   Triads — the 24 close-voiced triad inversions, top string group first.
 // Mirrored on Android (CagedTrainerState.kt). Standard tuning, guitar only.
 // Spec: docs/superpowers/specs/2026-07-25-*.
 
 import {
   PitchClass, fpKey, noteAt, standard,
   CagedBox, CAGED_BOXES, CagedMode, ScaleSubset, CagedNote,
-  triadInversions, TriadShape, practiceRegions, notesInWindow,
+  triadRun, TriadShape, resolveBox, boxWindow, DrillStep, PRACTICE_RUN, patternCount,
   explorePositions, EXPLORE_MAJOR, EXPLORE_MINOR, EXPLORE_PENTATONIC,
   ScalePosition,
 } from "../theory";
 import { WebAudioEngine } from "../audio";
 
-export type TrainerTab = "practice" | "challenge" | "triads" | "explore";
+export type TrainerSection = "scales" | "triads";
+export type TrainerTab = "practice" | "challenge" | "explore";
 export type ExploreScale = "major" | "minor" | "pentatonic";
 
-export interface DrillStep { mode: CagedMode; subset: ScaleSubset; }
-
-const SUBSET_ORDER: ScaleSubset[] = [ScaleSubset.Triad, ScaleSubset.FullScale, ScaleSubset.Pentatonic];
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export interface ChallengePrompt {
@@ -26,16 +26,18 @@ export interface ChallengePrompt {
   box: CagedBox;
   mode: CagedMode;
   subset: ScaleSubset;
+  pattern: number;
 }
 
 export class CagedTrainerState {
+  section: TrainerSection = "scales";
   tab: TrainerTab = "practice";
   key: PitchClass = 7;          // G
   bpm = 80;
   audioDemo = true;             // Practice: play notes vs metronome-only
   reveal = false;               // Challenge: overlay the scale on the neck
   isPlaying = false;
-  stepIndex = 0;                // Practice: 0..29 (5 boxes × 6 drill steps)
+  stepIndex = 0;                // Practice: 0..33, one per diagram on the sheet
   challenge: ChallengePrompt | null = null;
   /** fpKey of the note currently sounding in a Practice sweep (or null). */
   activeKey: string | null = null;
@@ -52,44 +54,36 @@ export class CagedTrainerState {
 
   private notify() { this.onChange(); }
 
-  // ---- Practice derivations (over the 7 major-scale POSITIONS, like Fretboard mode) ----
-  /** Fret windows of the key's positions (7 for a diatonic key), low→high. */
-  regions(): [number, number][] {
-    const r = practiceRegions(this.key, this.tuning);
-    return r.length ? r : [[0, 4]];
-  }
-  get regionCount(): number { return this.regions().length; }
-  get stepCount(): number { return this.regionCount * 6; }
-  get boxIndex(): number { return Math.min(Math.floor(this.stepIndex / 6), this.regionCount - 1); }
-  get drillIndex(): number { return this.stepIndex % 6; }
+  // ---- Practice derivations (the 5 CAGED boxes, shapes straight off the sheet) ----
 
-  /** The 6 drill steps for the current position: [triad,scale,pent] of the
-   *  leading mode then the other; the leading mode alternates each position. */
-  drillSteps(boxIndex: number): DrillStep[] {
-    const lead = boxIndex % 2 === 0 ? CagedMode.Major : CagedMode.Minor;
-    const other = lead === CagedMode.Major ? CagedMode.Minor : CagedMode.Major;
-    return [
-      ...SUBSET_ORDER.map((s) => ({ mode: lead, subset: s })),
-      ...SUBSET_ORDER.map((s) => ({ mode: other, subset: s })),
-    ];
-  }
-
-  get step(): DrillStep { return this.drillSteps(this.boxIndex)[this.drillIndex]; }
+  /** The guided run — 34 steps, one per diagram on the sheet. */
+  get run(): DrillStep[] { return PRACTICE_RUN; }
+  get stepCount(): number { return this.run.length; }
+  get step(): DrillStep { return this.run[Math.min(Math.max(this.stepIndex, 0), this.stepCount - 1)]; }
+  get box(): CagedBox { return this.step.box; }
+  /** 0-based index of the current box, for the "Box 3 of 5" readout. */
+  get boxIndex(): number { return CAGED_BOXES.indexOf(this.step.box); }
+  /** Position of the current step within its own box, and that box's length. */
+  get drillIndex(): number { return this.stepIndex - this.run.findIndex((s) => s.box === this.step.box); }
+  get drillCount(): number { return this.run.filter((s) => s.box === this.step.box).length; }
 
   practiceNotes(): CagedNote[] {
     const st = this.step;
-    const [lo, hi] = this.regions()[this.boxIndex] ?? [0, 4];
-    return notesInWindow(this.key, lo, hi, st.mode, st.subset, this.tuning);
+    return resolveBox(this.key, st.box, st.mode, st.subset, this.tuning, 22, st.pattern);
+  }
+
+  /** The fret span the current shape occupies, for the label under the neck. */
+  practiceWindow(): [number, number] {
+    const st = this.step;
+    return boxWindow(this.key, st.box, this.tuning, st.mode, st.subset, st.pattern);
   }
 
   triadSequence(): { quality: "maj" | "min"; shape: TriadShape }[] {
-    return [
-      ...triadInversions(this.key, "maj", this.tuning).map((shape) => ({ quality: "maj" as const, shape })),
-      ...triadInversions(this.key, "min", this.tuning).map((shape) => ({ quality: "min" as const, shape })),
-    ];
+    return triadRun(this.key, this.tuning);
   }
 
   // ---- Setters ----
+  setSection(sec: TrainerSection) { if (sec === this.section) return; this.stop(); this.section = sec; this.notify(); }
   setTab(t: TrainerTab) { if (t === this.tab) return; this.stop(); this.tab = t; this.notify(); }
   setKey(pc: PitchClass) { this.key = (((pc % 12) + 12) % 12) as PitchClass; this.resetPlayback(); this.notify(); }
   randomKey() { this.setKey(Math.floor(Math.random() * 12) as PitchClass); }
@@ -98,14 +92,21 @@ export class CagedTrainerState {
   toggleReveal() { this.reveal = !this.reveal; this.notify(); }
   setStep(i: number) { this.stepIndex = Math.min(Math.max(i, 0), this.stepCount - 1); this.resetPlayback(); this.notify(); }
   nudgeStep(d: number) { this.setStep(this.stepIndex + d); }
+  /** Jump to the first step of a box (the box scroller). */
+  jumpToBox(box: CagedBox) {
+    const i = this.run.findIndex((s) => s.box === box);
+    if (i >= 0) this.setStep(i);
+  }
 
   nextChallenge() {
     const boxes = CAGED_BOXES;
+    const box = boxes[Math.floor(Math.random() * boxes.length)];
+    const mode = Math.random() < 0.5 ? CagedMode.Major : CagedMode.Minor;
+    const subset = Math.random() < 0.5 ? ScaleSubset.FullScale : ScaleSubset.Pentatonic;
     this.challenge = {
       key: Math.floor(Math.random() * 12) as PitchClass,
-      box: boxes[Math.floor(Math.random() * boxes.length)],
-      mode: Math.random() < 0.5 ? CagedMode.Major : CagedMode.Minor,
-      subset: Math.random() < 0.5 ? ScaleSubset.FullScale : ScaleSubset.Pentatonic,
+      box, mode, subset,
+      pattern: Math.floor(Math.random() * patternCount(box, mode, subset)) + 1,
     };
     this.reveal = false;
     this.notify();
@@ -161,7 +162,7 @@ export class CagedTrainerState {
     void (async () => {
       while (this.isPlaying && myToken === this.token) {
         const beat = 60000 / Math.max(this.bpm, 20);
-        if (this.tab === "triads") {
+        if (this.section === "triads") {
           const seq = this.triadSequence();
           for (let i = 0; i < seq.length; i++) {
             if (!this.isPlaying || myToken !== this.token) return;
@@ -172,9 +173,11 @@ export class CagedTrainerState {
             this.notify();
             await sleep(beat);
           }
+          if (this.isPlaying && myToken === this.token) { this.stop(); return; }
         } else if (this.tab === "practice") {
-          // Play the CURRENT drill (up + down once), then advance to the next drill
-          // step — arp → scale → pentatonic across every box — and stop after the last.
+          // Play the CURRENT drill (up + down once), then advance to the next step
+          // — triad → scale → pentatonic of the leading mode, then the other mode,
+          // across every box — and stop after the last.
           if (this.audioDemo) {
             const notes = this.practiceNotes().slice().sort((a, b) =>
               noteAt(this.tuning, a.position).midi - noteAt(this.tuning, b.position).midi);

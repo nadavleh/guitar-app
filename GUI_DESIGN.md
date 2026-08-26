@@ -218,7 +218,7 @@ Draggable bottom sheet opened from the rail. Sections, top to bottom:
 
 ### 3.6 Full-screen tool routes
 
-Loop, Tuner, Ear, and Drums replace the content area (right of the rail) rather than opening as sheets; each has its own Back/Watch control. See §4.2.
+Loop, Tuner, Ear, Drums, Songs and Guitar practice replace the content area (right of the rail) rather than opening as sheets; each has its own Back/Watch control. See §4.2.
 
 ---
 
@@ -257,6 +257,8 @@ When Loop / Tuner / Ear / Drums is active, the content column to the right of th
 - **Tuner** — see §9.
 - **Ear training** — see §10.
 - **Drums** — see §11.
+- **Songs** — see §12.
+- **Guitar practice** (guitar only) — see §13.
 
 ---
 
@@ -538,5 +540,57 @@ chord swallow the next.
 
 **Deliberately absent**: playback, chord shapes, and fretboard positions. The screen
 shows, transposes, and relabels — nothing sounds.
+
+---
+
+## 13. Guitar practice screen (`ScalesTriadsScreen.kt` / `cagedTrainerUI.ts`)
+
+A guitar-only full-screen route. The header carries the title **Guitar practice**
+and, on the right, a **section dropdown** — the top-level split. Sections are
+`Scales` and `Triads`; a section owns the whole body below the shared key/tempo
+row, and only `Scales` brings a tab row of its own. The dropdown, not a tab, is
+the split because sections are expected to keep arriving; tab rows do not survive
+being widened indefinitely on a phone.
+
+Everything below the dropdown is shared by both sections: the **Key** row
+(`−` / `+` / `🎲 Random`), the **Tempo** slider, and — at the bottom — one
+`FretboardView` (22 frets) that every section paints into. There is never a
+second neck on the screen.
+
+### 13.1 Scales
+
+Tabs: **Guided run · Challenge · Explore**. (The tab is named *Guided run*, not
+*Practice*, so it does not collide with the screen's own name in the nav bar.)
+
+- **Guided run** — walks the 34 diagrams of Nadav's CAGED sheet
+  (`docs/caged-shapes-source.md`) in order. Transport is `Play ▶` / `Stop ■` plus
+  a `◀ n/34 ▶` stepper. Two lines of readout: a bold
+  `Box 3/5 (C shape) · Major scale` and, muted beneath it,
+  `Frets 7–10 · step 2 of 6 in this box`. Under those sits a row of five box
+  buttons (`1 2 3 4 5`) that jump straight to a box's first step — the current
+  box is filled, the rest outlined. The `pattern 1` / `pattern 2` suffix appears
+  **only** on boxes 1 and 4, the only ones the sheet draws twice; showing
+  `pattern 1` everywhere would imply a second fingering that does not exist.
+  A switch toggles *Audio demo* (sweep the notes) against metronome-only.
+- **Challenge** — `Next` and `Reveal on neck`, then a card naming the key,
+  quality, subset and `Box 4 (A shape) — root on string 5 (A)`. The neck stays
+  empty until Reveal.
+- **Explore** — Major / Minor / Pentatonic chips and a `◀ n/m ▶` position
+  scroller over the generic scale-position engine. This tab is a browser, not a
+  drill: `Play` does nothing here, and the space bar is inert.
+
+Roots are ringed on the neck; every other note carries its interval name.
+
+### 13.2 Triads
+
+No tab row — a single drill. `Play ▶` / `Stop ■` and a `◀ n/24 ▶` stepper over
+the 24 close-voiced inversions, in the order Nadav drills them: the three
+inversions on **strings 1-2-3**, then 2-3-4, 3-4-5, 4-5-6 — all major, then the
+whole run again minor. The bold line reads `G · strings 2-3-4 · 1st inversion`.
+The neck shows the three sounding notes as chord marks (not scale marks), so the
+Triads section reads visually different from Scales at a glance.
+
+The space bar maps to `Play/Stop` in both sections, except on Explore where it is
+inert and on Challenge where it means `Next`.
 
 ---

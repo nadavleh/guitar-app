@@ -9,6 +9,8 @@ import app.guitar.theory.CagedBox
 import app.guitar.theory.CagedMode
 import app.guitar.theory.CagedNote
 import app.guitar.theory.CagedScales
+import app.guitar.theory.CagedShapeTable
+import app.guitar.theory.DrillStep
 import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
 import app.guitar.theory.PitchClass
@@ -24,16 +26,25 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 /**
- * State + play loop for the guitar "Scales & Triads" CAGED trainer (Android).
- * Mirror of chorect-web/src/app/cagedTrainerState.ts. Three tabs: Practice
- * (guided box/drill run), Challenge (random unscored prompts), Triads (24 triad
- * inversions). Standard tuning, guitar only.
+ * State + play loop for the guitar "Guitar practice" trainer (Android).
+ * Mirror of chorect-web/src/app/cagedTrainerState.ts.
+ *
+ * Two sections, chosen from the dropdown at the top of the screen:
+ *  - **Scales** — the CAGED boxes, with tabs Practice (the guided 34-step run),
+ *    Challenge (random unscored prompts) and Explore (free position browser).
+ *  - **Triads** — the 24 close-voiced triad inversions, top string group first.
  */
-enum class TrainerTab { Practice, Challenge, Triads, Explore }
+enum class TrainerSection { Scales, Triads }
+enum class TrainerTab { Practice, Challenge, Explore }
 enum class ExploreScale { Major, Minor, Pentatonic }
 
-data class DrillStep(val mode: CagedMode, val subset: ScaleSubset)
-data class ChallengePrompt(val key: PitchClass, val box: CagedBox, val mode: CagedMode, val subset: ScaleSubset)
+data class ChallengePrompt(
+    val key: PitchClass,
+    val box: CagedBox,
+    val mode: CagedMode,
+    val subset: ScaleSubset,
+    val pattern: Int,
+)
 
 @Stable
 class CagedTrainerState(
@@ -42,6 +53,7 @@ class CagedTrainerState(
 ) {
     val tuning = Tunings.standard
 
+    var section by mutableStateOf(TrainerSection.Scales); private set
     var tab by mutableStateOf(TrainerTab.Practice); private set
     var key by mutableStateOf(PitchClass.G); private set
     var bpm by mutableStateOf(80); private set
@@ -60,38 +72,29 @@ class CagedTrainerState(
 
     private var job: Job? = null
 
-    private val subsetOrder = listOf(ScaleSubset.Triad, ScaleSubset.FullScale, ScaleSubset.Pentatonic)
+    // ---- Practice derivations (the 5 CAGED boxes, shapes straight off the sheet) ----
 
-    // ---- Practice derivations (over the 7 major-scale POSITIONS, like Fretboard mode) ----
-    /** Fret windows of the key's positions (7 for a diatonic key), low→high. */
-    fun regions(): List<IntRange> {
-        val r = CagedScales.practiceRegions(key, tuning)
-        return r.ifEmpty { listOf(0..4) }
-    }
-    val regionCount: Int get() = regions().size
-    val stepCount: Int get() = regionCount * 6
-    val boxIndex: Int get() = minOf(stepIndex / 6, regionCount - 1)
-    val drillIndex: Int get() = stepIndex % 6
+    /** The guided run — 34 steps, one per diagram on the sheet. */
+    val run: List<DrillStep> get() = CagedScales.PRACTICE_RUN
+    val stepCount: Int get() = run.size
+    val step: DrillStep get() = run[stepIndex.coerceIn(0, stepCount - 1)]
+    val box: CagedBox get() = step.box
+    /** 0-based index of the current box, for the "Box 3 of 5" readout. */
+    val boxIndex: Int get() = step.box.ordinal
+    /** Position of the current step within its own box, and that box's length. */
+    val drillIndex: Int get() = stepIndex - run.indexOfFirst { it.box == step.box }
+    val drillCount: Int get() = run.count { it.box == step.box }
 
-    /** 6 drill steps: [triad,scale,pentatonic] of the leading mode then the other;
-     *  the leading mode alternates each position. */
-    fun drillSteps(boxIndex: Int): List<DrillStep> {
-        val lead = if (boxIndex % 2 == 0) CagedMode.Major else CagedMode.Minor
-        val other = if (lead == CagedMode.Major) CagedMode.Minor else CagedMode.Major
-        return subsetOrder.map { DrillStep(lead, it) } + subsetOrder.map { DrillStep(other, it) }
-    }
+    fun practiceNotes(): List<CagedNote> =
+        CagedScales.resolve(key, step.box, step.mode, step.subset, tuning, pattern = step.pattern)
 
-    val step: DrillStep get() = drillSteps(boxIndex)[drillIndex]
+    /** The fret span the current shape occupies, for the label under the neck. */
+    fun practiceWindow(): IntRange =
+        CagedScales.window(key, step.box, tuning, step.mode, step.subset, step.pattern)
 
-    fun practiceNotes(): List<CagedNote> {
-        val w = regions()[boxIndex]
-        return CagedScales.notesInWindow(key, w.first, w.last, step.mode, step.subset, tuning)
-    }
+    fun triadSequence(): List<Pair<String, TriadShape>> = CagedScales.triadRun(key, tuning)
 
-    fun triadSequence(): List<Pair<String, TriadShape>> =
-        CagedScales.triadInversions(key, "maj", tuning).map { "maj" to it } +
-            CagedScales.triadInversions(key, "min", tuning).map { "min" to it }
-
+    fun selectSection(s: TrainerSection) { if (s == section) return; stop(); section = s }
     fun selectTab(t: TrainerTab) { if (t == tab) return; stop(); tab = t }
     fun chooseKey(pc: PitchClass) { key = PitchClass.of(pc.value); resetPlayback() }
     fun randomKey() { chooseKey(PitchClass.of(Random.nextInt(12))) }
@@ -100,13 +103,22 @@ class CagedTrainerState(
     fun toggleReveal() { reveal = !reveal }
     fun setStep(i: Int) { stepIndex = i.coerceIn(0, stepCount - 1); resetPlayback() }
     fun nudgeStep(d: Int) = setStep(stepIndex + d)
+    /** Jump to the first step of a box (the box scroller). */
+    fun jumpToBox(box: CagedBox) {
+        val i = run.indexOfFirst { it.box == box }
+        if (i >= 0) setStep(i)
+    }
 
     fun nextChallenge() {
+        val box = CagedBox.entries[Random.nextInt(CagedBox.entries.size)]
+        val mode = if (Random.nextBoolean()) CagedMode.Major else CagedMode.Minor
+        val subset = if (Random.nextBoolean()) ScaleSubset.FullScale else ScaleSubset.Pentatonic
         challenge = ChallengePrompt(
             key = PitchClass.of(Random.nextInt(12)),
-            box = CagedBox.entries[Random.nextInt(CagedBox.entries.size)],
-            mode = if (Random.nextBoolean()) CagedMode.Major else CagedMode.Minor,
-            subset = if (Random.nextBoolean()) ScaleSubset.FullScale else ScaleSubset.Pentatonic,
+            box = box,
+            mode = mode,
+            subset = subset,
+            pattern = Random.nextInt(CagedShapeTable.patternCount(box, mode, subset)) + 1,
         )
         reveal = false
     }
@@ -158,19 +170,22 @@ class CagedTrainerState(
         job = scope.launch {
             while (isPlaying) {
                 val beat = (60_000L / bpm.coerceAtLeast(20))
-                when (tab) {
-                    TrainerTab.Triads -> {
-                        val seq = triadSequence()
-                        for (i in seq.indices) {
-                            if (!isPlaying) break
-                            activeTriad = i
-                            pluckTriad(seq[i].second)
-                            delay(beat)
-                        }
+                if (section == TrainerSection.Triads) {
+                    val seq = triadSequence()
+                    for (i in seq.indices) {
+                        if (!isPlaying) break
+                        activeTriad = i
+                        pluckTriad(seq[i].second)
+                        delay(beat)
                     }
+                    if (isPlaying) { stop(); break }
+                    continue
+                }
+                when (tab) {
                     TrainerTab.Practice -> {
                         // Play the current drill (up+down once), then advance to the next
-                        // drill step — arp → scale → pentatonic across every box — stop after the last.
+                        // step — triad → scale → pentatonic of the leading mode, then the
+                        // other mode, across every box — and stop after the last.
                         if (audioDemo) {
                             val notes = practiceNotes().sortedBy { Fretboard.noteAt(tuning, it.position).midi.value }
                             val sweep = notes + notes.dropLast(1).reversed()

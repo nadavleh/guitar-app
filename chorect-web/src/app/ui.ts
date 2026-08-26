@@ -71,7 +71,7 @@ const TAB_ICON: Record<TabDestName, IconName> = {
   Neck: "neck", Ear: "ear", Rhythm: "rhythm", Loop: "loop", Tuner: "tuner", Decompose: "decompose", CavaqProgressions: "note", RhythmUnits: "rhythmNotes", Metronome: "timer", ScalesTriads: "neck", Theory: "book", Songs: "note",
 };
 const TAB_LABEL: Record<TabDestName, string> = {
-  Neck: "Fretboard", Ear: "Ear", Rhythm: "DrumLoop", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose", CavaqProgressions: "Progressions", RhythmUnits: "Rhythm", Metronome: "Metronome", ScalesTriads: "Scales", Theory: "Theory", Songs: "Songs",
+  Neck: "Fretboard", Ear: "Ear", Rhythm: "DrumLoop", Loop: "Loop", Tuner: "Tuner", Decompose: "Decompose", CavaqProgressions: "Progressions", RhythmUnits: "Rhythm", Metronome: "Metronome", ScalesTriads: "Practice", Theory: "Theory", Songs: "Songs",
 };
 /** One-line description shown under each destination's title in the More sheet. */
 const TAB_SUBTITLE: Record<TabDestName, string> = {
@@ -84,7 +84,7 @@ const TAB_SUBTITLE: Record<TabDestName, string> = {
   CavaqProgressions: "Cavaquinho functional sequences — looper + neck",
   RhythmUnits: "Learn & train basic rhythmic units",
   Metronome: "Click track with selectable time signatures",
-  ScalesTriads: "Guitar CAGED scales & triad practice",
+  ScalesTriads: "Guitar practice - CAGED scale boxes & triad inversions",
   Theory: "Interval song references & reference sheets — expanding",
   Songs: "Your chord sheets — view, transpose, show degrees",
 };
@@ -490,7 +490,7 @@ export class App {
         else if (sheet === Sheet.CavaqProgressions) { e.preventDefault(); this.cavaq.toggle(); }
         else if (sheet === Sheet.RhythmUnits) { e.preventDefault(); this.rhythmUnits.toggle(); }
         else if (sheet === Sheet.Metronome) { e.preventDefault(); this.metronome.toggle(); }
-        else if (sheet === Sheet.ScalesTriads) { e.preventDefault(); if (this.caged.tab === "challenge") this.caged.nextChallenge(); else if (this.caged.tab !== "explore") this.caged.toggle(); }
+        else if (sheet === Sheet.ScalesTriads) { e.preventDefault(); if (this.caged.section === "scales" && this.caged.tab === "challenge") this.caged.nextChallenge(); else if (this.caged.section === "triads" || this.caged.tab !== "explore") this.caged.toggle(); }
         return;
       }
 
@@ -1645,7 +1645,7 @@ export class App {
       case Sheet.CavaqProgressions: return "Progressions";
       case Sheet.RhythmUnits: return "Rhythm";
       case Sheet.Metronome: return "Metronome";
-      case Sheet.ScalesTriads: return "Scales & Triads";
+      case Sheet.ScalesTriads: return "Guitar practice";
       case Sheet.Theory: return "Theory";
       case Sheet.Songs: return "Songs";
     }

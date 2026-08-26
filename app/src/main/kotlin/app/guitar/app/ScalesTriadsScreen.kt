@@ -14,7 +14,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -23,10 +24,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.guitar.theory.CagedBox
 import app.guitar.theory.CagedMode
 import app.guitar.theory.CagedScales
 import app.guitar.theory.Fretboard
@@ -37,6 +42,15 @@ import app.guitar.theory.ScaleSubset
 
 private const val TRAINER_FRETS = 22
 private val STRING_NAMES = listOf("6 (low E)", "5 (A)", "4 (D)", "3 (G)", "2 (B)", "1 (high E)")
+
+/** How the Triads drill names each 3-string group, in the drill's own order. */
+private val TRIAD_GROUP_NAMES = listOf("strings 1-2-3", "strings 2-3-4", "strings 3-4-5", "strings 4-5-6")
+private val INVERSION_NAMES = listOf("root position", "1st inversion", "2nd inversion")
+
+private fun sectionLabel(s: TrainerSection) = when (s) {
+    TrainerSection.Scales -> "Scales"
+    TrainerSection.Triads -> "Triads"
+}
 
 @Composable
 fun ScalesTriadsScreen(state: AppState, onBack: () -> Unit) {
@@ -50,14 +64,21 @@ fun ScalesTriadsScreen(state: AppState, onBack: () -> Unit) {
             .padding(12.dp)
             .verticalScroll(rememberScrollState()),
     ) {
-        Text("Scales & Triads", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        // Title + section dropdown. The dropdown is the top-level split; each
+        // section brings its own tab row (or none).
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Guitar practice", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            SectionDropdown(t)
+        }
 
-        // Tabs
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TabButton("Practice", t.tab == TrainerTab.Practice) { t.selectTab(TrainerTab.Practice) }
-            TabButton("Challenge", t.tab == TrainerTab.Challenge) { t.selectTab(TrainerTab.Challenge) }
-            TabButton("Triads", t.tab == TrainerTab.Triads) { t.selectTab(TrainerTab.Triads) }
-            TabButton("Explore", t.tab == TrainerTab.Explore) { t.selectTab(TrainerTab.Explore) }
+        // Tabs (Scales only — the Triads drill is a single view)
+        if (t.section == TrainerSection.Scales) {
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TabButton("Guided run", t.tab == TrainerTab.Practice) { t.selectTab(TrainerTab.Practice) }
+                TabButton("Challenge", t.tab == TrainerTab.Challenge) { t.selectTab(TrainerTab.Challenge) }
+                TabButton("Explore", t.tab == TrainerTab.Explore) { t.selectTab(TrainerTab.Explore) }
+            }
         }
 
         // Key + tempo (shared)
@@ -72,10 +93,10 @@ fun ScalesTriadsScreen(state: AppState, onBack: () -> Unit) {
         Text("Tempo: ${t.bpm} BPM", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
         Slider(value = t.bpm.toFloat(), onValueChange = { t.changeBpm(it.toInt()) }, valueRange = 30f..200f)
 
-        when (t.tab) {
+        if (t.section == TrainerSection.Triads) TriadControls(t)
+        else when (t.tab) {
             TrainerTab.Practice -> PracticeControls(t)
             TrainerTab.Challenge -> ChallengeControls(t)
-            TrainerTab.Triads -> TriadControls(t)
             TrainerTab.Explore -> ExploreControls(t)
         }
 
@@ -85,13 +106,29 @@ fun ScalesTriadsScreen(state: AppState, onBack: () -> Unit) {
             FretboardView(
                 tuning = t.tuning,
                 marks = marks,
-                selectedPosition = if (t.tab == TrainerTab.Practice) t.activeNote else null,
+                selectedPosition = if (t.section == TrainerSection.Scales && t.tab == TrainerTab.Practice) t.activeNote else null,
                 onTap = { pos -> state.audio.playNote(Fretboard.noteAt(t.tuning, pos).midi.value, durationMillis = state.ringSustainMs) },
                 numFrets = TRAINER_FRETS,
                 leftHanded = state.leftHanded,
             )
         }
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun SectionDropdown(t: CagedTrainerState) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { open = true }) { Text("${sectionLabel(t.section)} ▾") }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            for (s in TrainerSection.entries) {
+                DropdownMenuItem(
+                    text = { Text(sectionLabel(s)) },
+                    onClick = { t.selectSection(s); open = false },
+                )
+            }
+        }
     }
 }
 
@@ -112,17 +149,36 @@ private fun PracticeControls(t: CagedTrainerState) {
         Spacer(Modifier.width(6.dp))
         OutlinedButton(onClick = { t.nudgeStep(1) }, enabled = t.stepIndex < t.stepCount - 1) { Text("▶") }
     }
-    val modeName = if (t.step.mode == CagedMode.Major) "Major" else "Minor"
-    val subName = when (t.step.subset) {
+    val step = t.step
+    val modeName = if (step.mode == CagedMode.Major) "Major" else "Minor"
+    val subName = when (step.subset) {
         ScaleSubset.Triad -> "triad"; ScaleSubset.FullScale -> "scale"; ScaleSubset.Pentatonic -> "pentatonic"
     }
-    Text("Position ${t.boxIndex + 1}/${t.regionCount} · $modeName $subName", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+    val patName = if (hasTwoPatterns(step.box, step.mode, step.subset)) " pattern ${step.pattern}" else ""
+    val w = t.practiceWindow()
+    Text(
+        "Box ${step.box.number}/5 (${step.box.cagedShape} shape) · $modeName $subName$patName",
+        fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp),
+    )
+    Text(
+        "Frets ${maxOf(w.first, 0)}–${w.last} · step ${t.drillIndex + 1} of ${t.drillCount} in this box",
+        style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 2.dp),
+    )
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for (b in CagedBox.entries) {
+            TabButton("${b.number}", b == step.box) { t.jumpToBox(b) }
+        }
+    }
     Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Switch(checked = t.audioDemo, onCheckedChange = { t.toggleAudioDemo() })
         Spacer(Modifier.width(8.dp))
         Text("Audio demo (play the notes) — off = metronome only")
     }
 }
+
+/** True when the sheet draws two fingerings for this diagram (scale of boxes 1 and 4). */
+private fun hasTwoPatterns(box: CagedBox, mode: CagedMode, subset: ScaleSubset): Boolean =
+    app.guitar.theory.CagedShapeTable.patternCount(box, mode, subset) > 1
 
 @Composable
 private fun ChallengeControls(t: CagedTrainerState) {
@@ -143,7 +199,7 @@ private fun ChallengeControls(t: CagedTrainerState) {
                 style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
             )
             Text(if (c.subset == ScaleSubset.Pentatonic) "Pentatonic" else "Diatonic (full scale)")
-            Text("Box ${c.box.ordinal + 1} — root on string $rootStr")
+            Text("Box ${c.box.number} (${c.box.cagedShape} shape) — root on string $rootStr")
         }
     }
 }
@@ -162,13 +218,14 @@ private fun TriadControls(t: CagedTrainerState) {
         OutlinedButton(onClick = { t.nudgeTriad(1) }) { Text("▶") }
     }
     val cur = seq.getOrNull(idx)
-    val groups = listOf("strings 6-5-4", "strings 5-4-3", "strings 4-3-2", "strings 3-2-1")
-    val invs = listOf("root position", "1st inversion", "2nd inversion")
     val label = if (cur != null)
-        "${NoteSpeller.spell(t.key)}${if (cur.first == "min") "m" else ""} · ${groups[(idx % 12) / 3]} · ${invs[cur.second.inversion]}"
-    else "All major triads then all minor — 4 groups × 3 inversions."
+        "${NoteSpeller.spell(t.key)}${if (cur.first == "min") "m" else ""} · ${TRIAD_GROUP_NAMES[(idx % 12) / 3]} · ${INVERSION_NAMES[cur.second.inversion]}"
+    else "All 3 inversions on strings 1-2-3, then 2-3-4, 3-4-5, 4-5-6 — major, then the same again minor."
     Text(label, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-    Text("◀ ▶ to step all 24; Play runs them one per beat.", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 2.dp))
+    Text(
+        "◀ ▶ to step all ${seq.size}; Play runs them one per beat.",
+        style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 2.dp),
+    )
 }
 
 @Composable
@@ -193,14 +250,27 @@ private fun ExploreControls(t: CagedTrainerState) {
     )
 }
 
-/** Marks for the current tab. */
+/** Marks for the current section/tab. */
 private fun trainerMarks(state: AppState): Map<FretPosition, FretMark> {
     val t = state.cagedTrainer
+    if (t.section == TrainerSection.Triads) {
+        val seq = t.triadSequence()
+        val cur = seq.getOrNull(if (t.activeTriad >= 0) t.activeTriad else 0) ?: return emptyMap()
+        val root = t.key.value
+        val out = HashMap<FretPosition, FretMark>()
+        cur.second.strings.forEachIndexed { k, s ->
+            val pos = FretPosition(s, cur.second.frets[k])
+            val pc = Fretboard.noteAt(t.tuning, pos).pitchClass
+            out[pos] = FretMark(intervalName(Interval(((pc.value - root) % 12 + 12) % 12)), pc.value == root, MarkKind.Chord)
+        }
+        return out
+    }
     return when (t.tab) {
         TrainerTab.Practice -> notesToMarks(t.practiceNotes())
         TrainerTab.Challenge -> {
             val c = t.challenge
-            if (c != null && t.reveal) notesToMarks(CagedScales.resolve(c.key, c.box, c.mode, c.subset, t.tuning))
+            if (c != null && t.reveal)
+                notesToMarks(CagedScales.resolve(c.key, c.box, c.mode, c.subset, t.tuning, pattern = c.pattern))
             else emptyMap()
         }
         TrainerTab.Explore -> {
@@ -210,18 +280,6 @@ private fun trainerMarks(state: AppState): Map<FretPosition, FretMark> {
             for (p in pos.positions) {
                 val pc = Fretboard.noteAt(t.tuning, p).pitchClass
                 out[p] = FretMark(intervalName(Interval(((pc.value - root) % 12 + 12) % 12)), pc.value == root, MarkKind.Scale)
-            }
-            out
-        }
-        TrainerTab.Triads -> {
-            val seq = t.triadSequence()
-            val cur = seq.getOrNull(if (t.activeTriad >= 0) t.activeTriad else 0) ?: return emptyMap()
-            val root = t.key.value
-            val out = HashMap<FretPosition, FretMark>()
-            cur.second.strings.forEachIndexed { k, s ->
-                val pos = FretPosition(s, cur.second.frets[k])
-                val pc = Fretboard.noteAt(t.tuning, pos).pitchClass
-                out[pos] = FretMark(intervalName(Interval(((pc.value - root) % 12 + 12) % 12)), pc.value == root, MarkKind.Chord)
             }
             out
         }
@@ -235,7 +293,7 @@ private fun notesToMarks(notes: List<app.guitar.theory.CagedNote>): Map<FretPosi
 }
 
 /** Guitar string number of the lowest string carrying the mode root in this box. */
-private fun primaryRootString(t: CagedTrainerState, key: app.guitar.theory.PitchClass, box: app.guitar.theory.CagedBox, mode: CagedMode): String {
+private fun primaryRootString(t: CagedTrainerState, key: app.guitar.theory.PitchClass, box: CagedBox, mode: CagedMode): String {
     val notes = CagedScales.resolve(key, box, mode, ScaleSubset.FullScale, t.tuning)
     val root = CagedScales.rootOf(key, mode)
     var lowest = 6
