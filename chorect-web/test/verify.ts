@@ -779,7 +779,9 @@ check("degrees are invariant under transposition", (() => {
   })());
   check("every dot of every CAGED shape is in the right scale, and roots are roots", (() => {
     for (const [key, dots] of CAGED_SHAPES) {
-      const [, mode, subset] = key.split("|") as [string, CagedMode, ScaleSubset];
+      const parts = key.split("|");
+      const mode = parts[1] as CagedMode;
+      const subset = parts[2] as ScaleSubset;
       const allowed = pcsOf(mode, subset);
       for (const d of dots) {
         const pc = pcAt(d.string, 3 + d.offset);
@@ -878,7 +880,7 @@ check("degrees are invariant under transposition", (() => {
     const perBox = CAGED_BOXES.map((b) => PRACTICE_RUN.filter((s2) => s2.box === b).length);
     return JSON.stringify(perBox) === JSON.stringify([8, 6, 6, 8, 6]);
   })());
-  check("triad groups run top-down: strings 1-2-3, 2-3-4, 3-4-5, 4-5-6", () =>
+  check("triad groups run top-down: strings 1-2-3, 2-3-4, 3-4-5, 4-5-6",
     JSON.stringify(TRIAD_GROUPS) === JSON.stringify([[3, 4, 5], [2, 3, 4], [1, 2, 3], [0, 1, 2]]));
   check("the triad run is all 24 - 12 major then 12 minor", (() => {
     const run = triadRun(G, standard);
