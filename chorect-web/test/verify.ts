@@ -264,6 +264,13 @@ for (const b of BUILTIN_PATTERNS) {
   if (!rt || rt.encode() !== b.pattern.encode()) builtinsOk = false;
 }
 check("built-in grooves are valid & round-trip", builtinsOk);
+// Pins the twin of PercussionBuiltins.CASA_2_LEVADA — his Casa 2 export, the one
+// groove with no surdo (two tamborims, the first at 97 %).
+check("the Casa 2 cavaco levada groove is in the list, exactly as exported", (() => {
+  const b = BUILTIN_PATTERNS.find((x) => x.name === "Casa 2 — Cavaco Levada");
+  if (!b || b.bpm !== 92) return false;
+  return b.pattern.encode() === "M:2,2,4,16;tamborim%97=0,-,0,1,2,0,-,0,1,2,0,1,0,-,0,1|tamborim#2=0,-,1,0,1,0,-,0,1,0,-,0,1,0,0,1";
+})());
 
 // --- Drum accents: toggle, survive voice cycling, round-trip encode/decode ---
 {

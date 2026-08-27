@@ -402,6 +402,19 @@ object PercussionBuiltins {
             "tamborim#2@50=100,1001,2,0,100,1001,2,0,100,1001,2,0,100,1001,2,0",
     )
 
+    /** Casa 2 — cavaco levada, from Nadav's export
+     *  (`Casa_2_version_cavaco_levada.chorect.json`): TWO TAMBORIMS AND NOTHING
+     *  ELSE — the levada he plays under the cavaco on Casa 2, the first line at
+     *  97 % so the second sits on top of it. His export numbered the tracks #2/#3
+     *  (a deleted first tamborim); renumbered to base + #2 here so the loaded
+     *  groove reads "Tamborim / Tamborim 2" like every other built-in. 92 BPM,
+     *  straight. */
+    val CASA_2_LEVADA: PercussionPattern = builtin(
+        "M:2,2,4,16;" +
+            "tamborim%97=0,-,0,1,2,0,-,0,1,2,0,1,0,-,0,1" + "|" +
+            "tamborim#2=0,-,1,0,1,0,-,0,1,0,-,0,1,0,0,1",
+    )
+
     /** Batida do cavaco 1 — the default samba groove for the new default kit
      *  (surdo + tamborim + bongo): the teleco-teco surdo/tamborim with a steady
      *  hi/lo bongo comp on the off-beats. */
@@ -641,6 +654,7 @@ object PercussionBuiltins {
         BuiltinPattern("2 Tamborims, Pandeiro & Surdo", TRES_TAMBORINS, bpm = 80),
         BuiltinPattern("Partido Alto Groove", PARTIDO_ALTO_OFFICIAL, bpm = 70),
         BuiltinPattern("Platinelas Pandeiro — Partido Alto Groove", PARTIDO_ALTO_PLATINELAS, bpm = 70),
+        BuiltinPattern("Casa 2 — Cavaco Levada", CASA_2_LEVADA, bpm = 92),
         BuiltinPattern("Xote (Bongo)", XOTE, bpm = 90),
         BuiltinPattern("Baião (Bongo)", BAIAO, bpm = 90),
         BuiltinPattern("Forró (Bongo)", FORRO, bpm = 95),

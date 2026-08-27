@@ -123,15 +123,30 @@ class PercussionPatternTest {
     }
 
     @Test fun `built-in grooves decode, are non-empty, and round-trip`() {
-        assertEquals(8, PercussionBuiltins.ALL.size)
+        assertEquals(9, PercussionBuiltins.ALL.size)
         for ((name, pat) in PercussionBuiltins.ALL) {
             assertTrue(!pat.isEmpty(), "$name is empty")
             assertEquals(16, pat.slots, "$name should be the default 16-slot meter")
             assertEquals(pat, PercussionPattern.decode(pat.encode()), "$name doesn't round-trip")
-            // Surdo hits both bar downbeats in every groove.
-            assertTrue(pat.voiceAt(PercussionCatalog.Surdo, 0) != null)
-            assertTrue(pat.voiceAt(PercussionCatalog.Surdo, 8) != null)
+            // Where a groove HAS a surdo it marks both bar downbeats. (Casa 2 is two
+            // tamborims and nothing else, so this is not a property of every groove.)
+            if (PercussionCatalog.Surdo in pat.instruments) {
+                assertTrue(pat.voiceAt(PercussionCatalog.Surdo, 0) != null, "$name surdo bar 1")
+                assertTrue(pat.voiceAt(PercussionCatalog.Surdo, 8) != null, "$name surdo bar 2")
+            }
         }
+    }
+
+    /** Nadav's Casa 2 export, the one groove with NO SURDO: two tamborims, the
+     *  first at 97 %. Pinned here and in chorect-web/test/verify.ts. */
+    @Test fun `the Casa 2 cavaco levada groove is in the list, exactly as exported`() {
+        val b = PercussionBuiltins.ALL.first { it.name == "Casa 2 — Cavaco Levada" }
+        assertEquals(92, b.bpm)
+        assertEquals(
+            "M:2,2,4,16;tamborim%97=0,-,0,1,2,0,-,0,1,2,0,1,0,-,0,1|tamborim#2=0,-,1,0,1,0,-,0,1,0,-,0,1,0,0,1",
+            b.pattern.encode(),
+        )
+        assertTrue(PercussionCatalog.Surdo !in b.pattern.instruments)
     }
 
     @Test fun `beat file round-trips name, tempo, swing, and pattern`() {

@@ -580,11 +580,25 @@ export const TRES_TAMBORINS = builtin(
   "tamborim#2@50=100,1001,2,0,100,1001,2,0,100,1001,2,0,100,1001,2,0",
 );
 
+/** Casa 2 — cavaco levada, from Nadav's export
+ *  (`Casa_2_version_cavaco_levada.chorect.json`): TWO TAMBORIMS AND NOTHING
+ *  ELSE — the levada he plays under the cavaco on Casa 2, the first line at
+ *  97 % so the second sits on top of it. His export numbered the tracks #2/#3
+ *  (a deleted first tamborim); renumbered to base + #2 here so the loaded
+ *  groove reads "Tamborim / Tamborim 2" like every other built-in. 92 BPM,
+ *  straight. */
+export const CASA_2_LEVADA = builtin(
+  "M:2,2,4,16;" +
+  "tamborim%97=0,-,0,1,2,0,-,0,1,2,0,1,0,-,0,1" + "|" +
+  "tamborim#2=0,-,1,0,1,0,-,0,1,0,-,0,1,0,0,1",
+);
+
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */
 export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "2 Tamborims, Pandeiro & Surdo", pattern: TRES_TAMBORINS, bpm: 80 },
   { name: "Partido Alto Groove", pattern: PARTIDO_ALTO_OFFICIAL, bpm: 70 },
   { name: "Platinelas Pandeiro — Partido Alto Groove", pattern: PARTIDO_ALTO_PLATINELAS, bpm: 70 },
+  { name: "Casa 2 — Cavaco Levada", pattern: CASA_2_LEVADA, bpm: 92 },
   { name: "Xote (Bongo)", pattern: XOTE, bpm: 90 },
   { name: "Baião (Bongo)", pattern: BAIAO, bpm: 90 },
   { name: "Forró (Bongo)", pattern: FORRO, bpm: 95 },
