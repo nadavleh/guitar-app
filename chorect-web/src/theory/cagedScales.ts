@@ -144,7 +144,17 @@ export const TRIAD_GROUPS: [number, number, number][] = [
 ];
 
 /** The 3 close-voiced inversions of a major/minor triad on each 3-string group,
- *  ascending the neck. 4 groups × 3 = 12 shapes. */
+ *  ascending the neck. 4 groups × 3 = 12 shapes.
+ *
+ *  Pinned to Nadav's triad sheet (docs/caged-shapes-source.md, D major) by three
+ *  rules that are NOT free choices:
+ *   - **no open strings** — these are movable shapes, so the search starts at
+ *     fret 1; an open-string voicing is a different (unmovable) grip;
+ *   - **complete triads only** — a close voicing that lands on root/3rd/3rd
+ *     (which happens once the open string is off the table, e.g. E-A-D in D at
+ *     fret 2) is not a triad and is skipped, pushing that inversion up the neck;
+ *   - **neck order, not inversion order** — within a string group the three shapes
+ *     come out low → high, the order they are drilled in. */
 export function triadInversions(
   keyTonic: PitchClass,
   quality: "maj" | "min",
@@ -160,7 +170,7 @@ export function triadInversions(
     const [a, b, c] = group;
     const found: TriadShape[] = [];
     const seenBass = new Set<number>();
-    for (let f0 = 0; f0 <= numFrets; f0++) {
+    for (let f0 = 1; f0 <= numFrets; f0++) {
       const m0 = noteAt(tuning, fp(a, f0)).midi;
       if (!triadPcs.has(midiPitchClass(m0))) continue;
       const f1 = nextTone(tuning, b, m0, triadPcs, numFrets);
@@ -168,10 +178,13 @@ export function triadInversions(
       const m1 = noteAt(tuning, fp(b, f1)).midi;
       const f2 = nextTone(tuning, c, m1, triadPcs, numFrets);
       if (f2 < 0) continue;
+      const m2 = noteAt(tuning, fp(c, f2)).midi;
       const frets: [number, number, number] = [f0, f1, f2];
-      const fretted = frets.filter((f) => f > 0);
-      const span = fretted.length ? Math.max(...fretted) - Math.min(...fretted) : 0;
+      const span = Math.max(...frets) - Math.min(...frets);
       if (span > 5) continue;
+      // A close voicing can double a degree and drop another — not a triad.
+      const degrees = new Set([midiPitchClass(m0), midiPitchClass(m1), midiPitchClass(m2)]);
+      if (degrees.size !== 3) continue;
       const bassPc = midiPitchClass(m0);
       if (seenBass.has(bassPc)) continue;        // one voicing per inversion (lowest)
       seenBass.add(bassPc);
@@ -180,16 +193,15 @@ export function triadInversions(
       found.push({ strings: group, frets, bassInterval, inversion });
       if (seenBass.size === 3) break;
     }
-    found.sort((x, y) => x.inversion - y.inversion);
-    out.push(...found);
+    out.push(...found);   // neck order — see triadInversions' contract
   }
   return out;
 }
 
 /**
- * The Triads drill, in Nadav's order: the top 3-string group's 3 inversions, then
- * 2-3-4, 3-4-5, 4-5-6 — all **major**, then the whole run again **minor**.
- * 24 voicings.
+ * The Triads drill, in Nadav's order: the top 3-string group's 3 shapes low → high
+ * the neck, then 2-3-4, 3-4-5, 4-5-6 — all **major**, then the whole run again
+ * **minor**. 24 voicings.
  */
 export function triadRun(
   keyTonic: PitchClass, tuning: Tuning, numFrets = 22,
@@ -200,9 +212,10 @@ export function triadRun(
   ];
 }
 
-/** Smallest fret on [str] whose note is a triad tone with midi strictly above [aboveMidi]. */
+/** Smallest FRETTED (>= 1) fret on [str] whose note is a triad tone strictly above
+ *  [aboveMidi]. Open strings are excluded — see triadInversions. */
 function nextTone(tuning: Tuning, str: number, aboveMidi: number, triadPcs: Set<PitchClass>, numFrets: number): number {
-  for (let f = 0; f <= numFrets; f++) {
+  for (let f = 1; f <= numFrets; f++) {
     const n = noteAt(tuning, fp(str, f)).midi;
     if (n > aboveMidi && triadPcs.has(midiPitchClass(n))) return f;
   }

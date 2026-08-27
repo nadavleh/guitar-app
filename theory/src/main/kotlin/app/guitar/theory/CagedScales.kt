@@ -147,7 +147,17 @@ object CagedScales {
     )
 
     /** The 3 close-voiced inversions of a [quality] ("maj"/"min") triad on each of
-     *  the 4 string groups, ascending — 4 × 3 = 12 shapes. */
+     *  the 4 string groups, ascending the neck — 4 × 3 = 12 shapes.
+     *
+     *  Pinned to Nadav's triad sheet (`docs/caged-shapes-source.md`, D major) by
+     *  three rules that are NOT free choices:
+     *   - **no open strings** — these are movable shapes, so the search starts at
+     *     fret 1; an open-string voicing is a different (unmovable) grip;
+     *   - **complete triads only** — a close voicing that lands on root/3rd/3rd
+     *     (which happens once the open string is off the table, e.g. E-A-D in D at
+     *     fret 2) is not a triad and is skipped, pushing that inversion up the neck;
+     *   - **neck order, not inversion order** — within a string group the three
+     *     shapes come out low → high, the order they are drilled in. */
     fun triadInversions(
         keyTonic: PitchClass,
         quality: String,
@@ -163,17 +173,19 @@ object CagedScales {
             val (a, b, c) = Triple(group[0], group[1], group[2])
             val found = ArrayList<TriadShape>()
             val seenBass = HashSet<Int>()
-            var f0 = 0
+            var f0 = 1
             while (f0 <= numFrets && seenBass.size < 3) {
                 val m0 = Fretboard.noteAt(tuning, FretPosition(a, f0)).midi.value
                 if (m0 % 12 in triadPcs) {
                     val f1 = nextTone(tuning, b, m0, triadPcs, numFrets)
-                    val f2 = if (f1 >= 0) nextTone(tuning, c, Fretboard.noteAt(tuning, FretPosition(b, f1)).midi.value, triadPcs, numFrets) else -1
+                    val m1 = if (f1 >= 0) Fretboard.noteAt(tuning, FretPosition(b, f1)).midi.value else 0
+                    val f2 = if (f1 >= 0) nextTone(tuning, c, m1, triadPcs, numFrets) else -1
                     if (f1 >= 0 && f2 >= 0) {
-                        val fretted = listOf(f0, f1, f2).filter { it > 0 }
-                        val span = if (fretted.isEmpty()) 0 else fretted.max() - fretted.min()
+                        val m2 = Fretboard.noteAt(tuning, FretPosition(c, f2)).midi.value
+                        val span = listOf(f0, f1, f2).max() - listOf(f0, f1, f2).min()
+                        val complete = setOf(m0 % 12, m1 % 12, m2 % 12).size == 3
                         val bassPc = m0 % 12
-                        if (span <= 5 && bassPc !in seenBass) {
+                        if (span <= 5 && complete && bassPc !in seenBass) {
                             seenBass.add(bassPc)
                             val inv = if (bassPc == root) 0 else if (bassPc == third) 1 else 2
                             found.add(TriadShape(group, listOf(f0, f1, f2), Interval(((bassPc - root) % 12 + 12) % 12), inv))
@@ -182,24 +194,24 @@ object CagedScales {
                 }
                 f0++
             }
-            found.sortBy { it.inversion }
-            out.addAll(found)
+            out.addAll(found)   // neck order — see triadInversions' contract
         }
         return out
     }
 
     /**
-     * The Triads drill, in Nadav's order: the top 3-string group's 3 inversions,
-     * then 2-3-4, 3-4-5, 4-5-6 — all **major**, then the whole run again
-     * **minor**. 24 voicings.
+     * The Triads drill, in Nadav's order: the top 3-string group's 3 shapes low →
+     * high the neck, then 2-3-4, 3-4-5, 4-5-6 — all **major**, then the whole run
+     * again **minor**. 24 voicings.
      */
     fun triadRun(keyTonic: PitchClass, tuning: Tuning, numFrets: Int = 22): List<Pair<String, TriadShape>> =
         triadInversions(keyTonic, "maj", tuning, numFrets).map { "maj" to it } +
             triadInversions(keyTonic, "min", tuning, numFrets).map { "min" to it }
 
-    /** Smallest fret on [str] whose note is a triad tone strictly above [aboveMidi]. */
+    /** Smallest FRETTED (>= 1) fret on [str] whose note is a triad tone strictly
+     *  above [aboveMidi]. Open strings are excluded: see [triadInversions]. */
     private fun nextTone(tuning: Tuning, str: Int, aboveMidi: Int, triadPcs: Set<Int>, numFrets: Int): Int {
-        for (f in 0..numFrets) {
+        for (f in 1..numFrets) {
             val m = Fretboard.noteAt(tuning, FretPosition(str, f)).midi.value
             if (m > aboveMidi && m % 12 in triadPcs) return f
         }

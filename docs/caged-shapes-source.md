@@ -4,6 +4,11 @@ Archive of `~/Desktop/fretboard.pdf` — Nadav's hand-drawn layout of the 5 CAGE
 positions in **G**, one column per CAGED chord shape (E, D, C, A, G = boxes 1–5),
 each with the major and parallel-minor scale, pentatonic and triad.
 
+The same PDF later gained a **triad page** — 4 three-string groups × 3 inversions
+in **D major**, archived in "[The triad page](#the-triad-page)" at the end. That
+page is the source of truth for `CagedScales.triadInversions`, which is a
+*generator* pinned to it, not a table.
+
 This is the source of truth for `theory/.../CagedShapeTable.kt` and
 `chorect-web/src/theory/cagedShapeTable.ts`, which encode it verbatim. The sheet
 replaced the old fret-window generator, which approximated these fingerings but
@@ -499,3 +504,39 @@ E    .   .   .   R
 ```
 `E:12* | A:10 | D:9 | G:9*,12 | B:12 | e:12*`
 
+
+
+## The triad page
+
+A second page of `~/Desktop/fretboard.pdf`, in **D major**: five neck diagrams
+(the last two are one wide neck split at fret 12) showing every close-voiced D
+triad on the **4 adjacent 3-string groups**, three inversions each, low → high the
+neck. Roots are red `1`, thirds and fifths green `3` / `5`; the grey dots are just
+the fretboard's position inlays, not notes.
+
+Unlike the scale boxes this is **not** a table in the code —
+`CagedScales.triadInversions` / `triadInversions()` (`cagedScales.ts`) generate it,
+and the sheet pins the generator. Three rules make the generator reproduce all 12
+diagrams exactly (`CagedScalesTest."triads match Nadav's D major sheet exactly"`,
+and the same check in `chorect-web/test/verify.ts`):
+
+1. **No open strings.** These are movable shapes; the search starts at fret 1.
+2. **Complete triads only.** With open strings off the table, a close voicing can
+   land on root/3rd/3rd — e.g. E-A-D in D at fret 2 gives F#–D–F#, no fifth. That
+   is not a triad, so it is skipped and the inversion moves up the neck (to fret
+   14 in that case, which is exactly what the sheet draws).
+3. **Neck order, not inversion order.** Within a group the three shapes come out
+   low → high; which inversion lands first depends on the key.
+
+Before these rules the app picked open-string voicings for three of the four
+groups (`D:0`, `A:0`, `E:2`) and re-sorted each group into root/1st/2nd order —
+the bug this page fixed.
+
+Frets are absolute (in D), low E first:
+
+| String group (low → high) | Shape 1 | Shape 2 | Shape 3 |
+| --- | --- | --- | --- |
+| G–B–e (strings 3-2-1) | `G2 B3 e2` (2nd inv) | `G7 B7 e5` (root) | `G11 B10 e10` (1st inv) |
+| D–G–B (strings 4-3-2) | `D4 G2 B3` (1st inv) | `D7 G7 B7` (2nd inv) | `D12 G11 B10` (root) |
+| A–D–G (strings 5-4-3) | `A5 D4 G2` (root) | `A9 D7 G7` (1st inv) | `A12 D12 G11` (2nd inv) |
+| E–A–D (strings 6-5-4) | `E5 A5 D4` (2nd inv) | `E10 A9 D7` (root) | `E14 A12 D12` (1st inv) |

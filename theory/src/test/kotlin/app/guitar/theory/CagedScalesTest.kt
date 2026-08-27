@@ -49,7 +49,16 @@ class CagedScalesTest {
         val maj = CagedScales.triadInversions(G, "maj", std)
         assertEquals(12, maj.size)
         assertEquals(CagedScales.TRIAD_GROUPS, maj.map { it.strings }.distinct())
-        assertEquals(listOf(0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2), maj.map { it.inversion })
+        // Neck order, not inversion order: each group's 3 shapes ascend the neck and
+        // between them cover all 3 inversions (which order they land in depends on the key).
+        for (g in CagedScales.TRIAD_GROUPS) {
+            val inGroup = maj.filter { it.strings == g }
+            assertEquals(3, inGroup.size)
+            assertEquals(setOf(0, 1, 2), inGroup.map { it.inversion }.toSet(), "all 3 inversions in $g")
+            val lows = inGroup.map { it.frets.min() }
+            assertEquals(lows.sorted(), lows, "$g must ascend the neck")
+        }
+        assertTrue(maj.all { t -> t.frets.all { it >= 1 } }, "movable shapes only — no open strings")
         for (t in maj) t.strings.indices.forEach { i ->
             val pc = Fretboard.noteAt(std, FretPosition(t.strings[i], t.frets[i])).pitchClass
             assertTrue(pc in setOf(PitchClass.G, PitchClass(11), PitchClass.D), "G major triad tone")
@@ -59,6 +68,27 @@ class CagedScalesTest {
         for (t in min) t.strings.indices.forEach { i ->
             val pc = Fretboard.noteAt(std, FretPosition(t.strings[i], t.frets[i])).pitchClass
             assertTrue(pc in setOf(PitchClass.G, PitchClass(10), PitchClass.D), "G minor triad tone")
+        }
+    }
+
+    /**
+     * Pinned to Nadav's triad sheet (`docs/caged-shapes-source.md` — the D-major
+     * page of ~/Desktop/fretboard.pdf): 4 adjacent 3-string groups x 3 inversions,
+     * low -> high the neck, no open strings. This is the reason [triadInversions]
+     * skips open strings and incomplete (degree-doubling) close voicings.
+     */
+    @Test fun `triads match Nadav's D major sheet exactly`() {
+        val d = PitchClass.D
+        val sheet = mapOf(
+            listOf(3, 4, 5) to listOf(listOf(2, 3, 2), listOf(7, 7, 5), listOf(11, 10, 10)),
+            listOf(2, 3, 4) to listOf(listOf(4, 2, 3), listOf(7, 7, 7), listOf(12, 11, 10)),
+            listOf(1, 2, 3) to listOf(listOf(5, 4, 2), listOf(9, 7, 7), listOf(12, 12, 11)),
+            listOf(0, 1, 2) to listOf(listOf(5, 5, 4), listOf(10, 9, 7), listOf(14, 12, 12)),
+        )
+        val got = CagedScales.triadInversions(d, "maj", std)
+        assertEquals(12, got.size)
+        for ((group, want) in sheet) {
+            assertEquals(want, got.filter { it.strings == group }.map { it.frets }, "group $group")
         }
     }
 

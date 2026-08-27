@@ -14,7 +14,7 @@ import {
   THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode,
   progressionLacksTonic, progressionRelativeTonicMode, relativeRomanLineFor, romanLineFor,
   CAGED_SHAPES, CAGED_BOXES, CagedBox, CagedMode, ScaleSubset, patternCount, boxNumber,
-  resolveBox, boxWindow, PRACTICE_RUN, TRIAD_GROUPS, triadRun, noteAt, fp, fpKey,
+  resolveBox, boxWindow, PRACTICE_RUN, TRIAD_GROUPS, triadRun, triadInversions, noteAt, fp, fpKey,
 } from "../src/theory";
 import { standard } from "../src/theory/tunings";
 import {
@@ -889,6 +889,42 @@ check("degrees are invariant under transposition", (() => {
     if (!run.slice(12).every((r) => r.quality === "min")) return false;
     const groups = [...new Set(run.slice(0, 12).map((r) => JSON.stringify(r.shape.strings)))];
     return JSON.stringify(groups) === JSON.stringify(TRIAD_GROUPS.map((g) => JSON.stringify(g)));
+  })());
+  // Pinned to Nadav's triad sheet (docs/caged-shapes-source.md — the D-major page of
+  // ~/Desktop/fretboard.pdf). This is why triadInversions skips open strings and
+  // incomplete (degree-doubling) close voicings, and orders by neck position.
+  check("triads match Nadav's D major sheet exactly", (() => {
+    const sheet: [number[], number[][]][] = [
+      [[3, 4, 5], [[2, 3, 2], [7, 7, 5], [11, 10, 10]]],
+      [[2, 3, 4], [[4, 2, 3], [7, 7, 7], [12, 11, 10]]],
+      [[1, 2, 3], [[5, 4, 2], [9, 7, 7], [12, 12, 11]]],
+      [[0, 1, 2], [[5, 5, 4], [10, 9, 7], [14, 12, 12]]],
+    ];
+    const got = triadInversions(parsePitchClass("D"), "maj", standard);
+    if (got.length !== 12) return false;
+    for (const [group, want] of sheet) {
+      const mine = got.filter((t) => JSON.stringify(t.strings) === JSON.stringify(group)).map((t) => t.frets);
+      if (JSON.stringify(mine) !== JSON.stringify(want)) return false;
+    }
+    return true;
+  })());
+  check("triad shapes are movable and ascend the neck (no open strings)", (() => {
+    for (const key of [0, 2, 5, 7, 9]) for (const q of ["maj", "min"] as const) {
+      const got = triadInversions(key, q, standard);
+      if (got.length !== 12) return false;
+      for (const g of TRIAD_GROUPS) {
+        const inGroup = got.filter((t) => JSON.stringify(t.strings) === JSON.stringify(g));
+        if (inGroup.length !== 3) return false;
+        if (new Set(inGroup.map((t) => t.inversion)).size !== 3) return false;
+        const lows = inGroup.map((t) => Math.min(...t.frets));
+        if (JSON.stringify(lows) !== JSON.stringify([...lows].sort((x, y) => x - y))) return false;
+        for (const t of inGroup) {
+          if (t.frets.some((f) => f < 1)) return false;
+          if (new Set(t.frets.map((f, i) => pcAt(t.strings[i], f))).size !== 3) return false;
+        }
+      }
+    }
+    return true;
   })());
   check("every triad-run voicing is a chord tone of the key", (() => {
     for (const { quality, shape } of triadRun(G, standard)) {
