@@ -51,6 +51,13 @@ export class CavaqProgState {
 
   private notify() { this.deps.onChange(); }
 
+  /** The tuning this screen actually plays on — always a cavaquinho one, whatever
+   *  the global instrument setting says. The neck must be drawn from THIS, not
+   *  appState.liveTuning, or a 6-string guitar neck gets 4-string voicings. */
+  get tuning(): Tuning {
+    return this.deps.tuningProvider();
+  }
+
   get sequence(): CavaqSequence {
     return cavaqSequenceById(this.sequenceId) ?? CAVAQ_SEQUENCES[0];
   }

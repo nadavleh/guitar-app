@@ -99,9 +99,9 @@ export class CavaqProgUI {
     const shape = cp.currentShape;
     const marks = shape ? shapeMarks(shape, s.labelMode) : new Map();
     this.fb!.setData({
-      tuning: s.liveTuning, marks, selectedPosition: null, leftHanded: s.leftHanded,
+      tuning: this.cp.tuning, marks, selectedPosition: null, leftHanded: s.leftHanded,
       numFrets: DISPLAY_FRETS, playOnTouchDown: false, mutedStrings: new Set<number>(),
-      onTap: (pos) => s.audio.playNote(noteAt(s.liveTuning, pos).midi, s.ringSustainMs),
+      onTap: (pos) => s.audio.playNote(noteAt(this.cp.tuning, pos).midi, s.ringSustainMs),
     });
   }
 

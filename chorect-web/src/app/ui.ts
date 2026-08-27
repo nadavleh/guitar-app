@@ -248,10 +248,15 @@ export class App {
     this.sambaUI = new SambaLooperUI(this.samba, this.drumBlocks, state, this.ear, () => state.closeSheet());
     this.cavaq = new CavaqProgState({
       audio: state.audio,
-      tuningProvider: () => state.liveTuning,
+      // Progressions is a CAVAQUINHO screen: its voicing pool, neck and voice
+      // leading only make sense on 4 strings, so it ignores a Guitar setting and
+      // always uses a cavaquinho tuning (the live one when the user IS on
+      // cavaquinho, so a custom DGBD variant is honoured) and timbre.
+      tuningProvider: () =>
+        state.instrument === Instrument.Cavaquinho ? state.liveTuning : Tunings.defaultFor(Instrument.Cavaquinho),
       sustainProvider: () => state.ringSustainMs,
       strumProvider: () => state.strumMs,
-      timbreProvider: () => (state.instrument === Instrument.Cavaquinho ? Timbres.Cavaquinho : Timbres.Guitar),
+      timbreProvider: () => Timbres.Cavaquinho,
       onChange: () => this.scheduleRender(),
     });
     this.cavaqUI = new CavaqProgUI(state, this.cavaq);

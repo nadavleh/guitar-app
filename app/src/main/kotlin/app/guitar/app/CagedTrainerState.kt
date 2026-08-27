@@ -192,6 +192,7 @@ class CagedTrainerState(
                             for (n in sweep) {
                                 if (!isPlaying) break
                                 activeNote = n.position
+                                audio.chokeChords()   // a guided-run sweep is one note at a time: damp the previous pluck
                                 audio.playNote(Fretboard.noteAt(tuning, n.position).midi.value, durationMillis = (beat * 0.95).toInt().coerceAtLeast(150))
                                 delay(beat)
                             }

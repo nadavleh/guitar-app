@@ -528,10 +528,14 @@ class AppState(
         CavaqProgState(
             audio = audio,
             scope = scope,
-            tuningProvider = { liveTuning },
+            // Progressions is a CAVAQUINHO screen: its voicing pool, neck and voice
+            // leading only make sense on 4 strings, so it ignores a Guitar setting and
+            // always uses a cavaquinho tuning (the live one when the user IS on
+            // cavaquinho, so a custom DGBD variant is honoured) and timbre.
+            tuningProvider = { if (instrument == Instrument.Cavaquinho) liveTuning else Tunings.defaultFor(Instrument.Cavaquinho) },
             sustainProvider = { ringSustainMs },
             strumProvider = { strumMs },
-            timbreProvider = { timbre },
+            timbreProvider = { app.guitar.audio.Timbre.Cavaquinho },
         )
     }
 

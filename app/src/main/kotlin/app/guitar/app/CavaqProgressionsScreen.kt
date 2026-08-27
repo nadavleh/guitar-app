@@ -142,11 +142,11 @@ fun CavaqProgressionsScreen(state: AppState, onBack: () -> Unit) {
         }
         Box(modifier = Modifier.fillMaxWidth().height(220.dp)) {
             FretboardView(
-                tuning = state.liveTuning,
+                tuning = cp.tuning,
                 marks = marks,
                 selectedPosition = null,
                 onTap = { pos ->
-                    val midi = Fretboard.noteAt(state.liveTuning, pos).midi.value
+                    val midi = Fretboard.noteAt(cp.tuning, pos).midi.value
                     state.audio.playNote(midi, durationMillis = state.ringSustainMs)
                 },
                 numFrets = DISPLAY_FRETS,

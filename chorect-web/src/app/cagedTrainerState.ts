@@ -185,6 +185,7 @@ export class CagedTrainerState {
             for (const n of sweep) {
               if (!this.isPlaying || myToken !== this.token) return;
               this.activeKey = fpKey(n.position);
+              this.audio.chokeChords();   // a guided-run sweep is one note at a time: damp the previous pluck
               this.audio.playNote(noteAt(this.tuning, n.position).midi, Math.max(beat * 0.95, 150));
               this.notify();
               await sleep(beat);

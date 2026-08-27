@@ -64,6 +64,11 @@ class CavaqProgState(
     private var loopJob: Job? = null
     private val gen = ChordShapeGenerator()
 
+    /** The tuning this screen actually plays on — always a cavaquinho one, whatever
+     *  the global instrument setting says. The neck must be drawn from THIS, not
+     *  AppState.liveTuning, or a 6-string guitar neck gets 4-string voicings. */
+    val tuning: Tuning get() = tuningProvider()
+
     val sequence: CavaqSequence
         get() = CavaqSequences.byId(sequenceId) ?: CavaqSequences.ALL.first()
 
