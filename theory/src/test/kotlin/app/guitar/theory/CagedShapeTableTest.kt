@@ -119,6 +119,27 @@ class CagedShapeTableTest {
         assertEquals(listOf(10), lowE)
     }
 
+    /**
+     * Nadav's later edits (not sheet slips — see the doc's "Nadav's later edits"):
+     * both box-1 pattern-2 scale fingerings drop one 5th. The tiling test above
+     * proves neither note leaves a hole in the 5-box coverage.
+     */
+    @Test fun `Nadav's edits - box 1 pattern 2 drops one 5th in each mode`() {
+        val fifth = (7 + 7) % 12   // D, the 5th of G
+
+        // Minor pattern 2: no 5th anywhere on the 3rd string (G string, index 3).
+        val minorG = CagedScales.resolve(G, CagedBox.POS1, CagedMode.Minor, ScaleSubset.FullScale, std, pattern = 2)
+            .filter { it.position.stringIndex == 3 }
+        assertEquals(listOf(3, 5), minorG.map { it.position.fret }.sorted())   // Bb, C — fret 7 (D) removed
+        assertTrue(minorG.none { Fretboard.noteAt(std, it.position).pitchClass.value == fifth })
+
+        // Major pattern 2: no 5th anywhere on the 2nd string (B string, index 4).
+        val majorB = CagedScales.resolve(G, CagedBox.POS1, CagedMode.Major, ScaleSubset.FullScale, std, pattern = 2)
+            .filter { it.position.stringIndex == 4 }
+        assertEquals(listOf(5, 7), majorB.map { it.position.fret }.sorted())   // E, F# — fret 3 (D) removed
+        assertTrue(majorB.none { Fretboard.noteAt(std, it.position).pitchClass.value == fifth })
+    }
+
     @Test fun `each triad shape is the triad subset of its own pentatonic shape`() {
         // The relationship every diagram on the sheet obeys, give or take the odd
         // extra reach-back note the sheet adds. Checked as containment of the

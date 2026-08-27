@@ -63,18 +63,18 @@ E    o   R   .   o
 ```
 `E:-1,0*,2 | A:-1,0,2 | D:-1,1,2* | G:-1,1,2 | B:0,2 | e:-1,0*,2`
 
-**Major scale box 1 pattern 2**
+**Major scale box 1 pattern 2**  *(edited: B string's 5th (fret 3, D) removed — see [Nadav's later edits](#nadavs-later-edits))*
 
 ```
       3   4   5   6   7
 e    R   .   o   .   o 
-B    o   .   o   .   o 
+B    .   .   o   .   o 
 G    .   o   o   .   o 
 D    .   o   R   .   o 
 A    o   .   o   .   o 
 E    R   .   o   .   o 
 ```
-`E:0*,2,4 | A:0,2,4 | D:1,2*,4 | G:1,2,4 | B:0,2,4 | e:0*,2,4`
+`E:0*,2,4 | A:0,2,4 | D:1,2*,4 | G:1,2,4 | B:2,4 | e:0*,2,4`
 
 **Major pentatonic scale box 1**
 
@@ -115,18 +115,18 @@ E    o   .   R   .   o
 ```
 `E:-2,0*,2 | A:-2,0,2 | D:-2,0,2* | G:-1,0,2 | B:0,1 | e:-2,0*,2`
 
-**Minor scale box 1 pattern 2**
+**Minor scale box 1 pattern 2**  *(edited: G string's 5th (fret 7, D) removed — see [Nadav's later edits](#nadavs-later-edits))*
 
 ```
       3   4   5   6   7
 e    R   .   o   o   . 
 B    o   o   .   o   . 
-G    o   .   o   .   o 
+G    o   .   o   .   . 
 D    o   .   R   .   o 
 A    o   .   o   o   . 
 E    R   .   o   o   . 
 ```
-`E:0*,2,3 | A:0,2,3 | D:0,2*,4 | G:0,2,4 | B:0,1,3 | e:0*,2,3`
+`E:0*,2,3 | A:0,2,3 | D:0,2*,4 | G:0,2 | B:0,1,3 | e:0*,2,3`
 
 **Minor pentatonic scale box 1**  *(corrected: A string 2nd dot fret 6 (D#) -> fret 5 (D))*
 
@@ -505,6 +505,17 @@ E    .   .   .   R
 `E:12* | A:10 | D:9 | G:9*,12 | B:12 | e:12*`
 
 
+
+## Nadav's later edits
+
+Changes he asked for *after* the transcription was verified — not slips in the
+sheet, so they are listed apart from the corrections above. Both are pinned by
+`CagedShapeTableTest`.
+
+| Diagram | Edit | Why it is safe |
+| --- | --- | --- |
+| Minor scale box 1 pattern 2 | dropped the **5th** on the 3rd string (G string, fret 7 = D) | D at G-string fret 7 is still covered by minor box 2 (`G:2,4,5`), so the 5-box tiling has no hole |
+| Major scale box 1 pattern 2 | dropped the **5th** on the 2nd string (B string, fret 3 = D) | D at B-string fret 3 is still covered by major box 1 pattern 1 (`B:0,2`) |
 
 ## The triad page
 

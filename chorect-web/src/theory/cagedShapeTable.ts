@@ -75,7 +75,7 @@ export const CAGED_SHAPES: Map<string, ShapeDot[]> = new Map([
   shape(CagedBox.POS1, CagedMode.Major, ScaleSubset.FullScale, 1,
     "E:-1,0*,2 | A:-1,0,2 | D:-1,1,2* | G:-1,1,2 | B:0,2 | e:-1,0*,2"),   // Major scale box 1 pattern 1
   shape(CagedBox.POS1, CagedMode.Major, ScaleSubset.FullScale, 2,
-    "E:0*,2,4 | A:0,2,4 | D:1,2*,4 | G:1,2,4 | B:0,2,4 | e:0*,2,4"),   // Major scale box 1 pattern 2
+    "E:0*,2,4 | A:0,2,4 | D:1,2*,4 | G:1,2,4 | B:2,4 | e:0*,2,4"),   // Major scale box 1 pattern 2
   shape(CagedBox.POS1, CagedMode.Major, ScaleSubset.Pentatonic, 1,
     "E:0*,2 | A:-1,2 | D:-1,2* | G:-1,1 | B:0,2 | e:0*,2"),   // Major pentatonic scale box 1
   shape(CagedBox.POS1, CagedMode.Major, ScaleSubset.Triad, 1,
@@ -83,7 +83,7 @@ export const CAGED_SHAPES: Map<string, ShapeDot[]> = new Map([
   shape(CagedBox.POS1, CagedMode.Minor, ScaleSubset.FullScale, 1,
     "E:-2,0*,2 | A:-2,0,2 | D:-2,0,2* | G:-1,0,2 | B:0,1 | e:-2,0*,2"),   // Minor scale box 1 pattern 1
   shape(CagedBox.POS1, CagedMode.Minor, ScaleSubset.FullScale, 2,
-    "E:0*,2,3 | A:0,2,3 | D:0,2*,4 | G:0,2,4 | B:0,1,3 | e:0*,2,3"),   // Minor scale box 1 pattern 2
+    "E:0*,2,3 | A:0,2,3 | D:0,2*,4 | G:0,2 | B:0,1,3 | e:0*,2,3"),   // Minor scale box 1 pattern 2
   shape(CagedBox.POS1, CagedMode.Minor, ScaleSubset.Pentatonic, 1,
     "E:0*,3 | A:0,2 | D:0,2* | G:0,2 | B:0,3 | e:0*,3"),   // Minor pentatonic scale box 1
   shape(CagedBox.POS1, CagedMode.Minor, ScaleSubset.Triad, 1,

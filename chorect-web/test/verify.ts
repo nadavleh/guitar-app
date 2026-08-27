@@ -853,6 +853,20 @@ check("degrees are invariant under transposition", (() => {
       .filter((n) => n.position.stringIndex === 0).map((n) => n.position.fret);
     return JSON.stringify(lowE) === JSON.stringify([10]);
   })());
+  // Nadav's later edits (not sheet slips): both box-1 pattern-2 scale fingerings
+  // drop one 5th. The tiling check above proves neither leaves a hole.
+  check("box 1 pattern 2 drops the 5th on the 3rd string (minor) / 2nd string (major)", (() => {
+    const fifth = (G + 7) % 12;
+    const onString = (mode: CagedMode, si: number) =>
+      resolveBox(G, CagedBox.POS1, mode, ScaleSubset.FullScale, standard, 22, 2)
+        .filter((n) => n.position.stringIndex === si);
+    const minorG = onString(CagedMode.Minor, 3);
+    if (JSON.stringify(minorG.map((n) => n.position.fret).sort((a, b) => a - b)) !== JSON.stringify([3, 5])) return false;
+    if (minorG.some((n) => pcAt(n.position.stringIndex, n.position.fret) === fifth)) return false;
+    const majorB = onString(CagedMode.Major, 4);
+    if (JSON.stringify(majorB.map((n) => n.position.fret).sort((a, b) => a - b)) !== JSON.stringify([5, 7])) return false;
+    return !majorB.some((n) => pcAt(n.position.stringIndex, n.position.fret) === fifth);
+  })());
   check("each triad shape contains its own pentatonic shape's chord tones", (() => {
     for (const box of CAGED_BOXES) for (const mode of MODES) {
       const triadPcs = pcsOf(mode, ScaleSubset.Triad);
