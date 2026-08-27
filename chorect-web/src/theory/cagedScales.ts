@@ -10,7 +10,6 @@
 // are hand-picked rather than filtered from the scale.
 
 import { PitchClass, Interval, Tuning, FretPosition, fp, noteAt, midiPitchClass } from "./core";
-import { SCALES, scalePositionsFor, Scale } from "./scales";
 import {
   CagedBox, CagedMode, ScaleSubset, CAGED_BOXES,
   shapeDots, patternCount, anchorFor,
@@ -112,18 +111,57 @@ export function drillSteps(box: CagedBox): DrillStep[] {
 /** The whole run: 5 boxes low to high, drillSteps at each. */
 export const PRACTICE_RUN: DrillStep[] = CAGED_BOXES.flatMap(drillSteps);
 
-// ---------- Explore tab (free scale/position browser, not part of the drill) ----------
+// ---------- Explore tab (free position browser, not part of the drill) ----------
 
-const MAJOR = SCALES.get("major")!;
-const NATURAL_MINOR = SCALES.get("natural minor")!;
-
-/** Positions of an arbitrary scale for the Explore tab's position scroller. */
-export function explorePositions(root: PitchClass, scale: Scale, tuning: Tuning, numFrets = 22) {
-  return scalePositionsFor(root, scale, tuning, numFrets);
+/** One entry of the Explore browser: a diagram from the sheet, with the box and
+ *  pattern it came from so the caption can name it the way the Guided run does. */
+export interface ExplorePosition {
+  /** 1-based index within the browser's list, ascending the neck. */
+  index: number;
+  box: CagedBox;
+  mode: CagedMode;
+  subset: ScaleSubset;
+  pattern: number;
+  firstFret: number;
+  lastFret: number;
+  notes: CagedNote[];
 }
-export const EXPLORE_MAJOR = MAJOR;
-export const EXPLORE_MINOR = NATURAL_MINOR;
-export const EXPLORE_PENTATONIC = SCALES.get("minor pentatonic")!;
+
+/**
+ * Positions for the Explore scroller: THE SHEET'S OWN DIAGRAMS, the same
+ * fingerings the Guided run drills, ordered low → high the neck.
+ *
+ * It used to call scalePositionsFor(), which takes every scale tone inside a
+ * 5-fret window. That is not a fingering: because the B string sits a major 3rd
+ * (not a 4th) above the G string, one pitch lands twice inside such a window —
+ * G-string fret n and B-string fret n−4 are the same note — so six of the seven
+ * windows carried a duplicate the real box does not, and the pentatonic windows
+ * were not the pentatonic boxes at all. Nadav flagged both. Reading the table
+ * instead fixes every case at once and keeps Explore and the Guided run showing
+ * the same shapes.
+ *
+ * Counts follow the sheet: 7 per mode for FullScale (5 boxes, with a second
+ * fingering on boxes 1 and 4), 5 for the other subsets. (Fretboard mode still
+ * browses arbitrary scales via scalePositionsFor.)
+ */
+export function explorePositions(
+  tonic: PitchClass, mode: CagedMode, subset: ScaleSubset, tuning: Tuning, numFrets = 22,
+): ExplorePosition[] {
+  const out: ExplorePosition[] = [];
+  for (const box of CAGED_BOXES) {
+    for (let pattern = 1; pattern <= patternCount(box, mode, subset); pattern++) {
+      const notes = resolveBox(tonic, box, mode, subset, tuning, numFrets, pattern);
+      if (!notes.length) continue;
+      const frets = notes.map((n) => n.position.fret);
+      out.push({
+        index: 0, box, mode, subset, pattern,
+        firstFret: Math.min(...frets), lastFret: Math.max(...frets), notes,
+      });
+    }
+  }
+  out.sort((a, b) => (a.firstFret - b.firstFret) || (a.lastFret - b.lastFret));
+  return out.map((p, i) => ({ ...p, index: i + 1 }));
+}
 
 // ---------- Triads: 4 adjacent 3-string groups × 3 inversions × {maj,min} ----------
 

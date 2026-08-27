@@ -10,8 +10,7 @@ import {
   PitchClass, fpKey, noteAt, standard,
   CagedBox, CAGED_BOXES, CagedMode, ScaleSubset, CagedNote,
   triadRun, TriadShape, resolveBox, boxWindow, DrillStep, PRACTICE_RUN, patternCount,
-  explorePositions, EXPLORE_MAJOR, EXPLORE_MINOR, EXPLORE_PENTATONIC,
-  ScalePosition,
+  explorePositions, ExplorePosition,
 } from "../theory";
 import { WebAudioEngine } from "../audio";
 
@@ -128,12 +127,16 @@ export class CagedTrainerState {
   }
   nudgeTriad(d: number) { this.setTriad((this.activeTriad < 0 ? 0 : this.activeTriad) + d); }
 
-  // ---- Explore (scroll positions like Fretboard mode) ----
-  private exploreScaleObj() {
-    return this.exploreScale === "major" ? EXPLORE_MAJOR : this.exploreScale === "minor" ? EXPLORE_MINOR : EXPLORE_PENTATONIC;
+  // ---- Explore (browse the SHEET's boxes, the same shapes the Guided run drills) ----
+  /** Pentatonic browses the MINOR pentatonic boxes — what the button showed before. */
+  private exploreModeSubset(): [CagedMode, ScaleSubset] {
+    if (this.exploreScale === "major") return [CagedMode.Major, ScaleSubset.FullScale];
+    if (this.exploreScale === "minor") return [CagedMode.Minor, ScaleSubset.FullScale];
+    return [CagedMode.Minor, ScaleSubset.Pentatonic];
   }
-  explorePositionsList(): ScalePosition[] {
-    return explorePositions(this.key, this.exploreScaleObj(), this.tuning);
+  explorePositionsList(): ExplorePosition[] {
+    const [mode, subset] = this.exploreModeSubset();
+    return explorePositions(this.key, mode, subset, this.tuning);
   }
   setExploreScale(s: ExploreScale) { this.exploreScale = s; this.explorePos = 0; this.notify(); }
   setExplorePos(i: number) {

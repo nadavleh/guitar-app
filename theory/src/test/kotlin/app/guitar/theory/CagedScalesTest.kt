@@ -77,6 +77,68 @@ class CagedScalesTest {
      * low -> high the neck, no open strings. This is the reason [triadInversions]
      * skips open strings and incomplete (degree-doubling) close voicings.
      */
+    // ---- Explore browser: the sheet's boxes, not fret windows ----
+
+    /**
+     * Explore used to show every scale tone inside a 5-fret window, which duplicated
+     * a PITCH in six of the seven windows: the B string is a major 3rd above the G
+     * string, so G-string fret n and B-string fret n−4 are the same note and both
+     * fall inside one window. Nadav circled five of them. Reading the sheet's own
+     * diagrams removes all of it — no box repeats a pitch.
+     */
+    @Test fun `no Explore box sounds the same pitch twice`() {
+        // The two subsets Explore serves. A TRIAD diagram is a chord grip and may
+        // legitimately double a pitch across strings, so it is not included.
+        for (mode in CagedMode.entries) for (subset in listOf(ScaleSubset.FullScale, ScaleSubset.Pentatonic)) {
+            for (tonic in 0..11) {
+                for (p in CagedScales.explorePositions(PitchClass(tonic), mode, subset, std)) {
+                    val midis = p.notes.map { Fretboard.noteAt(std, it.position).midi.value }
+                    assertEquals(midis.size, midis.distinct().size, "$mode $subset box ${p.box} pattern ${p.pattern} in key $tonic repeats a pitch")
+                }
+            }
+        }
+    }
+
+    @Test fun `Explore serves the sheet's diagrams, ascending the neck`() {
+        for (mode in CagedMode.entries) {
+            assertEquals(7, CagedScales.explorePositions(G, mode, ScaleSubset.FullScale, std).size)
+            assertEquals(5, CagedScales.explorePositions(G, mode, ScaleSubset.Pentatonic, std).size)
+            assertEquals(5, CagedScales.explorePositions(G, mode, ScaleSubset.Triad, std).size)
+            for (subset in ScaleSubset.entries) {
+                val ps = CagedScales.explorePositions(G, mode, subset, std)
+                assertEquals((1..ps.size).toList(), ps.map { it.index })
+                assertEquals(ps.map { it.firstFret }.sorted(), ps.map { it.firstFret }, "$mode $subset must ascend")
+                // Every entry IS the table's shape for its own box/pattern.
+                for (p in ps) {
+                    assertEquals(
+                        CagedScales.resolve(G, p.box, mode, subset, std, pattern = p.pattern),
+                        p.notes, "$mode $subset box ${p.box} pattern ${p.pattern}",
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * The five windows Nadav circled, now served as the boxes that replaced them.
+     * String indices: 3 = 3rd string (G), 4 = 2nd string (B).
+     *
+     * His fifth circle was on the old nut window (frets 0-4). The table has no
+     * such box — that window was box 5 an octave down — so box 5 at frets 12-16
+     * carries the same shape, minus the same duplicate.
+     */
+    @Test fun `Nadav's Explore removals - the duplicated pitch is gone from each box`() {
+        val major = CagedScales.explorePositions(G, CagedMode.Major, ScaleSubset.FullScale, std)
+        fun stringOf(box: CagedBox, pattern: Int, stringIndex: Int): List<Int> =
+            major.first { it.box == box && it.pattern == pattern }.notes
+                .filter { it.position.stringIndex == stringIndex }.map { it.position.fret }.sorted()
+        assertEquals(listOf(5, 7), stringOf(CagedBox.POS2, 1, 3))      // was 5-9: the 6th (G string fret 9) is gone
+        assertEquals(listOf(7, 9), stringOf(CagedBox.POS3, 1, 3))      // was 7-11: the 7th (G string fret 11) is gone
+        assertEquals(listOf(10, 12), stringOf(CagedBox.POS4, 1, 4))    // was 8-12: the 1 (B string fret 8) is gone
+        assertEquals(listOf(12, 13), stringOf(CagedBox.POS4, 2, 4))    // was 10-14: the 2 (B string fret 10) is gone
+        assertEquals(listOf(12, 14), stringOf(CagedBox.POS5, 1, 3))    // was 0-4: the 3rd (G string fret 4 / 16) is gone
+    }
+
     @Test fun `triads match Nadav's D major sheet exactly`() {
         val d = PitchClass.D
         val sheet = mapOf(

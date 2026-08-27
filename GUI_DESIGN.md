@@ -287,6 +287,14 @@ Dot and label sizes are scaled by the *smaller* of string-spacing and fret-spaci
 
 Pure-Kotlin function in the `theory` module.
 
+**Where it is used:** Fretboard mode's scale overlay only. It is deliberately
+*not* used by the Guitar-practice Explore tab (§13.1), which serves the CAGED
+sheet's own diagrams instead. The reason: this algorithm keeps every scale tone
+inside a 5-fret window, and because the B string sits a major 3rd (not a 4th)
+above the G string, one PITCH lands twice in such a window — G-string fret *n*
+and B-string fret *n*−4 are the same note. That is fine for "show me the scale
+around here" and wrong for "here is the fingering".
+
 ```kotlin
 data class ScalePosition(
     val anchorFret: Int,        // fret on the lowest string where the position is anchored
@@ -576,8 +584,14 @@ Tabs: **Guided run · Challenge · Explore**. (The tab is named *Guided run*, no
   quality, subset and `Box 4 (A shape) — root on string 5 (A)`. The neck stays
   empty until Reveal.
 - **Explore** — Major / Minor / Pentatonic chips and a `◀ n/m ▶` position
-  scroller over the generic scale-position engine. This tab is a browser, not a
-  drill: `Play` does nothing here, and the space bar is inert.
+  scroller over **the sheet's own boxes** — the same shapes the Guided run drills,
+  ordered low to high the neck, captioned `Box 4 (A shape) pattern 2 · frets
+  10–14`. Major and Minor scroll 7 diagrams (the 5 boxes, with a second fingering
+  on boxes 1 and 4); Pentatonic scrolls the 5 minor-pentatonic boxes. It does
+  **not** use the generic scale-position engine of §7 any more: that engine takes
+  every scale tone inside a 5-fret window, which is not a fingering (see §7's
+  note). This tab is a browser, not a drill: `Play` does nothing here, and the
+  space bar is inert.
 
 Roots are ringed on the neck; every other note carries its interval name.
 

@@ -11,11 +11,10 @@ import app.guitar.theory.CagedNote
 import app.guitar.theory.CagedScales
 import app.guitar.theory.CagedShapeTable
 import app.guitar.theory.DrillStep
+import app.guitar.theory.ExplorePosition
 import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
 import app.guitar.theory.PitchClass
-import app.guitar.theory.Scale
-import app.guitar.theory.ScalePosition
 import app.guitar.theory.ScaleSubset
 import app.guitar.theory.TriadShape
 import app.guitar.theory.Tunings
@@ -135,14 +134,17 @@ class CagedTrainerState(
     }
     fun nudgeTriad(d: Int) = setTriad((if (activeTriad < 0) 0 else activeTriad) + d)
 
-    // ---- Explore (scroll positions like Fretboard mode) ----
-    private fun exploreScaleObj(): Scale = when (exploreScale) {
-        ExploreScale.Major -> CagedScales.EXPLORE_MAJOR
-        ExploreScale.Minor -> CagedScales.EXPLORE_MINOR
-        ExploreScale.Pentatonic -> CagedScales.EXPLORE_PENTATONIC
+    // ---- Explore (browse the SHEET's boxes, the same shapes the Guided run drills) ----
+    /** Pentatonic browses the MINOR pentatonic boxes — what the button showed before. */
+    private fun exploreModeSubset(): Pair<CagedMode, ScaleSubset> = when (exploreScale) {
+        ExploreScale.Major -> CagedMode.Major to ScaleSubset.FullScale
+        ExploreScale.Minor -> CagedMode.Minor to ScaleSubset.FullScale
+        ExploreScale.Pentatonic -> CagedMode.Minor to ScaleSubset.Pentatonic
     }
-    fun explorePositionsList(): List<ScalePosition> =
-        CagedScales.explorePositions(key, exploreScaleObj(), tuning)
+    fun explorePositionsList(): List<ExplorePosition> {
+        val (mode, subset) = exploreModeSubset()
+        return CagedScales.explorePositions(key, mode, subset, tuning)
+    }
     fun selectExploreScale(s: ExploreScale) { exploreScale = s; explorePos = 0 }
     fun setExploreIndex(i: Int) {
         val n = explorePositionsList().size

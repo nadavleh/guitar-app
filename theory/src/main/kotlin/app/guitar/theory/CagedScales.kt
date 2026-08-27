@@ -50,6 +50,20 @@ data class CagedNote(
     val isRoot: Boolean,
 )
 
+/** One entry of the Explore browser: a diagram from the sheet, with the box and
+ *  pattern it came from so the caption can name it the way the Guided run does. */
+data class ExplorePosition(
+    /** 1-based index within the browser's list, ascending the neck. */
+    val index: Int,
+    val box: CagedBox,
+    val mode: CagedMode,
+    val subset: ScaleSubset,
+    val pattern: Int,
+    val firstFret: Int,
+    val lastFret: Int,
+    val notes: List<CagedNote>,
+)
+
 /** One step of the guided Practice run. */
 data class DrillStep(
     val box: CagedBox,
@@ -218,13 +232,42 @@ object CagedScales {
         return -1
     }
 
-    // ---- Explore tab (free scale/position browser, not part of the drill) ----
+    // ---- Explore tab (free position browser, not part of the drill) ----
 
-    val EXPLORE_MAJOR = MAJOR_SCALE
-    val EXPLORE_MINOR = Scale("natural minor", listOf(Interval.P1, Interval.maj2, Interval.min3, Interval.P4, Interval.P5, Interval.min6, Interval.min7))
-    val EXPLORE_PENTATONIC = Scale("minor pentatonic", listOf(Interval.P1, Interval.min3, Interval.P4, Interval.P5, Interval.min7))
-
-    /** Positions of an arbitrary scale for the Explore tab's scroller. */
-    fun explorePositions(root: PitchClass, scale: Scale, tuning: Tuning, numFrets: Int = 22): List<ScalePosition> =
-        ScalePositions.forScale(root, scale, tuning, numFrets)
+    /**
+     * Positions for the Explore scroller: THE SHEET'S OWN DIAGRAMS, the same
+     * fingerings the Guided run drills, ordered low → high the neck.
+     *
+     * It used to call [ScalePositions.forScale], which takes every scale tone
+     * inside a 5-fret window. That is not a fingering: because the B string sits
+     * a major 3rd (not a 4th) above the G string, one pitch lands twice inside
+     * such a window — G-string fret n and B-string fret n−4 are the same note —
+     * so six of the seven windows carried a duplicate the real box does not, and
+     * the pentatonic windows were not the pentatonic boxes at all. Nadav flagged
+     * both. Reading the table instead fixes every case at once and keeps Explore
+     * and the Guided run showing the same shapes.
+     *
+     * Counts follow the sheet: 7 per mode for [ScaleSubset.FullScale] (5 boxes,
+     * with a second fingering on boxes 1 and 4), 5 for the other subsets.
+     * (Fretboard mode still browses arbitrary scales via [ScalePositions].)
+     */
+    fun explorePositions(
+        tonic: PitchClass,
+        mode: CagedMode,
+        subset: ScaleSubset,
+        tuning: Tuning,
+        numFrets: Int = 22,
+    ): List<ExplorePosition> {
+        val out = ArrayList<ExplorePosition>()
+        for (box in CagedBox.entries) {
+            for (pattern in 1..CagedShapeTable.patternCount(box, mode, subset)) {
+                val notes = resolve(tonic, box, mode, subset, tuning, numFrets, pattern)
+                if (notes.isEmpty()) continue
+                val frets = notes.map { it.position.fret }
+                out.add(ExplorePosition(0, box, mode, subset, pattern, frets.min(), frets.max(), notes))
+            }
+        }
+        out.sortWith(compareBy({ it.firstFret }, { it.lastFret }))
+        return out.mapIndexed { i, p -> p.copy(index = i + 1) }
+    }
 }

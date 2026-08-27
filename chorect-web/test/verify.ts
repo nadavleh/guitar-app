@@ -14,7 +14,7 @@ import {
   THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode,
   progressionLacksTonic, progressionRelativeTonicMode, relativeRomanLineFor, romanLineFor,
   CAGED_SHAPES, CAGED_BOXES, CagedBox, CagedMode, ScaleSubset, patternCount, boxNumber,
-  resolveBox, boxWindow, PRACTICE_RUN, TRIAD_GROUPS, triadRun, triadInversions, noteAt, fp, fpKey,
+  resolveBox, boxWindow, PRACTICE_RUN, TRIAD_GROUPS, triadRun, triadInversions, explorePositions, noteAt, fp, fpKey,
 } from "../src/theory";
 import { standard } from "../src/theory/tunings";
 import {
@@ -914,6 +914,62 @@ check("degrees are invariant under transposition", (() => {
   // Pinned to Nadav's triad sheet (docs/caged-shapes-source.md — the D-major page of
   // ~/Desktop/fretboard.pdf). This is why triadInversions skips open strings and
   // incomplete (degree-doubling) close voicings, and orders by neck position.
+  // --- Explore browser: the sheet's boxes, not fret windows ---
+  // Explore used to show every scale tone inside a 5-fret window, which duplicated a
+  // PITCH in six of the seven windows (the B string is a major 3rd above the G string,
+  // so G-string fret n and B-string fret n-4 are the same note and both fall inside one
+  // window). Nadav circled five. Serving the sheet's diagrams removes all of it.
+  check("no Explore box sounds the same pitch twice", (() => {
+    for (const mode of [CagedMode.Major, CagedMode.Minor]) {
+      // Triads are chord grips and may double a pitch, so only what Explore serves.
+      for (const subset of [ScaleSubset.FullScale, ScaleSubset.Pentatonic]) {
+        for (let tonic = 0; tonic < 12; tonic++) {
+          for (const p of explorePositions(tonic, mode, subset, standard)) {
+            const midis = p.notes.map((n) => noteAt(standard, n.position).midi);
+            if (new Set(midis).size !== midis.length) return false;
+          }
+        }
+      }
+    }
+    return true;
+  })());
+  check("Explore serves the sheet's diagrams, ascending the neck", (() => {
+    for (const mode of [CagedMode.Major, CagedMode.Minor]) {
+      if (explorePositions(G, mode, ScaleSubset.FullScale, standard).length !== 7) return false;
+      if (explorePositions(G, mode, ScaleSubset.Pentatonic, standard).length !== 5) return false;
+      for (const subset of [ScaleSubset.FullScale, ScaleSubset.Pentatonic, ScaleSubset.Triad]) {
+        const ps = explorePositions(G, mode, subset, standard);
+        if (ps.some((p, i) => p.index !== i + 1)) return false;
+        const firsts = ps.map((p) => p.firstFret);
+        if (JSON.stringify(firsts) !== JSON.stringify([...firsts].sort((a, b) => a - b))) return false;
+        for (const p of ps) {
+          const want = resolveBox(G, p.box, mode, subset, standard, 22, p.pattern);
+          if (JSON.stringify(want) !== JSON.stringify(p.notes)) return false;
+        }
+      }
+    }
+    return true;
+  })());
+  // The five windows he circled, now served as the boxes that replaced them.
+  // String index 3 = 3rd string (G), 4 = 2nd string (B). His fifth circle was the old
+  // nut window (frets 0-4), which was box 5 an octave down — box 5 at 12-16 carries
+  // the same shape minus the same duplicate.
+  check("Nadav's Explore removals - the duplicated pitch is gone from each box", (() => {
+    const major = explorePositions(G, CagedMode.Major, ScaleSubset.FullScale, standard);
+    const stringOf = (box: CagedBox, pattern: number, si: number) => {
+      const p = major.find((x) => x.box === box && x.pattern === pattern);
+      if (!p) return null;
+      return p.notes.filter((n) => n.position.stringIndex === si).map((n) => n.position.fret).sort((a, b) => a - b);
+    };
+    const want: [CagedBox, number, number, number[]][] = [
+      [CagedBox.POS2, 1, 3, [5, 7]],       // was 5-9: the 6th (G string fret 9) is gone
+      [CagedBox.POS3, 1, 3, [7, 9]],       // was 7-11: the 7th (G string fret 11) is gone
+      [CagedBox.POS4, 1, 4, [10, 12]],     // was 8-12: the 1 (B string fret 8) is gone
+      [CagedBox.POS4, 2, 4, [12, 13]],     // was 10-14: the 2 (B string fret 10) is gone
+      [CagedBox.POS5, 1, 3, [12, 14]],     // was 0-4: the 3rd (G string fret 4 / 16) is gone
+    ];
+    return want.every(([b, pat, si, frets]) => JSON.stringify(stringOf(b, pat, si)) === JSON.stringify(frets));
+  })());
   check("triads match Nadav's D major sheet exactly", (() => {
     const sheet: [number[], number[][]][] = [
       [[3, 4, 5], [[2, 3, 2], [7, 7, 5], [11, 10, 10]]],

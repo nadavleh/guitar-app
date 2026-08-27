@@ -181,8 +181,15 @@ export class CagedTrainerUI {
       el("span", { class: "mono" }, [`${positions.length ? t.explorePos + 1 : 0}/${positions.length}`]),
       this.navBtn("▶", () => t.nudgeExplorePos(+1), false),
     ]));
+    const cur = positions[t.explorePos];
+    if (cur) {
+      const patName = patternCount(cur.box, cur.mode, cur.subset) > 1 ? ` pattern ${cur.pattern}` : "";
+      screen.appendChild(el("div", { style: "margin-top:6px;font-weight:700" }, [
+        `${boxLabel(cur.box)}${patName} · frets ${cur.firstFret}–${cur.lastFret}`,
+      ]));
+    }
     screen.appendChild(el("div", { style: "margin-top:2px" }, [
-      labelSm("Scroll the scale's positions across the neck (like Fretboard mode). Tap a note to hear it."),
+      labelSm("The same boxes the Guided run drills, low to high the neck. Tap a note to hear it."),
     ]));
   }
 
@@ -210,15 +217,9 @@ export class CagedTrainerUI {
       const c = t.challenge;
       if (c && t.reveal) marks = this.notesToMarks(resolveBox(c.key, c.box, c.mode, c.subset, t.tuning, NUM_FRETS, c.pattern));
     } else {
-      // explore: the current position of the selected scale
+      // explore: the sheet's box currently browsed
       const pos = t.explorePositionsList()[t.explorePos];
-      if (pos) {
-        const root = t.key;
-        for (const p of pos.positions) {
-          const pc = midiPitchClass(noteAt(t.tuning, p).midi);
-          marks.set(fpKey(p), { label: intervalName(((pc - root) % 12 + 12) % 12), isRoot: pc === root, kind: MarkKind.Scale });
-        }
-      }
+      if (pos) marks = this.notesToMarks(pos.notes);
     }
 
     this.fb!.setData({

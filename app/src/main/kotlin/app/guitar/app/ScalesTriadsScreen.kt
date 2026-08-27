@@ -244,8 +244,16 @@ private fun ExploreControls(t: CagedTrainerState) {
         Spacer(Modifier.width(6.dp))
         OutlinedButton(onClick = { t.nudgeExplorePos(1) }, enabled = positions.size > 1) { Text("▶") }
     }
+    val cur = positions.getOrNull(t.explorePos)
+    if (cur != null) {
+        val patName = if (hasTwoPatterns(cur.box, cur.mode, cur.subset)) " pattern ${cur.pattern}" else ""
+        Text(
+            "Box ${cur.box.number}/5 (${cur.box.cagedShape} shape)$patName · frets ${cur.firstFret}–${cur.lastFret}",
+            fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp),
+        )
+    }
     Text(
-        "Scroll the scale's positions across the neck (like Fretboard mode). Tap a note to hear it.",
+        "The same boxes the Guided run drills, low to high the neck. Tap a note to hear it.",
         style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 4.dp),
     )
 }
@@ -275,13 +283,7 @@ private fun trainerMarks(state: AppState): Map<FretPosition, FretMark> {
         }
         TrainerTab.Explore -> {
             val pos = t.explorePositionsList().getOrNull(t.explorePos) ?: return emptyMap()
-            val root = t.key.value
-            val out = HashMap<FretPosition, FretMark>()
-            for (p in pos.positions) {
-                val pc = Fretboard.noteAt(t.tuning, p).pitchClass
-                out[p] = FretMark(intervalName(Interval(((pc.value - root) % 12 + 12) % 12)), pc.value == root, MarkKind.Scale)
-            }
-            out
+            notesToMarks(pos.notes)
         }
     }
 }
