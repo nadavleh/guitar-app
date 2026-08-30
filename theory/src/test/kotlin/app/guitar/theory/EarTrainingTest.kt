@@ -3,6 +3,7 @@ package app.guitar.theory
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 class EarTrainingTest {
@@ -507,15 +508,31 @@ class EarTrainingTest {
         val royalRoad = Progression(TrainingMode.Major, listOf(4, 5, 3, 6))
         assertTrue(EarTraining.progressionLacksTonic(royalRoad))
         assertEquals(TrainingMode.Minor, EarTraining.progressionRelativeTonicMode(royalRoad))
+        assertEquals(4, EarTraining.progressionRelativeTonicBar(royalRoad))
+        assertTrue(EarTraining.progressionEndsOnRelativeTonic(royalRoad))
         assertEquals("bVI  –  bVII  –  v  –  i", EarTraining.relativeRomanLineFor(royalRoad))
     }
 
-    @Test fun `a progression that ends away from the relative tonic stays unresolved`() {
-        // vi-V-IV-V passes through vi but hangs on V, so there is no tonic either way.
+    @Test fun `vi-V-IV-V OPENS on the relative tonic - it is not tonic-less`() {
+        // Nadav: "the progression which has 6 5 4 5 indicates it's without a tonic where in
+        // fact it does have the minor 1". Right — vi IS the relative minor's i, in bar 1.
+        // It has a home; it just doesn't END there (it hangs on bVII).
         val hanging = Progression(TrainingMode.Major, listOf(6, 5, 4, 5))
         assertTrue(EarTraining.progressionLacksTonic(hanging))
-        assertNull(EarTraining.progressionRelativeTonicMode(hanging))
-        assertEquals("", EarTraining.relativeRomanLineFor(hanging))
+        assertEquals(TrainingMode.Minor, EarTraining.progressionRelativeTonicMode(hanging))
+        assertEquals(1, EarTraining.progressionRelativeTonicBar(hanging))
+        assertFalse(EarTraining.progressionEndsOnRelativeTonic(hanging))
+        assertEquals("i  –  bVII  –  bVI  –  bVII", EarTraining.relativeRomanLineFor(hanging))
+    }
+
+    @Test fun `only a progression holding neither tonic is truly tonic-less`() {
+        // ii-V-IV-V has no I and no vi, so neither reading gives it a home.
+        val none = Progression(TrainingMode.Major, listOf(2, 5, 4, 5))
+        assertTrue(EarTraining.progressionLacksTonic(none))
+        assertNull(EarTraining.progressionRelativeTonicMode(none))
+        assertEquals(0, EarTraining.progressionRelativeTonicBar(none))
+        assertFalse(EarTraining.progressionEndsOnRelativeTonic(none))
+        assertEquals("", EarTraining.relativeRomanLineFor(none))
     }
 
     @Test fun `a progression with its own tonic has no relative reading`() {

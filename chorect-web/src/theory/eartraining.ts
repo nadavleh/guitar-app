@@ -596,26 +596,44 @@ export function progressionLacksTonic(p: Progression): boolean {
   return !p.degrees.includes(1);
 }
 
+/** Scale degree of the RELATIVE key's tonic: a major key's relative minor has its i on
+ *  degree 6, a minor key's relative major has its I on degree 3. */
+function relativeTonicDegree(mode: TrainingMode): number {
+  return mode === TrainingMode.Major ? 6 : 3;
+}
+
 /**
- * The RELATIVE key a tonic-less progression actually resolves in, or null when it has
- * no such reading.
+ * The RELATIVE key a tonic-less progression is actually heard in, or null when it has no
+ * tonic at all.
  *
  * A major key and its relative minor share all seven chords, so a progression with no I
- * of its own may still land on a tonic when renumbered from the other tonic: IV–V–iii–vi
- * is bVI–bVII–v–i in the relative minor, which resolves perfectly. That reading only
- * counts when the progression ENDS on the relative tonic — one that merely passes through
- * it and finishes elsewhere (vi–V–IV–V ends hanging on V) is genuinely unresolved and
- * keeps the plain no-tonic warning.
+ * of its own may still OWN a tonic once renumbered from the other tonic: IV–V–iii–vi is
+ * bVI–bVII–v–i, and vi–V–IV–V is i–bVII–bVI–bVII — a minor vamp that opens on its own i.
+ * Both have a minor tonic; they differ only in whether they also END on it (see
+ * [progressionEndsOnRelativeTonic]). Only a progression holding neither degree 1 nor the
+ * relative tonic is genuinely tonic-less.
  *
  * Major → the relative minor's tonic is degree 6; minor → the relative major's is
  * degree 3 (see [majorRelativeDegree]).
  */
 export function progressionRelativeTonicMode(p: Progression): TrainingMode | null {
   if (!progressionLacksTonic(p)) return null;
-  const last = p.degrees[p.degrees.length - 1];
-  if (last === undefined) return null;
-  if (p.mode === TrainingMode.Major) return last === 6 ? TrainingMode.Minor : null;
-  return last === 3 ? TrainingMode.Major : null;
+  if (!p.degrees.includes(relativeTonicDegree(p.mode))) return null;
+  return p.mode === TrainingMode.Major ? TrainingMode.Minor : TrainingMode.Major;
+}
+
+/** 1-based bar holding the first relative-tonic chord, or 0 when there is none. */
+export function progressionRelativeTonicBar(p: Progression): number {
+  if (progressionRelativeTonicMode(p) === null) return 0;
+  return p.degrees.indexOf(relativeTonicDegree(p.mode)) + 1;
+}
+
+/** True when the relative reading also RESOLVES — the LAST bar is the relative tonic
+ *  (IV–V–iii–vi ends on vi). False for one that owns its tonic but finishes away from it
+ *  (vi–V–IV–V opens on i and hangs on bVII). */
+export function progressionEndsOnRelativeTonic(p: Progression): boolean {
+  return progressionRelativeTonicMode(p) !== null &&
+    p.degrees[p.degrees.length - 1] === relativeTonicDegree(p.mode);
 }
 
 /** [p] renumbered from its relative tonic, or null when it has no such reading.

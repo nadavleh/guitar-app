@@ -12,7 +12,8 @@ import {
   romanIsModeAmbiguous, MAJOR_DEGREES, MINOR_DEGREES,
   ProgFocus, randomProgression, hasOneSixStep, thirdSixthPrimaryPool, thirdSixthContrastPool,
   THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode,
-  progressionLacksTonic, progressionRelativeTonicMode, relativeRomanLineFor, romanLineFor,
+  progressionLacksTonic, progressionRelativeTonicMode, progressionRelativeTonicBar,
+  progressionEndsOnRelativeTonic, relativeRomanLineFor, romanLineFor,
   CAGED_SHAPES, CAGED_BOXES, CagedBox, CagedMode, ScaleSubset, patternCount, boxNumber,
   resolveBox, boxWindow, PRACTICE_RUN, TRIAD_GROUPS, triadRun, triadInversions, explorePositions, noteAt, fp, fpKey,
 } from "../src/theory";
@@ -446,11 +447,21 @@ const royalRoad: Progression = { mode: TrainingMode.Major, degrees: [4, 5, 3, 6]
 check("IV-V-iii-vi resolves in the relative minor as bVI-bVII-v-i",
   progressionLacksTonic(royalRoad) &&
   progressionRelativeTonicMode(royalRoad) === TrainingMode.Minor &&
+  progressionRelativeTonicBar(royalRoad) === 4 &&
+  progressionEndsOnRelativeTonic(royalRoad) &&
   relativeRomanLineFor(royalRoad) === "bVI  –  bVII  –  v  –  i");
 const hanging: Progression = { mode: TrainingMode.Major, degrees: [6, 5, 4, 5] };
-check("a progression ending away from the relative tonic stays unresolved",
-  progressionLacksTonic(hanging) && progressionRelativeTonicMode(hanging) === null &&
-  relativeRomanLineFor(hanging) === "");
+check("vi-V-IV-V OPENS on the relative tonic - it is not tonic-less",
+  progressionLacksTonic(hanging) &&
+  progressionRelativeTonicMode(hanging) === TrainingMode.Minor &&
+  progressionRelativeTonicBar(hanging) === 1 &&
+  !progressionEndsOnRelativeTonic(hanging) &&
+  relativeRomanLineFor(hanging) === "i  –  bVII  –  bVI  –  bVII");
+const noTonic: Progression = { mode: TrainingMode.Major, degrees: [2, 5, 4, 5] };
+check("only a progression holding neither tonic is truly tonic-less",
+  progressionLacksTonic(noTonic) && progressionRelativeTonicMode(noTonic) === null &&
+  progressionRelativeTonicBar(noTonic) === 0 &&
+  !progressionEndsOnRelativeTonic(noTonic) && relativeRomanLineFor(noTonic) === "");
 check("a progression with its own tonic has no relative reading",
   progressionRelativeTonicMode({ mode: TrainingMode.Major, degrees: [1, 5, 6, 4] }) === null);
 check("a minor progression ending on bIII reads in the relative major",

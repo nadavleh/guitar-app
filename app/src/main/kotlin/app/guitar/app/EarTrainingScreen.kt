@@ -2873,27 +2873,28 @@ internal fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
 
 /** Marker appended to a progression's Roman line when it has no tonic (no I/i): nothing
  *  anchors the key, so it's harder to place by ear — flagged as "difficult". A
- *  progression that lands on its RELATIVE tonic instead (IV–V–iii–vi ends on vi = the
- *  relative minor's i) is not one of those: it resolves, just in the other key, so it
- *  gets the calmer marker. */
-private fun tonicMark(p: Progression): String = when {
-    !EarTraining.progressionLacksTonic(p) -> ""
-    EarTraining.progressionRelativeTonicMode(p) != null -> "   ◆ relative minor"
-    else -> "   ◆ no-tonic (hard)"
+ *  progression that carries its RELATIVE tonic instead (IV–V–iii–vi ends on vi, vi–V–IV–V
+ *  opens on it — both are the relative minor's i) is not one of those: it has a home, just
+ *  in the other key, so it gets the calmer marker. */
+private fun tonicMark(p: Progression): String {
+    if (!EarTraining.progressionLacksTonic(p)) return ""
+    val rel = EarTraining.progressionRelativeTonicMode(p) ?: return "   ◆ no-tonic (hard)"
+    return if (rel == TrainingMode.Minor) "   ◆ relative minor" else "   ◆ relative major"
 }
 
 /**
  * Prominent note about where a progression's home is, when it isn't where the Roman
  * numbering says.
  *
- * Two different situations, and conflating them was a bug: a progression with no I of
- * its own that ENDS on the relative tonic (IV–V–iii–vi finishes on vi = the relative
- * minor's i) resolves perfectly well — it is simply a minor-key progression wearing
- * major numerals, so the card states the minor reading and stops there. Only a
- * progression that never lands anywhere (vi–V–IV–V hangs on V) gets the hard warning:
- * with no home to measure the other functions against, a wrong key guess stays wrong
- * for all four bars. Shown in Practice and in Challenge, where you meet the
- * progression, not only in the library.
+ * A progression with no I of its own still has a home whenever it CONTAINS the relative
+ * tonic — IV–V–iii–vi finishes on vi and vi–V–IV–V opens on it, and both vi ARE the
+ * relative minor's i. It is simply a minor-key progression wearing major numerals, so the
+ * card states the minor reading; it only adds whether the progression also ends there
+ * (IV–V–iii–vi cadences, vi–V–IV–V hangs on bVII). Calling that second one "no tonic" was
+ * a bug — it opens on its tonic. The hard warning is now reserved for a progression that
+ * holds neither tonic: with no home to measure the other functions against, a wrong key
+ * guess stays wrong for all four bars. Shown in Practice and in Challenge, where you meet
+ * the progression, not only in the library.
  */
 @Composable
 private fun NoTonicBanner(ear: EarTrainingState, showRelativeLine: Boolean) {
@@ -2901,6 +2902,8 @@ private fun NoTonicBanner(ear: EarTrainingState, showRelativeLine: Boolean) {
     if (!EarTraining.progressionLacksTonic(prog)) return
     val relativeMode = EarTraining.progressionRelativeTonicMode(prog)
     val relative = relativeMode != null
+    val relWord = if (relativeMode == TrainingMode.Minor) "minor" else "major"
+    val homeWord = if (relativeMode == TrainingMode.Minor) "major" else "minor"
     // The relative-tonic reading is information, not a warning — it uses the neutral
     // surface so it can't read as "you got something wrong".
     Surface(
@@ -2913,16 +2916,20 @@ private fun NoTonicBanner(ear: EarTrainingState, showRelativeLine: Boolean) {
                  else MaterialTheme.colorScheme.onErrorContainer
         Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
             Text(
-                if (relative) "◆  READS IN THE RELATIVE MINOR  ◆" else "◆  NO TONIC  ◆",
+                if (relative) "◆  READS IN THE RELATIVE ${relWord.uppercase()}  ◆" else "◆  NO TONIC  ◆",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Black,
                 color = fg,
             )
             if (relative) {
+                val endsHome = EarTraining.progressionEndsOnRelativeTonic(prog)
+                val bar = EarTraining.progressionRelativeTonicBar(prog)
                 Text(
-                    "No I in this key, but it lands on the relative tonic — so hear it " +
-                        "from the minor, not the major." +
-                        if (showRelativeLine) " Relative to the minor scale it is:" else "",
+                    (if (endsHome) "No I in this key, but it lands on the relative tonic"
+                     else "No I in this key, but bar $bar IS the relative tonic — it just " +
+                         "doesn't end there") +
+                        " — so hear it from the $relWord, not the $homeWord." +
+                        if (showRelativeLine) " Relative to the $relWord scale it is:" else "",
                     style = MaterialTheme.typography.bodySmall,
                     color = fg,
                 )
@@ -2938,8 +2945,8 @@ private fun NoTonicBanner(ear: EarTrainingState, showRelativeLine: Boolean) {
                 }
             } else {
                 Text(
-                    "This progression never lands on the tonic — one of the hard ones. " +
-                        "Don't wait to hear home; judge each chord by its pull instead.",
+                    "This progression holds no tonic at all, in either key — one of the " +
+                        "hard ones. Don't wait to hear home; judge each chord by its pull instead.",
                     style = MaterialTheme.typography.bodySmall,
                     color = fg,
                 )
