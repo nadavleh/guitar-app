@@ -509,20 +509,30 @@ class EarTrainingTest {
         assertTrue(EarTraining.progressionLacksTonic(royalRoad))
         assertEquals(TrainingMode.Minor, EarTraining.progressionRelativeTonicMode(royalRoad))
         assertEquals(4, EarTraining.progressionRelativeTonicBar(royalRoad))
-        assertTrue(EarTraining.progressionEndsOnRelativeTonic(royalRoad))
+        // Bar 4, not bar 1 — so the banner has something to say about it.
+        assertFalse(EarTraining.progressionHomeIsObvious(royalRoad))
         assertEquals("bVI  –  bVII  –  v  –  i", EarTraining.relativeRomanLineFor(royalRoad))
     }
 
-    @Test fun `vi-V-IV-V OPENS on the relative tonic - it is not tonic-less`() {
+    @Test fun `vi-V-IV-V OPENS on the relative tonic - so nothing is flagged`() {
         // Nadav: "the progression which has 6 5 4 5 indicates it's without a tonic where in
-        // fact it does have the minor 1". Right — vi IS the relative minor's i, in bar 1.
-        // It has a home; it just doesn't END there (it hangs on bVII).
+        // fact it does have the minor 1" — vi IS the relative minor's i, and it is bar 1.
+        // "If it is the first one, don't indicate a thing": the progression starts at home,
+        // so it gets NO banner and NO marker, exactly like one with its own I.
         val hanging = Progression(TrainingMode.Major, listOf(6, 5, 4, 5))
         assertTrue(EarTraining.progressionLacksTonic(hanging))
         assertEquals(TrainingMode.Minor, EarTraining.progressionRelativeTonicMode(hanging))
         assertEquals(1, EarTraining.progressionRelativeTonicBar(hanging))
-        assertFalse(EarTraining.progressionEndsOnRelativeTonic(hanging))
+        assertTrue(EarTraining.progressionHomeIsObvious(hanging))
         assertEquals("i  –  bVII  –  bVI  –  bVII", EarTraining.relativeRomanLineFor(hanging))
+    }
+
+    @Test fun `a progression with its own I is never flagged`() {
+        for (p in EarTraining.MAJOR_PROGRESSIONS + EarTraining.MINOR_PROGRESSIONS) {
+            if (!EarTraining.progressionLacksTonic(p)) {
+                assertTrue(EarTraining.progressionHomeIsObvious(p), EarTraining.romanLineFor(p))
+            }
+        }
     }
 
     @Test fun `only a progression holding neither tonic is truly tonic-less`() {
@@ -531,7 +541,7 @@ class EarTrainingTest {
         assertTrue(EarTraining.progressionLacksTonic(none))
         assertNull(EarTraining.progressionRelativeTonicMode(none))
         assertEquals(0, EarTraining.progressionRelativeTonicBar(none))
-        assertFalse(EarTraining.progressionEndsOnRelativeTonic(none))
+        assertFalse(EarTraining.progressionHomeIsObvious(none))
         assertEquals("", EarTraining.relativeRomanLineFor(none))
     }
 

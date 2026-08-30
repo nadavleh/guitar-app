@@ -2871,13 +2871,13 @@ internal fun EarStatsDialog(state: AppState, onDismiss: () -> Unit) {
 // Progression library — the pools the trainer draws from (major / minor / advanced / circle)
 // ======================================================================================
 
-/** Marker appended to a progression's Roman line when it has no tonic (no I/i): nothing
- *  anchors the key, so it's harder to place by ear — flagged as "difficult". A
- *  progression that carries its RELATIVE tonic instead (IV–V–iii–vi ends on vi, vi–V–IV–V
- *  opens on it — both are the relative minor's i) is not one of those: it has a home, just
- *  in the other key, so it gets the calmer marker. */
+/** Marker appended to a progression's Roman line when its home needs a word. Nothing is
+ *  said about one that starts at home — its own I, or the RELATIVE tonic in bar 1
+ *  (vi–V–IV–V opens on the relative minor's i). A tonic that arrives later (IV–V–iii–vi
+ *  reaches it in bar 4) gets the calm relative marker; only a progression with no tonic in
+ *  either key is "difficult", with nothing anchoring the key for the ear. */
 private fun tonicMark(p: Progression): String {
-    if (!EarTraining.progressionLacksTonic(p)) return ""
+    if (EarTraining.progressionHomeIsObvious(p)) return ""
     val rel = EarTraining.progressionRelativeTonicMode(p) ?: return "   ◆ no-tonic (hard)"
     return if (rel == TrainingMode.Minor) "   ◆ relative minor" else "   ◆ relative major"
 }
@@ -2887,19 +2887,21 @@ private fun tonicMark(p: Progression): String {
  * numbering says.
  *
  * A progression with no I of its own still has a home whenever it CONTAINS the relative
- * tonic — IV–V–iii–vi finishes on vi and vi–V–IV–V opens on it, and both vi ARE the
+ * tonic — IV–V–iii–vi reaches vi in bar 4 and vi–V–IV–V opens on it, and both vi ARE the
  * relative minor's i. It is simply a minor-key progression wearing major numerals, so the
- * card states the minor reading; it only adds whether the progression also ends there
- * (IV–V–iii–vi cadences, vi–V–IV–V hangs on bVII). Calling that second one "no tonic" was
- * a bug — it opens on its tonic. The hard warning is now reserved for a progression that
- * holds neither tonic: with no home to measure the other functions against, a wrong key
- * guess stays wrong for all four bars. Shown in Practice and in Challenge, where you meet
- * the progression, not only in the library.
+ * card states the minor reading and says the one useful thing: the tonic is NOT the first
+ * chord, it is bar n. When the tonic IS the first chord there is nothing to say — the
+ * progression starts at home like any other, so no card appears at all (calling that one
+ * "no tonic" was the bug). The hard warning is reserved for a progression holding neither
+ * tonic: with no home to measure the other functions against, a wrong key guess stays
+ * wrong for all four bars. Shown in Practice and in Challenge, where you meet the
+ * progression, not only in the library.
  */
 @Composable
 private fun NoTonicBanner(ear: EarTrainingState, showRelativeLine: Boolean) {
     val prog = ear.progProgression ?: return
-    if (!EarTraining.progressionLacksTonic(prog)) return
+    // Its own I, or the relative tonic in bar 1 — it starts at home, so say nothing.
+    if (EarTraining.progressionHomeIsObvious(prog)) return
     val relativeMode = EarTraining.progressionRelativeTonicMode(prog)
     val relative = relativeMode != null
     val relWord = if (relativeMode == TrainingMode.Minor) "minor" else "major"
@@ -2922,13 +2924,11 @@ private fun NoTonicBanner(ear: EarTrainingState, showRelativeLine: Boolean) {
                 color = fg,
             )
             if (relative) {
-                val endsHome = EarTraining.progressionEndsOnRelativeTonic(prog)
                 val bar = EarTraining.progressionRelativeTonicBar(prog)
                 Text(
-                    (if (endsHome) "No I in this key, but it lands on the relative tonic"
-                     else "No I in this key, but bar $bar IS the relative tonic — it just " +
-                         "doesn't end there") +
-                        " — so hear it from the $relWord, not the $homeWord." +
+                    "No I in this key, and the tonic is not the first chord — it is bar " +
+                        "$bar, the relative $relWord's i. Hear it from the $relWord, not " +
+                        "the $homeWord." +
                         if (showRelativeLine) " Relative to the $relWord scale it is:" else "",
                     style = MaterialTheme.typography.bodySmall,
                     color = fg,

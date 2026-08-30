@@ -609,9 +609,10 @@ function relativeTonicDegree(mode: TrainingMode): number {
  * A major key and its relative minor share all seven chords, so a progression with no I
  * of its own may still OWN a tonic once renumbered from the other tonic: IV–V–iii–vi is
  * bVI–bVII–v–i, and vi–V–IV–V is i–bVII–bVI–bVII — a minor vamp that opens on its own i.
- * Both have a minor tonic; they differ only in whether they also END on it (see
- * [progressionEndsOnRelativeTonic]). Only a progression holding neither degree 1 nor the
- * relative tonic is genuinely tonic-less.
+ * Both have a minor tonic; the only thing worth saying about the difference is WHERE it
+ * sits (see [progressionRelativeTonicBar]) — and when it is bar 1 there is nothing to say
+ * at all, the progression starts at home like any other. Only a progression holding
+ * neither degree 1 nor the relative tonic is genuinely tonic-less.
  *
  * Major → the relative minor's tonic is degree 6; minor → the relative major's is
  * degree 3 (see [majorRelativeDegree]).
@@ -628,12 +629,13 @@ export function progressionRelativeTonicBar(p: Progression): number {
   return p.degrees.indexOf(relativeTonicDegree(p.mode)) + 1;
 }
 
-/** True when the relative reading also RESOLVES — the LAST bar is the relative tonic
- *  (IV–V–iii–vi ends on vi). False for one that owns its tonic but finishes away from it
- *  (vi–V–IV–V opens on i and hangs on bVII). */
-export function progressionEndsOnRelativeTonic(p: Progression): boolean {
-  return progressionRelativeTonicMode(p) !== null &&
-    p.degrees[p.degrees.length - 1] === relativeTonicDegree(p.mode);
+/** True when nothing needs flagging about [p]'s home: it has its own I, or it OPENS on the
+ *  relative tonic (vi–V–IV–V is i–bVII–bVI–bVII — bar 1 is the minor i, so it starts at
+ *  home and the ear has its anchor from the first chord). Only a tonic that arrives LATER
+ *  (IV–V–iii–vi reaches i in bar 4) is worth a word, and only a progression with no tonic
+ *  in either key is a hard one. */
+export function progressionHomeIsObvious(p: Progression): boolean {
+  return !progressionLacksTonic(p) || progressionRelativeTonicBar(p) === 1;
 }
 
 /** [p] renumbered from its relative tonic, or null when it has no such reading.

@@ -19,8 +19,8 @@ import {
   IntervalDirection, INTERVAL_CHOICES, intervalChoiceFor,
   Progression, CarMode,
   MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, MINOR_HARMONIC_PROGRESSIONS, ADVANCED_PROGRESSIONS, ADVANCED2_PROGRESSIONS,
-  SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor, progressionFromKey, progressionLacksTonic,
-  progressionRelativeTonicMode, progressionRelativeTonicBar, progressionEndsOnRelativeTonic,
+  SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor, progressionFromKey,
+  progressionRelativeTonicMode, progressionRelativeTonicBar, progressionHomeIsObvious,
   relativeRomanLineFor,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow,
   ResolvedChord, ChordShape, resolveProgression, resolveNamed, resolveCircleWindow,
@@ -800,7 +800,7 @@ export class EarTrainingUI {
     // A progression with no tonic (no I/i) has nothing anchoring the key, so it's
     // harder to place by ear — append a marker to its row label.
     const tonicMark = (p: Progression): string =>
-      !progressionLacksTonic(p) ? ""
+      progressionHomeIsObvious(p) ? ""
         : progressionRelativeTonicMode(p) === TrainingMode.Minor ? "   ◆ relative minor"
         : progressionRelativeTonicMode(p) === TrainingMode.Major ? "   ◆ relative major"
         : "   ◆ no-tonic (hard)";
@@ -1117,21 +1117,22 @@ export class EarTrainingUI {
    * numbering says.
    *
    * A progression with no I of its own still has a home whenever it CONTAINS the relative
-   * tonic — IV–V–iii–vi finishes on vi and vi–V–IV–V opens on it, and both vi ARE the
+   * tonic — IV–V–iii–vi reaches vi in bar 4 and vi–V–IV–V opens on it, and both vi ARE the
    * relative minor's i. It is simply a minor-key progression wearing major numerals, so the
-   * card states the minor reading; it only adds whether the progression also ends there
-   * (IV–V–iii–vi cadences, vi–V–IV–V hangs on bVII). Calling that second one "no tonic" was
-   * a bug — it opens on its tonic. The hard warning is now reserved for a progression that
-   * holds neither tonic: with no home to measure the other functions against, a wrong key
-   * guess stays wrong for all four bars. Shown in Practice and in Challenge, not only in
-   * the library.
+   * card states the minor reading and says the one useful thing: the tonic is NOT the first
+   * chord, it is bar n. When the tonic IS the first chord there is nothing to say — the
+   * progression starts at home like any other, so no card appears at all (calling that one
+   * "no tonic" was the bug). The hard warning is reserved for a progression holding neither
+   * tonic: with no home to measure the other functions against, a wrong key guess stays
+   * wrong for all four bars. Shown in Practice and in Challenge, not only in the library.
    *
    * `showRelativeLine` is false on an unanswered challenge question: the relative Roman
    * line names every bar, so it IS the answer. Returns null when neither case applies.
    */
   private noTonicBanner(showRelativeLine: boolean): HTMLElement | null {
     const p = this.ear.progProgression;
-    if (!p || !progressionLacksTonic(p)) return null;
+    // Its own I, or the relative tonic in bar 1 — it starts at home, so say nothing.
+    if (!p || progressionHomeIsObvious(p)) return null;
     const relativeMode = progressionRelativeTonicMode(p);
     if (relativeMode === null) {
       return el("div", {
@@ -1153,10 +1154,8 @@ export class EarTrainingUI {
       el("div", { style: "font-weight:800;letter-spacing:0.5px" },
         [`◆  READS IN THE RELATIVE ${relWord.toUpperCase()}  ◆`]),
       el("div", { style: "font-size:12px;margin-top:2px" }, [
-        (progressionEndsOnRelativeTonic(p)
-          ? "No I in this key, but it lands on the relative tonic"
-          : `No I in this key, but bar ${bar} IS the relative tonic — it just doesn't end there`) +
-        ` — so hear it from the ${relWord}, not the ${homeWord}.` +
+        `No I in this key, and the tonic is not the first chord — it is bar ${bar}, the ` +
+        `relative ${relWord}'s i. Hear it from the ${relWord}, not the ${homeWord}.` +
         (showRelativeLine ? ` Relative to the ${relWord} scale it is:` : ""),
       ]),
     ];
@@ -2021,7 +2020,7 @@ export class EarTrainingUI {
       row.appendChild(el("div", { style: "display:flex;align-items:center;gap:8px" }, [
         el("div", { style: "flex:1" }, [
           el("div", { style: "font-weight:700" }, [romanLineFor(e.prog!) +
-            (!progressionLacksTonic(e.prog!) ? ""
+            (progressionHomeIsObvious(e.prog!) ? ""
               : progressionRelativeTonicMode(e.prog!) === TrainingMode.Minor ? "   ◆ relative minor"
               : progressionRelativeTonicMode(e.prog!) === TrainingMode.Major ? "   ◆ relative major"
               : "   ◆ no-tonic (hard)")]),
