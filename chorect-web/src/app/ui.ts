@@ -485,6 +485,10 @@ export class App {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "x" && sheet === Sheet.SambaLooper) {
         if (this.sambaUI.cutSelection()) { e.preventDefault(); return; }
       }
+      // Delete / Backspace blanks a cell selection without touching the clipboard.
+      if ((e.key === "Delete" || e.key === "Backspace") && sheet === Sheet.SambaLooper) {
+        if (this.sambaUI.deleteSelection()) { e.preventDefault(); return; }
+      }
 
       if (e.code === "Space") {
         if (sheet === Sheet.SambaLooper) { e.preventDefault(); this.sambaUI.togglePlay(); }
@@ -548,6 +552,10 @@ export class App {
       else rows.push(["← →", "Previous / next progression"], ["1–4", "Play that bar"]);
     } else if (sheet === Sheet.SambaLooper || sheet === Sheet.Loop) {
       rows.push(["Space", "Play / stop the loop"]);
+      if (sheet === Sheet.SambaLooper) {
+        rows.push(["Ctrl+Z", "Undo the last edit"], ["Ctrl+C / X / V", "Copy / cut / paste the selected strikes"],
+          ["Del", "Clear the selected strikes"]);
+      }
     } else if (sheet === null || sheet === Sheet.Fretboard) {
       rows.push(["← →", "Previous / next quick-chord slot (Play mode)"], ["1–8", "Apply that quick-chord slot"]);
     }

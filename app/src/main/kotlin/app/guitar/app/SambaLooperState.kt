@@ -524,9 +524,15 @@ class SambaLooperState(
         setMeter(meter.copy(division = division))
     }
 
-    /** Translate (rotate) the edited pattern by [n] slots with wrap-around. */
+    /** The selected track's instrument in the edited pattern, or null. */
+    val selectedInstrument: PercussionInstrument?
+        get() = selectedTrackId?.let { id -> editPattern.instruments.firstOrNull { it.id == id } }
+
+    /** Translate (rotate) by [n] slots with wrap-around: the SELECTED track alone
+     *  while one is selected, otherwise the whole edited pattern. */
     fun translate(n: Int) {
-        commit(editPattern.translated(n))
+        val inst = selectedInstrument
+        commit(if (inst != null) editPattern.translatedRow(inst, n) else editPattern.translated(n))
     }
 
     // ---- Save / load user beats ----

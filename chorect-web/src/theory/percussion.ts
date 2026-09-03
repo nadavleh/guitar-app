@@ -375,6 +375,25 @@ export class PercussionPattern {
   }
 
   /**
+   * Shift ONE instrument's row by [n] slots with wrap-around, leaving every other
+   * track where it is. Used by the looper's Shift control while a track is selected.
+   * Unknown instruments and a no-op shift return this pattern unchanged.
+   */
+  translatedRow(instrument: PercussionInstrument, n: number): PercussionPattern {
+    const slots = this.slots;
+    if (slots === 0) return this;
+    const row = this.grid.get(instrument.id);
+    if (!row) return this;
+    const shift = ((n % slots) + slots) % slots;
+    if (shift === 0) return this;
+    const moved: (number | null)[] = new Array(slots);
+    for (let i = 0; i < slots; i++) moved[i] = row[((i - shift) % slots + slots) % slots];
+    const g = new Map(this.grid);
+    g.set(instrument.id, moved);
+    return new PercussionPattern(this.instruments, g, this.meter, this.trackSwing, this.trackVolume);
+  }
+
+  /**
    * Re-fit this pattern onto [newMeter], copying cells by slot index (cells past
    * the new slot count are dropped; new slots are silent).
    */

@@ -622,8 +622,18 @@ export class SambaLooperState {
     this.setMeter(this.meter.copy({ division }));
   }
 
-  /** Translate (rotate) the edited pattern by [n] slots with wrap-around. */
-  translate(n: number) { this.commit(this.editPattern.translated(n)); }
+  /** The selected track's instrument in the edited pattern, or null. */
+  selectedInstrument(): PercussionInstrument | null {
+    const id = this.selectedTrackId;
+    return id === null ? null : (this.editPattern.instruments.find((i) => i.id === id) ?? null);
+  }
+
+  /** Translate (rotate) by [n] slots with wrap-around: the SELECTED track alone
+   *  while one is selected, otherwise the whole edited pattern. */
+  translate(n: number) {
+    const inst = this.selectedInstrument();
+    this.commit(inst ? this.editPattern.translatedRow(inst, n) : this.editPattern.translated(n));
+  }
 
   // ---- save / load ----
 

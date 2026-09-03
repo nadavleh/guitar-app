@@ -908,12 +908,18 @@ private val TIME_SIGNATURES = listOf(
     2 to 4, 3 to 4, 4 to 4, 5 to 4, 6 to 8, 3 to 8, 12 to 8, 2 to 2,
 )
 
-/** "Shift" the whole loop left/right by ±1, or by a typed amount (wrap-around). */
+/** "Shift" the loop left/right by ±1, or by a typed amount (wrap-around). With a
+ *  track selected it rotates THAT row alone — the label names it so the scope is
+ *  never a guess. */
 @Composable
 private fun TranslateControl(samba: SambaLooperState) {
     var n by remember { mutableStateOf("1") }
+    val selected = samba.selectedInstrument
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Shift", style = MaterialTheme.typography.labelMedium)
+        Text(
+            if (selected != null) "Shift · ${selected.displayName}" else "Shift",
+            style = MaterialTheme.typography.labelMedium,
+        )
         Spacer(Modifier.width(4.dp))
         OutlinedButton(onClick = { samba.translate(-1) }, contentPadding = STEP_PAD) { Text("◀") }
         Spacer(Modifier.width(2.dp))

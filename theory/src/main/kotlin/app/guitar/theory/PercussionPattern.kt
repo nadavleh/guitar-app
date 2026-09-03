@@ -262,6 +262,20 @@ data class PercussionPattern(
     }
 
     /**
+     * Shift ONE instrument's row by [n] slots with wrap-around, leaving every other
+     * track where it is. Used by the looper's Shift control while a track is selected.
+     * Unknown instruments and a no-op shift return this pattern unchanged.
+     */
+    fun translatedRow(instrument: PercussionInstrument, n: Int): PercussionPattern {
+        if (slots == 0) return this
+        val row = grid[instrument.id] ?: return this
+        val shift = ((n % slots) + slots) % slots
+        if (shift == 0) return this
+        val moved = List(slots) { i -> row[((i - shift) % slots + slots) % slots] }
+        return copy(grid = grid + (instrument.id to moved))
+    }
+
+    /**
      * Re-fit this pattern onto [newMeter], copying cells by slot index (cells past
      * the new slot count are dropped; new slots are silent). Out-of-range voice
      * indices can't occur because the instruments are unchanged.

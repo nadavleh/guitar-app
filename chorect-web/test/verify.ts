@@ -204,6 +204,23 @@ check("per-track volume encodes as id@33%20 and round-trips",
   PercussionPattern.decode(quiet.encode())?.trackVolumeOf("cuica") === 20 &&
   quiet.withTrackVolume("cuica", 100).encode().includes("%") === false);
 
+// --- translatedRow: the Shift control with one track selected (mirrors the Kotlin
+// test `translatedRow rotates one track and leaves the rest alone`) ---
+{
+  const two = empty.cycled(PercussionCatalog.Surdo, 0).cycled(PercussionCatalog.Tamborim, 1);
+  const moved = two.translatedRow(PercussionCatalog.Surdo, 3);
+  check("translatedRow moves only the named track",
+    moved.voiceAt(PercussionCatalog.Surdo, 0) === null &&
+    moved.voiceAt(PercussionCatalog.Surdo, 3) === two.voiceAt(PercussionCatalog.Surdo, 0) &&
+    moved.voiceAt(PercussionCatalog.Tamborim, 1) === two.voiceAt(PercussionCatalog.Tamborim, 1));
+  check("translatedRow wraps around and is reversible",
+    two.translatedRow(PercussionCatalog.Surdo, -1).voiceAt(PercussionCatalog.Surdo, two.slots - 1) === two.voiceAt(PercussionCatalog.Surdo, 0) &&
+    two.translatedRow(PercussionCatalog.Surdo, 3).translatedRow(PercussionCatalog.Surdo, -3).encode() === two.encode() &&
+    two.translatedRow(PercussionCatalog.Surdo, two.slots).encode() === two.encode());
+  const all = two.instruments.reduce((acc, inst) => acc.translatedRow(inst, 3), two);
+  check("translatedRow on every track === whole-pattern translate", all.encode() === two.translated(3).encode());
+}
+
 // --- Swing (samba microtiming): anchors 1st/2nd, anticipates 3rd & 4th; preserves loop length; 1/16 only ---
 const straightSum = Array.from({ length: 16 }, (_, i) => swungSlotMs(i, 100, 0, M)).reduce((a, b) => a + b, 0);
 const swungSum = Array.from({ length: 16 }, (_, i) => swungSlotMs(i, 100, 60, M)).reduce((a, b) => a + b, 0);

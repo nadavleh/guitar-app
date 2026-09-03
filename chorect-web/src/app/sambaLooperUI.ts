@@ -191,6 +191,17 @@ export class SambaLooperUI {
     return true;
   }
 
+  /** Delete / Backspace: blank the selected rectangle (no clipboard write, unlike
+   *  Cut) and drop the selection. False = nothing selected, so the key falls through. */
+  deleteSelection(): boolean {
+    const r = this.selRect;
+    if (!r) return false;
+    this.samba.clearRegion(r.inOpening, r.t0, r.t1, r.s0, r.s1);
+    this.selRect = null;
+    this.rerender();
+    return true;
+  }
+
   /** Ctrl+V: paste the copied region anchored at the hovered cell. */
   pasteAtHover(): boolean {
     const h = this.hoverCell, cb = this.cellClipboard;
@@ -511,7 +522,7 @@ export class SambaLooperUI {
             legendLine("Accent tool:  ", "turn it on, then tap a hit → the hit plays louder (teal ring)"),
             legendLine("Dyn tool:  ", "turn it on, then tap a hit → its volume cycles 100 → 75 → 50 → 25 % (shown faded)"),
             legendLine("Erase tool:  ", "turn it on, then tap any cell → cleared"),
-            legendLine("Copy strikes:  ", "right-click + drag to select a rectangle → Ctrl+C copies · hover a target cell → Ctrl+V pastes"),
+            legendLine("Copy strikes:  ", "right-click + drag to select a rectangle → Ctrl+C copies · hover a target cell → Ctrl+V pastes · Del clears the selection"),
           ]),
           closeBtn,
         ]),
@@ -629,13 +640,15 @@ export class SambaLooperUI {
       el("span", { class: "drum-setup-label" }, ["Note"]), divSel,
     ]);
 
-    // Shift (translate) control: ◀ / ▶ / numeric + Go
+    // Shift (translate) control: ◀ / ▶ / numeric + Go. With a track selected it
+    // rotates THAT row alone — the label names it so the scope is never a guess.
     const shiftInput = el("input", { type: "text", value: "1", class: "drum-shift-input" }) as HTMLInputElement;
     shiftInput.addEventListener("input", () => {
       shiftInput.value = shiftInput.value.replace(/[^0-9-]/g, "").slice(0, 3);
     });
+    const selInst = s.selectedInstrument();
     const shift = el("div", { class: "drum-setup-item" }, [
-      el("span", { class: "drum-setup-label" }, ["Shift"]),
+      el("span", { class: "drum-setup-label" }, [selInst ? `Shift · ${selInst.displayName}` : "Shift"]),
       btn("◀", () => s.translate(-1)),
       btn("▶", () => s.translate(1)),
       shiftInput,

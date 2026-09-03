@@ -103,6 +103,26 @@ class PercussionPatternTest {
             p.translated(-1).voiceAt(PercussionCatalog.Surdo, p.slots - 1))
     }
 
+    @Test fun `translatedRow rotates one track and leaves the rest alone`() {
+        // Surdo on 0, Tamborim on 1 — shifting the Surdo alone must not move the Tamborim.
+        val p = PercussionPattern.empty()
+            .cycled(PercussionCatalog.Surdo, 0)
+            .cycled(PercussionCatalog.Tamborim, 1)
+        val moved = p.translatedRow(PercussionCatalog.Surdo, 3)
+        assertNull(moved.voiceAt(PercussionCatalog.Surdo, 0))
+        assertEquals(p.voiceAt(PercussionCatalog.Surdo, 0), moved.voiceAt(PercussionCatalog.Surdo, 3))
+        assertEquals(p.voiceAt(PercussionCatalog.Tamborim, 1), moved.voiceAt(PercussionCatalog.Tamborim, 1))
+        // Wrap-around, reversibility and the whole-loop / zero identities all hold.
+        assertEquals(p.voiceAt(PercussionCatalog.Surdo, 0),
+            p.translatedRow(PercussionCatalog.Surdo, -1).voiceAt(PercussionCatalog.Surdo, p.slots - 1))
+        assertEquals(p, p.translatedRow(PercussionCatalog.Surdo, 3).translatedRow(PercussionCatalog.Surdo, -3))
+        assertEquals(p, p.translatedRow(PercussionCatalog.Surdo, p.slots))
+        assertEquals(p, p.translatedRow(PercussionCatalog.Surdo, 0))
+        // Shifting every row by the same amount equals a whole-pattern translate.
+        val all = p.instruments.fold(p) { acc, inst -> acc.translatedRow(inst, 3) }
+        assertEquals(p.translated(3), all)
+    }
+
     @Test fun `slotMs scales with division`() {
         assertEquals(250L, PercussionTiming.slotMs(120, 8))   // eighth note at 120 = 250 ms
         assertEquals(125L, PercussionTiming.slotMs(120, 16))
