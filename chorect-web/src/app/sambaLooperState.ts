@@ -68,6 +68,11 @@ export function decodeBeatPatterns(s: string): SavedBeatValue | null {
   return { main, opening, notes };
 }
 
+/** Reserved key for the master fader inside the persisted mixer map. Instrument
+ *  ids are catalog slugs (`surdo`, `tamborim#2`, …), so a leading "~" can never
+ *  collide with one — and an old build simply ignores the unknown key. */
+export const MASTER_VOLUME_KEY = "~master";
+
 export class SambaLooperState {
   // Web opens with a single "Pandeiro — Reta" track at 0 % TRACK swing, so the
   // Open with the FIRST built-in groove loaded (both platforms).
@@ -429,9 +434,22 @@ export class SambaLooperState {
   voiceVolumeOf(inst: PercussionInstrument, voiceIndex: number): number {
     return this.volumes.get(this.voiceKey(inst, voiceIndex)) ?? SambaLooperState.defaultVoiceVolume(basePercussionId(inst.id), voiceIndex);
   }
-  /** Combined gain a hit actually plays at: track (from `pat`) × per-voice. */
+  /** MASTER level (0..1): one output fader for the whole drum machine — hits,
+   *  previews and the metronome click alike. Per-device like the voice trims
+   *  (it rides in the same persisted map under a reserved key, so it can never
+   *  collide with an instrument id), NOT part of the beat: it is a monitoring
+   *  level, so saved/exported beats and the WAV render are unaffected by it. */
+  get masterVolume(): number { return this.volumes.get(MASTER_VOLUME_KEY) ?? 1; }
+  setMasterVolume(value: number) {
+    const v = Math.min(Math.max(value, 0), 1);
+    this.volumes.set(MASTER_VOLUME_KEY, v);
+    this.deps.saveVolume(MASTER_VOLUME_KEY, v);
+    this.notify();
+  }
+
+  /** Combined gain a hit actually plays at: master × track (from `pat`) × per-voice. */
   effectiveGain(inst: PercussionInstrument, voiceIndex: number, pat: PercussionPattern = this.editPattern): number {
-    return (pat.trackVolumeOf(inst.id) / 100) * this.voiceVolumeOf(inst, voiceIndex);
+    return this.masterVolume * (pat.trackVolumeOf(inst.id) / 100) * this.voiceVolumeOf(inst, voiceIndex);
   }
   setVolume(inst: PercussionInstrument, value: number) {
     this.commit(this.editPattern.withTrackVolume(inst.id, Math.round(Math.min(Math.max(value, 0), 1) * 100)));
@@ -691,7 +709,8 @@ export class SambaLooperState {
         const m = snapshot.meter;
         if (slot % m.slotsPerBeat === 0) {
           const barDownbeat = slot % m.slotsPerBar === 0;
-          this.deps.audio.playSamples(barDownbeat ? this.mAccent : this.mClick, barDownbeat ? 0.9 : 0.6, when);
+          this.deps.audio.playSamples(barDownbeat ? this.mAccent : this.mClick,
+            this.masterVolume * (barDownbeat ? 0.9 : 0.6), when);
         }
       }
       for (const inst of snapshot.instruments) {

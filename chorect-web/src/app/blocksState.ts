@@ -33,6 +33,9 @@ export interface BlocksDeps {
   delTrackPreset: (label: string) => void;
   /** Load a bundled one-shot sample for (instrument, voice), or null → synth fallback. */
   loadSample: (inst: PercussionInstrument, voice: number) => Promise<Float32Array | null>;
+  /** The drum machine's master fader (SambaLooperState.masterVolume) — Blocks is
+   *  the same screen, so it plays through the same output level. */
+  masterVolume: () => number;
 }
 
 /** Phrases are all on the default 16-slot meter (2 bars of 2/4 in 16ths). */
@@ -289,7 +292,8 @@ export class BlocksState {
         const ticks = 2 * PHRASE_METER.slotsPerBeat;
         for (let i = 0; i < ticks; i++) {
           const accent = i % PHRASE_METER.slotsPerBeat === 0;
-          this.deps.audio.playSamples(accent ? this.mAccent : this.mClick, accent ? 0.9 : 0.55, colStart + i * stepSec);
+          this.deps.audio.playSamples(accent ? this.mAccent : this.mClick,
+            this.deps.masterVolume() * (accent ? 0.9 : 0.55), colStart + i * stepSec);
         }
         colStart += ticks * stepSec;
       }
@@ -323,7 +327,7 @@ export class BlocksState {
             const voice = raw % PERCUSSION_ACCENT;
             const accented = Math.floor(raw / PERCUSSION_ACCENT) % 10 === 1;
             const dyn = Math.floor(raw / PERCUSSION_DYN);
-            const gain = (accented ? 1.4 : 1) * PERCUSSION_DYN_FACTORS[dyn];
+            const gain = this.deps.masterVolume() * (accented ? 1.4 : 1) * PERCUSSION_DYN_FACTORS[dyn];
             // Self-choke per TRACK (blocks may repeat an instrument — two
             // pandeiro players don't damp each other).
             const chokeKey = t.instrument.selfChoke ? `${t.instrument.id}@${ti}` : undefined;
@@ -336,7 +340,8 @@ export class BlocksState {
           const baseSec = slotMsExact(this.bpm, PHRASE_METER.division) / 1000;
           for (let slot = 0; slot < PHRASE_SLOTS; slot += PHRASE_METER.slotsPerBeat) {
             const barDownbeat = slot % PHRASE_METER.slotsPerBar === 0;
-            this.deps.audio.playSamples(barDownbeat ? this.mAccent : this.mClick, barDownbeat ? 0.9 : 0.6, colStart + slot * baseSec);
+            this.deps.audio.playSamples(barDownbeat ? this.mAccent : this.mClick,
+              this.deps.masterVolume() * (barDownbeat ? 0.9 : 0.6), colStart + slot * baseSec);
           }
         }
         // Columns advance on the STRAIGHT clock (16 × base slot) for all tracks.

@@ -1124,6 +1124,12 @@ select.et-select {
 /* Inline BPM (drum machine): readout is non-interactive, slider flexes to fill. */
 .transport-bpm-inline { flex: 0 0 auto; cursor: default; padding-left: 0; }
 .transport-bpm-slider { flex: 1 1 auto; min-width: 80px; margin: 0 4px; }
+/* Master fader (drum machine): icon + a short slider + a % readout, sized so it
+   never squeezes the BPM slider beside it. */
+.transport-vol { display: flex; align-items: center; gap: 4px; flex: 0 1 auto; min-width: 0; }
+.transport-vol-icon { font-size: 13px; line-height: 1; }
+.transport-vol-slider { flex: 0 1 96px; min-width: 56px; margin: 0; }
+.transport-vol-val { font-size: 11px; color: var(--muted); min-width: 30px; text-align: right; }
 .transport-bpm-pop {
   position: absolute;
   bottom: 100%;

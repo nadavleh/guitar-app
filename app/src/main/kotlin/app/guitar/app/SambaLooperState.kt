@@ -260,9 +260,22 @@ class SambaLooperState(
     fun voiceVolumeOf(inst: PercussionInstrument, voiceIndex: Int): Float =
         volumes[voiceKey(inst, voiceIndex)] ?: defaultVoiceVolume(PercussionCatalog.baseId(inst.id), voiceIndex)
 
-    /** Combined gain a hit of [voiceIndex] actually plays at: track (from [pat]) × per-voice. */
+    /** MASTER level (0..1): one output fader for the whole drum machine — hits,
+     *  previews and the metronome click alike. Per-device like the voice trims
+     *  (it rides in the same persisted map under a reserved key, so it can never
+     *  collide with an instrument id), NOT part of the beat: it is a monitoring
+     *  level, so saved/exported beats and the WAV render are unaffected by it. */
+    val masterVolume: Float get() = volumes[MASTER_VOLUME_KEY] ?: 1f
+
+    fun setMasterVolume(value: Float) {
+        val v = value.coerceIn(0f, 1f)
+        volumes = volumes + (MASTER_VOLUME_KEY to v)
+        scope.launch { repo.setDrumVolume(MASTER_VOLUME_KEY, v) }
+    }
+
+    /** Combined gain a hit of [voiceIndex] actually plays at: master × track (from [pat]) × per-voice. */
     fun effectiveGain(inst: PercussionInstrument, voiceIndex: Int, pat: PercussionPattern = editPattern): Float =
-        (pat.trackVolumeOf(inst.id) / 100f) * voiceVolumeOf(inst, voiceIndex)
+        masterVolume * (pat.trackVolumeOf(inst.id) / 100f) * voiceVolumeOf(inst, voiceIndex)
 
     fun setVolume(inst: PercussionInstrument, value: Float) {
         commit(editPattern.withTrackVolume(inst.id, (value.coerceIn(0f, 1f) * 100).toInt()))
@@ -276,6 +289,12 @@ class SambaLooperState(
     }
 
     companion object {
+        /** Reserved key for the master fader inside the persisted mixer map.
+         *  Instrument ids are catalog slugs (`surdo`, `tamborim#2`, …), so a
+         *  leading "~" can never collide with one — and an old build simply
+         *  ignores the unknown key. */
+        const val MASTER_VOLUME_KEY = "~master"
+
         /** Voices that should start quieter than full. The tamborim "muted clack"
          *  (voice 1) and "tap" (voice 2) are much softer than its open clack, so
          *  they default to 50% until the user dials them in. */
@@ -607,7 +626,11 @@ class SambaLooperState(
                     val m = snapshot.meter
                     if (slot % m.slotsPerBeat == 0) {
                         val barDown = slot % m.slotsPerBar == 0
-                        audio.playSamplesAt(if (barDown) mAccent else mClick, if (barDown) 0.9f else 0.6f, baseFrames)
+                        audio.playSamplesAt(
+                            if (barDown) mAccent else mClick,
+                            masterVolume * (if (barDown) 0.9f else 0.6f),
+                            baseFrames,
+                        )
                     }
                 }
                 for (inst in snapshot.instruments) {

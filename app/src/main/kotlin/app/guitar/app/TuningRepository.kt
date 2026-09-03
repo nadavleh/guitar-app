@@ -392,7 +392,9 @@ class TuningRepository(private val context: Context) {
     private val keyDrumVolumes = stringPreferencesKey("drum_volumes")
 
     /** Per-instrument and per-voice playback volumes, keyed by "<instId>" (global)
-     *  or "<instId>:<voiceIndex>" (single voice); value in 0f..1f. Absent keys use
+     *  or "<instId>:<voiceIndex>" (single voice), plus the reserved "~master" key
+     *  (SambaLooperState.MASTER_VOLUME_KEY, the drum machine's output fader);
+     *  value in 0f..1f. Absent keys use
      *  their code default (1f, or 0.5f for the two soft tamborim voices). Persisted
      *  so the mix survives closing the app. */
     val drumVolumes: Flow<Map<String, Float>> =

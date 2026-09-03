@@ -82,6 +82,10 @@ fun TransportDock(
     modifier: Modifier = Modifier,
     /** Show BPM as an always-visible readout + inline slider (no popover) — drum machine. */
     inlineBpm: Boolean = false,
+    /** Master output level 0..1. Pass both to add an always-visible 🔊 fader to the
+     *  dock (drum machine only — every other screen leaves them null). */
+    volume: Float? = null,
+    onVolume: ((Float) -> Unit)? = null,
 ) {
     val palette = LocalSignal.current
     Row(
@@ -180,6 +184,25 @@ fun TransportDock(
             }
         } else {
             Spacer(Modifier.weight(1f))
+        }
+
+        // Master output fader (drum machine): always visible next to the tempo, since
+        // it is the control you reach for while the loop is running.
+        if (volume != null && onVolume != null) {
+            Spacer(Modifier.width(8.dp))
+            Text("🔊", style = MaterialTheme.typography.labelMedium)
+            Slider(
+                value = volume,
+                onValueChange = onVolume,
+                valueRange = 0f..1f,
+                modifier = Modifier.width(84.dp).padding(horizontal = 4.dp),
+            )
+            Text(
+                "${(volume * 100).toInt()}%",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(8.dp))
         }
 
         // Tone chip: teal (feedback) outline + text, per the "current tone" role.

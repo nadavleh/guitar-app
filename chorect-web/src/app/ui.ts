@@ -244,6 +244,8 @@ export class App {
       saveTrackPreset: (name, enc) => state.saveDrumTrackPreset(name, enc),
       delTrackPreset: (name) => state.deleteDrumTrackPreset(name),
       loadSample: (inst, voice) => loadDrumSample(state.audio, inst, voice),
+      // Blocks is the same screen as the step editor: one master fader for both.
+      masterVolume: () => this.samba.masterVolume,
     });
     this.sambaUI = new SambaLooperUI(this.samba, this.drumBlocks, state, this.ear, () => state.closeSheet());
     this.cavaq = new CavaqProgState({

@@ -344,6 +344,9 @@ export class SambaLooperUI {
       bpm: s.bpm,
       onBpm: (v) => s.setBpm(v),
       inlineBpm: true,
+      // Master fader: one output level for the step editor, Blocks and the click.
+      volume: s.masterVolume,
+      onVolume: (v) => s.setMasterVolume(v),
       toneLabel: this.state.sound,
       onTone: () => { this.toneSheetOpen = true; this.rerender(); },
     }));

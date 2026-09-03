@@ -612,12 +612,37 @@ export const CASA_2_LEVADA = builtin(
   "tamborim#2=0,-,1,0,1,0,-,0,1,0,-,0,1,0,0,1",
 );
 
+/** Nadav's three tan-tan + teleco-teco studies, exported from his saved beats
+ *  (`Tantan_*.chorect.json`, all 67 BPM, straight). The low line is the surdo
+ *  voice standing in for his tan-tan; the three differ only in where the
+ *  tamborim clacks sit against it:
+ *    · "NL"       — a busier tan-tan line (open on 1 & the "e"), clacks off the beat
+ *    · "downbeat" — marcação tan-tan, clacks ON the beat
+ *    · "offbeat"  — marcação tan-tan, clacks pushed off it, with one 25 % tap (3002)
+ *                   on the "a" of beat 2. */
+export const TANTAN_TELECO_NL = builtin(
+  "M:2,2,4,16;" +
+  "surdo=1,1,-,1,0,-,0,1,1,-,1,-,0,-,0,-" + "|" +
+  "tamborim=0,-,0,-,-,0,-,0,-,0,-,0,-,-,0,-",
+);
+export const TANTAN_TELECO_DOWNBEAT = builtin(
+  "M:2,2,4,16;" + SURDO_TELECO + "|" +
+  "tamborim=0,-,0,-,0,-,-,0,-,0,-,0,-,-,0,-",
+);
+export const TANTAN_TELECO_OFFBEAT = builtin(
+  "M:2,2,4,16;" + SURDO_TELECO + "|" +
+  "tamborim=-,0,-,0,-,-,0,3002,0,-,0,-,0,-,-,0",
+);
+
 /** Grooves offered in the Drum-machine Load… menu (before the user's saved beats). */
 export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "2 Tamborims, Pandeiro & Surdo", pattern: TRES_TAMBORINS, bpm: 80 },
   { name: "Partido Alto Groove", pattern: PARTIDO_ALTO_OFFICIAL, bpm: 70 },
   { name: "Platinelas Pandeiro — Partido Alto Groove", pattern: PARTIDO_ALTO_PLATINELAS, bpm: 70 },
   { name: "Casa 2 — Cavaco Levada", pattern: CASA_2_LEVADA, bpm: 92 },
+  { name: "Tantan Teleco NL", pattern: TANTAN_TELECO_NL, bpm: 67 },
+  { name: "Tantan Telco downbeat", pattern: TANTAN_TELECO_DOWNBEAT, bpm: 67 },
+  { name: "Tantan Telco offbeat", pattern: TANTAN_TELECO_OFFBEAT, bpm: 67 },
   { name: "Xote (Bongo)", pattern: XOTE, bpm: 90 },
   { name: "Baião (Bongo)", pattern: BAIAO, bpm: 90 },
   { name: "Forró (Bongo)", pattern: FORRO, bpm: 95 },

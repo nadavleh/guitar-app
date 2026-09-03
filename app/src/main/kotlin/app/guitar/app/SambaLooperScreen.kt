@@ -240,6 +240,9 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             toneLabel = state.sound.name,
             onTone = { toneSheetOpen = true },
             inlineBpm = true,
+            // Master fader: one output level for the step editor, Blocks and the click.
+            volume = samba.masterVolume,
+            onVolume = { samba.setMasterVolume(it) },
         )
         if (toneSheetOpen) ToneSheet(state, onDismiss = { toneSheetOpen = false })
 

@@ -276,6 +276,24 @@ const isMin = cShapes.every((sh) => chosenCost <= movementCost(prev, sh));
 check("pickMinMovement returns the lowest-cost voicing", isMin && idx >= 0 && idx < cShapes.length);
 
 // --- Built-in grooves are valid (16 slots, in-range voice indices) ---
+// Nadav's three tan-tan studies, pinned exactly as his saved beats exported them
+// (mirrors the Kotlin test `the three Tantan teleco grooves are in the list...`).
+for (const [name, encoded] of [
+  ["Tantan Teleco NL", "M:2,2,4,16;surdo=1,1,-,1,0,-,0,1,1,-,1,-,0,-,0,-|tamborim=0,-,0,-,-,0,-,0,-,0,-,0,-,-,0,-"],
+  ["Tantan Telco downbeat", "M:2,2,4,16;surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2|tamborim=0,-,0,-,0,-,-,0,-,0,-,0,-,-,0,-"],
+  ["Tantan Telco offbeat", "M:2,2,4,16;surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2|tamborim=-,0,-,0,-,-,0,3002,0,-,0,-,0,-,-,0"],
+] as [string, string][]) {
+  const b = BUILTIN_PATTERNS.find((x) => x.name === name);
+  check(`built-in "${name}" is pinned as exported (67 BPM)`,
+    b !== undefined && b.bpm === 67 && b.pattern.encode() === encoded);
+}
+check("the offbeat variant keeps its 25 % tamborim tap on the 'a' of beat 2",
+  (() => {
+    const b = BUILTIN_PATTERNS.find((x) => x.name === "Tantan Telco offbeat")!;
+    return b.pattern.voiceAt(PercussionCatalog.Tamborim, 7) === 2 &&
+      b.pattern.dynLevelAt(PercussionCatalog.Tamborim, 7) === 3;
+  })());
+
 let builtinsOk = BUILTIN_PATTERNS.length >= 5;
 for (const b of BUILTIN_PATTERNS) {
   const rt = PercussionPattern.decode(b.pattern.encode());

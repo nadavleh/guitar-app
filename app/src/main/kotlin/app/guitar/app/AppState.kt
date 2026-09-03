@@ -553,7 +553,11 @@ class AppState(
 
     /** App-lifetime Blocks state (the drum machine's phrase sequencer). */
     val drumBlocks: BlocksState by lazy {
-        BlocksState(audio = audio, scope = scope, repo = repo, sampleLoader = drumSampleLoader)
+        // Blocks is the same screen as the step editor: one master fader for both.
+        BlocksState(
+            audio = audio, scope = scope, repo = repo, sampleLoader = drumSampleLoader,
+            masterVolume = { sambaLooper.masterVolume },
+        )
     }
 
     @JvmName("applyA4Hz")

@@ -43,6 +43,9 @@ class BlocksState(
     private val scope: CoroutineScope,
     private val repo: TuningRepository,
     private val sampleLoader: (PercussionInstrument, Int) -> FloatArray? = { _, _ -> null },
+    /** The drum machine's master fader (SambaLooperState.masterVolume) — Blocks is
+     *  the same screen, so it plays through the same output level. */
+    private val masterVolume: () -> Float = { 1f },
 ) {
     var block by mutableStateOf(DrumBlock.empty())
         private set
@@ -234,7 +237,11 @@ class BlocksState(
                 for (i in 0 until ticks) {
                     val accent = i % meter.slotsPerBeat == 0
                     val delayMs = ((colStartNanos - System.nanoTime()) / 1_000_000 + Math.round(i * stepMs)).coerceAtLeast(0)
-                    audio.playSamplesAt(if (accent) mAccent else mClick, if (accent) 0.9f else 0.55f, (delayMs * sr / 1000).toInt())
+                    audio.playSamplesAt(
+                        if (accent) mAccent else mClick,
+                        masterVolume() * (if (accent) 0.9f else 0.55f),
+                        (delayMs * sr / 1000).toInt(),
+                    )
                 }
                 colStartNanos += Math.round(ticks * stepMs * 1_000_000)
             }
@@ -268,7 +275,7 @@ class BlocksState(
                             val voice = raw % PERCUSSION_ACCENT
                             val accented = (raw / PERCUSSION_ACCENT) % 10 == 1
                             val dyn = raw / PERCUSSION_DYN
-                            val gain = (if (accented) 1.4f else 1f) * PERCUSSION_DYN_FACTORS[dyn]
+                            val gain = masterVolume() * (if (accented) 1.4f else 1f) * PERCUSSION_DYN_FACTORS[dyn]
                             val delayMs = ((colStartNanos - System.nanoTime()) / 1_000_000 + Math.round(onsetMs)).coerceAtLeast(0)
                             // Self-choke per TRACK (blocks may repeat an instrument —
                             // two pandeiro players don't damp each other).
@@ -286,7 +293,11 @@ class BlocksState(
                     while (slot < 16) {
                         val barDown = slot % meter.slotsPerBar == 0
                         val delayMs = ((colStartNanos - System.nanoTime()) / 1_000_000 + Math.round(slot * baseMs)).coerceAtLeast(0)
-                        audio.playSamplesAt(if (barDown) mAccent else mClick, if (barDown) 0.9f else 0.6f, (delayMs * sr / 1000).toInt())
+                        audio.playSamplesAt(
+                            if (barDown) mAccent else mClick,
+                            masterVolume() * (if (barDown) 0.9f else 0.6f),
+                            (delayMs * sr / 1000).toInt(),
+                        )
                         slot += meter.slotsPerBeat
                     }
                 }

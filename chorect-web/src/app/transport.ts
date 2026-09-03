@@ -22,6 +22,10 @@ export interface TransportDockOpts {
   /** Show the BPM as an always-visible inline readout + slider (no popover) —
    *  used by the drum machine so tempo needs no extra tap. */
   inlineBpm?: boolean;
+  /** Master output level 0..1. Pass both to add an always-visible 🔊 fader to
+   *  the dock (drum machine only — every other screen omits it). */
+  volume?: number;
+  onVolume?: (v: number) => void;
   toneLabel: string;
   onTone: () => void;
 }
@@ -119,6 +123,21 @@ export function transportDock(opts: TransportDockOpts): HTMLElement {
       details.addEventListener("toggle", () => { bpmExpanded = details.open; });
       children.push(details);
     }
+  }
+
+  // Master output fader (drum machine): always visible next to the tempo, since
+  // it is the control you reach for while the loop is running.
+  if (opts.volume !== undefined && opts.onVolume) {
+    const onVolume = opts.onVolume;
+    const vvs = valueSlider((v) => `${Math.round(v)}%`, 0, 100, Math.round(opts.volume * 100),
+      (v) => onVolume(Math.round(v) / 100));
+    vvs.label.className = "transport-vol-val";
+    vvs.input.classList.add("transport-vol-slider");
+    children.push(el("div", { class: "transport-vol" }, [
+      el("span", { class: "transport-vol-icon", title: "Master volume" }, ["🔊"]),
+      vvs.input,
+      vvs.label,
+    ]));
   }
 
   children.push(el("div", { class: "spacer" }));

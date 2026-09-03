@@ -143,7 +143,7 @@ class PercussionPatternTest {
     }
 
     @Test fun `built-in grooves decode, are non-empty, and round-trip`() {
-        assertEquals(9, PercussionBuiltins.ALL.size)
+        assertEquals(12, PercussionBuiltins.ALL.size)
         for ((name, pat) in PercussionBuiltins.ALL) {
             assertTrue(!pat.isEmpty(), "$name is empty")
             assertEquals(16, pat.slots, "$name should be the default 16-slot meter")
@@ -167,6 +167,29 @@ class PercussionPatternTest {
             b.pattern.encode(),
         )
         assertTrue(PercussionCatalog.Surdo !in b.pattern.instruments)
+    }
+
+    /** Nadav's three tan-tan studies, pinned exactly as his saved beats exported
+     *  them (`Tantan_*.chorect.json`, 67 BPM straight). Mirrored in verify.ts. */
+    @Test fun `the three Tantan teleco grooves are in the list, exactly as exported`() {
+        val expected = mapOf(
+            "Tantan Teleco NL" to
+                "M:2,2,4,16;surdo=1,1,-,1,0,-,0,1,1,-,1,-,0,-,0,-|tamborim=0,-,0,-,-,0,-,0,-,0,-,0,-,-,0,-",
+            "Tantan Telco downbeat" to
+                "M:2,2,4,16;surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2|tamborim=0,-,0,-,0,-,-,0,-,0,-,0,-,-,0,-",
+            "Tantan Telco offbeat" to
+                "M:2,2,4,16;surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2|tamborim=-,0,-,0,-,-,0,3002,0,-,0,-,0,-,-,0",
+        )
+        for ((name, encoded) in expected) {
+            val b = PercussionBuiltins.ALL.first { it.name == name }
+            assertEquals(67, b.bpm, name)
+            assertEquals(encoded, b.pattern.encode(), name)
+        }
+        // The offbeat variant's one dynamics cell survives: a 25 % tamborim TAP on
+        // the "a" of beat 2 (slot 7, voice 2, dyn level 3).
+        val off = PercussionBuiltins.TANTAN_TELECO_OFFBEAT
+        assertEquals(2, off.voiceAt(PercussionCatalog.Tamborim, 7))
+        assertEquals(3, off.dynLevelAt(PercussionCatalog.Tamborim, 7))
     }
 
     @Test fun `beat file round-trips name, tempo, swing, and pattern`() {
