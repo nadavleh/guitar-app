@@ -28,6 +28,7 @@ import {
   PercussionCatalog, PercussionPattern, PercussionMeter, swungSlotMs, slotMs, voiceCount, SwingModel,
   movementCost, pickMinMovement, BUILTIN_PATTERNS,
   INTERVAL_CHOICES, intervalTargetMidi, CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
+  MissedTake, encodeMissedTake, decodeMissedTake,
 } from "../src/theory";
 import { readFileSync } from "node:fs";
 import { PluckedSynth, PitchDetector, analyzePitch, PercussionSynth, panGains, nearestRoot, pitchRate, renderCueBeep } from "../src/audio";
@@ -143,6 +144,44 @@ check("every other degree of both rows is unambiguous",
   [...MAJOR_DEGREES.values(), ...MINOR_DEGREES.values()].map((d) => d.roman)
     .filter((r) => r !== "V").every((r) => !romanIsModeAmbiguous(r)) &&
   !romanIsModeAmbiguous("VI7") && !romanIsModeAmbiguous("v7") && !romanIsModeAmbiguous(""));
+
+// --- Missed TAKES: the rendition saved when a progression is missed (mirrors the three
+// Kotlin tests `MissedTake round-trips…` / `…refuses to encode…` / `…decode rejects junk`) ---
+{
+  // A minor i–bVII–bVI–v whose last two bars sit an OCTAVE below the bVII — exactly the
+  // case a regenerated drill voicing would silently "fix".
+  const take: MissedTake = {
+    keyPc: 9,
+    bars: [
+      { symbol: "Am", midis: [57, 60, 64] },
+      { symbol: "G", midis: [67, 71, 74] },
+      { symbol: "F", midis: [53, 57, 60] },
+      { symbol: "Em", midis: [52, 55, 59] },
+    ],
+  };
+  const enc = encodeMissedTake(take);
+  check("MissedTake encodes flat as <key>|<sym>:<midis>",
+    enc === "9|Am:57.60.64|G:67.71.74|F:53.57.60|Em:52.55.59");
+  const back = enc ? decodeMissedTake(enc) : null;
+  check("MissedTake round-trips the key and every bar's pitches (octaves included)",
+    back !== null && back.keyPc === 9 && back.bars.length === 4 &&
+    back.bars[1].midis[0] === 67 && back.bars[2].midis[0] === 53 &&
+    back.bars.every((b, i) => b.symbol === take.bars[i].symbol &&
+      b.midis.join(".") === take.bars[i].midis.join(".")));
+  const bars = [{ symbol: "Am", midis: [57, 60, 64] }];
+  check("MissedTake refuses to encode anything a flat store can't read back",
+    encodeMissedTake({ keyPc: 9, bars: [{ symbol: "A=m", midis: [57] }] }) === null &&
+    encodeMissedTake({ keyPc: 9, bars: [{ symbol: "A;m", midis: [57] }] }) === null &&
+    encodeMissedTake({ keyPc: 9, bars: [{ symbol: "A|m", midis: [57] }] }) === null &&
+    encodeMissedTake({ keyPc: 9, bars: [{ symbol: "Am", midis: [] }] }) === null &&
+    encodeMissedTake({ keyPc: 12, bars }) === null &&
+    encodeMissedTake({ keyPc: 9, bars: [] }) === null &&
+    encodeMissedTake({ keyPc: 9, bars: [{ symbol: "Am", midis: [200] }] }) === null);
+  check("MissedTake decode rejects junk instead of half-reading it",
+    decodeMissedTake("") === null && decodeMissedTake("9") === null &&
+    decodeMissedTake("9|Am") === null && decodeMissedTake("9|:57.60") === null &&
+    decodeMissedTake("13|Am:57") === null && decodeMissedTake("x|Am:57") === null);
+}
 
 // --- Ear training: every advanced progression resolves to parseable chords in any key ---
 let advOk = true;

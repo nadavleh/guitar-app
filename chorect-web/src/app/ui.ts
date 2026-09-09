@@ -204,6 +204,8 @@ export class App {
       onChallengeComplete: (kind, s, t, d) => state.recordChallengeScore(s, t, d, kind),
       onProgressionMistake: (k) => state.recordProgressionMistake(k),
       progressionMistakesProvider: () => state.progressionMistakes,
+      onProgressionMistakeTake: (k, enc) => state.setProgressionMistakeTake(k, enc),
+      progressionMistakeTakeProvider: (k) => state.progressionMistakeTakes[k] ?? null,
       speak,
     });
     this.loop = new LoopState({

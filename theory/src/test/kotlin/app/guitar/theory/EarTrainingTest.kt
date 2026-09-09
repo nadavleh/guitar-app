@@ -327,6 +327,50 @@ class EarTrainingTest {
         assertEquals("min:1,4,5,1@2", EarTraining.progressionKey(cases[2]))
     }
 
+    // ---- Missed TAKES: the rendition saved when a progression is missed ----
+
+    @Test fun `MissedTake round-trips the key and every bar's pitches`() {
+        // A minor i–bVII–bVI–v where the last two bars sit an OCTAVE below the bVII —
+        // exactly the case a regenerated drill voicing would silently "fix".
+        val take = EarTraining.MissedTake(
+            keyPc = 9,
+            bars = listOf(
+                EarTraining.MissedBar("Am", listOf(57, 60, 64)),
+                EarTraining.MissedBar("G", listOf(67, 71, 74)),
+                EarTraining.MissedBar("F", listOf(53, 57, 60)),
+                EarTraining.MissedBar("Em", listOf(52, 55, 59)),
+            ),
+        )
+        val enc = take.encode()
+        assertEquals("9|Am:57.60.64|G:67.71.74|F:53.57.60|Em:52.55.59", enc)
+        val back = EarTraining.MissedTake.decode(enc!!)
+        assertEquals(take, back)
+        // The octave difference survives: bar 2's bVII is an octave above bar 3's bVI root.
+        assertEquals(67, back!!.bars[1].midis.first())
+        assertEquals(53, back.bars[2].midis.first())
+    }
+
+    @Test fun `MissedTake refuses to encode anything a flat store can't read back`() {
+        val bars = listOf(EarTraining.MissedBar("Am", listOf(57, 60, 64)))
+        // Separator characters of the preference stores, and out-of-range values.
+        assertNull(EarTraining.MissedTake(9, listOf(EarTraining.MissedBar("A=m", listOf(57)))).encode())
+        assertNull(EarTraining.MissedTake(9, listOf(EarTraining.MissedBar("A;m", listOf(57)))).encode())
+        assertNull(EarTraining.MissedTake(9, listOf(EarTraining.MissedBar("A|m", listOf(57)))).encode())
+        assertNull(EarTraining.MissedTake(9, listOf(EarTraining.MissedBar("Am", emptyList()))).encode())
+        assertNull(EarTraining.MissedTake(12, bars).encode())
+        assertNull(EarTraining.MissedTake(9, emptyList()).encode())
+        assertNull(EarTraining.MissedTake(9, listOf(EarTraining.MissedBar("Am", listOf(200)))).encode())
+    }
+
+    @Test fun `MissedTake decode rejects junk instead of half-reading it`() {
+        assertNull(EarTraining.MissedTake.decode(""))
+        assertNull(EarTraining.MissedTake.decode("9"))              // key only, no bars
+        assertNull(EarTraining.MissedTake.decode("9|Am"))           // bar with no pitches
+        assertNull(EarTraining.MissedTake.decode("9|:57.60"))       // pitches with no symbol
+        assertNull(EarTraining.MissedTake.decode("13|Am:57"))       // key out of range
+        assertNull(EarTraining.MissedTake.decode("x|Am:57"))
+    }
+
     @Test fun `natural and harmonic minor with same degrees get distinct keys`() {
         val natural = Progression(TrainingMode.Minor, listOf(1, 4, 5, 1))
         val harmonic = Progression(TrainingMode.Minor, listOf(1, 4, 5, 1), dominantBars = setOf(2))

@@ -713,6 +713,51 @@ object EarTraining {
         }.joinToString("  –  ")
     }
 
+    /**
+     * One BAR of a saved rendition: the resolved chord symbol plus the exact MIDI
+     * notes that sounded for it.
+     */
+    data class MissedBar(val symbol: String, val midis: List<Int>)
+
+    /**
+     * A recording of the progression EXACTLY as the user heard it when they missed it:
+     * the key it was played in, and per bar the resolved symbol + the sounded pitches.
+     *
+     * Re-deriving a rendition from the progression key alone loses the octaves — and the
+     * octaves are often the whole difficulty (i–bVII–bVI–v is a different puzzle when the
+     * last two chords sit an octave off the bVII). So a miss stores the take, and the drill
+     * replays these pitches verbatim instead of re-voicing from scratch.
+     *
+     * Encoded flat for the key→value preference stores: "<keyPc>|<symbol>:<m>.<m>…|…",
+     * e.g. "9|Am:57.60.64|G:55.59.62". Deliberately avoids '=' and ';' (the row/entry
+     * separators of those stores), and [encode] returns null for anything that would
+     * collide with a separator rather than writing a row that can't be read back.
+     */
+    data class MissedTake(val keyPc: Int, val bars: List<MissedBar>) {
+        fun encode(): String? {
+            if (keyPc !in 0..11 || bars.isEmpty()) return null
+            if (bars.any { b -> b.midis.isEmpty() || b.symbol.isEmpty() || b.symbol.any { it in "=;|:." } }) return null
+            if (bars.any { b -> b.midis.any { it < 0 || it > 127 } }) return null
+            return "$keyPc" + bars.joinToString("") { b -> "|${b.symbol}:${b.midis.joinToString(".")}" }
+        }
+
+        companion object {
+            /** Inverse of [encode]; null when [raw] is empty, truncated or malformed. */
+            fun decode(raw: String): MissedTake? {
+                val parts = raw.split("|")
+                if (parts.size < 2) return null
+                val keyPc = parts[0].toIntOrNull()?.takeIf { it in 0..11 } ?: return null
+                val bars = parts.drop(1).map { row ->
+                    val sym = row.substringBefore(':', "")
+                    val midis = row.substringAfter(':', "").split(".").mapNotNull { it.toIntOrNull() }
+                    if (sym.isEmpty() || midis.isEmpty()) return null
+                    MissedBar(sym, midis)
+                }
+                return MissedTake(keyPc, bars)
+            }
+        }
+    }
+
     /** Canonical id for a diatonic progression: "maj:1,5,6,4" or "min:1,4,5,1@2"
      *  (mode prefix + degrees, optional @-joined dominantBars to distinguish
      *  natural-minor from harmonic-minor variants that share degrees). Used to track

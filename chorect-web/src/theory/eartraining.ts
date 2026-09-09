@@ -580,6 +580,61 @@ export function romanLineFor(prog: Progression): string {
   ).join("  –  ");
 }
 
+/** One BAR of a saved rendition: the resolved chord symbol plus the exact MIDI
+ *  notes that sounded for it. */
+export interface MissedBar {
+  symbol: string;
+  midis: number[];
+}
+
+/**
+ * A recording of the progression EXACTLY as the user heard it when they missed it:
+ * the key it was played in, and per bar the resolved symbol + the sounded pitches.
+ *
+ * Re-deriving a rendition from the progression key alone loses the octaves — and the
+ * octaves are often the whole difficulty (i–bVII–bVI–v is a different puzzle when the
+ * last two chords sit an octave off the bVII). So a miss stores the take, and the drill
+ * replays these pitches verbatim instead of re-voicing from scratch.
+ */
+export interface MissedTake {
+  keyPc: number;
+  bars: MissedBar[];
+}
+
+/**
+ * Encode a take flat for the key→value stores: "<keyPc>|<symbol>:<m>.<m>…|…",
+ * e.g. "9|Am:57.60.64|G:55.59.62". Deliberately avoids '=' and ';' (the row/entry
+ * separators of those stores), and returns null for anything that would collide with
+ * a separator rather than writing a row that can't be read back.
+ */
+export function encodeMissedTake(take: MissedTake): string | null {
+  if (!Number.isInteger(take.keyPc) || take.keyPc < 0 || take.keyPc > 11 || take.bars.length === 0) return null;
+  for (const b of take.bars) {
+    if (!b.symbol || b.midis.length === 0) return null;
+    if (/[=;|:.]/.test(b.symbol)) return null;
+    if (b.midis.some((m) => !Number.isInteger(m) || m < 0 || m > 127)) return null;
+  }
+  return String(take.keyPc) + take.bars.map((b) => `|${b.symbol}:${b.midis.join(".")}`).join("");
+}
+
+/** Inverse of [encodeMissedTake]; null when `raw` is empty, truncated or malformed. */
+export function decodeMissedTake(raw: string): MissedTake | null {
+  const parts = raw.split("|");
+  if (parts.length < 2) return null;
+  const keyPc = Number(parts[0]);
+  if (!Number.isInteger(keyPc) || keyPc < 0 || keyPc > 11) return null;
+  const bars: MissedBar[] = [];
+  for (const row of parts.slice(1)) {
+    const at = row.indexOf(":");
+    if (at <= 0) return null;
+    const symbol = row.slice(0, at);
+    const midis = row.slice(at + 1).split(".").map(Number).filter((n) => Number.isInteger(n));
+    if (!symbol || midis.length === 0) return null;
+    bars.push({ symbol, midis });
+  }
+  return { keyPc, bars };
+}
+
 /** Canonical id for a diatonic progression: "maj:1,5,6,4" or "min:1,4,5,1@2"
  *  (mode prefix + degrees, optional @-joined dominantBars to distinguish
  *  natural-minor from harmonic-minor variants that share degrees). Used to track

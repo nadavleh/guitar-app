@@ -2715,12 +2715,14 @@ private fun IntervalsView(ear: EarTrainingState) {
 @Composable
 private fun DrillView(state: AppState, ear: EarTrainingState) {
     val mistakes by state.progressionMistakes.collectAsState(initial = emptyMap())
+    val takes by state.progressionMistakeTakes.collectAsState(initial = emptyMap())
     val entries = mistakes.entries
         .mapNotNull { e -> app.guitar.theory.EarTraining.progressionFromKey(e.key)?.let { Triple(e.key, e.value, it) } }
         .sortedByDescending { it.second }
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Text("Progressions you've missed in the Progression Challenge, most-missed first. Loop one to " +
-            "drill it by ear — adjust each chord's voicing to isolate the sound you keep missing.",
+            "drill it by ear — it replays the EXACT rendition you missed (same key, same octaves), " +
+            "and you can still override each chord's voicing to isolate the sound you keep missing.",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(10.dp))
         if (entries.isEmpty()) {
@@ -2741,7 +2743,13 @@ private fun DrillView(state: AppState, ear: EarTrainingState) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(app.guitar.theory.EarTraining.romanLineFor(prog) + tonicMark(prog), fontWeight = FontWeight.Bold)
-                            Text("${if (prog.mode == app.guitar.theory.TrainingMode.Major) "Major" else "Minor"} · missed ${count}×",
+                            val take = takes[key]?.let { app.guitar.theory.EarTraining.MissedTake.decode(it) }
+                            val heard = take?.let {
+                                " · as heard in " + app.guitar.theory.NoteSpeller.spell(
+                                    app.guitar.theory.PitchClass.of(it.keyPc),
+                                ) + (if (prog.mode == app.guitar.theory.TrainingMode.Minor) "m" else "")
+                            } ?: ""
+                            Text("${if (prog.mode == app.guitar.theory.TrainingMode.Major) "Major" else "Minor"} · missed ${count}×$heard",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (drilling) Button(onClick = { ear.stopDrill() }) { Text("■ Stop") }
@@ -2778,10 +2786,19 @@ private fun DrillControls(ear: EarTrainingState) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         OutlinedButton(onClick = { ear.setAllDrillInversions(2) }) { Text("5th in bass (all)") }
         OutlinedButton(onClick = { ear.setAllDrillInversions(0) }) { Text("Root (all)") }
-        OutlinedButton(onClick = { ear.setAllDrillInversions(null) }) { Text("Auto (voice-led shell)") }
+        OutlinedButton(onClick = { ear.setAllDrillInversions(null) }) {
+            Text(if (ear.drillTake != null) "Auto (as heard)" else "Auto (voice-led shell)")
+        }
     }
-    Text("Auto uses the app's voice-led shell voicing. Forcing an inversion plays a full close " +
-        "voicing so the 5th is present and you control whether it sits above or below the root.",
+    Text(
+        if (ear.drillTake != null)
+            "Auto replays the pitches you actually heard when you missed this — the octaves included. " +
+                "Forcing an inversion plays a full close voicing instead, so the 5th is present and you " +
+                "control whether it sits above or below the root."
+        else
+            "Auto uses the app's voice-led shell voicing (no rendition was recorded for this older miss). " +
+                "Forcing an inversion plays a full close voicing so the 5th is present and you control " +
+                "whether it sits above or below the root.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 

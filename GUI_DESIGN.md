@@ -402,6 +402,14 @@ When the **"Advanced (non-diatonic) progressions"** `Switch` is on (only shown f
 
 The **Advanced Challenge** runs a fixed number of progressions and is **self-marked**: you reveal, then tap **✔ I got it / ✘ Missed** (both enabled only after revealing), then **Next → / See score →**. It ends on the shared `SimpleDoneCard`.
 
+### 10.1b Drill — replaying the renditions you missed
+
+The Drill tab lists every progression missed in a Progression Challenge, most-missed first, each with `▶ Loop` / `✕`.
+
+A miss now saves the **rendition**, not just the progression: the key it was played in and the exact MIDI pitches of every bar (`EarTraining.MissedTake`, stored beside the miss counts). `▶ Loop` replays **that** take verbatim — same key, same octaves — and each row's caption says which key it was heard in (`Minor · missed 3× · as heard in F♯m`). The reason is that the octave placement is often the whole difficulty: `i–bVII–bVI–v` is a different puzzle when the last two chords sit an octave off the `bVII`, and a drill that re-voices from scratch quietly drills the easy version instead.
+
+The per-bar voicing chips still override it, and with a take loaded the reset button reads **`Auto (as heard)`** rather than `Auto (voice-led shell)`. A miss recorded before takes existed (or one whose bars can't be voiced) falls back to the old behavior — canonical key, freshly voice-led shell — and the caption says so. Clearing a row (`✕`, or `Clear drill list`) drops its take with it. The **Drill-list challenge source** deliberately keeps drawing a random key and a fresh voicing: that is a re-test, and re-testing the identical rendition would train recognition of one recording rather than of the harmony.
+
 ### 10.2 Inversions
 
 Practice (`InversionsView`): a **"Chord types"** palette (`FilterChip`s over `invPalette` — maj, m, sus2/4, aug, dim, 7, maj7, m7, m7♭5, dim7, 6, m6, 9, …) to enable which qualities can appear; **New chord ▶ / Replay**; a **"Which inversion?"** guess-chip row (`Root position / 1st inversion / 2nd … / 3rd …`, count depends on the chord) where **tapping a chip auditions that inversion** so you can compare; then a **reveal card** (inversion name + root+quality) with a `✔/✘` line once revealed.

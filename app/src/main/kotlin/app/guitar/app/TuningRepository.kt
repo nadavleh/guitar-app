@@ -370,11 +370,49 @@ class TuningRepository(private val context: Context) {
             val m = decodeMistakes(prefs[keyProgMistakes] ?: "").toMutableMap()
             m.remove(key)
             prefs[keyProgMistakes] = encodeMistakes(m)
+            // The saved take goes with the count — an untracked progression has nothing to replay.
+            val t = decodeTakes(prefs[keyProgMistakeTakes] ?: "").toMutableMap()
+            t.remove(key)
+            prefs[keyProgMistakeTakes] = encodeTakes(t)
         }
     }
     suspend fun clearProgressionMistakes() {
-        context.tuningDataStore.edit { prefs -> prefs[keyProgMistakes] = "" }
+        context.tuningDataStore.edit { prefs ->
+            prefs[keyProgMistakes] = ""
+            prefs[keyProgMistakeTakes] = ""
+        }
     }
+
+    // ---------- Missed-progression TAKES (the rendition actually heard) ----------
+
+    private val keyProgMistakeTakes = stringPreferencesKey("progression_mistake_takes")
+
+    /** progressionKey → [EarTraining.MissedTake] encoding of the LAST rendition the user
+     *  missed: the key it was played in and the exact pitches per bar. Kept beside
+     *  [progressionMistakes] rather than folded into it, so the counts need no migration
+     *  and a missing take simply means "drill regenerates a voicing", as it always did. */
+    val progressionMistakeTakes: Flow<Map<String, String>> =
+        context.tuningDataStore.data.map { prefs -> decodeTakes(prefs[keyProgMistakeTakes] ?: "") }
+
+    /** Store (replacing) the take for [key]. The newest miss wins: it is the rendition
+     *  that just fooled the ear, so it is the one worth drilling. */
+    suspend fun setProgressionMistakeTake(key: String, encoded: String) {
+        if (key.isEmpty() || key.any { it in "=;" } || encoded.any { it in "=;" }) return
+        context.tuningDataStore.edit { prefs ->
+            val t = decodeTakes(prefs[keyProgMistakeTakes] ?: "").toMutableMap()
+            t[key] = encoded
+            prefs[keyProgMistakeTakes] = encodeTakes(t)
+        }
+    }
+
+    private fun encodeTakes(m: Map<String, String>): String =
+        m.entries.filter { it.value.isNotEmpty() }.joinToString(";") { "${it.key}=${it.value}" }
+    private fun decodeTakes(raw: String): Map<String, String> =
+        raw.split(";").mapNotNull { row ->
+            val k = row.substringBefore('=', "")
+            val v = row.substringAfter('=', "")
+            if (k.isEmpty() || v.isEmpty()) null else k to v
+        }.toMap()
 
     private fun encodeMistakes(m: Map<String, Int>): String =
         m.entries.filter { it.value > 0 }.joinToString(";") { "${it.key}=${it.value}" }

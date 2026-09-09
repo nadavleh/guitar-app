@@ -15,7 +15,7 @@ import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../au
 
 export const DISPLAY_FRETS = 14;
 /** App version shown beside the header wordmark. Keep in sync with package.json on release. */
-export const APP_VERSION = "2.80.0";
+export const APP_VERSION = "2.81.0";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 
@@ -127,6 +127,7 @@ interface Persisted {
   customTunings: Record<string, number[]>;
   challengeScores: ChallengeScore[];
   progressionMistakes: Record<string, number>;
+  progressionMistakeTakes?: Record<string, string>;
   drumPatterns: Record<string, string>;
   drumBlocks: Record<string, string>;
   drumTrackPresets: Record<string, string>;
@@ -213,6 +214,11 @@ export class AppState {
   challengeScores: ChallengeScore[] = [];
   /** Progression mistake-drill counts: progressionKey → number of times missed. */
   progressionMistakes: Record<string, number> = {};
+  /** progressionKey → encoded MissedTake of the rendition last missed: the key it was
+   *  played in and the exact pitches per bar, so the drill can replay it verbatim.
+   *  Kept beside the counts (not folded into them) so old saves need no migration and a
+   *  missing take just means "the drill regenerates a voicing", as it did before. */
+  progressionMistakeTakes: Record<string, string> = {};
   /** Saved drum beats: name Ã¢â€ â€™ encoded PercussionPattern string (insertion order). */
   drumPatterns = new Map<string, string>();
   /** Saved drum BLOCKS (phrase sequences), name -> DrumBlock.encode(). */
@@ -308,6 +314,9 @@ export class AppState {
       if (p.progressionMistakes && typeof p.progressionMistakes === "object") {
         for (const [k, v] of Object.entries(p.progressionMistakes)) if (typeof v === "number" && v > 0) this.progressionMistakes[k] = v;
       }
+      if (p.progressionMistakeTakes && typeof p.progressionMistakeTakes === "object") {
+        for (const [k, v] of Object.entries(p.progressionMistakeTakes)) if (typeof v === "string" && v) this.progressionMistakeTakes[k] = v;
+      }
       if (p.drumPatterns) for (const [name, enc] of Object.entries(p.drumPatterns)) this.drumPatterns.set(name, enc);
       if (p.drumBlocks) for (const [name, enc] of Object.entries(p.drumBlocks)) this.drumBlocks.set(name, enc);
       if (p.drumTrackPresets) for (const [name, enc] of Object.entries(p.drumTrackPresets)) this.drumTrackPresets.set(name, enc);
@@ -354,6 +363,7 @@ export class AppState {
       customTunings,
       challengeScores: this.challengeScores,
       progressionMistakes: this.progressionMistakes,
+      progressionMistakeTakes: this.progressionMistakeTakes,
       drumPatterns: Object.fromEntries(this.drumPatterns),
       drumBlocks: Object.fromEntries(this.drumBlocks),
       drumTrackPresets: Object.fromEntries(this.drumTrackPresets),
@@ -394,13 +404,22 @@ export class AppState {
   recordProgressionMistake(key: string): void {
     this.commit(() => { this.progressionMistakes = { ...this.progressionMistakes, [key]: (this.progressionMistakes[key] ?? 0) + 1 }; });
   }
-  /** Drop one progression from the drill list (resets its count). */
-  clearProgressionMistake(key: string): void {
-    this.commit(() => { const m = { ...this.progressionMistakes }; delete m[key]; this.progressionMistakes = m; });
+  /** Store (replacing) the rendition last missed for a progression. The newest miss
+   *  wins: it is the take that just fooled the ear, so it is the one worth drilling. */
+  setProgressionMistakeTake(key: string, encoded: string): void {
+    this.commit(() => { this.progressionMistakeTakes = { ...this.progressionMistakeTakes, [key]: encoded }; });
   }
-  /** Reset every progression mistake count. */
+  /** Drop one progression from the drill list (resets its count, and its saved take —
+   *  an untracked progression has nothing left to replay). */
+  clearProgressionMistake(key: string): void {
+    this.commit(() => {
+      const m = { ...this.progressionMistakes }; delete m[key]; this.progressionMistakes = m;
+      const t = { ...this.progressionMistakeTakes }; delete t[key]; this.progressionMistakeTakes = t;
+    });
+  }
+  /** Reset every progression mistake count (and every saved take). */
   clearProgressionMistakes(): void {
-    this.commit(() => { this.progressionMistakes = {}; });
+    this.commit(() => { this.progressionMistakes = {}; this.progressionMistakeTakes = {}; });
   }
 
   saveDrumTrackPreset(name: string, encoded: string): void {

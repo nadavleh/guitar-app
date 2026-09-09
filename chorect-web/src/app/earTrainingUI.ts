@@ -13,7 +13,7 @@ import { icon } from "./icons";
 import { renderChallengeStatsOverlay } from "./statsOverlay";
 import { intervalRefsContent } from "./theoryUI";
 import {
-  spellPc, noteAt, TrainingMode, ChordTypeLevel, ChordTypeLevelName,
+  spellPc, noteAt, TrainingMode, ChordTypeLevel, ChordTypeLevelName, PitchClass, decodeMissedTake,
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
   parseChord, ChordShapeGenerator, CagedShape, notesFrom, midiPitchClass, fp, fpKey,
   IntervalDirection, INTERVAL_CHOICES, intervalChoiceFor,
@@ -2002,7 +2002,7 @@ export class EarTrainingUI {
       .sort((a, b) => b.count - a.count);
 
     parent.appendChild(el("div", { class: "et-muted", style: "margin-bottom:8px" }, [
-      "Progressions you've missed in the Progression Challenge, most-missed first. Loop one to drill it by ear — adjust each chord's voicing to isolate the sound you keep missing.",
+      "Progressions you've missed in the Progression Challenge, most-missed first. Loop one to drill it by ear — it replays the EXACT rendition you missed (same key, same octaves), and you can still override each chord's voicing to isolate the sound you keep missing.",
     ]));
 
     if (entries.length === 0) {
@@ -2024,7 +2024,7 @@ export class EarTrainingUI {
               : progressionRelativeTonicMode(e.prog!) === TrainingMode.Minor ? "   ◆ relative minor"
               : progressionRelativeTonicMode(e.prog!) === TrainingMode.Major ? "   ◆ relative major"
               : "   ◆ no-tonic (hard)")]),
-          el("div", { class: "et-muted", style: "font-size:12px" }, [`${modeName} · missed ${e.count}×`]),
+          el("div", { class: "et-muted", style: "font-size:12px" }, [`${modeName} · missed ${e.count}×${this.heardInSuffix(e.key, e.prog!.mode)}`]),
         ]),
         btn(drilling ? "■ Stop" : "▶ Loop", () => { if (drilling) ear.stopDrill(); else ear.startDrill(e.key); this.rerender(); }, drilling ? "btn primary" : "btn"),
         btn("✕", () => { if (drilling) ear.stopDrill(); this.state.clearProgressionMistake(e.key); this.rerender(); }, "btn text"),
@@ -2258,12 +2258,23 @@ export class EarTrainingUI {
     wrap.appendChild(chipsRow([
       btn("5th in bass (all)", () => { ear.setAllDrillInversions(2); this.rerender(); }, "btn"),
       btn("Root (all)", () => { ear.setAllDrillInversions(0); this.rerender(); }, "btn"),
-      btn("Auto (voice-led shell)", () => { ear.setAllDrillInversions(null); this.rerender(); }, "btn"),
+      btn(ear.drillTake ? "Auto (as heard)" : "Auto (voice-led shell)",
+        () => { ear.setAllDrillInversions(null); this.rerender(); }, "btn"),
     ]));
     wrap.appendChild(el("div", { class: "et-muted", style: "font-size:12px;margin-top:6px" }, [
-      "Auto uses the app's voice-led shell voicing. Forcing an inversion plays a full close voicing, so the 5th is present and you control whether it sits above or below the root.",
+      ear.drillTake
+        ? "Auto replays the pitches you actually heard when you missed this — the octaves included. Forcing an inversion plays a full close voicing instead, so the 5th is present and you control whether it sits above or below the root."
+        : "Auto uses the app's voice-led shell voicing (no rendition was recorded for this older miss). Forcing an inversion plays a full close voicing, so the 5th is present and you control whether it sits above or below the root.",
     ]));
     return wrap;
+  }
+
+  /** " · as heard in F#m" for an entry with a saved take, "" when there is none. */
+  private heardInSuffix(progKey: string, mode: TrainingMode): string {
+    const raw = this.state.progressionMistakeTakes[progKey];
+    const take = raw ? decodeMissedTake(raw) : null;
+    if (!take) return "";
+    return ` · as heard in ${spellPc(take.keyPc as PitchClass)}${mode === TrainingMode.Minor ? "m" : ""}`;
   }
 
   private drillBarLabel(i: number, inv: number | null): string {

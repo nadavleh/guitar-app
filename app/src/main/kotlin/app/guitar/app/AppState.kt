@@ -482,6 +482,10 @@ class AppState(
             },
             onProgressionMistake = { progKey -> recordProgressionMistake(progKey) },
             progressionMistakesProvider = { progressionMistakesSnapshot.value },
+            onProgressionMistakeTake = { progKey, encoded ->
+                scope.launch { repo.setProgressionMistakeTake(progKey, encoded) }
+            },
+            progressionMistakeTakeProvider = { progKey -> progressionMistakeTakesSnapshot.value[progKey] },
             speak = speak,
         )
     }
@@ -490,6 +494,12 @@ class AppState(
      *  synchronous) can read the Drill pool without suspending. */
     private val progressionMistakesSnapshot by lazy {
         repo.progressionMistakes.stateIn(scope, SharingStarted.Eagerly, emptyMap())
+    }
+
+    /** Eager mirror of [TuningRepository.progressionMistakeTakes] — the drill looper reads
+     *  it synchronously when it starts, like the counts above. */
+    private val progressionMistakeTakesSnapshot by lazy {
+        repo.progressionMistakeTakes.stateIn(scope, SharingStarted.Eagerly, emptyMap())
     }
 
     /** Persisted challenge results across all ear-training kinds (best first). */
@@ -513,6 +523,9 @@ class AppState(
 
     /** Progression mistake-drill counts: progressionKey → times missed. */
     val progressionMistakes get() = repo.progressionMistakes
+
+    /** progressionKey → encoded [EarTraining.MissedTake] of the rendition last missed. */
+    val progressionMistakeTakes get() = repo.progressionMistakeTakes
     fun recordProgressionMistake(key: String) { scope.launch { repo.recordProgressionMistake(key) } }
     fun clearProgressionMistake(key: String) { scope.launch { repo.clearProgressionMistake(key) } }
     fun clearProgressionMistakes() { scope.launch { repo.clearProgressionMistakes() } }

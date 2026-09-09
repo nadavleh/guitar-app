@@ -64,6 +64,13 @@ class EarTrainingState(
     /** Snapshot of the tracked mistake counts (progressionKey → times missed) — the pool
      *  the "Drill list" challenge source draws from. */
     private val progressionMistakesProvider: () -> Map<String, Int> = { emptyMap() },
+    /** Called with the same progKey as [onProgressionMistake], carrying the rendition the
+     *  user actually heard ([EarTraining.MissedTake], encoded) so the drill can replay the
+     *  exact key + octaves rather than re-voicing from scratch. */
+    private val onProgressionMistakeTake: (progKey: String, encoded: String) -> Unit = { _, _ -> },
+    /** The stored take for a progKey, or null when none was ever recorded (drill then
+     *  falls back to generating a voicing, as it did before takes existed). */
+    private val progressionMistakeTakeProvider: (progKey: String) -> String? = { null },
     /** Speaks a chord label aloud in car mode at a 0..1 volume (see `Speaker`), or does
      *  nothing on a device with no TTS engine. An EMPTY string means "stop talking now".
      *  Injected rather than constructed here so this class stays Context-free. */
@@ -600,6 +607,9 @@ class EarTrainingState(
     var drillInversions by mutableStateOf<List<Int?>>(emptyList())
         private set
     private var drillMidis: List<List<Int>> = emptyList()
+    /** The rendition being replayed (null = none recorded, so the drill regenerates). */
+    var drillTake by mutableStateOf<EarTraining.MissedTake?>(null)
+        private set
     var drillBar by mutableStateOf(-1)
         private set
     private var drillJob: Job? = null
@@ -620,19 +630,63 @@ class EarTrainingState(
         if (i in challengeMistakesRecorded) return
         if (challengeAnswers.getOrNull(i) == false) {
             challengeMistakesRecorded.add(i)
-            challengeLog.getOrNull(i)?.let { onProgressionMistake(EarTraining.progressionKey(it.prog)) }
+            challengeLog.getOrNull(i)?.let { q ->
+                val key = EarTraining.progressionKey(q.prog)
+                onProgressionMistake(key)
+                // Save the rendition too: the octaves are often the whole difficulty, and
+                // they are what a regenerated drill voicing throws away. This runs on Next,
+                // while the current progression state IS still this question's.
+                currentTake(q)?.encode()?.let { onProgressionMistakeTake(key, it) }
+            }
         }
     }
 
-    /** Start (or restart) looping the missed progression identified by [progKey]. */
+    /** The take for question [q] as it is sounding right now: its key, and per bar the
+     *  resolved symbol + the exact pitches the loop plays ([earMidis] of the voice-led
+     *  shape, or the block-tone fallback). Null when the bars can't be voiced at all. */
+    private fun currentTake(q: QState): EarTraining.MissedTake? {
+        if (progResolved.size != q.resolved.size) return null
+        ensureProgShapes()
+        val bars = progResolved.mapIndexed { i, rc ->
+            val shape = progShapes.getOrNull(i)
+            val midis = if (shape != null) earMidis(shape) else {
+                val parsed = ChordLibrary.parse(rc.symbol) ?: return null
+                val rootMidi = 52 + parsed.first.value
+                parsed.second.intervals.map { rootMidi + it.semitones }
+            }
+            EarTraining.MissedBar(rc.symbol, midis)
+        }
+        return EarTraining.MissedTake(q.key.value, bars)
+    }
+
+    /** Start (or restart) looping the missed progression identified by [progKey].
+     *
+     *  When a take was recorded for it (see [onProgressionMistakeTake]) the loop replays
+     *  THAT rendition: its key, its chord symbols and its exact pitches — the octave
+     *  placement is usually why the progression fooled the ear, so regenerating a voicing
+     *  here would drill a different puzzle. With no take (older misses) it falls back to
+     *  the canonical key + a freshly voice-led shell, as it always did. */
     fun startDrill(progKey: String) {
         val prog = EarTraining.progressionFromKey(progKey) ?: return
         stopLoop()
         stopDrill()
-        val tonic = if (prog.mode == TrainingMode.Major) PitchClass.of(0) else PitchClass.of(9)
+        val take = progressionMistakeTakeProvider(progKey)
+            ?.let { EarTraining.MissedTake.decode(it) }
+            ?.takeIf { it.bars.size == prog.degrees.size }
+        val tonic = take?.let { PitchClass.of(it.keyPc) }
+            ?: if (prog.mode == TrainingMode.Major) PitchClass.of(0) else PitchClass.of(9)
         drillKey = progKey
         drillProg = prog
-        drillResolved = EarTraining.resolveProgression(prog, tonic, chordTypeLevel, rng)
+        drillTake = take
+        // Roman labels come from a fresh resolve at the take's key; the SYMBOLS come from
+        // the take, so an extension the quiz rolled (Imaj7 vs I) is drilled as heard.
+        drillResolved = EarTraining.resolveProgression(prog, tonic, chordTypeLevel, rng).let { fresh ->
+            if (take == null) fresh
+            else fresh.mapIndexed { i, rc ->
+                val sym = take.bars[i].symbol
+                ChordLibrary.parse(sym)?.let { rc.copy(symbol = sym, root = it.first) } ?: rc
+            }
+        }
         drillInversions = drillResolved.map { null }
         rebuildDrillVoicing()
         drillBar = 0
@@ -656,6 +710,7 @@ class EarTrainingState(
     fun stopDrill() {
         if (drillKey == null) return
         drillKey = null
+        drillTake = null
         drillBar = -1
         drillJob?.cancel()
         drillJob = null
@@ -700,7 +755,9 @@ class EarTrainingState(
             val shape = if (prev == null) shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.first()
                         else shapes[app.guitar.theory.VoiceLeading.pickMinMovement(prev!!, shapes)]
             prev = shape
-            earMidis(shape)
+            // "auto" means AS HEARD when a take exists — the shape chain above still runs so
+            // that any bar the user forces back to auto keeps voice-leading from its neighbour.
+            drillTake?.bars?.getOrNull(i)?.midis?.takeIf { it.isNotEmpty() } ?: earMidis(shape)
         }
     }
 

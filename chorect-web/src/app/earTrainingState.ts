@@ -11,6 +11,7 @@ import {
   EarTrainingDegrees, degreeRoot, degreeRefMidi, resolve as resolveDegree, resolveProgression,
   randomProgression, ProgFocus, CarMode, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
   MINOR_DOMINANT, romanModeTag, romanIsModeAmbiguous, progressionKey, progressionFromKey,
+  MissedTake, MissedBar, encodeMissedTake, decodeMissedTake,
   majorRelativeDegree, degreeFromMajorRelative,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow, importedSongsForDiatonic, CIRCLE_WINDOWS, namedRomanLine,
   N2cChallenge, randomN2c, n2cAnswerLabel, n2cChordSymbol, n2cTestNote, n2cLabel,
@@ -50,6 +51,13 @@ export interface EarDeps {
   /** Snapshot of the tracked mistake counts (progressionKey → times missed) — the pool
    *  the "Drill list" challenge source draws from. */
   progressionMistakesProvider?: () => Record<string, number>;
+  /** Fires with the same progKey as onProgressionMistake, carrying the rendition the user
+   *  actually heard (an encoded MissedTake) so the drill can replay the exact key +
+   *  octaves rather than re-voicing from scratch. */
+  onProgressionMistakeTake?: (progKey: string, encoded: string) => void;
+  /** The stored take for a progKey, or null when none was recorded (the drill then falls
+   *  back to generating a voicing, as it did before takes existed). */
+  progressionMistakeTakeProvider?: (progKey: string) => string | null;
   /** Speaks a car-mode chord label aloud at a 0..1 volume (see speech.ts); an EMPTY
    *  string means "stop talking now". Injected rather than imported so this class stays
    *  testable and mirrors Android, where the Activity owns the TextToSpeech engine. */
@@ -513,6 +521,8 @@ export class EarTrainingState {
   drillInversions: (number | null)[] = [];
   /** Precomputed per-bar MIDI voicings, rebuilt on any voicing change. */
   private drillMidis: number[][] = [];
+  /** The rendition being replayed (null = none recorded, so the drill regenerates). */
+  drillTake: MissedTake | null = null;
   drillBar = -1;
   private drillToken = 0;
 
@@ -534,20 +544,69 @@ export class EarTrainingState {
     if (this.challengeAnswers[i] === false) {
       this.challengeMistakesRecorded.add(i);
       const q = this.challengeLog[i];
-      if (q) this.deps.onProgressionMistake?.(progressionKey(q.prog));
+      if (q) {
+        const key = progressionKey(q.prog);
+        this.deps.onProgressionMistake?.(key);
+        // Save the rendition too: the octaves are often the whole difficulty, and they are
+        // what a regenerated drill voicing throws away. This runs on Next, while the
+        // current progression state IS still this question's.
+        const take = this.currentTake(q);
+        const enc = take ? encodeMissedTake(take) : null;
+        if (enc) this.deps.onProgressionMistakeTake?.(key, enc);
+      }
     }
   }
 
-  /** Start (or restart) looping the missed progression identified by [progKey]. */
+  /** The take for question `q` as it is sounding right now: its key, and per bar the
+   *  resolved symbol + the exact pitches the loop plays (earMidis of the voice-led shape,
+   *  or the block-tone fallback). Null when the bars can't be voiced at all. */
+  private currentTake(q: QState): MissedTake | null {
+    if (this.progResolved.length !== q.resolved.length) return null;
+    this.ensureProgShapes();
+    const bars: MissedBar[] = [];
+    for (let i = 0; i < this.progResolved.length; i++) {
+      const rc = this.progResolved[i];
+      const shape = this.progShapes[i] ?? null;
+      let midis: number[];
+      if (shape) midis = this.earMidis(shape);
+      else {
+        const parsed = parseChord(rc.symbol);
+        if (!parsed) return null;
+        const rootMidi = 52 + parsed[0];
+        midis = parsed[1].intervals.map((iv) => rootMidi + iv);
+      }
+      bars.push({ symbol: rc.symbol, midis });
+    }
+    return { keyPc: q.key, bars };
+  }
+
+  /** Start (or restart) looping the missed progression identified by [progKey].
+   *
+   *  When a take was recorded for it (see onProgressionMistakeTake) the loop replays THAT
+   *  rendition: its key, its chord symbols and its exact pitches — the octave placement is
+   *  usually why the progression fooled the ear, so regenerating a voicing here would drill
+   *  a different puzzle. With no take (older misses) it falls back to the canonical key + a
+   *  freshly voice-led shell, as it always did. */
   startDrill(progKey: string) {
     const prog = progressionFromKey(progKey);
     if (!prog) return;
     this.stopLoop();
     this.stopDrill();
-    const tonic: PitchClass = (prog.mode === TrainingMode.Major ? 0 : 9) as PitchClass;
+    const raw = this.deps.progressionMistakeTakeProvider?.(progKey) ?? null;
+    const decoded = raw ? decodeMissedTake(raw) : null;
+    const take = decoded && decoded.bars.length === prog.degrees.length ? decoded : null;
+    const tonic: PitchClass = (take ? take.keyPc : (prog.mode === TrainingMode.Major ? 0 : 9)) as PitchClass;
     this.drillKey = progKey;
     this.drillProg = prog;
-    this.drillResolved = resolveProgression(prog, tonic, this.chordTypeLevel, this.rng);
+    this.drillTake = take;
+    // Roman labels come from a fresh resolve at the take's key; the SYMBOLS come from the
+    // take, so an extension the quiz rolled (Imaj7 vs I) is drilled as heard.
+    const fresh = resolveProgression(prog, tonic, this.chordTypeLevel, this.rng);
+    this.drillResolved = take === null ? fresh : fresh.map((rc, i) => {
+      const sym = take.bars[i].symbol;
+      const parsed = parseChord(sym);
+      return parsed ? { ...rc, symbol: sym, root: parsed[0] } : rc;
+    });
     this.drillInversions = this.drillResolved.map(() => null);
     this.rebuildDrillVoicing();
     this.drillBar = 0;
@@ -576,6 +635,7 @@ export class EarTrainingState {
   stopDrill() {
     if (this.drillKey === null) return;
     this.drillKey = null;
+    this.drillTake = null;
     this.drillBar = -1;
     this.drillToken++;
     this.deps.audio.stop();
@@ -623,7 +683,10 @@ export class EarTrainingState {
         ? (shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0])
         : shapes[pickMinMovement(prev, shapes)];
       prev = shape;
-      return this.earMidis(shape);
+      // "auto" means AS HEARD when a take exists — the shape chain above still runs so that
+      // any bar the user forces back to auto keeps voice-leading from its neighbour.
+      const heard = this.drillTake?.bars[i]?.midis;
+      return heard && heard.length > 0 ? heard : this.earMidis(shape);
     });
   }
 
