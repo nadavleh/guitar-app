@@ -840,6 +840,73 @@ object EarTraining {
      *  for a major IV–V–iii–vi. Empty when it has no relative-tonic reading. */
     fun relativeRomanLineFor(prog: Progression): String =
         progressionInRelativeKey(prog)?.let { romanLineFor(it) } ?: ""
+
+    /** The mode [prog] is HEARD in when its first chord is the relative tonic — a major
+     *  progression opening on vi is heard from the minor's i (vi7 IS i7), a minor one
+     *  opening on bIII from the major's I — else null. The ear takes bar 1 as home, so
+     *  answers must be named from there: showing "Imaj7" for a chord heard as bIIImaj7
+     *  reads as a wrong answer when it is the same chord. */
+    fun openingRelativeMode(prog: Progression): TrainingMode? {
+        if (prog.degrees.firstOrNull() != relativeTonicDegree(prog.mode)) return null
+        return if (prog.mode == TrainingMode.Major) TrainingMode.Minor else TrainingMode.Major
+    }
+
+    /**
+     * [label] (bar [bar]'s Roman, as resolved in [prog]'s own key) renamed from the
+     * relative tonic when [prog] opens on it ([openingRelativeMode]); [label] unchanged
+     * otherwise. Only the numeral changes — a chord keeps its quality across the two
+     * readings (vi↔i, ii↔iv, IV↔bVI, vii°↔ii°), so the suffix ("7", "maj9", "°7"…)
+     * carries over verbatim. A harmonic-minor dominant becomes a major III in the
+     * relative major.
+     */
+    fun openingRelativeLabel(prog: Progression, bar: Int, label: String): String {
+        val rel = openingRelativeMode(prog) ?: return label
+        val deg = prog.degrees.getOrNull(bar) ?: return label
+        val dominant = prog.mode == TrainingMode.Minor && bar in prog.dominantBars
+        val own = if (dominant) MINOR_DOMINANT
+                  else (if (prog.mode == TrainingMode.Major) MAJOR_DEGREES else MINOR_DEGREES)[deg] ?: return label
+        if (!label.startsWith(own.roman)) return label
+        val relDeg = degreeFromMajorRelative(majorRelativeDegree(deg, prog.mode), rel)
+        val relRoman = (if (rel == TrainingMode.Major) MAJOR_DEGREES else MINOR_DEGREES)[relDeg]?.roman ?: return label
+        return (if (dominant) relRoman.uppercase() else relRoman) + label.removePrefix(own.roman)
+    }
+
+    /** A run of chords moving round the circle: [length] chords from bar index [start]
+     *  (wrapping — the progression loops), every root a perfect 4th up ([fallingFifths],
+     *  the ii–V–I direction) or a perfect 5th up (I–V–ii). */
+    data class CircleRun(val start: Int, val length: Int, val fallingFifths: Boolean) {
+        /** The 0-based bar indices of the run, in playing order, for a progression of [n] bars. */
+        fun bars(n: Int): List<Int> = (0 until length).map { (start + it) % n }
+    }
+
+    /**
+     * The longest run of at least [minChords] consecutive chords whose roots move round
+     * the circle of fifths in ONE direction, or null. Steps are read cyclically, since the
+     * progression loops: V–x–x–I–IV hears V→I→IV across the bar line. Only perfect
+     * 4ths/5ths count (the diatonic IV→vii° tritone does not); a repeated root breaks a run.
+     * Ties go to the earliest start.
+     */
+    fun circleRun(roots: List<Int>, minChords: Int = 3): CircleRun? {
+        val n = roots.size
+        if (n < minChords || n < 2) return null
+        val steps = IntArray(n) { ((roots[(it + 1) % n] - roots[it]) % 12 + 12) % 12 }
+        var best: CircleRun? = null
+        for (dir in intArrayOf(5, 7)) {
+            if (steps.all { it == dir }) return CircleRun(0, n, dir == 5)
+            for (s in 0 until n) {
+                // Only start a run where the previous step breaks it, so each run is seen once.
+                if (steps[s] != dir || steps[(s - 1 + n) % n] == dir) continue
+                var len = 0
+                while (len < n - 1 && steps[(s + len) % n] == dir) len++
+                val chords = len + 1
+                if (chords >= minChords && (best == null || chords > best.length ||
+                        (chords == best.length && s < best.start))) {
+                    best = CircleRun(s, chords, dir == 5)
+                }
+            }
+        }
+        return best
+    }
 }
 
 /** Direction an interval is played in the interval-ID trainer. */

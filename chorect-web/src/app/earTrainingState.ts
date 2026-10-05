@@ -13,6 +13,7 @@ import {
   MINOR_DOMINANT, romanModeTag, romanIsModeAmbiguous, progressionKey, progressionFromKey,
   MissedTake, MissedBar, encodeMissedTake, decodeMissedTake,
   majorRelativeDegree, degreeFromMajorRelative,
+  openingRelativeLabel, circleRun as findCircleRun, CircleRun,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow, importedSongsForDiatonic, CIRCLE_WINDOWS, namedRomanLine,
   N2cChallenge, randomN2c, n2cAnswerLabel, n2cChordSymbol, n2cTestNote, n2cLabel,
   N2C_MAJOR_TEST_OFFSETS, N2C_MINOR_TEST_OFFSETS,
@@ -1120,6 +1121,32 @@ export class EarTrainingState {
     return this.progMode === TrainingMode.Minor && (this.progProgression?.dominantBars ?? []).includes(i);
   }
 
+  /** Bar [i]'s Roman as the ANSWER should read it: named from the relative tonic when the
+   *  progression opens on it (a major vi7 opener is heard as i7, so its I chord is
+   *  bIIImaj7, not Imaj7 — see [openingRelativeLabel]). */
+  barRoman(i: number): string {
+    const label = this.progResolved[i]?.romanLabel;
+    if (label === undefined) return "";
+    return this.progProgression ? openingRelativeLabel(this.progProgression, i, label) : label;
+  }
+
+  /** The longest run of 3+ chords moving round the circle of fifths in the CURRENT
+   *  progression (any generator — read off the resolved roots), or null. */
+  get circleRun(): CircleRun | null {
+    return findCircleRun(this.progResolved.map((rc) => rc.root));
+  }
+
+  /** Show the circle-motion banner only once every slot is filled — it names bars, so
+   *  before that it would be a spoiler. Practice: every bar revealed (diatonic) or the
+   *  answer card open (advanced/circle). Challenge: every bar answered. */
+  get circleBannerVisible(): boolean {
+    if (this.circleRun === null) return false;
+    if (!this.progProgression) return this.advRevealed;
+    return this.earMode === EarMode.Challenge
+      ? this.challengeAllBarsAnswered
+      : this.progResolved.every((_, i) => this.progBarRevealed.has(i));
+  }
+
   /**
    * The revealed correct Roman for bar [i], marked "(major)" or "(minor)" whenever the
    * numeral alone is ambiguous — a minor key's harmonic dominant prints exactly like the
@@ -1128,7 +1155,7 @@ export class EarTrainingState {
    * [romanIsModeAmbiguous].
    */
   challengeAnswerLabel(i: number): string {
-    const roman = this.progResolved[i]?.romanLabel ?? "";
+    const roman = this.barRoman(i);
     return romanIsModeAmbiguous(roman)
       ? `${roman} ${romanModeTag(this.challengeBarIsDominant(i))}` : roman;
   }
@@ -1538,9 +1565,20 @@ export class EarTrainingState {
     return i < this.carRevealedSlots || this.carTappedSlots.has(i);
   }
 
-  /** Tap a slot to peek at its function before the schedule gets there. Tapping a peeked
-   *  slot again hides it, so a stray thumb is undoable; a slot the schedule has already
-   *  revealed is not tappable — that answer is spent. */
+  /** TAP a slot: hear its chord again — the same cached voicing the exercise plays.
+   *  Deliberately leaves `currentBar` alone: the schedule's reveals read the playhead, so
+   *  moving it would uncover slots. */
+  playCarSlot(i: number) {
+    if (i < 0 || i >= this.progResolved.length) return;
+    this.ensureProgShapes();
+    const barMs = (60000 / Math.max(this.progBpm, 10)) * 4;
+    this.deps.audio.cutReverb();
+    this.soundBar(i, Math.max(Math.floor(barMs * 0.9), 200));
+  }
+
+  /** DOUBLE-TAP a slot to peek at its function before the schedule gets there. Doing it
+   *  again hides it, so a stray thumb is undoable; a slot the schedule has already
+   *  revealed stays revealed — that answer is spent. */
   toggleCarSlot(i: number) {
     if (i < 0 || i >= this.progResolved.length || i < this.carRevealedSlots) return;
     if (this.carTappedSlots.has(i)) { this.carTappedSlots.delete(i); this.carSpokenSlots.delete(i); }
@@ -1552,7 +1590,7 @@ export class EarTrainingState {
    *  Never a chord symbol and never the key — the drill is function recognition. */
   carSlotLabel(i: number): string {
     if (!this.carSlotRevealed(i)) return "?";
-    return this.progResolved[i]?.romanLabel ?? "—";
+    return this.barRoman(i) || "—";
   }
 
   /** "(minor)" / "(major)" for a revealed slot whose Roman reads the same in both keys
@@ -1561,7 +1599,7 @@ export class EarTrainingState {
    *  (v2.69.2). Rendered as a small second line so it can't crowd the big label. */
   carSlotTag(i: number): string {
     if (!this.carSlotRevealed(i)) return "";
-    const roman = this.progResolved[i]?.romanLabel;
+    const roman = this.barRoman(i);
     if (!roman || !romanIsModeAmbiguous(roman)) return "";
     // Advanced/circle progressions carry no dominantBars (progProgression is null), so
     // fall back to the progression's own tonic mode — otherwise the Andalusian Cadence's
@@ -1576,7 +1614,7 @@ export class EarTrainingState {
    *  slot off this, not off each label, so the type stays put as reveals come in — and
    *  so an "Imaj13" at the extended level is scaled to fit instead of being clipped. */
   get carLongestLabel(): number {
-    return Math.max(1, ...this.progResolved.map((rc) => rc.romanLabel.length));
+    return Math.max(1, ...this.progResolved.map((_, i) => this.barRoman(i).length));
   }
 
   /** Seconds one exercise takes at the current tempo, for the on-screen estimate. */
@@ -1612,6 +1650,7 @@ export class EarTrainingState {
     this.carRound = 0;
     this.carExerciseCount = 0;
     this.carTappedSlots.clear();
+    this.carHistory = [];
     this.stopLoop();
     this.notify();
   }
@@ -1638,6 +1677,30 @@ export class EarTrainingState {
     }
     this.earMode = EarMode.Challenge;
     this.notify();
+  }
+
+  /** Exercises already driven past this session, for ← Prev (car mode never touches the
+   *  practice history — that one belongs to the progression view it borrowed). */
+  private carHistory: {
+    prog: Progression | null; advProg: NamedProgression | null; key: PitchClass;
+    mode: TrainingMode; resolved: ResolvedChord[];
+  }[] = [];
+  get canGoPrevCar(): boolean { return this.carHistory.length > 0; }
+
+  /** Back to the previous exercise — the SAME chords in the same key (and so the same
+   *  cached voicing), replayed from the lead-in. */
+  previousCarExercise() {
+    const snap = this.carHistory.pop();
+    if (!snap) return;
+    this.stopLoop();
+    this.progProgression = snap.prog;
+    this.advProg = snap.advProg;
+    this.progKey = snap.key;
+    this.progMode = snap.mode;
+    this.progResolved = snap.resolved;
+    this.progTranspose = 0;
+    this.carExerciseCount = Math.max(1, this.carExerciseCount - 1);
+    this.beginCarExercise(false, true);
   }
 
   startCarExercise() { this.beginCarExercise(true, true); }
@@ -1669,7 +1732,7 @@ export class EarTrainingState {
   private speakCarSlot(i: number): void {
     if (!this.carSpeakChords || !this.carSlotRevealed(i)) return;
     if (this.carSpokenSlots.has(i)) return;
-    const roman = this.progResolved[i]?.romanLabel;
+    const roman = this.barRoman(i);
     if (!roman) return;
     this.carSpokenSlots.add(i);
     this.deps.speak?.(CarMode.speechFor(roman), this.carSpeechVolume);
@@ -1699,6 +1762,13 @@ export class EarTrainingState {
     if (cancelExisting) this.stopLoop();
     else this.deps.audio.stop();
     if (draw) {
+      if (this.carExerciseCount > 0 && this.progResolved.length > 0) {
+        this.carHistory.push({
+          prog: this.progProgression, advProg: this.advProg, key: this.progKey,
+          mode: this.progMode, resolved: this.progResolved,
+        });
+        while (this.carHistory.length > 20) this.carHistory.shift();
+      }
       if (this.specialProgMode) this.nextAdvancedProgression();
       else this.nextProgression();
       this.carExerciseCount++;

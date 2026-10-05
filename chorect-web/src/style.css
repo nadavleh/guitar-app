@@ -1289,6 +1289,7 @@ select.et-select {
   gap: 6px;
 }
 .car-slot {
+  touch-action: manipulation;   /* double-tap peeks — it must not zoom the page */
   flex: 1;
   display: flex;
   align-items: center;

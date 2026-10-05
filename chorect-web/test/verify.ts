@@ -14,6 +14,7 @@ import {
   THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode,
   progressionLacksTonic, progressionRelativeTonicMode, progressionRelativeTonicBar,
   progressionHomeIsObvious, relativeRomanLineFor, romanLineFor,
+  openingRelativeMode, openingRelativeLabel, circleRun, circleRunBars,
   CAGED_SHAPES, CAGED_BOXES, CagedBox, CagedMode, ScaleSubset, patternCount, boxNumber,
   resolveBox, boxWindow, PRACTICE_RUN, TRIAD_GROUPS, triadRun, triadInversions, explorePositions, noteAt, fp, fpKey,
 } from "../src/theory";
@@ -543,6 +544,40 @@ check("a progression with its own tonic has no relative reading",
 check("a minor progression ending on bIII reads in the relative major",
   progressionRelativeTonicMode({ mode: TrainingMode.Minor, degrees: [4, 5, 6, 3] }) === TrainingMode.Major &&
   relativeRomanLineFor({ mode: TrainingMode.Minor, degrees: [4, 5, 6, 3] }) === "ii  –  iii  –  IV  –  I");
+// --- Answers named from the relative tonic when bar 1 IS that tonic (mirrors EarTrainingTest) ---
+const viOpener: Progression = { mode: TrainingMode.Major, degrees: [6, 4, 1, 5] };
+check("a major progression opening on vi7 is answered in minor numerals",
+  openingRelativeMode(viOpener) === TrainingMode.Minor &&
+  openingRelativeLabel(viOpener, 0, "vi7") === "i7" &&
+  openingRelativeLabel(viOpener, 1, "IVmaj7") === "bVImaj7" &&
+  openingRelativeLabel(viOpener, 2, "Imaj7") === "bIIImaj7" &&
+  openingRelativeLabel(viOpener, 3, "V7") === "bVII7" &&
+  openingRelativeLabel(viOpener, 2, "I") === "bIII");
+const bIIIOpener: Progression = { mode: TrainingMode.Minor, degrees: [3, 2, 5, 1], dominantBars: [2] };
+check("a minor progression opening on bIII is answered in major numerals",
+  openingRelativeMode(bIIIOpener) === TrainingMode.Major &&
+  openingRelativeLabel(bIIIOpener, 0, "bIIImaj7") === "Imaj7" &&
+  openingRelativeLabel(bIIIOpener, 1, "ii°7") === "vii°7" &&
+  openingRelativeLabel(bIIIOpener, 2, "V7") === "III7" &&
+  openingRelativeLabel(bIIIOpener, 3, "i7") === "vi7");
+check("a progression opening anywhere else keeps its own numerals",
+  openingRelativeMode({ mode: TrainingMode.Major, degrees: [1, 6, 4, 5] }) === null &&
+  openingRelativeLabel({ mode: TrainingMode.Major, degrees: [1, 6, 4, 5] }, 1, "vi7") === "vi7");
+// --- Circle-of-fifths runs ---
+check("ii-V-I is a falling-fifths run of three", (() => {
+  const r = circleRun([9, 2, 7, 0]);
+  const iiVI = circleRun([0, 2, 7, 0]);
+  return !!r && r.fallingFifths && r.length === 4 && circleRunBars(r, 4).join() === "0,1,2,3" &&
+    !!iiVI && circleRunBars(iiVI, 4).join() === "1,2,3";
+})());
+check("circle runs wrap across the loop and read both directions", (() => {
+  const wrap = circleRun([0, 5, 4, 7]);
+  const up = circleRun([0, 7, 2, 9]);
+  return !!wrap && circleRunBars(wrap, 4).join() === "3,0,1" && !!up && !up.fallingFifths && up.length === 4;
+})());
+check("no circle run in I-vi-IV-V or with only two linked chords",
+  circleRun([0, 9, 5, 7]) === null && circleRun([0, 5, 0, 5]) === null &&
+  circleRunBars(circleRun([5, 11, 4, 9])!, 4).join() === "1,2,3");
 check("the lead-in and round 1 reveal nothing wherever the playhead is",
   [-1, 0, 1, 2, 3].every((p) => CarMode.revealedSlotsAt(0, p, 4) === 0 && CarMode.revealedSlotsAt(1, p, 4) === 0) &&
   CarMode.revealedSlotsAt(2, -5, 4) === 0 &&

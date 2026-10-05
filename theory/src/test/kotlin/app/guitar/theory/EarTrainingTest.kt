@@ -579,6 +579,63 @@ class EarTrainingTest {
         }
     }
 
+    // ---- answers named from the relative tonic when bar 1 IS that tonic ----
+
+    @Test fun `a major progression opening on vi7 is answered in minor numerals`() {
+        // Nadav: "if the chord should've been bIIImaj7 don't show Imaj7" — bar 1 is heard as i7.
+        val p = Progression(TrainingMode.Major, listOf(6, 4, 1, 5))
+        assertEquals(TrainingMode.Minor, EarTraining.openingRelativeMode(p))
+        assertEquals("i7", EarTraining.openingRelativeLabel(p, 0, "vi7"))
+        assertEquals("bVImaj7", EarTraining.openingRelativeLabel(p, 1, "IVmaj7"))
+        assertEquals("bIIImaj7", EarTraining.openingRelativeLabel(p, 2, "Imaj7"))
+        assertEquals("bVII7", EarTraining.openingRelativeLabel(p, 3, "V7"))
+        assertEquals("bIII", EarTraining.openingRelativeLabel(p, 2, "I"))
+    }
+
+    @Test fun `a minor progression opening on bIII is answered in major numerals`() {
+        val p = Progression(TrainingMode.Minor, listOf(3, 2, 5, 1), dominantBars = setOf(2))
+        assertEquals(TrainingMode.Major, EarTraining.openingRelativeMode(p))
+        assertEquals("Imaj7", EarTraining.openingRelativeLabel(p, 0, "bIIImaj7"))
+        assertEquals("vii°7", EarTraining.openingRelativeLabel(p, 1, "ii°7"))
+        assertEquals("III7", EarTraining.openingRelativeLabel(p, 2, "V7"))   // harmonic dominant
+        assertEquals("vi7", EarTraining.openingRelativeLabel(p, 3, "i7"))
+    }
+
+    @Test fun `a progression opening anywhere else keeps its own numerals`() {
+        val p = Progression(TrainingMode.Major, listOf(1, 6, 4, 5))
+        assertNull(EarTraining.openingRelativeMode(p))
+        assertEquals("vi7", EarTraining.openingRelativeLabel(p, 1, "vi7"))
+    }
+
+    // ---- circle-of-fifths runs ----
+
+    @Test fun `ii-V-I is a falling-fifths run of three`() {
+        // C major vi ii V I: A D G C — every step a 4th up.
+        val r = EarTraining.circleRun(listOf(9, 2, 7, 0))!!
+        assertTrue(r.fallingFifths)
+        assertEquals(4, r.length)
+        assertEquals(listOf(0, 1, 2, 3), r.bars(4))
+        val iiVI = EarTraining.circleRun(listOf(0, 2, 7, 0))!!   // I ii V I
+        assertEquals(listOf(1, 2, 3), iiVI.bars(4))
+    }
+
+    @Test fun `circle runs wrap across the loop and read both directions`() {
+        // I IV iii V: G→C wraps (V→I→IV) — falling fifths across the bar line.
+        val wrap = EarTraining.circleRun(listOf(0, 5, 4, 7))!!
+        assertEquals(listOf(3, 0, 1), wrap.bars(4))
+        // I V ii vi: C G D A — rising fifths.
+        val up = EarTraining.circleRun(listOf(0, 7, 2, 9))!!
+        assertFalse(up.fallingFifths)
+        assertEquals(4, up.length)
+    }
+
+    @Test fun `no circle run in I-vi-IV-V or with only two linked chords`() {
+        assertNull(EarTraining.circleRun(listOf(0, 9, 5, 7)))
+        assertNull(EarTraining.circleRun(listOf(0, 5, 0, 5)))      // back and forth, not a chain
+        // IV vii° iii vi: the IV→vii° tritone is not a perfect 5th, so the run is vii°–iii–vi only.
+        assertEquals(listOf(1, 2, 3), EarTraining.circleRun(listOf(5, 11, 4, 9))!!.bars(4))
+    }
+
     @Test fun `only a progression holding neither tonic is truly tonic-less`() {
         // ii-V-IV-V has no I and no vi, so neither reading gives it a home.
         val none = Progression(TrainingMode.Major, listOf(2, 5, 4, 5))

@@ -709,6 +709,75 @@ export function relativeRomanLineFor(p: Progression): string {
   return rel ? romanLineFor(rel) : "";
 }
 
+/** The mode [p] is HEARD in when its first chord is the relative tonic — a major
+ *  progression opening on vi is heard from the minor's i (vi7 IS i7), a minor one opening
+ *  on bIII from the major's I — else null. The ear takes bar 1 as home, so answers must be
+ *  named from there: showing "Imaj7" for a chord heard as bIIImaj7 reads as a wrong answer
+ *  when it is the same chord. */
+export function openingRelativeMode(p: Progression): TrainingMode | null {
+  if (p.degrees[0] !== relativeTonicDegree(p.mode)) return null;
+  return p.mode === TrainingMode.Major ? TrainingMode.Minor : TrainingMode.Major;
+}
+
+/**
+ * [label] (bar [bar]'s Roman, as resolved in [p]'s own key) renamed from the relative
+ * tonic when [p] opens on it (see [openingRelativeMode]); [label] unchanged otherwise.
+ * Only the numeral changes — a chord keeps its quality across the two readings (vi↔i,
+ * ii↔iv, IV↔bVI, vii°↔ii°), so the suffix ("7", "maj9", "°7"…) carries over verbatim. A
+ * harmonic-minor dominant becomes a major III in the relative major.
+ */
+export function openingRelativeLabel(p: Progression, bar: number, label: string): string {
+  const rel = openingRelativeMode(p);
+  if (rel === null) return label;
+  const deg = p.degrees[bar];
+  if (deg === undefined) return label;
+  const dominant = p.mode === TrainingMode.Minor && (p.dominantBars ?? []).includes(bar);
+  const own = dominant ? MINOR_DOMINANT : degreesMapFor(p.mode).get(deg);
+  if (!own || !label.startsWith(own.roman)) return label;
+  const relRoman = degreesMapFor(rel).get(degreeFromMajorRelative(majorRelativeDegree(deg, p.mode), rel))?.roman;
+  if (!relRoman) return label;
+  return (dominant ? relRoman.toUpperCase() : relRoman) + label.slice(own.roman.length);
+}
+
+/** A run of chords moving round the circle: `length` chords from bar index `start`
+ *  (wrapping — the progression loops), every root a perfect 4th up (`fallingFifths`, the
+ *  ii–V–I direction) or a perfect 5th up (I–V–ii). */
+export interface CircleRun { start: number; length: number; fallingFifths: boolean }
+
+/** The 0-based bar indices of [run], in playing order, for a progression of [n] bars. */
+export function circleRunBars(run: CircleRun, n: number): number[] {
+  return Array.from({ length: run.length }, (_, k) => (run.start + k) % n);
+}
+
+/**
+ * The longest run of at least [minChords] consecutive chords whose roots move round the
+ * circle of fifths in ONE direction, or null. Steps are read cyclically, since the
+ * progression loops: V–x–x–I–IV hears V→I→IV across the bar line. Only perfect 4ths/5ths
+ * count (the diatonic IV→vii° tritone does not); a repeated root breaks a run. Ties go to
+ * the earliest start.
+ */
+export function circleRun(roots: number[], minChords = 3): CircleRun | null {
+  const n = roots.length;
+  if (n < minChords || n < 2) return null;
+  const steps = roots.map((r, i) => (((roots[(i + 1) % n] - r) % 12) + 12) % 12);
+  let best: CircleRun | null = null;
+  for (const dir of [5, 7]) {
+    if (steps.every((st) => st === dir)) return { start: 0, length: n, fallingFifths: dir === 5 };
+    for (let s = 0; s < n; s++) {
+      // Only start a run where the previous step breaks it, so each run is seen once.
+      if (steps[s] !== dir || steps[(s - 1 + n) % n] === dir) continue;
+      let len = 0;
+      while (len < n - 1 && steps[(s + len) % n] === dir) len++;
+      const chords = len + 1;
+      if (chords >= minChords && (best === null || chords > best.length ||
+          (chords === best.length && s < best.start))) {
+        best = { start: s, length: chords, fallingFifths: dir === 5 };
+      }
+    }
+  }
+  return best;
+}
+
 /** Inverse of [progressionKey]; null if [key] is not a valid diatonic key. */
 export function progressionFromKey(key: string): Progression | null {
   const m = /^(maj|min):(\d+(?:,\d+)*)(?:@(\d+(?:,\d+)*))?$/.exec(key);

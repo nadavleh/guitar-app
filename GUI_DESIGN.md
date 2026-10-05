@@ -383,6 +383,8 @@ Highlights of the **Progression Challenge** (the most elaborate view):
   - **Neither tonic anywhere** (e.g. `ii–V–IV–V`) → **error-tinted** `◆ NO TONIC ◆` warning and the `◆ no-tonic (hard)` marker.
 
   The relative Roman line names every bar, so it **is the answer** — printed in Practice and the library, and in Challenge only once every bar already carries a verdict (`challengeAllBarsAnswered`).
+- **Circle-of-fifths banner (v2.82).** When 3+ consecutive chords move round the circle in one direction — every root a perfect 4th up (`ii–V–I`, "falls a 5th") or a perfect 5th up (`I–V–ii`) — a card styled exactly like the neutral relative-tonic card appears under the tonic banner: `◆ CIRCLE OF FIFTHS ◆`, a line naming the bars and the direction, then the chain (`ii7 → V7 → Imaj7`) in the act colour. Read off the **resolved roots** (`EarTraining.circleRun`), so it works for every generator; steps wrap across the loop (`V` in bar 4 → `I` in bar 1 counts); the diatonic `IV→vii°` tritone does **not** count. It names bars, so it appears **only once every slot is filled**: Challenge — every bar answered; Practice — every bar revealed; Advanced — the answer card open.
+- **Answers named from the opening tonic (v2.82).** When bar 1 **is** the relative tonic — a major progression opening on `vi`, a minor one opening on `bIII` — the ear takes it as home, so every revealed answer (Challenge answer, Practice slot, Car slot + its spoken label) is numbered from **there**: a major `vi7–IVmaj7–Imaj7–V7` reads `i7 – bVImaj7 – bIIImaj7 – bVII7`, never `Imaj7` for a chord heard as `bIIImaj7`. Scoring is unchanged — both keyboard rows already score as the same chord (`EarTraining.openingRelativeLabel`).
 - Optional `Show chord on fretboard` switch renders a 220-dp `FretboardView` of the current/last shape.
 - **Compact density (Android, v2.72.1).** The three blocks you touch on every question are deliberately tighter than stock Material so the whole answering loop — references, squares, keyboard — fits one phone screen without scrolling: the `▶ Play` + degree-reference row is **30 dp** high, a bar square is a **44 dp** box with a 19 sp numeral and a **26 dp** `▶`, and every answer-pad chip is **28 dp** (Major/Minor shift chips 30 dp) inside a 6 dp card with 3 dp grid gaps. Web needs none of this — its chips are already 4 px-padded and its rows flow at text height.
 - **Score screen** (`ChallengeDoneCard`): big `score / total` bars-correct, duration, a **wrapping per-question dot strip** (15 numbered squares, green/red/outline), and a **High-scores table** — best first, ties broken by faster completion time (`CHALLENGE_SCORE_ORDER`), each row showing rank, `score/total`, time, and date; the current run is **bold + "← you"**. The just-finished run is merged in locally so it shows even before the async DataStore write lands. `Restart` / `Exit`.
@@ -443,7 +445,9 @@ The beep is an 880 Hz sine, 140 ms, 5 ms linear attack then exponential decay �
 
 **The reveal waits for the playhead.** A round's newly-earned slot lights up **when the chord under it sounds**, not at the top of the round — you hear the chord and read its function in the same instant, instead of reading ahead of the sound. Slots earned in earlier rounds stay up, so nothing ever un-reveals mid-exercise. Still derived, from round *and* playhead: `CarMode.revealedSlotsAt(round, playheadSlot, slotCount)`.
 
-**Tap a slot to peek.** Any still-hidden slot is a tap target for its whole area (nothing smaller is hittable at arm's length in a car) and shows its function immediately, ahead of the schedule — for when you have committed to an answer and want it now. Tapping a peeked slot again re-hides it, so a stray thumb is undoable; a slot the schedule has already revealed is not tappable, because that answer is spent. Peeks belong to **one exercise**: every draw, replay and auto-advance clears them.
+**Tap a slot to hear it, double-tap to peek (v2.82).** Every slot is a target for its whole area (nothing smaller is hittable at arm's length in a car). A **single tap replays that slot's chord** — the same cached voicing the exercise plays, without moving the playhead (the reveals read it). A **double-tap shows a hidden slot's function** immediately, ahead of the schedule — for when you have committed to an answer and want it now; double-tapping a peeked slot re-hides it, so a stray thumb is undoable, and a slot the schedule has already revealed stays revealed, because that answer is spent. The single tap waits out the double-tap window (~280 ms web, the platform timeout on Android) so a peek never also fires two replays; web slots carry `touch-action: manipulation` so a double-tap never zooms.
+
+**← Prev (v2.82).** Steps back to the previous car exercise — the same chords in the same key, so the same voicing — and replays it from the lead-in. Car mode keeps its own 20-deep history; it never touches the Practice ← Prev stack of the view it borrowed. Peeks belong to **one exercise**: every draw, replay and auto-advance clears them.
 
 **Layout.** Car mode owns the whole content column — the tab bar (portrait) / tab rail (landscape) stays, per the Studio invariant, but the sub-mode chips, mode picker, answer pad, degree-reference row, fretboard, transport dock and generator card are all gone:
 
@@ -454,7 +458,7 @@ Diatonic  -  7th chords                          (read-only)
 |    I    |  |   V7    |  |    ?    |  |    ?    |   slots fill all
 +---------+  +---------+  +---------+  +---------+   remaining height
               * * * o o   (round dots)
-[  Replay 5x  ] [   Next    ] [    Stop    ]         56dp, equal flex
+[← Prev] [ Replay 5x ] [   Next   ] [   Stop   ]     56dp; Prev narrower
 [x] Auto-advance (4 s gap)
 [x] Speak each chord as it appears
     Over the music - "4 minor" for iv, "4 major" for IV.
@@ -466,7 +470,7 @@ Voice level: 90%
 - Slot labels are sized off the **shorter** viewport edge (`clamp(40px, 13vmin, 132px)` web; `min(width/slots, height) * 0.42` on Android), so **one layout serves both orientations** — landscape simply makes the slots taller.
 - The sounding slot takes the accent fill + inset ring, so a glance shows *where* in the bar cycle you are.
 - Hidden slots show `?` at 45% opacity, and are tappable (see the peek rule above). Labels are **Roman-numeral functions only** — never chord symbols, and the key is **never** shown (per the ear-training digest: work directly in function).
-- Idle state: one 72dp `Start ▶` plus an "≈N s per exercise" estimate from `CarMode.exerciseMs`, and the line "tap a slot to peek at it early".
+- Idle state: one 72dp `Start ▶` plus an "≈N s per exercise" estimate from `CarMode.exerciseMs`, and the line "tap a slot to hear its chord - double-tap to peek at it".
 - Existing tokens only (`--surface2`, `--act`, `--line`, `--muted`), so both themes work with no new palette entries.
 
 **Chord voice (v2.74).** A TTS voice reads each slot's function **at the instant that slot appears** — as the playhead-gated schedule uncovers it, or when you tap one to peek — never before. The words come from the pure `CarMode.speechFor`, so both platforms say the same thing and it is unit-tested: the numeral becomes a *degree number* and the case becomes a spoken *quality*, because over road noise "four" alone is useless — `IV` → "4 major", `iv` → "4 minor", `bVImaj7` → "flat 6 major 7", `V7` → "5 dominant 7", `vii°` → "7 diminished".

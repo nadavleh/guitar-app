@@ -66,6 +66,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontStyle
@@ -577,6 +579,7 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
         )
 
         NoTonicBanner(ear, showRelativeLine = true)
+        CircleBanner(ear)
 
         Spacer(Modifier.height(12.dp))
 
@@ -589,7 +592,7 @@ private fun ProgressionView(state: AppState, ear: EarTrainingState) {
                 val isCurrent = ear.isLooping && ear.currentBar == i
                 ChordSlotCard(
                     barNumber = i + 1,
-                    label = resolved?.romanLabel ?: "—",
+                    label = if (resolved != null) ear.barRoman(i) else "—",
                     hidden = i !in ear.progBarRevealed,
                     onToggle = { ear.toggleBarReveal(i) },
                     onPlay = { ear.playBarOnce(i) },
@@ -1658,6 +1661,7 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
         // The no-tonic warning sits directly under the squares being filled — on top it
         // scrolled away from the answering area, which is where it matters.
         NoTonicBanner(ear, showRelativeLine = ear.challengeAllBarsAnswered)
+        CircleBanner(ear)
 
         // Optional fretboard (v2.65: moved up from the bottom of the screen, where
         // checking it meant scrolling down and back up to hit ▶ on the next bar).
@@ -2186,6 +2190,7 @@ private fun AdvancedProgressionBody(ear: EarTrainingState) {
             }
         }
     }
+    CircleBanner(ear)
     Spacer(Modifier.height(10.dp))
     // Teaching note — always visible (the user wants the explanation shown while quizzing).
     Card(
@@ -2972,6 +2977,50 @@ private fun NoTonicBanner(ear: EarTrainingState, showRelativeLine: Boolean) {
     }
 }
 
+/**
+ * Says so when 3+ consecutive chords move round the circle of fifths (ii–V–I, or the
+ * other way, I–V–ii) — read off the actual roots, wrapping across the loop. Styled like
+ * the relative-tonic card: information, not a warning. It names bars, so it only appears
+ * once every slot is filled ([EarTrainingState.circleBannerVisible]).
+ */
+@Composable
+private fun CircleBanner(ear: EarTrainingState) {
+    if (!ear.circleBannerVisible) return
+    val run = ear.circleRun ?: return
+    val n = ear.progResolved.size
+    val bars = run.bars(n)
+    val chain = bars.joinToString(" → ") { ear.barRoman(it) }
+    val barList = bars.joinToString("–") { (it + 1).toString() }
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+    ) {
+        val fg = MaterialTheme.colorScheme.onSurfaceVariant
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text(
+                "◆  CIRCLE OF FIFTHS  ◆",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Black,
+                color = fg,
+            )
+            Text(
+                "${run.length} chords in a row round the circle (bars $barList): every root " +
+                    if (run.fallingFifths) "falls a 5th (= up a 4th) — the ii–V–I pull."
+                    else "rises a 5th (= down a 4th) — the circle walked backwards.",
+                style = MaterialTheme.typography.bodySmall,
+                color = fg,
+            )
+            Text(
+                chain,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
 @Composable
 private fun ProgressionLibraryDialog(state: AppState, onDismiss: () -> Unit) {
     val ear = state.earTraining
@@ -3226,7 +3275,7 @@ private fun CarModeView(state: AppState, ear: EarTrainingState) {
                     Text(
                         "about " + ear.carExerciseSeconds + " s per exercise  -  " +
                             CarMode.ROUNDS + " plays  -  one more chord revealed each play" +
-                            "\ntap a slot to peek at it early",
+                            "\ntap a slot to hear its chord  -  double-tap to peek at it",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -3266,9 +3315,15 @@ private fun CarModeView(state: AppState, ear: EarTrainingState) {
                                     if (sounding) MaterialTheme.colorScheme.primaryContainer
                                     else MaterialTheme.colorScheme.surfaceVariant
                                 )
-                                // Tap to peek: the whole slot is the target, because at
+                                // Tap = hear this chord again, double-tap = peek at its
+                                // function. The whole slot is the target, because at
                                 // arm's length in a car nothing smaller is hittable.
-                                .clickable { ear.toggleCarSlot(i) },
+                                .pointerInput(i) {
+                                    detectTapGestures(
+                                        onTap = { ear.playCarSlot(i) },
+                                        onDoubleTap = { ear.toggleCarSlot(i) },
+                                    )
+                                },
                             contentAlignment = Alignment.Center,
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -3323,11 +3378,16 @@ private fun CarModeView(state: AppState, ear: EarTrainingState) {
 
             Spacer(Modifier.height(10.dp))
 
-            // ---- the three thumb-sized actions ----
+            // ---- the thumb-sized actions ----
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                OutlinedButton(
+                    onClick = { ear.previousCarExercise() },
+                    enabled = ear.canGoPrevCar,
+                    modifier = Modifier.weight(0.7f).height(56.dp),
+                ) { Text("← Prev") }
                 Button(
                     onClick = { ear.replayCarExercise() },
                     modifier = Modifier.weight(1f).height(56.dp),

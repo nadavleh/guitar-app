@@ -1256,6 +1256,31 @@ class EarTrainingState(
     fun challengeBarIsDominant(i: Int): Boolean =
         progMode == TrainingMode.Minor && progProgression?.dominantBars?.contains(i) == true
 
+    /** Bar [i]'s Roman as the ANSWER should read it: named from the relative tonic when
+     *  the progression opens on it (a major vi7 opener is heard as i7, so its I chord is
+     *  bIIImaj7, not Imaj7 — see [EarTraining.openingRelativeLabel]). */
+    fun barRoman(i: Int): String {
+        val label = progResolved.getOrNull(i)?.romanLabel ?: return ""
+        val prog = progProgression ?: return label
+        return EarTraining.openingRelativeLabel(prog, i, label)
+    }
+
+    /** The longest run of 3+ chords moving round the circle of fifths in the CURRENT
+     *  progression (any generator — read off the resolved roots), or null. */
+    val circleRun: EarTraining.CircleRun?
+        get() = EarTraining.circleRun(progResolved.map { it.root.value })
+
+    /** Show the circle-motion banner only once every slot is filled — it names bars, so
+     *  before that it would be a spoiler. Practice: every bar revealed (diatonic) or the
+     *  answer card open (advanced/circle). Challenge: every bar answered. */
+    val circleBannerVisible: Boolean
+        get() {
+            if (circleRun == null) return false
+            if (progProgression == null) return advRevealed
+            return if (earMode == EarMode.Challenge) challengeAllBarsAnswered
+                   else progResolved.indices.all { it in progBarRevealed }
+        }
+
     /**
      * The revealed correct Roman for bar [i], marked "(major)" or "(minor)" whenever the
      * numeral alone is ambiguous — a minor key's harmonic dominant prints exactly like
@@ -1264,7 +1289,7 @@ class EarTrainingState(
      * see [EarTraining.romanIsModeAmbiguous].
      */
     fun challengeAnswerLabel(i: Int): String {
-        val roman = progResolved.getOrNull(i)?.romanLabel ?: return ""
+        val roman = barRoman(i).ifEmpty { return "" }
         return if (EarTraining.romanIsModeAmbiguous(roman))
             "$roman ${EarTraining.romanModeTag(challengeBarIsDominant(i))}" else roman
     }
@@ -1778,9 +1803,20 @@ class EarTrainingState(
      *  it to peek early? */
     fun carSlotRevealed(i: Int): Boolean = i < carRevealedSlots || i in carTappedSlots
 
-    /** Tap a slot to peek at its function before the schedule gets there. Tapping a
-     *  peeked slot again hides it, so a stray thumb on the wheel is undoable; a slot the
-     *  schedule has already revealed is not tappable — that answer is spent. */
+    /** TAP a slot: hear its chord again — the same cached voicing the exercise plays.
+     *  Deliberately leaves [currentBar] alone: the schedule's reveals read the playhead,
+     *  so moving it would uncover slots. */
+    fun playCarSlot(i: Int) {
+        if (i < 0 || i >= progResolved.size) return
+        ensureProgShapes()
+        val barMs = (60_000L / progBpm.coerceAtLeast(10)) * 4
+        audio.cutReverb()
+        soundBar(i, (barMs * 0.9).toInt().coerceAtLeast(200))
+    }
+
+    /** DOUBLE-TAP a slot to peek at its function before the schedule gets there. Doing it
+     *  again hides it, so a stray thumb on the wheel is undoable; a slot the schedule has
+     *  already revealed stays revealed — that answer is spent. */
     fun toggleCarSlot(i: Int) {
         if (i < 0 || i >= progResolved.size || i < carRevealedSlots) return
         carTappedSlots = if (i in carTappedSlots) carTappedSlots - i else carTappedSlots + i
@@ -1791,7 +1827,7 @@ class EarTrainingState(
      *  Never a chord symbol and never the key — the drill is function recognition. */
     fun carSlotLabel(i: Int): String {
         if (!carSlotRevealed(i)) return "?"
-        return progResolved.getOrNull(i)?.romanLabel ?: "—"
+        return barRoman(i).ifEmpty { "—" }
     }
 
     /** "(minor)" / "(major)" for a revealed slot whose Roman reads the same in both keys
@@ -1800,7 +1836,7 @@ class EarTrainingState(
      *  (v2.69.2). Rendered as a small second line so it can't crowd the big label. */
     fun carSlotTag(i: Int): String {
         if (!carSlotRevealed(i)) return ""
-        val roman = progResolved.getOrNull(i)?.romanLabel ?: return ""
+        val roman = barRoman(i).ifEmpty { return "" }
         if (!EarTraining.romanIsModeAmbiguous(roman)) return ""
         // Advanced/circle progressions carry no dominantBars (progProgression is null),
         // so fall back to the progression's own tonic mode — otherwise the Andalusian
@@ -1815,7 +1851,7 @@ class EarTrainingState(
      *  slot off this, not off each label, so the type stays put as reveals come in — and
      *  so an "Imaj13" at the extended level is scaled to fit instead of being clipped. */
     val carLongestLabel: Int
-        get() = progResolved.maxOfOrNull { it.romanLabel.length }?.coerceAtLeast(1) ?: 1
+        get() = progResolved.indices.maxOfOrNull { barRoman(it).length }?.coerceAtLeast(1) ?: 1
 
     /** Seconds one exercise takes at the current tempo, for the on-screen estimate. */
     val carExerciseSeconds: Int
@@ -1869,6 +1905,8 @@ class EarTrainingState(
         carRound = 0
         carExerciseCount = 0
         carTappedSlots = emptySet()
+        carHistory.clear()
+        canGoPrevCar = false
         stopLoop()
     }
 
@@ -1892,6 +1930,36 @@ class EarTrainingState(
             carSaved = null
         }
         earMode = EarMode.Challenge
+    }
+
+    /** Exercises already driven past this session, for ← Prev (car mode never touches the
+     *  practice history — that one belongs to the progression view it borrowed). */
+    private data class CarSnapshot(
+        val prog: Progression?,
+        val advProg: EarTraining.NamedProgression?,
+        val key: PitchClass,
+        val mode: TrainingMode,
+        val resolved: List<ResolvedChord>,
+    )
+
+    private val carHistory = ArrayDeque<CarSnapshot>()
+    var canGoPrevCar by mutableStateOf(false)
+        private set
+
+    /** Back to the previous exercise — the SAME chords in the same key (and so the same
+     *  cached voicing), replayed from the lead-in. */
+    fun previousCarExercise() {
+        val snap = carHistory.removeLastOrNull() ?: return
+        canGoPrevCar = carHistory.isNotEmpty()
+        stopLoop()
+        progProgression = snap.prog
+        advProg = snap.advProg
+        progKey = snap.key
+        progMode = snap.mode
+        progResolved = snap.resolved
+        progTranspose = 0
+        carExerciseCount = (carExerciseCount - 1).coerceAtLeast(1)
+        beginCarExercise(draw = false, cancelExisting = true)
     }
 
     fun startCarExercise() = beginCarExercise(draw = true, cancelExisting = true)
@@ -1920,7 +1988,7 @@ class EarTrainingState(
     private fun speakCarSlot(i: Int) {
         if (!carSpeakChords || !carSlotRevealed(i)) return
         if (!carSpokenSlots.add(i)) return
-        speak(CarMode.speechFor(progResolved.getOrNull(i)?.romanLabel ?: return), carSpeechVolume)
+        speak(CarMode.speechFor(barRoman(i).ifEmpty { return }), carSpeechVolume)
     }
 
     fun stopCarExercise() {
@@ -1950,6 +2018,11 @@ class EarTrainingState(
     private fun beginCarExercise(draw: Boolean, cancelExisting: Boolean) {
         if (cancelExisting) stopLoop() else audio.stop()
         if (draw) {
+            if (carExerciseCount > 0 && progResolved.isNotEmpty()) {
+                carHistory.addLast(CarSnapshot(progProgression, advProg, progKey, progMode, progResolved))
+                while (carHistory.size > 20) carHistory.removeFirst()
+                canGoPrevCar = true
+            }
             if (specialProgMode) nextAdvancedProgression() else nextProgression()
             carExerciseCount++
         }

@@ -21,7 +21,7 @@ import {
   MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, MINOR_HARMONIC_PROGRESSIONS, ADVANCED_PROGRESSIONS, ADVANCED2_PROGRESSIONS,
   SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor, progressionFromKey,
   progressionRelativeTonicMode, progressionRelativeTonicBar, progressionHomeIsObvious,
-  relativeRomanLineFor,
+  relativeRomanLineFor, circleRunBars,
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow,
   ResolvedChord, ChordShape, resolveProgression, resolveNamed, resolveCircleWindow,
   WorkoutSession, WorkoutWeek, WORKOUT_WEEKS, WORKOUT_MONTHS,
@@ -41,6 +41,8 @@ const BG_PRIMARY = "color-mix(in srgb, var(--act) 20%, transparent)";
 // same as an ACT-coloured user selection (which stays coral/--act).
 const BG_PLAYHEAD = "color-mix(in srgb, var(--feedback) 30%, transparent)";
 const BG_TEACH = "color-mix(in srgb, var(--chord-tone) 15%, transparent)";
+/** Two taps on a car slot inside this window are a double-tap (peek), not two replays. */
+const CAR_DOUBLE_TAP_MS = 280;
 
 function select(options: { value: string; label: string }[], value: string, onChange: (v: string) => void): HTMLSelectElement {
   const s = el("select", { class: "et-select" }) as HTMLSelectElement;
@@ -253,6 +255,9 @@ export class EarTrainingUI {
   // ---------- Car mode (hands-free progression drill) ----------
 
   private carWake: WakeLockHandle | null = null;
+  /** Pending single-tap on a car slot, waiting out the double-tap window. */
+  private carTapTimer: number | null = null;
+  private carTapSlot = -1;
   private carWakePending = false;
   private carWakeUnavailable = false;
   private carVisListener: (() => void) | null = null;
@@ -340,7 +345,7 @@ export class EarTrainingUI {
         start,
         el("div", { class: "et-muted car-est" }, [
           `\u2248${ear.carExerciseSeconds}s per exercise \u00b7 ${CarMode.ROUNDS} plays \u00b7 ` +
-          "one more chord revealed each play \u00b7 tap a slot to peek at it early",
+          "one more chord revealed each play \u00b7 tap a slot to hear its chord \u00b7 double-tap to peek at it",
         ]),
       ]));
       screen.appendChild(wrap);
@@ -368,9 +373,26 @@ export class EarTrainingUI {
           ...(tag ? [el("span", { class: "tag" }, [tag])] : []),
         ]),
       ]);
-      // Tap to peek: the whole slot is the target, because at arm's length in a car
-      // nothing smaller is hittable.
-      cell.onclick = () => { ear.toggleCarSlot(i); this.rerender(); };
+      // Tap = hear this chord again, double-tap = peek at its function. The whole slot is
+      // the target, because at arm's length in a car nothing smaller is hittable. A
+      // native dblclick would fire two clicks first (two replays), so a single tap waits
+      // out the double-tap window before it plays — the same trade Compose's
+      // detectTapGestures makes on Android.
+      cell.onclick = () => {
+        if (this.carTapTimer !== null && this.carTapSlot === i) {
+          clearTimeout(this.carTapTimer);
+          this.carTapTimer = null;
+          ear.toggleCarSlot(i);
+          this.rerender();
+          return;
+        }
+        if (this.carTapTimer !== null) clearTimeout(this.carTapTimer);
+        this.carTapSlot = i;
+        this.carTapTimer = window.setTimeout(() => {
+          this.carTapTimer = null;
+          ear.playCarSlot(i);
+        }, CAR_DOUBLE_TAP_MS);
+      };
       row.appendChild(cell);
     }
     wrap.appendChild(row);
@@ -382,8 +404,11 @@ export class EarTrainingUI {
     }
     wrap.appendChild(dots);
 
-    // ---- the three thumb-sized actions ----
+    // ---- the thumb-sized actions ----
+    const prevCar = btn("\u2190 Prev", () => { ear.previousCarExercise(); this.rerender(); });
+    prevCar.disabled = !ear.canGoPrevCar;
     wrap.appendChild(el("div", { class: "car-actions" }, [
+      prevCar,
       btn(`Replay ${CarMode.ROUNDS}\u00d7`, () => { ear.replayCarExercise(); this.rerender(); }, "btn primary"),
       btn("Next \u2192", () => { ear.startCarExercise(); this.rerender(); }, "btn primary"),
       btn("Stop", () => { ear.stopCarExercise(); this.rerender(); }),
@@ -1129,6 +1154,33 @@ export class EarTrainingUI {
    * `showRelativeLine` is false on an unanswered challenge question: the relative Roman
    * line names every bar, so it IS the answer. Returns null when neither case applies.
    */
+  /**
+   * Says so when 3+ consecutive chords move round the circle of fifths (ii–V–I, or the
+   * other way, I–V–ii) — read off the actual roots, wrapping across the loop. Styled like
+   * the relative-tonic card: information, not a warning. It names bars, so it only
+   * appears once every slot is filled (`circleBannerVisible`).
+   */
+  private circleBanner(): HTMLElement | null {
+    const ear = this.ear;
+    const run = ear.circleRun;
+    if (!ear.circleBannerVisible || !run) return null;
+    const bars = circleRunBars(run, ear.progResolved.length);
+    const chain = bars.map((b) => ear.barRoman(b)).join(" → ");
+    const barList = bars.map((b) => String(b + 1)).join("–");
+    return el("div", {
+      style: "margin:6px 0;padding:8px 10px;border-radius:8px;background:var(--panel);" +
+        "border:1px solid var(--line)",
+    }, [
+      el("div", { style: "font-weight:800;letter-spacing:0.5px" }, ["◆  CIRCLE OF FIFTHS  ◆"]),
+      el("div", { style: "font-size:12px;margin-top:2px" }, [
+        `${run.length} chords in a row round the circle (bars ${barList}): every root ` +
+        (run.fallingFifths ? "falls a 5th (= up a 4th) — the ii–V–I pull."
+                           : "rises a 5th (= down a 4th) — the circle walked backwards."),
+      ]),
+      el("div", { style: "font-weight:700;margin-top:2px;color:var(--act)" }, [chain]),
+    ]);
+  }
+
   private noTonicBanner(showRelativeLine: boolean): HTMLElement | null {
     const p = this.ear.progProgression;
     // Its own I, or the relative tonic in bar 1 — it starts at home, so say nothing.
@@ -1185,6 +1237,8 @@ export class EarTrainingUI {
       () => ear.toggleKeyModeReveal(), false));
     const practiceNoTonic = this.noTonicBanner(true);
     if (practiceNoTonic) parent.appendChild(practiceNoTonic);
+    const practiceCircle = this.circleBanner();
+    if (practiceCircle) parent.appendChild(practiceCircle);
     parent.appendChild(el("div", { class: "v-gap-12" }));
     parent.appendChild(this.chordSlots());
     parent.appendChild(el("div", { class: "v-gap-8" }));
@@ -1227,7 +1281,7 @@ export class EarTrainingUI {
       const bg = isCurrent ? BG_PLAYHEAD : hidden ? BG_HIDDEN : BG_REVEAL;
       const slot = el("div", { class: "et-slot", style: `background:${bg}` }, [
         el("div", { class: "ans-label" }, [`Bar ${i + 1}`]),
-        el("div", { style: `margin:6px 0;font-weight:600;${hidden ? "font-size:13px;color:var(--text-secondary)" : "font-size:24px"}` }, [hidden ? "tap" : (resolved?.romanLabel ?? "—")]),
+        el("div", { style: `margin:6px 0;font-weight:600;${hidden ? "font-size:13px;color:var(--text-secondary)" : "font-size:24px"}` }, [hidden ? "tap" : (resolved ? ear.barRoman(i) : "—")]),
         btn("▶", () => ear.playBarOnce(i)),
       ]);
       slot.querySelector(".ans-label")!.addEventListener("click", () => ear.toggleBarReveal(i));
@@ -1319,6 +1373,8 @@ export class EarTrainingUI {
     // scrolled away from the answering area, which is where it matters.
     const challengeNoTonic = this.noTonicBanner(ear.challengeAllBarsAnswered);
     if (challengeNoTonic) parent.appendChild(challengeNoTonic);
+    const challengeCircle = this.circleBanner();
+    if (challengeCircle) parent.appendChild(challengeCircle);
 
     // Optional fretboard (v2.65: moved up from the bottom of the screen, where
     // checking it meant scrolling down and back up to hit ▶ on the next bar).
@@ -1535,6 +1591,8 @@ export class EarTrainingUI {
       el("div", {}, [ear.progResolved.map((rc) => rc.symbol).join("   ")]),
       el("div", { class: "ans-label" }, ["in " + spellPc(ear.progKey) + " " + (ear.progMode === TrainingMode.Major ? "major" : "minor")]),
     ]));
+    const advCircle = this.circleBanner();
+    if (advCircle) parent.appendChild(advCircle);
     parent.appendChild(el("div", { class: "et-card", style: `background:${BG_TEACH}` }, [
       el("div", { class: "ans-label" }, ["About this progression"]),
       el("div", { class: "et-muted", style: "margin-top:2px" }, [np.explanation]),
