@@ -335,12 +335,33 @@ class EarTrainingTest {
             IntervalTrainer.diatonicAnswerSet(M, IntervalTrainer.DEGREES.toSet(), IntervalDirection.Ascending))
     }
 
-    @Test fun `every interval song row has a lookup and the extras name real intervals`() {
+    @Test fun `every interval has a reference row in both directions`() {
         for (st in 1..12) for (up in listOf(true, false))
             assertEquals(st, IntervalSongs.refFor(st, up)?.semitones)
-        for (r in IntervalSongs.ASCENDING + IntervalSongs.DESCENDING)
-            IntervalSongs.moreSongs(r).forEach { (title, _) -> assertTrue(title.isNotBlank()) }
-        assertTrue(IntervalSongs.moreSongs(IntervalSongs.refFor(5, true)!!).any { it.first == "Amazing Grace" })
+    }
+
+    @Test fun `song count is pinned (web verify pins the same number)`() {
+        assertEquals(46, (IntervalSongs.ASCENDING + IntervalSongs.DESCENDING).sumOf { it.songs.size })
+    }
+
+    @Test fun `every song snippet actually sounds its interval in its direction`() {
+        for (r in IntervalSongs.ASCENDING + IntervalSongs.DESCENDING) for (song in r.songs) {
+            val notes = IntervalSongs.melodyNotes(song.melody)
+            assertTrue(notes.size in 2..12, "${song.title}: a few notes, not a transcription")
+            assertTrue(notes.all { it.eighths > 0 }, "${song.title}: lengths")
+            assertTrue(IntervalSongs.melodyContains(song.melody, r.semitones, r.ascending),
+                "${song.title} does not contain ${r.interval} ${if (r.ascending) "up" else "down"}")
+            // Centred near F#4 so nothing sounds too low or shrill.
+            assertTrue(notes.all { it.midi in 54..80 }, "${song.title}: range")
+        }
+    }
+
+    @Test fun `melody parsing centres the snippet and keeps lengths`() {
+        val n = IntervalSongs.melodyNotes("0/2 5/1.5 5/0.5", centerMidi = 66)
+        assertEquals(listOf(64, 69, 69), n.map { it.midi })
+        assertEquals(listOf(2.0, 1.5, 0.5), n.map { it.eighths })
+        assertTrue(IntervalSongs.melodyContains("0/4 12/4 11/2", 11, ascending = true))   // 1st→3rd
+        assertFalse(IntervalSongs.melodyContains("0/4 12/4 11/2", 11, ascending = false))
     }
 
     @Test fun `choiceFor maps semitones to the right interval`() {

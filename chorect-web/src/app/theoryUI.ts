@@ -1,8 +1,7 @@
 import { el, btn, externalSongRow } from "./dom";
 import { EarTrainingState } from "./earTrainingState";
 import {
-  IntervalSongRef, INTERVAL_SONGS_ASCENDING, INTERVAL_SONGS_DESCENDING, INTERVAL_COMPLEMENT_NOTE,
-  intervalMoreSongs, intervalRefFor,
+  IntervalSongRef, INTERVAL_COMPLEMENT_NOTE, intervalRefFor,
 } from "../theory";
 
 /** Theory tab — reference sheets. First section: interval → song lookup
@@ -11,68 +10,85 @@ import {
  *  together. Song links are explicitly labelled YouTube/Spotify so ▶ always
  *  means "the app makes the sound". Mirrors Android's TheoryScreen.kt. */
 
-/** One interval row: ▶ play · name · inversion · song links · cue. */
-function intervalRow(ear: EarTrainingState, rerender: () => void, r: IntervalSongRef): HTMLElement {
-  const id = `${r.ascending ? "asc" : "desc"}:${r.interval}`;
+/** A small ▶/■ toggle bound to one `ear.intervalPreviewId`. */
+function previewButton(ear: EarTrainingState, rerender: () => void, id: string, label: string,
+                       title: string, onPlay: () => void): HTMLElement {
   const playing = ear.intervalPreviewId === id;
-  const play = btn(playing ? "■" : "▶", () => {
-    if (playing) ear.stopIntervalPreview();
-    else ear.playIntervalPreview(id, r.semitones, r.ascending);
+  const b = btn(playing ? "■" : label, () => {
+    if (playing) ear.stopIntervalPreview(); else onPlay();
     rerender();
   }, playing ? "btn primary" : "btn");
-  play.title = `Play the ${r.intervalLong} ${r.ascending ? "ascending" : "descending"} (from C4)`;
-  play.style.minWidth = "36px";
-
-  // Title line: interval name only. The ▶ sits on the line BENEATH it, beside the
-  // external links, so in-app audio and outward links live on the same row.
-  const head = el("div", { style: "display:flex;gap:8px;align-items:baseline;flex-wrap:wrap" }, [
-    el("span", { style: "font-weight:700;min-width:32px;color:var(--act)" }, [r.interval]),
-    el("span", { style: "font-weight:600" }, [r.intervalLong]),
-    el("span", { class: "et-muted", style: "font-size:12px" }, [`(${r.inversion})`]),
-  ]);
-  // A row without an artist is a "construct it yourself" entry — nothing to search for.
-  const songPart = r.artist
-    ? externalSongRow(r.song, r.artist)
-    : el("div", { class: "et-muted", style: "flex:1;font-size:14px" }, [r.song]);
-  songPart.style.flex = "1";
-  const more = intervalMoreSongs(r).map(([title, artist]) => externalSongRow(title, artist));
-  const children: HTMLElement[] = [
-    head,
-    el("div", { style: "display:flex;gap:8px;align-items:center" }, [play, songPart]),
-    ...(more.length ? [el("div", { style: "padding-left:44px" }, more)] : []),
-    el("div", { class: "et-muted", style: "font-size:13px;padding-left:8px" }, [r.cue]),
-  ];
-  return el("div", { style: "padding:6px 0;border-bottom:1px solid var(--surface2)" }, children);
+  b.title = title;
+  b.style.minWidth = "36px";
+  return b;
 }
 
-/** Just one interval's songs — the direction you heard first, the other underneath.
- *  Opened by the trainer's post-answer "♪ Songs for …" button. */
+/** One direction of an interval: ▶ the bare interval, then each song with its own ▶
+ *  that plays a few notes of the melody containing the interval. */
+function directionBlock(ear: EarTrainingState, rerender: () => void, r: IntervalSongRef): HTMLElement {
+  const dirId = `${r.ascending ? "asc" : "desc"}:${r.interval}`;
+  const dirWord = r.ascending ? "ascending" : "descending";
+  const children: HTMLElement[] = [
+    el("div", { style: "display:flex;gap:8px;align-items:baseline;margin-top:4px" }, [
+      previewButton(ear, rerender, dirId, r.ascending ? "▶ ↑" : "▶ ↓",
+        `Play the ${r.intervalLong} ${dirWord} (from C4)`,
+        () => ear.playIntervalPreview(dirId, r.semitones, r.ascending)),
+      el("span", { style: "font-weight:600" }, [r.ascending ? "Ascending" : "Descending"]),
+      el("span", { class: "et-muted", style: "font-size:12px" }, [`(${r.inversion})`]),
+    ]),
+  ];
+  if (r.songs.length === 0 && r.note) {
+    children.push(el("div", { class: "et-muted", style: "font-size:13px;padding-left:12px" }, [r.note]));
+  }
+  r.songs.forEach((song, i) => {
+    const songId = `${dirId}:song${i}`;
+    const links = externalSongRow(song.title, song.artist);
+    links.style.flex = "1";
+    children.push(el("div", { style: "display:flex;gap:8px;align-items:flex-start;padding-left:12px;margin-top:2px" }, [
+      previewButton(ear, rerender, songId, "▶", `Play a few notes of ${song.title}`,
+        () => ear.playMelodySnippet(songId, song.melody)),
+      el("div", { style: "flex:1" }, [
+        links,
+        el("div", { class: "et-muted", style: "font-size:12px" }, [song.cue]),
+      ]),
+    ]));
+  });
+  return el("div", {}, children);
+}
+
+/** One interval, both directions; `firstAscending` picks which comes first (the
+ *  trainer puts the direction you just heard on top). */
+function intervalCard(ear: EarTrainingState, rerender: () => void, semitones: number, firstAscending = true): HTMLElement {
+  const first = intervalRefFor(semitones, firstAscending);
+  const second = intervalRefFor(semitones, !firstAscending);
+  if (!first || !second) return el("div");
+  return el("div", { style: "padding:6px 0 8px;border-bottom:1px solid var(--surface2)" }, [
+    el("div", { style: "display:flex;gap:8px;align-items:baseline" }, [
+      el("span", { style: "font-weight:700;min-width:32px;color:var(--act)" }, [first.interval]),
+      el("span", { style: "font-weight:700" }, [first.intervalLong]),
+    ]),
+    directionBlock(ear, rerender, first),
+    directionBlock(ear, rerender, second),
+  ]);
+}
+
+/** Just one interval — opened by the trainer's post-answer "♪ Songs for …" button. */
 export function intervalSongsContent(ear: EarTrainingState, rerender: () => void,
                                      semitones: number, ascending: boolean): HTMLElement {
-  const rows = [intervalRefFor(semitones, ascending), intervalRefFor(semitones, !ascending)]
-    .filter((r): r is IntervalSongRef => r !== undefined);
-  return el("div", {}, rows.map((r) => el("div", { style: "margin-bottom:8px" }, [
-    el("div", { style: "font-weight:700;color:var(--act)" }, [r.ascending ? "Ascending" : "Descending"]),
-    intervalRow(ear, rerender, r),
-  ])));
+  return intervalCard(ear, rerender, semitones, ascending);
 }
 
 /** The interval-reference block, shared by the Theory tab and the ear-training
  *  interval trainer's overlay. */
 export function intervalRefsContent(ear: EarTrainingState, rerender: () => void): HTMLElement {
-  const section = (title: string, sub: string, rows: IntervalSongRef[]): HTMLElement =>
-    el("div", { style: "margin-bottom:14px" }, [
-      el("div", { style: "font-weight:700;color:var(--act);margin-bottom:2px" }, [title]),
-      el("div", { class: "et-muted", style: "font-size:12px;font-style:italic;margin-bottom:4px" }, [sub]),
-      ...rows.map((r) => intervalRow(ear, rerender, r)),
-    ]);
+  const cards: HTMLElement[] = [];
+  for (let st = 1; st <= 12; st++) cards.push(intervalCard(ear, rerender, st));
   return el("div", {}, [
-    el("div", { class: "et-muted", style: "font-size:12px;margin-bottom:8px" }, [
-      "▶ plays the interval itself (from C4): the two notes in turn, then together. The YouTube/Spotify links open the reference song outside the app.",
+    el("div", { class: "et-muted", style: "font-size:12px;margin-bottom:4px" }, [
+      "▶ ↑ / ▶ ↓ play the bare interval (from C4): the two notes in turn, then together. The ▶ beside a song plays a few notes of its melody that contain the interval; YouTube/Spotify open the real recording.",
     ]),
-    section("Ascending", "Sing the cue, then the leap — the song IS the interval.", INTERVAL_SONGS_ASCENDING),
-    section("Descending", "From the reference sheet — the classic downward leaps.", INTERVAL_SONGS_DESCENDING),
-    el("div", { class: "et-muted", style: "font-size:12px;font-style:italic" }, [INTERVAL_COMPLEMENT_NOTE]),
+    ...cards,
+    el("div", { class: "et-muted", style: "font-size:12px;font-style:italic;margin-top:8px" }, [INTERVAL_COMPLEMENT_NOTE]),
   ]);
 }
 

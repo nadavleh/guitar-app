@@ -112,7 +112,8 @@ class EarWorkoutTest {
         assertTrue(IntervalSongs.ASCENDING.all { it.ascending })
         assertTrue(IntervalSongs.DESCENDING.none { it.ascending })
         for (r in IntervalSongs.ASCENDING + IntervalSongs.DESCENDING) {
-            assertTrue(r.song.isNotEmpty() && r.cue.isNotEmpty(), r.interval)
+            assertTrue(r.songs.isNotEmpty() || r.note.isNotEmpty(), r.interval)
+            r.songs.forEach { assertTrue(it.title.isNotEmpty() && it.cue.isNotEmpty(), r.interval) }
             assertTrue(r.semitones in 1..12, "${r.interval} semitones")
         }
         // Semitone values must match the interval names, in order.

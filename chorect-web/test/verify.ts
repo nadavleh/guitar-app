@@ -29,7 +29,8 @@ import {
   PercussionCatalog, PercussionPattern, PercussionMeter, swungSlotMs, slotMs, voiceCount, SwingModel,
   movementCost, pickMinMovement, BUILTIN_PATTERNS,
   INTERVAL_CHOICES, intervalTargetMidi, INTERVAL_DEGREES, intervalDegreeSemitones, intervalDegreeLabel,
-  diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalRefFor, intervalMoreSongs, intervalChoiceFor, IntervalDirection,
+  diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalRefFor, intervalChoiceFor, IntervalDirection,
+  INTERVAL_SONGS_ASCENDING, INTERVAL_SONGS_DESCENDING, melodyNotes, melodyContains,
   CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
   MissedTake, encodeMissedTake, decodeMissedTake,
 } from "../src/theory";
@@ -385,7 +386,20 @@ check("diatonic answer set",
   for (let st = 1; st <= 12; st++) for (const up of [true, false]) if (intervalRefFor(st, up)?.semitones !== st) ok = false;
   for (const m of [TrainingMode.Major, TrainingMode.Minor]) for (const d of INTERVAL_DEGREES) for (const up of [true, false])
     if (!intervalChoiceFor(diatonicIntervalSemitones(m, d, up))) ok = false;
-  check("interval song lookup + extras", ok && intervalMoreSongs(intervalRefFor(5, true)!).some(([t]) => t === "Amazing Grace"));
+  check("interval song lookup", ok);
+  const allRefs = [...INTERVAL_SONGS_ASCENDING, ...INTERVAL_SONGS_DESCENDING];
+  // Pinned to Kotlin EarTrainingTest: same song count, every snippet sounds its interval.
+  check("interval song count = 46", allRefs.reduce((n, r) => n + r.songs.length, 0) === 46);
+  let melOk = true;
+  for (const r of allRefs) for (const sg of r.songs) {
+    const notes = melodyNotes(sg.melody);
+    if (notes.length < 2 || notes.length > 12 || !notes.every((n) => n.midi >= 54 && n.midi <= 80)) melOk = false;
+    if (!melodyContains(sg.melody, r.semitones, r.ascending)) melOk = false;
+  }
+  check("every song snippet contains its interval", melOk);
+  check("melody parse centres + keeps lengths",
+    melodyNotes("0/2 5/1.5 5/0.5", 66).map((n) => n.midi).join() === "64,69,69" &&
+    melodyNotes("0/2 5/1.5 5/0.5", 66).map((n) => n.eighths).join() === "2,1.5,0.5");
 }
 
 // --- Chord decomposition (#5): shell + a valid 3-note upper triad ---

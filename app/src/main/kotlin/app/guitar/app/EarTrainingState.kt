@@ -16,6 +16,7 @@ import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
 import app.guitar.theory.IntervalChoice
 import app.guitar.theory.IntervalDirection
+import app.guitar.theory.IntervalSongs
 import app.guitar.theory.IntervalSource
 import app.guitar.theory.IntervalTrainer
 import app.guitar.theory.NoteSpeller
@@ -2588,6 +2589,26 @@ class EarTrainingState(
                 audio.playChord(listOf(base, target), strumDelayMillis = 0,
                     sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
                 delay(900)
+            } finally {
+                if (intervalPreviewId == id) intervalPreviewId = null
+            }
+        }
+    }
+
+    /** Play a song's few-note [melody] snippet (see [IntervalSongs.melodyNotes]); shares the
+     *  ▶/■ state with [playIntervalPreview], so starting one stops the other. */
+    fun playMelodySnippet(id: String, melody: String) {
+        intervalPreviewJob?.cancel()
+        intervalPreviewId = id
+        intervalPreviewJob = scope.launch {
+            try {
+                audio.chokeChords()
+                for (n in IntervalSongs.melodyNotes(melody)) {
+                    val ms = (n.eighths * IntervalSongs.EIGHTH_MS).toLong()
+                    audio.playNote(n.midi, durationMillis = maxOf(ms.toInt(), 180))
+                    delay(ms)
+                }
+                delay(400)
             } finally {
                 if (intervalPreviewId == id) intervalPreviewId = null
             }

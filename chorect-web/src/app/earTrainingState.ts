@@ -20,6 +20,7 @@ import {
   inversionCount, inversionMidis,
   pickMinMovement, defaultRng,
   IntervalDirection, INTERVAL_CHOICES, intervalTargetMidi, IntervalChoice, IntervalSource,
+  melodyNotes, INTERVAL_EIGHTH_MS,
   INTERVAL_DEGREES, diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalChoiceFor,
 } from "../theory";
 import { WebAudioEngine, Timbres, renderCueBeep } from "../audio";
@@ -2248,6 +2249,29 @@ export class EarTrainingState {
   /** Which reference row is currently sounding (for the ▶/■ button), or null. */
   intervalPreviewId: string | null = null;
   private intervalPreviewToken = 0;
+
+  /** Play a song's few-note melody snippet (see `melodyNotes`); shares the ▶/■ state
+   *  with `playIntervalPreview`, so starting one stops the other. */
+  playMelodySnippet(id: string, melody: string) {
+    this.intervalPreviewToken++;
+    const token = this.intervalPreviewToken;
+    this.intervalPreviewId = id;
+    this.notify();
+    void (async () => {
+      const live = () => token === this.intervalPreviewToken;
+      this.deps.audio.chokeChords();
+      for (const n of melodyNotes(melody)) {
+        if (!live()) return;
+        const ms = n.eighths * INTERVAL_EIGHTH_MS;
+        this.deps.audio.playNote(n.midi, Math.max(ms, 180));
+        await sleep(ms);
+      }
+      await sleep(400);
+      if (!live()) return;
+      this.intervalPreviewId = null;
+      this.notify();
+    })();
+  }
 
   playIntervalPreview(id: string, semitones: number, ascending: boolean) {
     this.intervalPreviewToken++;
