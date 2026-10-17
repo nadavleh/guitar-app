@@ -2,6 +2,7 @@ import { el, btn, externalSongRow } from "./dom";
 import { EarTrainingState } from "./earTrainingState";
 import {
   IntervalSongRef, INTERVAL_SONGS_ASCENDING, INTERVAL_SONGS_DESCENDING, INTERVAL_COMPLEMENT_NOTE,
+  intervalMoreSongs, intervalRefFor,
 } from "../theory";
 
 /** Theory tab — reference sheets. First section: interval → song lookup
@@ -34,12 +35,26 @@ function intervalRow(ear: EarTrainingState, rerender: () => void, r: IntervalSon
     ? externalSongRow(r.song, r.artist)
     : el("div", { class: "et-muted", style: "flex:1;font-size:14px" }, [r.song]);
   songPart.style.flex = "1";
+  const more = intervalMoreSongs(r).map(([title, artist]) => externalSongRow(title, artist));
   const children: HTMLElement[] = [
     head,
     el("div", { style: "display:flex;gap:8px;align-items:center" }, [play, songPart]),
+    ...(more.length ? [el("div", { style: "padding-left:44px" }, more)] : []),
     el("div", { class: "et-muted", style: "font-size:13px;padding-left:8px" }, [r.cue]),
   ];
   return el("div", { style: "padding:6px 0;border-bottom:1px solid var(--surface2)" }, children);
+}
+
+/** Just one interval's songs — the direction you heard first, the other underneath.
+ *  Opened by the trainer's post-answer "♪ Songs for …" button. */
+export function intervalSongsContent(ear: EarTrainingState, rerender: () => void,
+                                     semitones: number, ascending: boolean): HTMLElement {
+  const rows = [intervalRefFor(semitones, ascending), intervalRefFor(semitones, !ascending)]
+    .filter((r): r is IntervalSongRef => r !== undefined);
+  return el("div", {}, rows.map((r) => el("div", { style: "margin-bottom:8px" }, [
+    el("div", { style: "font-weight:700;color:var(--act)" }, [r.ascending ? "Ascending" : "Descending"]),
+    intervalRow(ear, rerender, r),
+  ])));
 }
 
 /** The interval-reference block, shared by the Theory tab and the ear-training

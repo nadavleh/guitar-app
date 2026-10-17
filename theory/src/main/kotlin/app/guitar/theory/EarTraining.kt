@@ -912,6 +912,10 @@ object EarTraining {
 /** Direction an interval is played in the interval-ID trainer. */
 enum class IntervalDirection { Ascending, Descending, Mixed }
 
+/** Where interval questions are drawn from: the degrees of the key's [Diatonic] scale
+ *  (major or natural minor), or all 13 [Chromatic] intervals. */
+enum class IntervalSource { Diatonic, Chromatic }
+
 /** One choosable interval: [semitones] above the tonic, with a short and long name. */
 data class IntervalChoice(val semitones: Int, val shortName: String, val longName: String)
 
@@ -945,4 +949,49 @@ object IntervalTrainer {
 
     fun choiceFor(semitones: Int): IntervalChoice =
         INTERVALS.first { it.semitones == semitones }
+
+    // ---- Diatonic source: the target is a scale degree of the key ----
+
+    /** Selectable target degrees: 1..7, plus 8 = the tonic an octave away. */
+    val DEGREES: List<Int> = (1..8).toList()
+
+    private val MAJOR_STEPS = intArrayOf(0, 2, 4, 5, 7, 9, 11, 12)
+    private val MINOR_STEPS = intArrayOf(0, 2, 3, 5, 7, 8, 10, 12)   // natural minor
+
+    /** Semitones from the tonic UP to scale [degree] (1..8) of [mode]. */
+    fun degreeSemitones(mode: TrainingMode, degree: Int): Int =
+        (if (mode == TrainingMode.Major) MAJOR_STEPS else MINOR_STEPS)[degree - 1]
+
+    /** Degree box label: "1".."7", flattened in minor ("♭3", "♭6", "♭7"), and "8". */
+    fun degreeLabel(mode: TrainingMode, degree: Int): String {
+        val flat = degreeSemitones(mode, degree) < degreeSemitones(TrainingMode.Major, degree)
+        return (if (flat) "♭" else "") + degree
+    }
+
+    /**
+     * The interval HEARD when the target is scale [degree]. Ascending, the target sits
+     * above the tonic. Descending, it is the SAME scale degree in the octave below, so
+     * every note stays in the key — the heard interval is then the octave complement
+     * (degree 3 in major, down: a minor 6th). Degree 1 is the unison and degree 8 the
+     * octave in either direction.
+     */
+    fun diatonicSemitones(mode: TrainingMode, degree: Int, ascending: Boolean): Int {
+        val up = degreeSemitones(mode, degree)
+        return when {
+            ascending || degree == 1 || degree == 8 -> up
+            else -> 12 - up
+        }
+    }
+
+    /** Every interval (semitones, ascending order) the diatonic draw can produce from
+     *  [degrees] in [direction] — the answer chips offered, so a degree switched off
+     *  also leaves the answer pad. */
+    fun diatonicAnswerSet(mode: TrainingMode, degrees: Set<Int>, direction: IntervalDirection): List<Int> {
+        val dirs = when (direction) {
+            IntervalDirection.Ascending -> listOf(true)
+            IntervalDirection.Descending -> listOf(false)
+            IntervalDirection.Mixed -> listOf(true, false)
+        }
+        return degrees.flatMap { d -> dirs.map { diatonicSemitones(mode, d, it) } }.distinct().sorted()
+    }
 }

@@ -80,6 +80,8 @@ import app.guitar.theory.CarMode
 import app.guitar.theory.EarTraining
 import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
+import app.guitar.theory.IntervalSource
+import app.guitar.theory.IntervalTrainer
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
 import app.guitar.theory.Progression
@@ -145,10 +147,11 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                 maxLines = 1,
             )
             if (progChallengeInFlight) {
+                // Restarts THIS progression only; the full restart is in the fold.
                 IconButton(onClick = {
-                    if (ear.specialProgMode) ear.startAdvChallenge() else ear.startChallenge()
+                    if (ear.specialProgMode) ear.restartAdvQuestion() else ear.restartChallengeQuestion()
                 }) {
-                    Icon(Icons.Rounded.RestartAlt, contentDescription = "Restart challenge")
+                    Icon(Icons.Rounded.RestartAlt, contentDescription = "Restart this progression")
                 }
                 IconButton(onClick = {
                     if (ear.specialProgMode) ear.exitAdvChallenge() else ear.exitChallenge()
@@ -217,7 +220,7 @@ fun EarTrainingScreen(state: AppState, onBack: () -> Unit) {
                     if (ear.earMode == EarMode.Challenge) AugDimChallengeView(state, ear)
                     else AugDimView(state, ear)
                 // Intervals is challenge-only (#6) — same view in either mode.
-                EarSubMode.Intervals -> IntervalsView(ear)
+                EarSubMode.Intervals -> IntervalsView(state, ear)
                 EarSubMode.Drill -> DrillView(state, ear)
                 EarSubMode.Workout -> WorkoutView(state, ear)
             }
@@ -371,6 +374,14 @@ private fun ChallengeModeFold(state: AppState, ear: EarTrainingState) {
                             onClick = { ear.challengeFollowPlayhead = !ear.challengeFollowPlayhead },
                             label = { Text("Keys follow playhead") },
                         )
+                        FilterChip(
+                            selected = ear.challengeShowAnswerOnMiss,
+                            onClick = { ear.challengeShowAnswerOnMiss = !ear.challengeShowAnswerOnMiss },
+                            label = { Text("Show answer on miss") },
+                        )
+                        OutlinedButton(onClick = { open = false; ear.startChallenge() }) {
+                            Text("Restart all ${ear.challengeTotal}")
+                        }
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -1647,7 +1658,7 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                     // "V7" there is indistinguishable from the major key's V7.
                     labelTag = ear.challengeGuessTag(i),
                     verdict = verdict,
-                    answer = if (verdict != null) ear.challengeAnswerLabel(i) else null,
+                    answer = if (verdict != null && ear.challengeShowAnswerOnMiss) ear.challengeAnswerLabel(i) else null,
                     selected = selectedBar == i,
                     playhead = ear.isLooping && ear.currentBar == i,   // playing "head"
                     onTap = { selectedBar = i; ear.disarmChallengeFollow() },
@@ -1656,6 +1667,15 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                     modifier = Modifier.weight(1f),
                 )
             }
+        }
+
+        // A hand-picked square stops the pad following the playhead; this hands it back.
+        if (ear.challengeFollowPlayhead && !ear.challengeFollowArmed) {
+            TextButton(
+                onClick = { ear.rearmChallengeFollow(); if (ear.isLooping) selectedBar = ear.currentBar },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                modifier = Modifier.align(Alignment.CenterHorizontally).height(CHALLENGE_REF_H),
+            ) { Text("⟲ Follow playhead") }
         }
 
         // The no-tonic warning sits directly under the squares being filled — on top it
@@ -2598,7 +2618,7 @@ private fun AugDimChallengeView(state: AppState, ear: EarTrainingState) {
 private fun IntervalGuessChips(ear: EarTrainingState, enabled: Boolean) {
     Text("Which interval?", style = MaterialTheme.typography.labelMedium)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        for (iv in app.guitar.theory.IntervalTrainer.INTERVALS) {
+        for (iv in ear.intervalAnswerChoices()) {
             FilterChip(
                 selected = ear.intervalGuess == iv.semitones,
                 enabled = enabled,
@@ -2611,16 +2631,70 @@ private fun IntervalGuessChips(ear: EarTrainingState, enabled: Boolean) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun IntervalsView(ear: EarTrainingState) {
+private fun IntervalsView(state: AppState, ear: EarTrainingState) {
     // "♪ Song refs" — the interval→song reference sheet (same content as the Theory tab).
     var refsOpen by remember { mutableStateOf(false) }
     if (refsOpen) IntervalRefsDialog(ear, onDismiss = { refsOpen = false })
+    // "♪ Songs for M3" — after answering, just the answered interval's songs.
+    var songsFor by remember { mutableStateOf<Int?>(null) }
+    songsFor?.let { st ->
+        IntervalSongsDialog(ear, st, ear.intervalAscending, onDismiss = { songsFor = null })
+    }
+    val keyName = NoteSpeller.spell(ear.intervalKey) + " " +
+        if (ear.intervalKeyMode == TrainingMode.Major) "major" else "minor"
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         if (!ear.intervalChActive) {
-            Text("${ear.intervalChallengeTotal} questions. A I–V–I cadence sets the key, then the " +
+            Text("${ear.intervalChallengeTotal} questions. A cadence sets the key, then the " +
                 "tonic and a note sound — identify the interval. Choose a direction first; you can " +
                 "always replay the tonic, and transpose if the key is uncomfortable.",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(10.dp))
+            Text("Draw from", style = MaterialTheme.typography.labelMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = ear.intervalSource == IntervalSource.Diatonic,
+                    onClick = { ear.intervalSource = IntervalSource.Diatonic },
+                    label = { Text("Scale degrees") })
+                FilterChip(selected = ear.intervalSource == IntervalSource.Chromatic,
+                    onClick = { ear.intervalSource = IntervalSource.Chromatic },
+                    label = { Text("All 12 (chromatic)") })
+            }
+            if (ear.intervalSource == IntervalSource.Diatonic) {
+                Spacer(Modifier.height(8.dp))
+                Text("Scale", style = MaterialTheme.typography.labelMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (m in TrainingMode.entries) {
+                        FilterChip(selected = ear.intervalMode == m,
+                            onClick = { ear.intervalMode = m },
+                            label = { Text(if (m == TrainingMode.Major) "Major" else "Minor") })
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text("Degrees drawn (tap to switch one off)", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    for (d in IntervalTrainer.DEGREES) {
+                        val on = d in ear.intervalDegrees
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (on) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                                .clickable { ear.toggleIntervalDegree(d) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(IntervalTrainer.degreeLabel(ear.intervalMode, d), fontWeight = FontWeight.Bold,
+                                color = if (on) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Text("Descending plays the same degree an octave below the tonic, so every note stays in the key.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp))
+            }
             Spacer(Modifier.height(10.dp))
             Text("Direction", style = MaterialTheme.typography.labelMedium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -2644,7 +2718,7 @@ private fun IntervalsView(ear: EarTrainingState) {
             }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Key: ${NoteSpeller.spell(ear.intervalKey)} major",
+                Text("Key: $keyName",
                     style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(150.dp))
                 OutlinedButton(onClick = { ear.intervalTranspose(-1) }) { Text("♭") }
                 Spacer(Modifier.width(6.dp))
@@ -2691,6 +2765,32 @@ private fun IntervalsView(ear: EarTrainingState) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterVertically))
         }
+        // Try it by hand: every tonic on the neck is marked; tapping any fret sounds it.
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Show fretboard (tonic marked)", style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f))
+            Switch(checked = ear.intervalShowFretboard, onCheckedChange = { ear.intervalShowFretboard = it })
+        }
+        if (ear.intervalShowFretboard) {
+            val tuning = state.liveTuning
+            val marks = remember(tuning, ear.intervalKey) {
+                Fretboard.allPositions(tuning, DISPLAY_FRETS, ear.intervalKey)
+                    .associateWith { FretMark(NoteSpeller.spell(ear.intervalKey), isRoot = true) }
+            }
+            Box(Modifier.fillMaxWidth().height(220.dp).padding(vertical = 4.dp)) {
+                FretboardView(
+                    tuning = tuning,
+                    marks = marks,
+                    onTap = { pos ->
+                        state.audio.playNote(Fretboard.noteAt(tuning, pos).midi.value,
+                            durationMillis = state.ringSustainMs)
+                    },
+                    numFrets = DISPLAY_FRETS,
+                    leftHanded = state.leftHanded,
+                    camera = ear.intervalFretboardCamera,
+                )
+            }
+        }
         Spacer(Modifier.height(12.dp))
         IntervalGuessChips(ear, enabled = !ear.intervalChAnswered)
         Spacer(Modifier.height(10.dp))
@@ -2700,10 +2800,17 @@ private fun IntervalsView(ear: EarTrainingState) {
         } else {
             val ok = ear.intervalGuess == ear.intervalSemitones
             val dir = if (ear.intervalAscending) "ascending" else "descending"
-            Text((if (ok) "✔ correct" else "✘ answer: ${app.guitar.theory.IntervalTrainer.choiceFor(ear.intervalSemitones).longName}") +
-                "  ($dir)",
+            val degree = ear.intervalDegree?.let { "degree ${IntervalTrainer.degreeLabel(ear.intervalMode, it)}, " } ?: ""
+            val choice = IntervalTrainer.choiceFor(ear.intervalSemitones)
+            Text((if (ok) "✔ correct" else "✘ answer: ${choice.longName}") + "  ($degree$dir)",
                 style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary)
+            if (ear.intervalSemitones > 0) {
+                Spacer(Modifier.height(6.dp))
+                OutlinedButton(onClick = { songsFor = ear.intervalSemitones }) {
+                    Text("♪ Songs for ${choice.shortName} $dir")
+                }
+            }
             Spacer(Modifier.height(8.dp))
             Button(onClick = { ear.advanceIntervalChallenge() }, modifier = Modifier.fillMaxWidth()) {
                 Text(if (ear.intervalChIndex == ear.intervalChallengeTotal - 1) "See score →" else "Next →")

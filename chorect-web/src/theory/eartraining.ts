@@ -793,6 +793,10 @@ export function progressionFromKey(key: string): Progression | null {
 
 export enum IntervalDirection { Ascending = "Ascending", Descending = "Descending", Mixed = "Mixed" }
 
+/** Where interval questions are drawn from: the degrees of the key's Diatonic scale
+ *  (major or natural minor), or all 13 Chromatic intervals. */
+export enum IntervalSource { Diatonic = "Diatonic", Chromatic = "Chromatic" }
+
 export interface IntervalChoice { semitones: number; shortName: string; longName: string; }
 
 /** The 13 intervals from unison to octave, with the arithmetic to place a target
@@ -819,4 +823,40 @@ export function intervalTargetMidi(tonicMidi: number, semitones: number, ascendi
 
 export function intervalChoiceFor(semitones: number): IntervalChoice {
   return INTERVAL_CHOICES.find((i) => i.semitones === semitones)!;
+}
+
+// ---- Diatonic source: the target is a scale degree of the key ----
+
+/** Selectable target degrees: 1..7, plus 8 = the tonic an octave away. */
+export const INTERVAL_DEGREES: number[] = [1, 2, 3, 4, 5, 6, 7, 8];
+
+const INTERVAL_MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11, 12];
+const INTERVAL_MINOR_STEPS = [0, 2, 3, 5, 7, 8, 10, 12];   // natural minor
+
+/** Semitones from the tonic UP to scale `degree` (1..8) of `mode`. */
+export function intervalDegreeSemitones(mode: TrainingMode, degree: number): number {
+  return (mode === TrainingMode.Major ? INTERVAL_MAJOR_STEPS : INTERVAL_MINOR_STEPS)[degree - 1];
+}
+
+/** Degree box label: "1".."7", flattened in minor ("♭3", "♭6", "♭7"), and "8". */
+export function intervalDegreeLabel(mode: TrainingMode, degree: number): string {
+  const flat = intervalDegreeSemitones(mode, degree) < intervalDegreeSemitones(TrainingMode.Major, degree);
+  return (flat ? "♭" : "") + degree;
+}
+
+/** The interval HEARD when the target is scale `degree`. Descending puts the SAME degree
+ *  in the octave below, so every note stays in the key — the heard interval is the octave
+ *  complement. Degree 1 is the unison and degree 8 the octave either way. */
+export function diatonicIntervalSemitones(mode: TrainingMode, degree: number, ascending: boolean): number {
+  const up = intervalDegreeSemitones(mode, degree);
+  return ascending || degree === 1 || degree === 8 ? up : 12 - up;
+}
+
+/** Every interval (semitones, ascending) the diatonic draw can produce — the answer chips. */
+export function diatonicIntervalAnswerSet(mode: TrainingMode, degrees: Set<number>, direction: IntervalDirection): number[] {
+  const dirs = direction === IntervalDirection.Ascending ? [true]
+    : direction === IntervalDirection.Descending ? [false] : [true, false];
+  const out = new Set<number>();
+  for (const d of degrees) for (const up of dirs) out.add(diatonicIntervalSemitones(mode, d, up));
+  return [...out].sort((a, b) => a - b);
 }

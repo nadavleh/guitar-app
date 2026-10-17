@@ -96,6 +96,7 @@ private fun IntervalRow(ear: EarTrainingState, r: IntervalSongRef) {
                 if (r.artist.isNotEmpty()) ExternalSongRow(r.song, r.artist)
                 else Text(r.song, style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                for ((title, artist) in IntervalSongs.moreSongs(r)) ExternalSongRow(title, artist)
             }
         }
         Text(r.cue, style = MaterialTheme.typography.bodySmall,
@@ -129,6 +130,28 @@ internal fun IntervalRefsContent(ear: EarTrainingState) {
 }
 
 /** "♪ Song refs" dialog for the interval trainer — same content as the Theory tab. */
+@Composable
+internal fun IntervalSongsDialog(ear: EarTrainingState, semitones: Int, ascending: Boolean, onDismiss: () -> Unit) {
+    val first = IntervalSongs.refFor(semitones, ascending)
+    val other = IntervalSongs.refFor(semitones, !ascending)
+    AlertDialog(
+        onDismissRequest = { ear.stopIntervalPreview(); onDismiss() },
+        confirmButton = { TextButton(onClick = { ear.stopIntervalPreview(); onDismiss() }) { Text("Close") } },
+        title = { Text("Songs: ${first?.intervalLong ?: ""}") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+                // The direction you just heard first, the other one underneath.
+                for (r in listOfNotNull(first, other)) {
+                    Text(if (r.ascending) "Ascending" else "Descending", fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary)
+                    IntervalRow(ear, r)
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+        },
+    )
+}
+
 @Composable
 internal fun IntervalRefsDialog(ear: EarTrainingState, onDismiss: () -> Unit) {
     AlertDialog(

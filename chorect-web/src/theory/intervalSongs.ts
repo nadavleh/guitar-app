@@ -90,3 +90,39 @@ export const INTERVAL_SONGS_DESCENDING: IntervalSongRef[] = [
   desc("P8", "Perfect octave", 12, "inverts to unison", "My Sharona", "The Knack",
     "The octave drop in the main guitar riff."),
 ];
+
+/** More well-known songs per interval ([title, artist]), shown under each row. */
+const MORE_ASCENDING: Record<string, [string, string][]> = {
+  m2: [["White Christmas", "Irving Berlin"], ["The Pink Panther Theme", "Henry Mancini"]],
+  M2: [["Frère Jacques", "traditional"], ["Silent Night", "Franz Gruber"]],
+  m3: [["Smoke on the Water", "Deep Purple"], ["Brahms' Lullaby", "Brahms"]],
+  M3: [["Kumbaya", "traditional"], ["Morning Has Broken", "Cat Stevens"]],
+  P4: [["Amazing Grace", "traditional"], ["Auld Lang Syne", "traditional"]],
+  TT: [["Maria (West Side Story)", "Leonard Bernstein"]],
+  P5: [["Star Wars — main theme", "John Williams"], ["Can't Help Falling in Love", "Elvis Presley"]],
+  m6: [["The Entertainer", "Scott Joplin"]],
+  M6: [["NBC chimes", "NBC"], ["Jingle Bells (verse: “Dashing through…”)", "traditional"]],
+  m7: [["Star Trek — original theme", "Alexander Courage"]],
+  M7: [["Somewhere Over the Rainbow (1st to 3rd note)", "Harold Arlen"]],
+  P8: [["Singin' in the Rain", "Nacio Herb Brown"]],
+};
+const MORE_DESCENDING: Record<string, [string, string][]> = {
+  m2: [["Joy to the World", "traditional"]],
+  M2: [["Three Blind Mice", "traditional"]],
+  m3: [["Frosty the Snowman", "Gene Autry"]],
+  M3: [["Swing Low, Sweet Chariot", "traditional"]],
+  P4: [["Eine kleine Nachtmusik", "Mozart"]],
+  P5: [["The Flintstones — theme", "Hoyt Curtin"]],
+  M6: [["Nobody Knows the Trouble I've Seen", "traditional"], ["Over There", "George M. Cohan"]],
+  P8: [["Willow Weep for Me", "Ann Ronell"]],
+};
+
+/** The extra songs for `r`'s interval and direction (may be empty). */
+export function intervalMoreSongs(r: IntervalSongRef): [string, string][] {
+  return (r.ascending ? MORE_ASCENDING : MORE_DESCENDING)[r.interval] ?? [];
+}
+
+/** The reference row for `semitones` (1..12) in one direction, or undefined (unison). */
+export function intervalRefFor(semitones: number, ascending: boolean): IntervalSongRef | undefined {
+  return (ascending ? INTERVAL_SONGS_ASCENDING : INTERVAL_SONGS_DESCENDING).find((r) => r.semitones === semitones);
+}

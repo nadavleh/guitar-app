@@ -28,7 +28,9 @@ import { synthClick, clickAt } from "../src/app/woodClick";
 import {
   PercussionCatalog, PercussionPattern, PercussionMeter, swungSlotMs, slotMs, voiceCount, SwingModel,
   movementCost, pickMinMovement, BUILTIN_PATTERNS,
-  INTERVAL_CHOICES, intervalTargetMidi, CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
+  INTERVAL_CHOICES, intervalTargetMidi, INTERVAL_DEGREES, intervalDegreeSemitones, intervalDegreeLabel,
+  diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalRefFor, intervalMoreSongs, intervalChoiceFor, IntervalDirection,
+  CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
   MissedTake, encodeMissedTake, decodeMissedTake,
 } from "../src/theory";
 import { readFileSync } from "node:fs";
@@ -365,6 +367,26 @@ check("the Casa 2 cavaco levada groove is in the list, exactly as exported", (()
 check("13 intervals from unison to octave", INTERVAL_CHOICES.length === 13 &&
   INTERVAL_CHOICES[0].longName === "unison" && INTERVAL_CHOICES[12].longName === "octave");
 check("intervalTargetMidi ascends/descends", intervalTargetMidi(60, 7, true) === 67 && intervalTargetMidi(60, 7, false) === 53);
+// Pinned to theory EarTrainingTest (diatonic interval source).
+check("diatonic degree steps (major/minor)",
+  INTERVAL_DEGREES.map((d) => intervalDegreeSemitones(TrainingMode.Major, d)).join() === "0,2,4,5,7,9,11,12" &&
+  INTERVAL_DEGREES.map((d) => intervalDegreeSemitones(TrainingMode.Minor, d)).join() === "0,2,3,5,7,8,10,12");
+check("diatonic degree labels (minor)",
+  INTERVAL_DEGREES.map((d) => intervalDegreeLabel(TrainingMode.Minor, d)).join() === "1,2,♭3,4,5,♭6,♭7,8");
+check("descending diatonic = same degree an octave lower",
+  diatonicIntervalSemitones(TrainingMode.Major, 3, true) === 4 && diatonicIntervalSemitones(TrainingMode.Major, 3, false) === 8 &&
+  diatonicIntervalSemitones(TrainingMode.Major, 5, false) === 5 && diatonicIntervalSemitones(TrainingMode.Major, 1, false) === 0 &&
+  diatonicIntervalSemitones(TrainingMode.Major, 8, false) === 12);
+check("diatonic answer set",
+  diatonicIntervalAnswerSet(TrainingMode.Major, new Set([3, 5]), IntervalDirection.Mixed).join() === "4,5,7,8" &&
+  diatonicIntervalAnswerSet(TrainingMode.Major, new Set(INTERVAL_DEGREES), IntervalDirection.Ascending).join() === "0,2,4,5,7,9,11,12");
+{
+  let ok = true;
+  for (let st = 1; st <= 12; st++) for (const up of [true, false]) if (intervalRefFor(st, up)?.semitones !== st) ok = false;
+  for (const m of [TrainingMode.Major, TrainingMode.Minor]) for (const d of INTERVAL_DEGREES) for (const up of [true, false])
+    if (!intervalChoiceFor(diatonicIntervalSemitones(m, d, up))) ok = false;
+  check("interval song lookup + extras", ok && intervalMoreSongs(intervalRefFor(5, true)!).some(([t]) => t === "Amazing Grace"));
+}
 
 // --- Chord decomposition (#5): shell + a valid 3-note upper triad ---
 let decOk = CHORD_DECOMPOSITIONS.length > 0;

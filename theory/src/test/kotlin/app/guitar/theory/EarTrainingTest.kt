@@ -303,6 +303,46 @@ class EarTrainingTest {
         assertEquals(72, IntervalTrainer.targetMidi(tonic, 12, ascending = true))      // octave up
     }
 
+    @Test fun `diatonic degrees map to the major and natural-minor scale steps`() {
+        assertEquals(listOf(0, 2, 4, 5, 7, 9, 11, 12),
+            IntervalTrainer.DEGREES.map { IntervalTrainer.degreeSemitones(TrainingMode.Major, it) })
+        assertEquals(listOf(0, 2, 3, 5, 7, 8, 10, 12),
+            IntervalTrainer.DEGREES.map { IntervalTrainer.degreeSemitones(TrainingMode.Minor, it) })
+        assertEquals(listOf("1", "2", "♭3", "4", "5", "♭6", "♭7", "8"),
+            IntervalTrainer.DEGREES.map { IntervalTrainer.degreeLabel(TrainingMode.Minor, it) })
+        assertEquals("3", IntervalTrainer.degreeLabel(TrainingMode.Major, 3))
+    }
+
+    @Test fun `descending diatonic target is the same degree an octave lower`() {
+        val M = TrainingMode.Major
+        assertEquals(4, IntervalTrainer.diatonicSemitones(M, 3, ascending = true))    // M3 up
+        assertEquals(8, IntervalTrainer.diatonicSemitones(M, 3, ascending = false))   // m6 down
+        assertEquals(5, IntervalTrainer.diatonicSemitones(M, 5, ascending = false))   // P4 down
+        assertEquals(0, IntervalTrainer.diatonicSemitones(M, 1, ascending = false))   // unison
+        assertEquals(12, IntervalTrainer.diatonicSemitones(M, 8, ascending = false))  // octave
+        // Every diatonic answer is a real interval choice.
+        for (mode in TrainingMode.entries) for (d in IntervalTrainer.DEGREES) for (up in listOf(true, false))
+            IntervalTrainer.choiceFor(IntervalTrainer.diatonicSemitones(mode, d, up))
+    }
+
+    @Test fun `diatonic answer set follows the enabled degrees and direction`() {
+        val M = TrainingMode.Major
+        assertEquals(listOf(4, 7), IntervalTrainer.diatonicAnswerSet(M, setOf(3, 5), IntervalDirection.Ascending))
+        assertEquals(listOf(5, 8), IntervalTrainer.diatonicAnswerSet(M, setOf(3, 5), IntervalDirection.Descending))
+        assertEquals(listOf(4, 5, 7, 8), IntervalTrainer.diatonicAnswerSet(M, setOf(3, 5), IntervalDirection.Mixed))
+        // All degrees of major, ascending: no m2/m3/TT/m6/m7.
+        assertEquals(listOf(0, 2, 4, 5, 7, 9, 11, 12),
+            IntervalTrainer.diatonicAnswerSet(M, IntervalTrainer.DEGREES.toSet(), IntervalDirection.Ascending))
+    }
+
+    @Test fun `every interval song row has a lookup and the extras name real intervals`() {
+        for (st in 1..12) for (up in listOf(true, false))
+            assertEquals(st, IntervalSongs.refFor(st, up)?.semitones)
+        for (r in IntervalSongs.ASCENDING + IntervalSongs.DESCENDING)
+            IntervalSongs.moreSongs(r).forEach { (title, _) -> assertTrue(title.isNotBlank()) }
+        assertTrue(IntervalSongs.moreSongs(IntervalSongs.refFor(5, true)!!).any { it.first == "Amazing Grace" })
+    }
+
     @Test fun `choiceFor maps semitones to the right interval`() {
         assertEquals("M3", IntervalTrainer.choiceFor(4).shortName)
         assertEquals("TT", IntervalTrainer.choiceFor(6).shortName)

@@ -90,4 +90,38 @@ object IntervalSongs {
         desc("P8", "Perfect octave", 12, "inverts to unison", "My Sharona", "The Knack",
             "The octave drop in the main guitar riff."),
     )
+    /** More well-known songs per interval (title, artist), shown under each row so an
+     *  interval can be checked against whichever tune you already know. */
+    private val MORE_ASCENDING: Map<String, List<Pair<String, String>>> = mapOf(
+        "m2" to listOf("White Christmas" to "Irving Berlin", "The Pink Panther Theme" to "Henry Mancini"),
+        "M2" to listOf("Frère Jacques" to "traditional", "Silent Night" to "Franz Gruber"),
+        "m3" to listOf("Smoke on the Water" to "Deep Purple", "Brahms' Lullaby" to "Brahms"),
+        "M3" to listOf("Kumbaya" to "traditional", "Morning Has Broken" to "Cat Stevens"),
+        "P4" to listOf("Amazing Grace" to "traditional", "Auld Lang Syne" to "traditional"),
+        "TT" to listOf("Maria (West Side Story)" to "Leonard Bernstein"),
+        "P5" to listOf("Star Wars — main theme" to "John Williams", "Can't Help Falling in Love" to "Elvis Presley"),
+        "m6" to listOf("The Entertainer" to "Scott Joplin"),
+        "M6" to listOf("NBC chimes" to "NBC", "Jingle Bells (verse: “Dashing through…”)" to "traditional"),
+        "m7" to listOf("Star Trek — original theme" to "Alexander Courage"),
+        "M7" to listOf("Somewhere Over the Rainbow (1st to 3rd note)" to "Harold Arlen"),
+        "P8" to listOf("Singin' in the Rain" to "Nacio Herb Brown"),
+    )
+    private val MORE_DESCENDING: Map<String, List<Pair<String, String>>> = mapOf(
+        "m2" to listOf("Joy to the World" to "traditional"),
+        "M2" to listOf("Three Blind Mice" to "traditional"),
+        "m3" to listOf("Frosty the Snowman" to "Gene Autry"),
+        "M3" to listOf("Swing Low, Sweet Chariot" to "traditional"),
+        "P4" to listOf("Eine kleine Nachtmusik" to "Mozart"),
+        "P5" to listOf("The Flintstones — theme" to "Hoyt Curtin"),
+        "M6" to listOf("Nobody Knows the Trouble I've Seen" to "traditional", "Over There" to "George M. Cohan"),
+        "P8" to listOf("Willow Weep for Me" to "Ann Ronell"),
+    )
+
+    /** The extra songs for [r]'s interval and direction (may be empty). */
+    fun moreSongs(r: IntervalSongRef): List<Pair<String, String>> =
+        (if (r.ascending) MORE_ASCENDING else MORE_DESCENDING)[r.interval].orEmpty()
+
+    /** The reference row for [semitones] (1..12) in one direction, or null (unison). */
+    fun refFor(semitones: Int, ascending: Boolean): IntervalSongRef? =
+        (if (ascending) ASCENDING else DESCENDING).firstOrNull { it.semitones == semitones }
 }

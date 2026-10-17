@@ -14,7 +14,9 @@ import app.guitar.theory.ChordTypeLevel
 import app.guitar.theory.EarTraining
 import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
+import app.guitar.theory.IntervalChoice
 import app.guitar.theory.IntervalDirection
+import app.guitar.theory.IntervalSource
 import app.guitar.theory.IntervalTrainer
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
@@ -1059,6 +1061,13 @@ class EarTrainingState(
     /** A manual bar pick — stops the pad following for the rest of this question. */
     fun disarmChallengeFollow() { challengeFollowArmed = false }
 
+    /** Undo [disarmChallengeFollow]: hand the answer pad back to the playhead. */
+    fun rearmChallengeFollow() { challengeFollowArmed = true }
+
+    /** Whether a wrong bar also prints the correct chord under its ✘. Off by default —
+     *  a miss should send you back to listening, not hand you the answer. */
+    var challengeShowAnswerOnMiss by mutableStateOf(false)
+
     /** #6: answer-keyboard "shift" state — false shows the MAJOR Roman row
      *  (I ii iii IV V vi vii°), true shows the MINOR row (i ii° III iv v VI VII).
      *  Both rows label the same seven shared diatonic chords; see
@@ -1350,6 +1359,19 @@ class EarTrainingState(
         degreesMap().keys.sorted().map { it to it.toString() }
 
     /** Re-roll the current question's progression and clear its guesses. */
+    /** Header ↻: start the CURRENT question over — same progression, its answers
+     *  cleared, playhead back to bar 1. Restarting all [challengeTotal] questions lives
+     *  in the "More tools" fold. */
+    fun restartChallengeQuestion() {
+        if (!challengeActive || challengeIndex >= challengeTotal) return
+        val q = challengeLog.getOrNull(challengeIndex) ?: return
+        q.guessDeg = List(4) { null }
+        q.guessExt = List(4) { null }
+        q.guessLabel = List(4) { null }
+        q.guessDom = List(4) { false }
+        applyChallengeQuestion(q)
+    }
+
     fun rerollChallengeQuestion() {
         if (!challengeActive) { resetChallengeGuesses(); nextProgression(); return }
         val q = freshChallengeQuestion()
@@ -2174,6 +2196,13 @@ class EarTrainingState(
         nextAdvancedProgression()
     }
     fun exitAdvChallenge() { advChActive = false; advChIndex = 0; stopLoop() }
+    /** Header ↻ for the advanced challenge: hide the current answer again (unless it's
+     *  already been marked) and stop — same progression, not a new challenge. */
+    fun restartAdvQuestion() {
+        if (!advChActive || advChIndex >= advChallengeTotal) return
+        if (!advChMarked) advRevealed = false
+        stopLoop()
+    }
 
     // ---------- #3 Inversions trainer ----------
 
@@ -2451,6 +2480,35 @@ class EarTrainingState(
     var intervalTransposeSteps by mutableStateOf(0)
         private set
     var intervalDirection by mutableStateOf(IntervalDirection.Ascending)
+    /** Draw from the key's scale degrees (default) or from all 13 chromatic intervals. */
+    var intervalSource by mutableStateOf(IntervalSource.Diatonic)
+    /** Scale the diatonic draw uses — also picks the I–V–I vs i–V–i cadence. */
+    var intervalMode by mutableStateOf(TrainingMode.Major)
+    /** Target degrees the diatonic draw may pick (1..8); all on by default. */
+    var intervalDegrees by mutableStateOf(IntervalTrainer.DEGREES.toSet())
+        private set
+    /** Show a fretboard under the question with every tonic marked, to try it by hand. */
+    var intervalShowFretboard by mutableStateOf(false)
+    val intervalFretboardCamera = FretboardCamera()
+    /** Scale degree the current diatonic question targets (null in chromatic mode). */
+    var intervalDegree by mutableStateOf<Int?>(null)
+        private set
+
+    /** Mode the key is heard in: the chosen scale when diatonic, else major. */
+    val intervalKeyMode: TrainingMode
+        get() = if (intervalSource == IntervalSource.Diatonic) intervalMode else TrainingMode.Major
+
+    /** Switch a degree box on/off; the last one left on stays on. */
+    fun toggleIntervalDegree(degree: Int) {
+        val next = if (degree in intervalDegrees) intervalDegrees - degree else intervalDegrees + degree
+        if (next.isNotEmpty()) intervalDegrees = next
+    }
+
+    /** The answer chips: every chromatic interval, or only what the diatonic draw can produce. */
+    fun intervalAnswerChoices(): List<IntervalChoice> =
+        if (intervalSource == IntervalSource.Chromatic) IntervalTrainer.INTERVALS
+        else IntervalTrainer.diatonicAnswerSet(intervalMode, intervalDegrees, intervalDirection)
+            .map { IntervalTrainer.choiceFor(it) }
     /** Harmonic mode: sound tonic + target TOGETHER (else melodic: one after the other). */
     var intervalHarmonic by mutableStateOf(false)
     var intervalChActive by mutableStateOf(false)
@@ -2481,19 +2539,27 @@ class EarTrainingState(
         if (intervalChActive) playIntervalTonicCadence()
     }
 
-    /** Play I–V–I in the current major key to anchor the tonic. */
+    /** I–V–I in major, i–V–i (harmonic-minor dominant) in minor. */
+    private suspend fun playIntervalCadenceInline() {
+        val mode = intervalKeyMode
+        for (deg in listOf(1, 5, 1)) {
+            val root = EarTraining.degreeRoot(intervalKey, deg, mode)
+            val q = when {
+                mode == TrainingMode.Major -> EarTraining.MAJOR_DEGREES[deg]?.triadQuality
+                deg == 5 -> EarTraining.MINOR_DOMINANT.triadQuality
+                else -> EarTraining.MINOR_DEGREES[deg]?.triadQuality
+            } ?: ""
+            playSymbolOnce(NoteSpeller.spell(root) + q, 600)
+            delay(650)
+        }
+    }
+
+    /** Play the key's cadence to anchor the tonic. */
     fun playIntervalTonicCadence() {
         intervalJob?.cancel()
         intervalPlaying = true
         intervalJob = scope.launch {
-            try {
-                for (deg in listOf(1, 5, 1)) {
-                    val root = EarTraining.degreeRoot(intervalKey, deg, TrainingMode.Major)
-                    val q = EarTraining.MAJOR_DEGREES[deg]?.triadQuality ?: ""
-                    playSymbolOnce(NoteSpeller.spell(root) + q, 600)
-                    delay(650)
-                }
-            } finally { intervalPlaying = false }
+            try { playIntervalCadenceInline() } finally { intervalPlaying = false }
         }
     }
 
@@ -2563,11 +2629,19 @@ class EarTrainingState(
     }
 
     private fun drawIntervalQuestion() {
-        intervalSemitones = rng.nextInt(IntervalTrainer.INTERVALS.size)   // 0..12
         intervalAscending = when (intervalDirection) {
             IntervalDirection.Ascending -> true
             IntervalDirection.Descending -> false
             IntervalDirection.Mixed -> rng.nextBoolean()
+        }
+        if (intervalSource == IntervalSource.Diatonic) {
+            val pool = intervalDegrees.sorted()
+            val degree = pool[rng.nextInt(pool.size)]
+            intervalDegree = degree
+            intervalSemitones = IntervalTrainer.diatonicSemitones(intervalMode, degree, intervalAscending)
+        } else {
+            intervalDegree = null
+            intervalSemitones = rng.nextInt(IntervalTrainer.INTERVALS.size)   // 0..12
         }
         intervalGuess = null
         intervalChAnswered = false
@@ -2582,12 +2656,7 @@ class EarTrainingState(
         intervalPlaying = true
         intervalJob = scope.launch {
             try {
-                for (deg in listOf(1, 5, 1)) {
-                    val root = EarTraining.degreeRoot(intervalKey, deg, TrainingMode.Major)
-                    val q = EarTraining.MAJOR_DEGREES[deg]?.triadQuality ?: ""
-                    playSymbolOnce(NoteSpeller.spell(root) + q, 600)
-                    delay(650)
-                }
+                playIntervalCadenceInline()
                 delay(300)
                 audio.chokeChords()   // the anchoring cadence must stop before the question
                 val tonic = intervalTonicMidi()

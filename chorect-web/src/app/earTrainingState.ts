@@ -19,7 +19,8 @@ import {
   N2C_MAJOR_TEST_OFFSETS, N2C_MINOR_TEST_OFFSETS,
   inversionCount, inversionMidis,
   pickMinMovement, defaultRng,
-  IntervalDirection, INTERVAL_CHOICES, intervalTargetMidi,
+  IntervalDirection, INTERVAL_CHOICES, intervalTargetMidi, IntervalChoice, IntervalSource,
+  INTERVAL_DEGREES, diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalChoiceFor, MINOR_DOMINANT,
 } from "../theory";
 import { WebAudioEngine, Timbres, renderCueBeep } from "../audio";
 
@@ -860,6 +861,14 @@ export class EarTrainingState {
   /** A manual bar pick — stops the pad following for the rest of this question. */
   disarmChallengeFollow(): void { this.challengeFollowArmed = false; }
 
+  /** Undo `disarmChallengeFollow`: hand the answer pad back to the playhead. */
+  rearmChallengeFollow(): void { this.challengeFollowArmed = true; this.notify(); }
+
+  /** Whether a wrong bar also prints the correct chord under its ✘. Off by default —
+   *  a miss should send you back to listening, not hand you the answer. */
+  challengeShowAnswerOnMiss = false;
+  toggleChallengeShowAnswerOnMiss(): void { this.challengeShowAnswerOnMiss = !this.challengeShowAnswerOnMiss; this.notify(); }
+
   /** True once EVERY bar of the current question carries a verdict — i.e. the user has
    *  committed an answer everywhere, so naming the progression outright can no longer
    *  spoil it. Gates the relative-minor reading in the tonic banner. */
@@ -1205,6 +1214,20 @@ export class EarTrainingState {
    *  whether the key is major or minor. */
   challengeReferenceLabels(): [number, string][] {
     return [...EarTrainingDegrees(this.progMode).keys()].sort((a, b) => a - b).map((deg) => [deg, String(deg)]);
+  }
+
+  /** Header ↻: start the CURRENT question over — same progression, its answers
+   *  cleared, playhead back to bar 1. Restarting all `challengeTotal` questions lives
+   *  in the "More tools" fold. */
+  restartChallengeQuestion() {
+    if (!this.challengeActive || this.challengeIndex >= this.challengeTotal) return;
+    const q = this.challengeLog[this.challengeIndex];
+    if (!q) return;
+    q.guessDeg = [null, null, null, null];
+    q.guessExt = [null, null, null, null];
+    q.guessLabel = [null, null, null, null];
+    q.guessDom = [false, false, false, false];
+    this.applyChallengeQuestion(q);
   }
 
   rerollChallengeQuestion() {
@@ -1909,6 +1932,14 @@ export class EarTrainingState {
     this.advChIndex++; this.advChMarked = false; this.nextAdvancedProgression();
   }
   exitAdvChallenge() { this.advChActive = false; this.advChIndex = 0; this.stopLoop(); this.notify(); }
+  /** Header ↻ for the advanced challenge: hide the current answer again (unless it's
+   *  already been marked) and stop — same progression, not a new challenge. */
+  restartAdvQuestion() {
+    if (!this.advChActive || this.advChIndex >= this.advChallengeTotal) return;
+    if (!this.advChMarked) this.advRevealed = false;
+    this.stopLoop();
+    this.notify();
+  }
 
   // ---------- Inversions ----------
 
@@ -2125,6 +2156,55 @@ export class EarTrainingState {
   private intervalTonicMidi(): number { return 60 + (((this.intervalKey + 6) % 12) - 6); }
 
   setIntervalDirection(d: IntervalDirection) { this.intervalDirection = d; this.notify(); }
+  /** Draw from the key's scale degrees (default) or from all 13 chromatic intervals. */
+  intervalSource = IntervalSource.Diatonic;
+  setIntervalSource(v: IntervalSource) { this.intervalSource = v; this.notify(); }
+  /** Scale the diatonic draw uses — also picks the I–V–I vs i–V–i cadence. */
+  intervalMode = TrainingMode.Major;
+  setIntervalMode(m: TrainingMode) { this.intervalMode = m; this.notify(); }
+  /** Target degrees the diatonic draw may pick (1..8); all on by default. */
+  intervalDegrees = new Set<number>(INTERVAL_DEGREES);
+  /** Show a fretboard under the question with every tonic marked, to try it by hand. */
+  intervalShowFretboard = false;
+  setIntervalShowFretboard(v: boolean) { this.intervalShowFretboard = v; this.notify(); }
+  /** Scale degree the current diatonic question targets (null in chromatic mode). */
+  intervalDegree: number | null = null;
+
+  /** Mode the key is heard in: the chosen scale when diatonic, else major. */
+  get intervalKeyMode(): TrainingMode {
+    return this.intervalSource === IntervalSource.Diatonic ? this.intervalMode : TrainingMode.Major;
+  }
+
+  /** Switch a degree box on/off; the last one left on stays on. */
+  toggleIntervalDegree(degree: number) {
+    const next = new Set(this.intervalDegrees);
+    if (next.has(degree)) next.delete(degree); else next.add(degree);
+    if (next.size > 0) this.intervalDegrees = next;
+    this.notify();
+  }
+
+  /** The answer chips: every chromatic interval, or only what the diatonic draw can produce. */
+  intervalAnswerChoices(): IntervalChoice[] {
+    if (this.intervalSource === IntervalSource.Chromatic) return INTERVAL_CHOICES;
+    return diatonicIntervalAnswerSet(this.intervalMode, this.intervalDegrees, this.intervalDirection)
+      .map((st) => intervalChoiceFor(st));
+  }
+
+  /** I–V–I in major, i–V–i (harmonic-minor dominant) in minor. Stops early once
+   *  `token` is stale; returns false in that case. */
+  private async playIntervalCadenceInline(token: number): Promise<boolean> {
+    const mode = this.intervalKeyMode;
+    for (const deg of [1, 5, 1]) {
+      if (token !== this.intervalToken) return false;
+      const root = degreeRoot(this.intervalKey, deg, mode);
+      const q = (mode === TrainingMode.Major ? EarTrainingDegrees(mode).get(deg)?.triadQuality
+        : deg === 5 ? MINOR_DOMINANT.triadQuality
+        : EarTrainingDegrees(mode).get(deg)?.triadQuality) ?? "";
+      this.playSymbolOnce(spellPc(root) + q, 600);
+      await sleep(650);
+    }
+    return true;
+  }
   /** Harmonic mode: sound tonic + target TOGETHER (else melodic). */
   intervalHarmonic = false;
   setIntervalHarmonic(v: boolean) { this.intervalHarmonic = v; this.notify(); }
@@ -2152,15 +2232,7 @@ export class EarTrainingState {
     this.intervalPlaying = true;
     this.notify();
     void (async () => {
-      try {
-        for (const deg of [1, 5, 1]) {
-          if (token !== this.intervalToken) return;
-          const root = degreeRoot(this.intervalKey, deg, TrainingMode.Major);
-          const q = EarTrainingDegrees(TrainingMode.Major).get(deg)?.triadQuality ?? "";
-          this.playSymbolOnce(spellPc(root) + q, 600);
-          await sleep(650);
-        }
-      } finally { this.intervalPlaying = false; this.notify(); }
+      try { await this.playIntervalCadenceInline(token); } finally { this.intervalPlaying = false; this.notify(); }
     })();
   }
 
@@ -2223,10 +2295,18 @@ export class EarTrainingState {
   }
 
   private drawIntervalQuestion() {
-    this.intervalSemitones = this.rng.int(INTERVAL_CHOICES.length);   // 0..12
     this.intervalAscending = this.intervalDirection === IntervalDirection.Ascending ? true
       : this.intervalDirection === IntervalDirection.Descending ? false
       : this.rng.int(2) === 0;
+    if (this.intervalSource === IntervalSource.Diatonic) {
+      const pool = [...this.intervalDegrees].sort((a, b) => a - b);
+      const degree = pool[this.rng.int(pool.length)];
+      this.intervalDegree = degree;
+      this.intervalSemitones = diatonicIntervalSemitones(this.intervalMode, degree, this.intervalAscending);
+    } else {
+      this.intervalDegree = null;
+      this.intervalSemitones = this.rng.int(INTERVAL_CHOICES.length);   // 0..12
+    }
     this.intervalGuess = null;
     this.intervalChAnswered = false;
   }
@@ -2241,13 +2321,7 @@ export class EarTrainingState {
     this.notify();
     void (async () => {
       try {
-        for (const deg of [1, 5, 1]) {
-          if (token !== this.intervalToken) return;
-          const root = degreeRoot(this.intervalKey, deg, TrainingMode.Major);
-          const q = EarTrainingDegrees(TrainingMode.Major).get(deg)?.triadQuality ?? "";
-          this.playSymbolOnce(spellPc(root) + q, 600);
-          await sleep(650);
-        }
+        if (!(await this.playIntervalCadenceInline(token))) return;
         await sleep(300);
         if (token !== this.intervalToken) return;
         const tonic = this.intervalTonicMidi();
