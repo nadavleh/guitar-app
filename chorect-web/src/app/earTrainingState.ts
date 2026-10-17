@@ -20,7 +20,7 @@ import {
   inversionCount, inversionMidis,
   pickMinMovement, defaultRng,
   IntervalDirection, INTERVAL_CHOICES, intervalTargetMidi, IntervalChoice, IntervalSource,
-  INTERVAL_DEGREES, diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalChoiceFor, MINOR_DOMINANT,
+  INTERVAL_DEGREES, diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalChoiceFor,
 } from "../theory";
 import { WebAudioEngine, Timbres, renderCueBeep } from "../audio";
 
