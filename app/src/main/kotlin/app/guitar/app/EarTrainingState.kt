@@ -2512,6 +2512,8 @@ class EarTrainingState(
             .map { IntervalTrainer.choiceFor(it) }
     /** Harmonic mode: sound tonic + target TOGETHER (else melodic: one after the other). */
     var intervalHarmonic by mutableStateOf(false)
+    /** A new random key for every question (default); off = stay in [intervalKey]. */
+    var intervalRandomKey by mutableStateOf(true)
     var intervalChActive by mutableStateOf(false)
         private set
     var intervalChIndex by mutableStateOf(0)
@@ -2556,13 +2558,7 @@ class EarTrainingState(
     }
 
     /** Play the key's cadence to anchor the tonic. */
-    fun playIntervalTonicCadence() {
-        intervalJob?.cancel()
-        intervalPlaying = true
-        intervalJob = scope.launch {
-            try { playIntervalCadenceInline() } finally { intervalPlaying = false }
-        }
-    }
+    fun playIntervalTonicCadence() = launchIntervalSound { playIntervalCadenceInline() }
 
     // ---------- Interval REFERENCE playback (Theory tab / song-refs dialog) ----------
     // Independent of the challenge's key and harmonic settings: a fixed C4 base so every
@@ -2582,13 +2578,9 @@ class EarTrainingState(
                 audio.chokeChords()   // start of a phrase; the notes inside it may overlap
                 val base = 60                                   // C4
                 val target = if (ascending) base + semitones else base - semitones
-                audio.playNote(base, durationMillis = sustainProvider())
-                delay(700)
-                audio.playNote(target, durationMillis = sustainProvider())
-                delay(700)
-                audio.playChord(listOf(base, target), strumDelayMillis = 0,
-                    sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
-                delay(900)
+                soundInterval(base, target, harmonic = false)
+                delay(150)
+                soundInterval(base, target, harmonic = true)
             } finally {
                 if (intervalPreviewId == id) intervalPreviewId = null
             }
@@ -2605,10 +2597,11 @@ class EarTrainingState(
                 audio.chokeChords()
                 for (n in IntervalSongs.melodyNotes(melody)) {
                     val ms = (n.eighths * IntervalSongs.EIGHTH_MS).toLong()
-                    audio.playNote(n.midi, durationMillis = maxOf(ms.toInt(), 180))
+                    // Gated just short of the next onset: detached, dry, no ring-over.
+                    audio.playNote(n.midi, durationMillis = (ms * 0.9).toInt().coerceAtLeast(60), timbre = Timbre.Soft)
                     delay(ms)
                 }
-                delay(400)
+                delay(200)
             } finally {
                 if (intervalPreviewId == id) intervalPreviewId = null
             }
@@ -2620,52 +2613,87 @@ class EarTrainingState(
         intervalPreviewId = null
     }
 
-    /** Re-sound just the tonic note (the reference). */
-    fun playIntervalTonic() {
+    /** Interval notes are short, soft and dry ([Timbre.Soft]) so the two pitches stay distinct. */
+    private val intervalNoteMs = 600
+
+    /** Sound [tonic] and [target]: one after the other, or together when [harmonic]. */
+    private suspend fun soundInterval(tonic: Int, target: Int, harmonic: Boolean) {
+        if (harmonic) {
+            audio.playChord(listOf(tonic, target), strumDelayMillis = 0,
+                sustainMillis = 1000, timbre = Timbre.Soft)
+            delay(1050)
+        } else {
+            audio.playNote(tonic, durationMillis = intervalNoteMs, timbre = Timbre.Soft)
+            delay(650)
+            audio.playNote(target, durationMillis = intervalNoteMs, timbre = Timbre.Soft)
+            delay(650)
+        }
+    }
+
+    private fun intervalTargetMidi(semitones: Int = intervalSemitones): Int =
+        IntervalTrainer.targetMidi(intervalTonicMidi(), semitones, intervalAscending)
+
+    /** Run one interval-trainer sound job, cancelling whatever was playing. */
+    private fun launchIntervalSound(block: suspend () -> Unit) {
         intervalJob?.cancel()
-        intervalJob = scope.launch { audio.playNote(intervalTonicMidi(), durationMillis = sustainProvider()) }
+        intervalPlaying = true
+        intervalJob = scope.launch {
+            try { audio.chokeChords(); block() } finally { intervalPlaying = false }
+        }
+    }
+
+    /** Re-sound just the tonic note (the reference). */
+    fun playIntervalTonic() = launchIntervalSound {
+        audio.playNote(intervalTonicMidi(), durationMillis = intervalNoteMs, timbre = Timbre.Soft)
+    }
+
+    /** Sound only the question's second note, without the tonic. */
+    fun playIntervalTarget() = launchIntervalSound {
+        audio.playNote(intervalTargetMidi(), durationMillis = intervalNoteMs, timbre = Timbre.Soft)
+    }
+
+    /** Sound tonic and target together, whatever the playback setting. */
+    fun playIntervalTogether() = launchIntervalSound {
+        soundInterval(intervalTonicMidi(), intervalTargetMidi(), harmonic = true)
     }
 
     /** Play the current interval question: tonic then target (melodic), or both
      *  together (harmonic mode). */
-    fun playIntervalQuestion() {
-        if (intervalPlaying) return
-        intervalJob?.cancel()
-        intervalPlaying = true
-        intervalJob = scope.launch {
-            try {
-                audio.chokeChords()   // start of a phrase; the notes inside it may overlap
-                val tonic = intervalTonicMidi()
-                val target = IntervalTrainer.targetMidi(tonic, intervalSemitones, intervalAscending)
-                if (intervalHarmonic) {
-                    audio.playChord(listOf(tonic, target), strumDelayMillis = 0,
-                        sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
-                } else {
-                    audio.playNote(tonic, durationMillis = sustainProvider())
-                    delay(700)
-                    audio.playNote(target, durationMillis = sustainProvider())
-                }
-            } finally { intervalPlaying = false }
-        }
+    fun playIntervalQuestion() = launchIntervalSound {
+        soundInterval(intervalTonicMidi(), intervalTargetMidi(), intervalHarmonic)
     }
 
-    private fun drawIntervalQuestion() {
-        intervalAscending = when (intervalDirection) {
-            IntervalDirection.Ascending -> true
-            IntervalDirection.Descending -> false
-            IntervalDirection.Mixed -> rng.nextBoolean()
+    /** Semitones of the question before this one, so the next draw can avoid it. */
+    private var lastIntervalSemitones: Int? = null
+
+    private data class IntervalDraw(val ascending: Boolean, val semitones: Int, val degree: Int?)
+
+    /** Draw the next question. Returns true when the key changed (the cadence should
+     *  re-anchor it before the question sounds). */
+    private fun drawIntervalQuestion(): Boolean {
+        val oldKey = intervalKey
+        if (intervalRandomKey) intervalKey = IntervalTrainer.randomOtherKey(intervalKey, rng)
+        val d = IntervalTrainer.drawAvoiding(lastIntervalSemitones, { it.semitones }) {
+            val up = when (intervalDirection) {
+                IntervalDirection.Ascending -> true
+                IntervalDirection.Descending -> false
+                IntervalDirection.Mixed -> rng.nextBoolean()
+            }
+            if (intervalSource == IntervalSource.Diatonic) {
+                val pool = intervalDegrees.sorted()
+                val degree = pool[rng.nextInt(pool.size)]
+                IntervalDraw(up, IntervalTrainer.diatonicSemitones(intervalMode, degree, up), degree)
+            } else {
+                IntervalDraw(up, rng.nextInt(IntervalTrainer.INTERVALS.size), null)   // 0..12
+            }
         }
-        if (intervalSource == IntervalSource.Diatonic) {
-            val pool = intervalDegrees.sorted()
-            val degree = pool[rng.nextInt(pool.size)]
-            intervalDegree = degree
-            intervalSemitones = IntervalTrainer.diatonicSemitones(intervalMode, degree, intervalAscending)
-        } else {
-            intervalDegree = null
-            intervalSemitones = rng.nextInt(IntervalTrainer.INTERVALS.size)   // 0..12
-        }
+        intervalAscending = d.ascending
+        intervalSemitones = d.semitones
+        intervalDegree = d.degree
+        lastIntervalSemitones = d.semitones
         intervalGuess = null
         intervalChAnswered = false
+        return intervalKey != oldKey
     }
 
     fun startIntervalChallenge() {
@@ -2673,32 +2701,28 @@ class EarTrainingState(
         markChallengeStart("intervals")
         drawIntervalQuestion()
         // Anchor the key, then sound the first interval after the cadence.
-        intervalJob?.cancel()
-        intervalPlaying = true
-        intervalJob = scope.launch {
-            try {
-                playIntervalCadenceInline()
-                delay(300)
-                audio.chokeChords()   // the anchoring cadence must stop before the question
-                val tonic = intervalTonicMidi()
-                val target = IntervalTrainer.targetMidi(tonic, intervalSemitones, intervalAscending)
-                if (intervalHarmonic) {
-                    audio.playChord(listOf(tonic, target), strumDelayMillis = 0,
-                        sustainMillis = sustainProvider(), timbre = Timbre.Clarity)
-                } else {
-                    audio.playNote(tonic, durationMillis = sustainProvider())
-                    delay(700)
-                    audio.playNote(target, durationMillis = sustainProvider())
-                }
-            } finally { intervalPlaying = false }
+        launchIntervalSound {
+            playIntervalCadenceInline()
+            delay(300)
+            audio.chokeChords()   // the anchoring cadence must stop before the question
+            soundInterval(intervalTonicMidi(), intervalTargetMidi(), intervalHarmonic)
         }
     }
 
-    fun submitIntervalGuess() {
-        if (!intervalChActive || intervalChAnswered) return
-        val g = intervalGuess ?: return
-        intervalChAnswered = true
-        if (g == intervalSemitones) intervalChScore++
+    /**
+     * Tap an answer chip. The first tap of a question IS the answer (no Submit): it is
+     * graded at once. Every tap, before or after answering, sounds the chosen interval
+     * from this question's tonic in its direction, so a wrong pick can be compared
+     * against the real one by ear.
+     */
+    fun chooseIntervalGuess(semitones: Int) {
+        if (!intervalChActive) return
+        if (!intervalChAnswered) {
+            intervalGuess = semitones
+            intervalChAnswered = true
+            if (semitones == intervalSemitones) intervalChScore++
+        }
+        launchIntervalSound { soundInterval(intervalTonicMidi(), intervalTargetMidi(semitones), intervalHarmonic) }
     }
 
     fun advanceIntervalChallenge() {
@@ -2709,8 +2733,17 @@ class EarTrainingState(
             return
         }
         intervalChIndex++
-        drawIntervalQuestion()
-        playIntervalQuestion()
+        val keyChanged = drawIntervalQuestion()
+        // A new key in diatonic mode is re-anchored by its cadence; a chromatic interval
+        // needs no key, so it sounds straight away.
+        launchIntervalSound {
+            if (keyChanged && intervalSource == IntervalSource.Diatonic) {
+                playIntervalCadenceInline()
+                delay(300)
+                audio.chokeChords()
+            }
+            soundInterval(intervalTonicMidi(), intervalTargetMidi(), intervalHarmonic)
+        }
     }
 
     fun exitIntervalChallenge() { intervalChActive = false; intervalChIndex = 0; intervalChAnswered = false }

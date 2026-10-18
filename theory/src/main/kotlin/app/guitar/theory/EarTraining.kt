@@ -673,10 +673,10 @@ object EarTraining {
             window[i] = AdvChord(c.semitone, "7", c.roman.uppercase() + "7")
             domCount = 1
         }
-        val note = "Four chords along the circle of fifths (roots falling by a fifth). " +
+        val note = "Four chords along the circle of fourths (each root a 4th above the last = a 5th below). " +
             (if (domCount > 1) "Several chords are secondary dominants (V7 of the next), forming an applied-dominant chain that pulls hard toward the tonic."
              else "One chord is a secondary dominant (V7 of the next), intensifying the pull toward the tonic.")
-        return NamedProgression("Circle of 5ths", note, TrainingMode.Major, window)
+        return NamedProgression("Circle of 4ths", note, TrainingMode.Major, window)
     }
 
     /** One draw-able 4-chord window of the diatonic circle of fifths, for the
@@ -927,7 +927,7 @@ data class IntervalChoice(val semitones: Int, val shortName: String, val longNam
  */
 object IntervalTrainer {
     val INTERVALS: List<IntervalChoice> = listOf(
-        IntervalChoice(0, "P1", "unison"),
+        IntervalChoice(0, "Unison", "unison"),
         IntervalChoice(1, "m2", "minor 2nd"),
         IntervalChoice(2, "M2", "major 2nd"),
         IntervalChoice(3, "m3", "minor 3rd"),
@@ -939,7 +939,7 @@ object IntervalTrainer {
         IntervalChoice(9, "M6", "major 6th"),
         IntervalChoice(10, "m7", "minor 7th"),
         IntervalChoice(11, "M7", "major 7th"),
-        IntervalChoice(12, "P8", "octave"),
+        IntervalChoice(12, "Octave", "octave"),
     )
 
     /** The MIDI note [semitones] from [tonicMidi] in [direction]. Mixed must be
@@ -951,6 +951,23 @@ object IntervalTrainer {
         INTERVALS.first { it.semitones == semitones }
 
     // ---- Diatonic source: the target is a scale degree of the key ----
+
+    /** A random key other than [previous], so consecutive questions never share a key. */
+    fun randomOtherKey(previous: PitchClass, rng: kotlin.random.Random): PitchClass =
+        PitchClass((previous.value + 1 + rng.nextInt(11)) % 12)
+
+    /**
+     * Call [draw] until it yields a heard interval (semitones) other than [previous], so
+     * the same interval never comes twice in a row. A pool that can only produce one
+     * interval (one degree switched on) returns that interval after a bounded number
+     * of tries instead of looping forever.
+     */
+    fun <T> drawAvoiding(previous: Int?, semitonesOf: (T) -> Int, draw: () -> T): T {
+        var pick = draw()
+        var tries = 0
+        while (previous != null && semitonesOf(pick) == previous && tries++ < 64) pick = draw()
+        return pick
+    }
 
     /** Selectable target degrees: 1..7, plus 8 = the tonic an octave away. */
     val DEGREES: List<Int> = (1..8).toList()

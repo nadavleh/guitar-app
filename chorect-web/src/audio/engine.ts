@@ -256,7 +256,7 @@ export class WebAudioEngine {
    *  modernMaster (dry) AND panner -> reverbSend -> reverbBus (wet).
    *  `startAt` (AudioContext seconds) defaults to "now" — used by playChord to
    *  stagger strum voices. */
-  private playModernVoice(samples: Float32Array, pan: number, reverbSend: number, level: number, releaseMs: number, startAt?: number): void {
+  private playModernVoice(samples: Float32Array, pan: number, reverbSend: number, level: number, releaseMs: number, startAt?: number, gateSec?: number): void {
     if (samples.length === 0) return;
     const ctx = this.ensure();
     const startT = startAt ?? ctx.currentTime;
@@ -269,6 +269,14 @@ export class WebAudioEngine {
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, startT);
     env.gain.linearRampToValueAtTime(level * this.voiceLevel, startT + 0.003);
+    let stopAt: number | undefined;
+    if (gateSec !== undefined) {
+      // Gated (Timbre.gated): hold, then fade over releaseMs and stop — no ring-over.
+      const endT = startT + Math.max(0.01, gateSec);
+      env.gain.setValueAtTime(level * this.voiceLevel, endT);
+      env.gain.linearRampToValueAtTime(0, endT + releaseMs / 1000);
+      stopAt = endT + releaseMs / 1000 + 0.01;
+    }
 
     const panner = ctx.createStereoPanner();
     panner.pan.value = pan;
@@ -292,6 +300,7 @@ export class WebAudioEngine {
     };
     this.active.add(entry);
     src.start(startT);
+    if (stopAt !== undefined) src.stop(stopAt);
   }
 
   /** MODERN, sampled variant of `playModernVoice`: identical envelope/panner/
@@ -305,6 +314,7 @@ export class WebAudioEngine {
     level: number,
     releaseMs: number,
     startAt?: number,
+    gateSec?: number,
   ): void {
     const ctx = this.ensure();
     const startT = startAt ?? ctx.currentTime;
@@ -316,6 +326,14 @@ export class WebAudioEngine {
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, startT);
     env.gain.linearRampToValueAtTime(level * this.voiceLevel, startT + 0.003);
+    let stopAt: number | undefined;
+    if (gateSec !== undefined) {
+      // Gated (Timbre.gated): hold, then fade over releaseMs and stop — no ring-over.
+      const endT = startT + Math.max(0.01, gateSec);
+      env.gain.setValueAtTime(level * this.voiceLevel, endT);
+      env.gain.linearRampToValueAtTime(0, endT + releaseMs / 1000);
+      stopAt = endT + releaseMs / 1000 + 0.01;
+    }
 
     const panner = ctx.createStereoPanner();
     panner.pan.value = pan;
@@ -339,7 +357,11 @@ export class WebAudioEngine {
     };
     this.active.add(entry);
     src.start(startT);
+    if (stopAt !== undefined) src.stop(stopAt);
   }
+
+  /** A gated timbre is dry; every other voice takes the Sound's reverb send. */
+  private sendFor(timbre: Timbre): number { return timbre.gated ? 0 : this.voiceReverbSend; }
 
   playNote(midiNote: number, durationMillis = 1500, timbre: Timbre = Timbres.Guitar): void {
     if (midiNote < 0 || midiNote > 127) return;
@@ -351,17 +373,19 @@ export class WebAudioEngine {
           this.currentBank.buffers.get(root)!,
           pitchRate(midiNote, root),
           panForMidi(midiNote),
-          this.voiceReverbSend,
+          this.sendFor(timbre),
           // Samples ignore the synth's amplitude param, so map it to voice level
           // (0.6 = the Timbre default = unity) — keeps per-timbre level differences
           // (e.g. the ear-training root boost) audible on samples.
           timbre.amplitude / 0.6,
           timbre.releaseMs,
+          undefined,
+          gateFor(timbre, durationMillis),
         );
         return;
       }
-      const samples = synth.synthesize(midiNote, durationMillis / 1000, 1, timbre.damping, timbre.amplitude, 0.6);
-      this.playModernVoice(samples, panForMidi(midiNote), this.voiceReverbSend, 1.0, timbre.releaseMs);
+      const samples = synth.synthesize(midiNote, durationMillis / 1000, 1, timbre.damping, timbre.amplitude, brightnessFor(timbre));
+      this.playModernVoice(samples, panForMidi(midiNote), this.sendFor(timbre), 1.0, timbre.releaseMs, undefined, gateFor(timbre, durationMillis));
     } else {
       const samples = synth.synthesize(midiNote, durationMillis / 1000, 1, timbre.damping, timbre.amplitude);
       this.playLegacy(samples);
@@ -418,15 +442,16 @@ export class WebAudioEngine {
             bank.buffers.get(root)!,
             pitchRate(midi, root),
             panForMidi(midi),
-            this.voiceReverbSend,
+            this.sendFor(timbre),
             level * boost * (timbre.amplitude / 0.6), // amplitude → level (0.6 = unity); see playNote
             timbre.releaseMs,
             startAt,
+            gateFor(timbre, sustainMillis),
           );
           return;
         }
-        const samples = synth.synthesize(midi, sustainMillis / 1000, seedBase + i, timbre.damping, timbre.amplitude, 0.6);
-        this.playModernVoice(samples, panForMidi(midi), this.voiceReverbSend, level * boost, timbre.releaseMs, startAt);
+        const samples = synth.synthesize(midi, sustainMillis / 1000, seedBase + i, timbre.damping, timbre.amplitude, brightnessFor(timbre));
+        this.playModernVoice(samples, panForMidi(midi), this.sendFor(timbre), level * boost, timbre.releaseMs, startAt, gateFor(timbre, sustainMillis));
       });
     } else {
       const strumDelaySamples = Math.round((strumDelayMillis / 1000) * synth.sampleRate);
@@ -574,4 +599,15 @@ export class WebAudioEngine {
     this.ensure();
     return this.synth!;
   }
+}
+
+/** Seconds after which a gated voice is released (undefined = let it ring). */
+function gateFor(timbre: Timbre, durationMillis: number): number | undefined {
+  return timbre.gated ? durationMillis / 1000 : undefined;
+}
+
+/** Gated voices lose their high harmonics faster — a rounder, softer tone. Mirrors
+ *  AudioTrackEngine.brightnessFor (0.6 guitar, 0.25 soft). */
+function brightnessFor(timbre: Timbre): number {
+  return timbre.gated ? 0.25 : 0.6;
 }

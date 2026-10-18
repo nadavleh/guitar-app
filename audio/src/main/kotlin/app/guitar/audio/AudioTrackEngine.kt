@@ -242,9 +242,10 @@ class AudioTrackEngine(
                     // differences (e.g. the ear-training root boost) audible on samples.
                     gain = (timbre.amplitude / 0.6).toFloat() * voiceLevel,
                     pan = Panner.forMidi(midiNote),
-                    reverbSend = voiceReverbSend,
+                    reverbSend = sendFor(timbre),
                     releaseMs = timbre.releaseMs,
                     group = AudioEngine.PITCHED_GROUP,
+                    releaseAfterFrames = gateFrames(timbre, durationMillis),
                 )
                 return@execute
             }
@@ -255,14 +256,14 @@ class AudioTrackEngine(
                 seed = System.nanoTime(),
                 damping = timbre.damping,
                 amplitude = timbre.amplitude,
-                brightnessDecay = GUITAR_BRIGHTNESS_DECAY,
+                brightnessDecay = brightnessFor(timbre),
             )
             val tEnd = System.nanoTime()
             addVoice(
                 samples,
                 gain = voiceLevel,
                 pan = Panner.forMidi(midiNote),
-                reverbSend = voiceReverbSend,
+                reverbSend = sendFor(timbre),
                 releaseMs = timbre.releaseMs,
                 group = AudioEngine.PITCHED_GROUP,
             )
@@ -327,17 +328,21 @@ class AudioTrackEngine(
                     else BufferSource(synth.synthesize(
                         midi, sustainMillis / 1000.0, System.nanoTime() + i,
                         timbre.damping, timbre.amplitude,
-                        brightnessDecay = GUITAR_BRIGHTNESS_DECAY,
+                        brightnessDecay = brightnessFor(timbre),
                     ))
+                val gate = gateFrames(timbre, sustainMillis)
                 mixer.addAndCap(
                     MixVoice(
                         source,
                         voiceGain * boost,
                         strumFrames * i,
                         AmpEnvelope(sampleRate, 3.0, timbre.releaseMs.toDouble()),
-                        reverbSend = voiceReverbSend,
+                        reverbSend = sendFor(timbre),
                         group = AudioEngine.PITCHED_GROUP,
-                    ).also { it.pan = Panner.forMidi(midi) },
+                    ).also {
+                        it.pan = Panner.forMidi(midi)
+                        if (gate >= 0) it.releaseIn = gate + strumFrames * i
+                    },
                     MAX_VOICES,
                 )
             }
@@ -363,13 +368,28 @@ class AudioTrackEngine(
         reverbSend: Float = 0f,
         releaseMs: Int = 20,
         group: String? = null,
+        releaseAfterFrames: Int = -1,
     ) {
         mixer.addAndCap(
             MixVoice(source, gain, delayFrames, AmpEnvelope(sampleRate, 3.0, releaseMs.toDouble()),
-                reverbSend = reverbSend, group = group).also { it.pan = pan },
+                reverbSend = reverbSend, group = group).also {
+                it.pan = pan
+                if (releaseAfterFrames >= 0) it.releaseIn = releaseAfterFrames
+            },
             MAX_VOICES,
         )
     }
+
+    /** A [Timbre.gated] voice is dry; every other voice takes the Sound's reverb send. */
+    private fun sendFor(timbre: Timbre): Float = if (timbre.gated) 0f else voiceReverbSend
+
+    /** Frames after which a [Timbre.gated] voice is released (-1 = let it ring). */
+    private fun gateFrames(timbre: Timbre, durationMillis: Int): Int =
+        if (timbre.gated) (sampleRate.toLong() * durationMillis / 1000).toInt() else -1
+
+    /** Gated voices lose their high harmonics faster — a rounder, softer tone. */
+    private fun brightnessFor(timbre: Timbre): Double =
+        if (timbre.gated) SOFT_BRIGHTNESS_DECAY else GUITAR_BRIGHTNESS_DECAY
 
     private fun addVoice(
         samples: FloatArray,
@@ -459,5 +479,6 @@ class AudioTrackEngine(
         // fundamental over the note — bright attack, warmer tail. 1.0 = uniform decay
         // (PluckedSynth's own default, used by tests that need reproducible behavior).
         private const val GUITAR_BRIGHTNESS_DECAY = 0.6
+        private const val SOFT_BRIGHTNESS_DECAY = 0.25
     }
 }

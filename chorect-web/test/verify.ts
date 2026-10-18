@@ -30,6 +30,7 @@ import {
   movementCost, pickMinMovement, BUILTIN_PATTERNS,
   INTERVAL_CHOICES, intervalTargetMidi, INTERVAL_DEGREES, intervalDegreeSemitones, intervalDegreeLabel,
   diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalRefFor, intervalChoiceFor, IntervalDirection,
+  randomOtherKey, drawAvoiding,
   INTERVAL_SONGS_ASCENDING, INTERVAL_SONGS_DESCENDING, melodyNotes, melodyContains,
   CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
   MissedTake, encodeMissedTake, decodeMissedTake,
@@ -378,6 +379,19 @@ check("descending diatonic = same degree an octave lower",
   diatonicIntervalSemitones(TrainingMode.Major, 3, true) === 4 && diatonicIntervalSemitones(TrainingMode.Major, 3, false) === 8 &&
   diatonicIntervalSemitones(TrainingMode.Major, 5, false) === 5 && diatonicIntervalSemitones(TrainingMode.Major, 1, false) === 0 &&
   diatonicIntervalSemitones(TrainingMode.Major, 8, false) === 12);
+check("unison/octave names", intervalChoiceFor(0).shortName === "Unison" && intervalChoiceFor(12).shortName === "Octave");
+{
+  let prev: number | null = null, ok = true;
+  for (let i = 0; i < 300; i++) {
+    const st = drawAvoiding(prev, (x: number) => x, () => Math.floor(Math.random() * 3));
+    if (st === prev) ok = false;
+    prev = st;
+  }
+  ok = ok && drawAvoiding(4, (x: number) => x, () => 4) === 4;
+  const keys = new Set<number>();
+  for (let i = 0; i < 300; i++) { const k = randomOtherKey(0); if (k === 0) ok = false; keys.add(k); }
+  check("no repeated interval; random key always changes", ok && keys.size === 11);
+}
 check("diatonic answer set",
   diatonicIntervalAnswerSet(TrainingMode.Major, new Set([3, 5]), IntervalDirection.Mixed).join() === "4,5,7,8" &&
   diatonicIntervalAnswerSet(TrainingMode.Major, new Set(INTERVAL_DEGREES), IntervalDirection.Ascending).join() === "0,2,4,5,7,9,11,12");
@@ -389,11 +403,11 @@ check("diatonic answer set",
   check("interval song lookup", ok);
   const allRefs = [...INTERVAL_SONGS_ASCENDING, ...INTERVAL_SONGS_DESCENDING];
   // Pinned to Kotlin EarTrainingTest: same song count, every snippet sounds its interval.
-  check("interval song count = 46", allRefs.reduce((n, r) => n + r.songs.length, 0) === 46);
+  check("interval song count = 37", allRefs.reduce((n, r) => n + r.songs.length, 0) === 37);
   let melOk = true;
   for (const r of allRefs) for (const sg of r.songs) {
     const notes = melodyNotes(sg.melody);
-    if (notes.length < 2 || notes.length > 12 || !notes.every((n) => n.midi >= 54 && n.midi <= 80)) melOk = false;
+    if (notes.length < 6 || notes.length > 12 || !notes.every((n) => n.midi >= 54 && n.midi <= 80)) melOk = false;
     if (!melodyContains(sg.melody, r.semitones, r.ascending)) melOk = false;
   }
   check("every song snippet contains its interval", melOk);

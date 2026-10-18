@@ -540,11 +540,11 @@ export function randomCircleOfFifths(rng: Rng = defaultRng): NamedProgression {
     window[i] = c(window[i].semitone, "7", window[i].roman.toUpperCase() + "7");
     domCount = 1;
   }
-  const note = "Four chords along the circle of fifths (roots falling by a fifth). "
+  const note = "Four chords along the circle of fourths (each root a 4th above the last = a 5th below). "
     + (domCount > 1
       ? "Several chords are secondary dominants (V7 of the next), forming an applied-dominant chain that pulls hard toward the tonic."
       : "One chord is a secondary dominant (V7 of the next), intensifying the pull toward the tonic.");
-  return { name: "Circle of 5ths", explanation: note, tonicMode: TrainingMode.Major, chords: window };
+  return { name: "Circle of 4ths", explanation: note, tonicMode: TrainingMode.Major, chords: window };
 }
 
 /** One draw-able 4-chord window of the diatonic circle of fifths, for the
@@ -802,7 +802,7 @@ export interface IntervalChoice { semitones: number; shortName: string; longName
 /** The 13 intervals from unison to octave, with the arithmetic to place a target
  *  note above/below a tonic. Mirrors theory/EarTraining.kt's IntervalTrainer. */
 export const INTERVAL_CHOICES: IntervalChoice[] = [
-  { semitones: 0, shortName: "P1", longName: "unison" },
+  { semitones: 0, shortName: "Unison", longName: "unison" },
   { semitones: 1, shortName: "m2", longName: "minor 2nd" },
   { semitones: 2, shortName: "M2", longName: "major 2nd" },
   { semitones: 3, shortName: "m3", longName: "minor 3rd" },
@@ -814,7 +814,7 @@ export const INTERVAL_CHOICES: IntervalChoice[] = [
   { semitones: 9, shortName: "M6", longName: "major 6th" },
   { semitones: 10, shortName: "m7", longName: "minor 7th" },
   { semitones: 11, shortName: "M7", longName: "major 7th" },
-  { semitones: 12, shortName: "P8", longName: "octave" },
+  { semitones: 12, shortName: "Octave", longName: "octave" },
 ];
 
 export function intervalTargetMidi(tonicMidi: number, semitones: number, ascending: boolean): number {
@@ -823,6 +823,22 @@ export function intervalTargetMidi(tonicMidi: number, semitones: number, ascendi
 
 export function intervalChoiceFor(semitones: number): IntervalChoice {
   return INTERVAL_CHOICES.find((i) => i.semitones === semitones)!;
+}
+
+/** A random key other than `previous`, so consecutive questions never share a key.
+ *  Mirror of Kotlin IntervalTrainer.randomOtherKey. */
+export function randomOtherKey(previous: PitchClass, rng: Rng = defaultRng): PitchClass {
+  return (previous + 1 + rng.int(11)) % 12;
+}
+
+/** Call `draw` until it yields a heard interval other than `previous`, so the same
+ *  interval never comes twice in a row; a pool of one returns after bounded tries.
+ *  Mirror of Kotlin IntervalTrainer.drawAvoiding. */
+export function drawAvoiding<T>(previous: number | null, semitonesOf: (t: T) => number, draw: () => T): T {
+  let pick = draw();
+  let tries = 0;
+  while (previous !== null && semitonesOf(pick) === previous && tries++ < 64) pick = draw();
+  return pick;
 }
 
 // ---- Diatonic source: the target is a scale degree of the key ----

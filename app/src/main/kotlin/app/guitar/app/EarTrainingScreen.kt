@@ -41,6 +41,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -418,7 +419,7 @@ private fun generatorLabel(ear: EarTrainingState): String = when {
     ear.advancedMode -> when (ear.advCategory) {
         "sus" -> "Sus chords"; "advanced2" -> "Advanced II"; else -> "Advanced"
     }
-    ear.circleMode -> "Circle of 5ths"
+    ear.circleMode -> "Circle of 4ths"
     ear.iiiFocusMode -> "I → iii focus"
     ear.third6FocusMode -> "3rd vs 6th focus"
     else -> "Diatonic"
@@ -429,7 +430,7 @@ private fun generatorCaption(ear: EarTrainingState): String = when {
     ear.advancedMode && ear.advCategory == "sus" -> "Progressions built on suspended (sus2/sus4) chords."
     ear.advancedMode && ear.advCategory == "advanced2" -> "Richer colours: major-7th, minor-9th and modal (Dorian/Mixolydian/Lydian/Phrygian)."
     ear.advancedMode -> "Borrowed chords, secondary dominants & jazz turnarounds, each with a note."
-    ear.circleMode -> "Circle-of-fifths windows built around secondary dominants (V7 of the next chord)."
+    ear.circleMode -> "Circle-of-fourths windows (each root a 4th up, the ii–V–I motion) built around secondary dominants (V7 of the next chord)."
     ear.iiiFocusMode -> "Drill for hearing the I→iii move — every progression opens with I then iii (major)."
     ear.third6FocusMode -> "Drill for telling the 3rd from the 6th — progressions with iii/bIII, mixed with ~30% I→vi (i→bVI) foils."
     else -> "Standard diatonic progressions in the chosen key & mode."
@@ -457,7 +458,7 @@ private fun GeneratorDropdown(ear: EarTrainingState, modifier: Modifier = Modifi
                 onClick = { ear.chooseAdvancedCategory("advanced2"); open = false })
             DropdownMenuItem(text = { Text("Sus chords") },
                 onClick = { ear.chooseAdvancedCategory("sus"); open = false })
-            DropdownMenuItem(text = { Text("Circle of fifths — secondary dominants") },
+            DropdownMenuItem(text = { Text("Circle of fourths — secondary dominants") },
                 onClick = { ear.chooseCircleMode(true); open = false })
         }
     }
@@ -2615,15 +2616,21 @@ private fun AugDimChallengeView(state: AppState, ear: EarTrainingState) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun IntervalGuessChips(ear: EarTrainingState, enabled: Boolean) {
-    Text("Which interval?", style = MaterialTheme.typography.labelMedium)
+private fun IntervalGuessChips(ear: EarTrainingState) {
+    Text(if (ear.intervalChAnswered) "Tap any interval to hear it from this tonic"
+         else "Which interval? (tap = answer)", style = MaterialTheme.typography.labelMedium)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         for (iv in ear.intervalAnswerChoices()) {
+            val isAnswer = ear.intervalChAnswered && iv.semitones == ear.intervalSemitones
+            val isWrongPick = ear.intervalChAnswered && iv.semitones == ear.intervalGuess && !isAnswer
             FilterChip(
-                selected = ear.intervalGuess == iv.semitones,
-                enabled = enabled,
-                onClick = { ear.intervalGuess = iv.semitones },
-                label = { Text(iv.shortName) },
+                selected = isAnswer || isWrongPick,
+                onClick = { ear.chooseIntervalGuess(iv.semitones) },
+                label = { Text((if (isAnswer) "✔ " else if (isWrongPick) "✘ " else "") + iv.shortName) },
+                colors = if (isWrongPick) FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer,
+                ) else FilterChipDefaults.filterChipColors(),
             )
         }
     }
@@ -2645,8 +2652,8 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         if (!ear.intervalChActive) {
             Text("${ear.intervalChallengeTotal} questions. A cadence sets the key, then the " +
-                "tonic and a note sound — identify the interval. Choose a direction first; you can " +
-                "always replay the tonic, and transpose if the key is uncomfortable.",
+                "tonic and a note sound — tap the interval you hear. The first tap is your answer, " +
+                "and every tap plays that interval so you can compare it with the real one.",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(10.dp))
             Text("Draw from", style = MaterialTheme.typography.labelMedium)
@@ -2716,16 +2723,27 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
                     onClick = { ear.intervalHarmonic = true },
                     label = { Text("Harmonic (together)") })
             }
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Key: $keyName",
-                    style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(150.dp))
-                OutlinedButton(onClick = { ear.intervalTranspose(-1) }) { Text("♭") }
-                Spacer(Modifier.width(6.dp))
-                OutlinedButton(onClick = { ear.intervalTranspose(1) }) { Text("♯") }
-                Spacer(Modifier.width(8.dp))
-                Text(transposeLabel(ear.intervalTransposeSteps), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            Text("Key", style = MaterialTheme.typography.labelMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = ear.intervalRandomKey,
+                    onClick = { ear.intervalRandomKey = true },
+                    label = { Text("New random key each question") })
+                FilterChip(selected = !ear.intervalRandomKey,
+                    onClick = { ear.intervalRandomKey = false },
+                    label = { Text("Fixed key") })
+            }
+            if (!ear.intervalRandomKey) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Key: $keyName",
+                        style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(150.dp))
+                    OutlinedButton(onClick = { ear.intervalTranspose(-1) }) { Text("♭") }
+                    Spacer(Modifier.width(6.dp))
+                    OutlinedButton(onClick = { ear.intervalTranspose(1) }) { Text("♯") }
+                    Spacer(Modifier.width(8.dp))
+                    Text(transposeLabel(ear.intervalTransposeSteps), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -2754,9 +2772,13 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
             }
         }
         Spacer(Modifier.height(8.dp))
+        Text("Key: $keyName", style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { ear.playIntervalQuestion() }, enabled = !ear.intervalPlaying) { Text("Replay ▶") }
             OutlinedButton(onClick = { ear.playIntervalTonic() }) { Text("♪ Tonic") }
+            OutlinedButton(onClick = { ear.playIntervalTarget() }) { Text("♪ Note") }
+            OutlinedButton(onClick = { ear.playIntervalTogether() }) { Text("♪ Together") }
             OutlinedButton(onClick = { ear.playIntervalTonicCadence() }) { Text("Hear I–V–I") }
             OutlinedButton(onClick = { ear.intervalTranspose(-1) }) { Text("♭") }
             OutlinedButton(onClick = { ear.intervalTranspose(1) }) { Text("♯") }
@@ -2770,6 +2792,11 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
             Text("Show fretboard (tonic marked)", style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f))
             Switch(checked = ear.intervalShowFretboard, onCheckedChange = { ear.intervalShowFretboard = it })
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("New random key each question", style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f))
+            Switch(checked = ear.intervalRandomKey, onCheckedChange = { ear.intervalRandomKey = it })
         }
         if (ear.intervalShowFretboard) {
             val tuning = state.liveTuning
@@ -2792,17 +2819,17 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
             }
         }
         Spacer(Modifier.height(12.dp))
-        IntervalGuessChips(ear, enabled = !ear.intervalChAnswered)
+        IntervalGuessChips(ear)
         Spacer(Modifier.height(10.dp))
-        if (!ear.intervalChAnswered) {
-            Button(onClick = { ear.submitIntervalGuess() }, enabled = ear.intervalGuess != null,
-                modifier = Modifier.fillMaxWidth()) { Text("Submit") }
-        } else {
+        if (ear.intervalChAnswered) {
             val ok = ear.intervalGuess == ear.intervalSemitones
+            // A unison has no direction, so none is printed for it.
             val dir = if (ear.intervalAscending) "ascending" else "descending"
-            val degree = ear.intervalDegree?.let { "degree ${IntervalTrainer.degreeLabel(ear.intervalMode, it)}, " } ?: ""
+            val degree = ear.intervalDegree?.let { "degree ${IntervalTrainer.degreeLabel(ear.intervalMode, it)}" }
+            val detail = listOfNotNull(degree, dir.takeIf { ear.intervalSemitones > 0 }).joinToString(", ")
             val choice = IntervalTrainer.choiceFor(ear.intervalSemitones)
-            Text((if (ok) "✔ correct" else "✘ answer: ${choice.longName}") + "  ($degree$dir)",
+            Text((if (ok) "✔ correct" else "✘ answer: ${choice.longName}") +
+                    (if (detail.isNotEmpty()) "  ($detail)" else ""),
                 style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary)
             if (ear.intervalSemitones > 0) {
@@ -3106,15 +3133,15 @@ private fun CircleBanner(ear: EarTrainingState) {
         val fg = MaterialTheme.colorScheme.onSurfaceVariant
         Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
             Text(
-                "◆  CIRCLE OF FIFTHS  ◆",
+                if (run.fallingFifths) "◆  CIRCLE OF FOURTHS  ◆" else "◆  CIRCLE OF FIFTHS  ◆",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Black,
                 color = fg,
             )
             Text(
-                "${run.length} chords in a row round the circle (bars $barList): every root " +
-                    if (run.fallingFifths) "falls a 5th (= up a 4th) — the ii–V–I pull."
-                    else "rises a 5th (= down a 4th) — the circle walked backwards.",
+                "${run.length} chords in a row (bars $barList): every root " +
+                    if (run.fallingFifths) "moves up a 4th (= down a 5th) — the ii–V–I pull."
+                    else "moves up a 5th (= down a 4th) — the opposite direction to ii–V–I.",
                 style = MaterialTheme.typography.bodySmall,
                 color = fg,
             )
@@ -3202,7 +3229,7 @@ private fun ProgressionLibraryDialog(state: AppState, onDismiss: () -> Unit) {
                             expandedKey, toggle)
                     }
                 }
-                LibrarySection("Circle of fifths",
+                LibrarySection("Circle of fourths",
                     "Draws 4 adjacent chords; the 2nd may become a dominant 7th (except vii°). Characteristic examples.") {
                     EarTraining.CIRCLE_WINDOWS.forEach { w ->
                         LibraryRow(state, "cof:${w.id}", w.romanLine,

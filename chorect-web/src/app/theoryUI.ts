@@ -93,6 +93,9 @@ export function intervalRefsContent(ear: EarTrainingState, rerender: () => void)
 }
 
 export class TheoryUI {
+  /** Scroll position of the reference list, kept across rerenders. */
+  private scroll = 0;
+
   constructor(
     private ear: EarTrainingState,
     private onBack: () => void,
@@ -117,5 +120,8 @@ export class TheoryUI {
     ]));
 
     container.appendChild(screen);
+    // Every ▶ rebuilds the page; put the list back where it was instead of at the top.
+    body.scrollTop = this.scroll;
+    body.addEventListener("scroll", () => { this.scroll = body.scrollTop; }, { passive: true });
   }
 }

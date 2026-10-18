@@ -14,10 +14,15 @@ export interface Timbre {
   /** Envelope release time in milliseconds when a voice is stopped. MODERN
    *  chain only — the legacy chain hard-stops. */
   readonly releaseMs: number;
+  /** Short and dry: released after its duration even when it is a sample, no reverb
+   *  send, and a darker synth tone. Mirrors Kotlin Timbre.gated. */
+  readonly gated?: boolean;
 }
 
 export const Timbres = {
   Guitar: { damping: 0.997, amplitude: 0.6, pan: 0, reverbSend: 0.03, releaseMs: 20 } as Timbre,
   Cavaquinho: { damping: 0.989, amplitude: 0.55, pan: 0, reverbSend: 0.03, releaseMs: 20 } as Timbre,
   Clarity: { damping: 0.997, amplitude: 0.62, pan: 0, reverbSend: 0.03, releaseMs: 20 } as Timbre,
+  /** Interval trainer + song snippets: soft, short, no reverb. */
+  Soft: { damping: 0.994, amplitude: 0.42, pan: 0, reverbSend: 0, releaseMs: 70, gated: true } as Timbre,
 };

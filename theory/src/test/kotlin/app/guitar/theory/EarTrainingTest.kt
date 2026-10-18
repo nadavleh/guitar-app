@@ -341,13 +341,13 @@ class EarTrainingTest {
     }
 
     @Test fun `song count is pinned (web verify pins the same number)`() {
-        assertEquals(46, (IntervalSongs.ASCENDING + IntervalSongs.DESCENDING).sumOf { it.songs.size })
+        assertEquals(37, (IntervalSongs.ASCENDING + IntervalSongs.DESCENDING).sumOf { it.songs.size })
     }
 
     @Test fun `every song snippet actually sounds its interval in its direction`() {
         for (r in IntervalSongs.ASCENDING + IntervalSongs.DESCENDING) for (song in r.songs) {
             val notes = IntervalSongs.melodyNotes(song.melody)
-            assertTrue(notes.size in 2..12, "${song.title}: a few notes, not a transcription")
+            assertTrue(notes.size in 6..12, "${song.title}: enough notes to recognise the tune, not a transcription")
             assertTrue(notes.all { it.eighths > 0 }, "${song.title}: lengths")
             assertTrue(IntervalSongs.melodyContains(song.melody, r.semitones, r.ascending),
                 "${song.title} does not contain ${r.interval} ${if (r.ascending) "up" else "down"}")
@@ -367,6 +367,31 @@ class EarTrainingTest {
     @Test fun `choiceFor maps semitones to the right interval`() {
         assertEquals("M3", IntervalTrainer.choiceFor(4).shortName)
         assertEquals("TT", IntervalTrainer.choiceFor(6).shortName)
+        assertEquals("Unison", IntervalTrainer.choiceFor(0).shortName)
+        assertEquals("Octave", IntervalTrainer.choiceFor(12).shortName)
+    }
+
+    @Test fun `drawAvoiding never repeats the previous interval while another exists`() {
+        val rng = kotlin.random.Random(7)
+        var prev: Int? = null
+        repeat(500) {
+            val st = IntervalTrainer.drawAvoiding(prev, { it }) { rng.nextInt(3) }
+            assertTrue(st != prev)
+            prev = st
+        }
+        // A pool of one cannot avoid itself — it must still return, not loop.
+        assertEquals(4, IntervalTrainer.drawAvoiding(4, { it }) { 4 })
+    }
+
+    @Test fun `randomOtherKey always changes the key and reaches all 11 others`() {
+        val rng = kotlin.random.Random(3)
+        val seen = mutableSetOf<Int>()
+        repeat(500) {
+            val k = IntervalTrainer.randomOtherKey(PitchClass.C, rng)
+            assertTrue(k != PitchClass.C)
+            seen += k.value
+        }
+        assertEquals(11, seen.size)
     }
 
     // ---- Mistake-drill progression keys (#drill) ----

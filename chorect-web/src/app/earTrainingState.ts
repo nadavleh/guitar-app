@@ -22,6 +22,7 @@ import {
   IntervalDirection, INTERVAL_CHOICES, intervalTargetMidi, IntervalChoice, IntervalSource,
   melodyNotes, INTERVAL_EIGHTH_MS,
   INTERVAL_DEGREES, diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalChoiceFor,
+  randomOtherKey, drawAvoiding,
 } from "../theory";
 import { WebAudioEngine, Timbres, renderCueBeep } from "../audio";
 
@@ -32,6 +33,9 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 // earBoostTonic root-emphasis toggle): the lowest note of a voicing is ~40% louder,
 // tapering to none at the top, so chords sit on a fuller low end.
 const EAR_BASS_BOOST = 0.4;
+
+/** Interval-trainer note length (ms) — short so the two pitches stay distinct. */
+const INTERVAL_NOTE_MS = 600;
 
 export enum EarSubMode { Progression = "Progression", Note2Chord = "Note2Chord", Flavor = "Flavor", Inversions = "Inversions", AugDim = "AugDim", Intervals = "Intervals", Drill = "Drill", Workout = "Workout" }
 export enum EarMode { Practice = "Practice", Challenge = "Challenge", Car = "Car" }
@@ -2209,16 +2213,45 @@ export class EarTrainingState {
   /** Harmonic mode: sound tonic + target TOGETHER (else melodic). */
   intervalHarmonic = false;
   setIntervalHarmonic(v: boolean) { this.intervalHarmonic = v; this.notify(); }
-  private playIntervalPair(tonic: number, target: number): Promise<void> {
-    this.deps.audio.chokeChords();   // start of a phrase; the notes inside it may overlap
-    if (this.intervalHarmonic) {
-      this.deps.audio.playChord([tonic, target], 0, this.deps.sustainProvider(), Timbres.Clarity);
-      return Promise.resolve();
+  /** A new random key for every question (default); off = stay in `intervalKey`. */
+  intervalRandomKey = true;
+  setIntervalRandomKey(v: boolean) { this.intervalRandomKey = v; this.notify(); }
+
+  /** Sound tonic and target — one after the other, or together when `harmonic` — with
+   *  the short, soft, dry Timbres.Soft so the two pitches stay distinct. Stops early
+   *  once `live()` turns false. */
+  private async soundInterval(tonic: number, target: number, harmonic: boolean, live: () => boolean = () => true): Promise<void> {
+    const a = this.deps.audio;
+    if (harmonic) {
+      a.playChord([tonic, target], 0, 1000, Timbres.Soft);
+      await sleep(1050);
+      return;
     }
-    this.deps.audio.playNote(tonic, this.deps.sustainProvider());
-    return sleep(700).then(() => this.deps.audio.playNote(target, this.deps.sustainProvider()));
+    a.playNote(tonic, INTERVAL_NOTE_MS, Timbres.Soft);
+    await sleep(650);
+    if (!live()) return;
+    a.playNote(target, INTERVAL_NOTE_MS, Timbres.Soft);
+    await sleep(650);
   }
-  setIntervalGuess(s: number) { this.intervalGuess = s; this.notify(); }
+
+  private intervalTargetMidiFor(semitones: number = this.intervalSemitones): number {
+    return intervalTargetMidi(this.intervalTonicMidi(), semitones, this.intervalAscending);
+  }
+
+  /** Run one interval-trainer sound job, cancelling whatever was playing. */
+  private launchIntervalSound(job: (live: () => boolean) => Promise<void>) {
+    this.intervalToken++;
+    const token = this.intervalToken;
+    const live = () => token === this.intervalToken;
+    this.intervalPlaying = true;
+    this.notify();
+    this.deps.audio.chokeChords();
+    void (async () => {
+      try { await job(live); } finally {
+        if (live()) { this.intervalPlaying = false; this.notify(); }
+      }
+    })();
+  }
 
   intervalTranspose(n: number) {
     this.intervalKey = ((this.intervalKey + n) % 12 + 12) % 12;
@@ -2228,17 +2261,28 @@ export class EarTrainingState {
   }
 
   playIntervalTonicCadence() {
-    this.intervalToken++;
-    const token = this.intervalToken;
-    this.intervalPlaying = true;
-    this.notify();
-    void (async () => {
-      try { await this.playIntervalCadenceInline(token); } finally { this.intervalPlaying = false; this.notify(); }
-    })();
+    this.launchIntervalSound(async () => { await this.playIntervalCadenceInline(this.intervalToken); });
   }
 
+  /** Re-sound just the tonic (the reference). */
   playIntervalTonic() {
-    this.deps.audio.playNote(this.intervalTonicMidi(), this.deps.sustainProvider());
+    this.launchIntervalSound(async () => {
+      this.deps.audio.playNote(this.intervalTonicMidi(), INTERVAL_NOTE_MS, Timbres.Soft);
+      await sleep(INTERVAL_NOTE_MS);
+    });
+  }
+
+  /** Sound only the question's second note, without the tonic. */
+  playIntervalTarget() {
+    this.launchIntervalSound(async () => {
+      this.deps.audio.playNote(this.intervalTargetMidiFor(), INTERVAL_NOTE_MS, Timbres.Soft);
+      await sleep(INTERVAL_NOTE_MS);
+    });
+  }
+
+  /** Sound tonic and target together, whatever the playback setting. */
+  playIntervalTogether() {
+    this.launchIntervalSound((live) => this.soundInterval(this.intervalTonicMidi(), this.intervalTargetMidiFor(), true, live));
   }
 
   // ---------- Interval REFERENCE playback (Theory tab / song-refs sheet) ----------
@@ -2263,10 +2307,11 @@ export class EarTrainingState {
       for (const n of melodyNotes(melody)) {
         if (!live()) return;
         const ms = n.eighths * INTERVAL_EIGHTH_MS;
-        this.deps.audio.playNote(n.midi, Math.max(ms, 180));
+        // Gated just short of the next onset: detached, dry, no ring-over.
+        this.deps.audio.playNote(n.midi, Math.max(60, ms * 0.9), Timbres.Soft);
         await sleep(ms);
       }
-      await sleep(400);
+      await sleep(200);
       if (!live()) return;
       this.intervalPreviewId = null;
       this.notify();
@@ -2281,17 +2326,13 @@ export class EarTrainingState {
     void (async () => {
       const base = 60;                                    // C4
       const target = ascending ? base + semitones : base - semitones;
-      const sustain = this.deps.sustainProvider();
       const live = () => token === this.intervalPreviewToken;
-      this.deps.audio.chokeChords();   // start of a phrase; the notes inside it may overlap
-      this.deps.audio.playNote(base, sustain);
-      await sleep(700);
+      this.deps.audio.chokeChords();   // start of a phrase
+      await this.soundInterval(base, target, false, live);
       if (!live()) return;
-      this.deps.audio.playNote(target, sustain);
-      await sleep(700);
+      await sleep(150);
       if (!live()) return;
-      this.deps.audio.playChord([base, target], 0, sustain, Timbres.Clarity);
-      await sleep(900);
+      await this.soundInterval(base, target, true, live);
       if (!live()) return;
       this.intervalPreviewId = null;
       this.notify();
@@ -2304,71 +2345,84 @@ export class EarTrainingState {
     this.notify();
   }
 
+  /** Play the current question: tonic then target (melodic), or both together (harmonic). */
   playIntervalQuestion() {
-    if (this.intervalPlaying) return;
-    this.intervalToken++;   // cancels any in-flight cadence/question sequence
-    this.intervalPlaying = true;
-    this.notify();
-    void (async () => {
-      try {
-        const tonic = this.intervalTonicMidi();
-        await this.playIntervalPair(tonic,
-          intervalTargetMidi(tonic, this.intervalSemitones, this.intervalAscending));
-      } finally { this.intervalPlaying = false; this.notify(); }
-    })();
+    this.launchIntervalSound((live) =>
+      this.soundInterval(this.intervalTonicMidi(), this.intervalTargetMidiFor(), this.intervalHarmonic, live));
   }
 
-  private drawIntervalQuestion() {
-    this.intervalAscending = this.intervalDirection === IntervalDirection.Ascending ? true
-      : this.intervalDirection === IntervalDirection.Descending ? false
-      : this.rng.int(2) === 0;
-    if (this.intervalSource === IntervalSource.Diatonic) {
-      const pool = [...this.intervalDegrees].sort((a, b) => a - b);
-      const degree = pool[this.rng.int(pool.length)];
-      this.intervalDegree = degree;
-      this.intervalSemitones = diatonicIntervalSemitones(this.intervalMode, degree, this.intervalAscending);
-    } else {
-      this.intervalDegree = null;
-      this.intervalSemitones = this.rng.int(INTERVAL_CHOICES.length);   // 0..12
-    }
+  /** Semitones of the question before this one, so the next draw can avoid it. */
+  private lastIntervalSemitones: number | null = null;
+
+  /** Draw the next question. Returns true when the key changed (the cadence should
+   *  re-anchor it before the question sounds). */
+  private drawIntervalQuestion(): boolean {
+    const oldKey = this.intervalKey;
+    if (this.intervalRandomKey) this.intervalKey = randomOtherKey(this.intervalKey, this.rng);
+    const d = drawAvoiding(this.lastIntervalSemitones, (x: { up: boolean; st: number; degree: number | null }) => x.st, () => {
+      const up = this.intervalDirection === IntervalDirection.Ascending ? true
+        : this.intervalDirection === IntervalDirection.Descending ? false
+        : this.rng.int(2) === 0;
+      if (this.intervalSource === IntervalSource.Diatonic) {
+        const pool = [...this.intervalDegrees].sort((x, y) => x - y);
+        const degree = pool[this.rng.int(pool.length)];
+        return { up, st: diatonicIntervalSemitones(this.intervalMode, degree, up), degree };
+      }
+      return { up, st: this.rng.int(INTERVAL_CHOICES.length), degree: null };   // 0..12
+    });
+    this.intervalAscending = d.up;
+    this.intervalSemitones = d.st;
+    this.intervalDegree = d.degree;
+    this.lastIntervalSemitones = d.st;
     this.intervalGuess = null;
     this.intervalChAnswered = false;
+    return this.intervalKey !== oldKey;
   }
 
   startIntervalChallenge() {
     this.intervalChActive = true; this.intervalChIndex = 0; this.intervalChScore = 0;
     this.markChallengeStart("intervals");
     this.drawIntervalQuestion();
-    this.intervalToken++;
-    const token = this.intervalToken;
-    this.intervalPlaying = true;
-    this.notify();
-    void (async () => {
-      try {
-        if (!(await this.playIntervalCadenceInline(token))) return;
-        await sleep(300);
-        if (token !== this.intervalToken) return;
-        const tonic = this.intervalTonicMidi();
-        await this.playIntervalPair(tonic,
-          intervalTargetMidi(tonic, this.intervalSemitones, this.intervalAscending));
-      } finally { this.intervalPlaying = false; this.notify(); }
-    })();
+    // Anchor the key, then sound the first interval after the cadence.
+    this.launchIntervalSound(async (live) => {
+      if (!(await this.playIntervalCadenceInline(this.intervalToken))) return;
+      await sleep(300);
+      if (!live()) return;
+      this.deps.audio.chokeChords();   // the anchoring cadence must stop before the question
+      await this.soundInterval(this.intervalTonicMidi(), this.intervalTargetMidiFor(), this.intervalHarmonic, live);
+    });
   }
 
-  submitIntervalGuess() {
-    if (!this.intervalChActive || this.intervalChAnswered) return;
-    if (this.intervalGuess == null) return;
-    this.intervalChAnswered = true;
-    if (this.intervalGuess === this.intervalSemitones) this.intervalChScore++;
-    this.notify();
+  /** Tap an answer chip. The first tap of a question IS the answer (no Submit): it is
+   *  graded at once. Every tap, before or after answering, sounds the chosen interval
+   *  from this question's tonic in its direction, to compare with the real one. */
+  chooseIntervalGuess(semitones: number) {
+    if (!this.intervalChActive) return;
+    if (!this.intervalChAnswered) {
+      this.intervalGuess = semitones;
+      this.intervalChAnswered = true;
+      if (semitones === this.intervalSemitones) this.intervalChScore++;
+    }
+    this.launchIntervalSound((live) =>
+      this.soundInterval(this.intervalTonicMidi(), this.intervalTargetMidiFor(semitones), this.intervalHarmonic, live));
   }
 
   advanceIntervalChallenge() {
     if (!this.intervalChActive) return;
     if (this.intervalChIndex >= this.intervalChallengeTotal - 1) { this.intervalChIndex = this.intervalChallengeTotal; this.reportChallengeDone("intervals", this.intervalChScore, this.intervalChallengeTotal); this.notify(); return; }
     this.intervalChIndex++;
-    this.drawIntervalQuestion();
-    this.playIntervalQuestion();
+    const keyChanged = this.drawIntervalQuestion();
+    // A new key in diatonic mode is re-anchored by its cadence; a chromatic interval
+    // needs no key, so it sounds straight away.
+    this.launchIntervalSound(async (live) => {
+      if (keyChanged && this.intervalSource === IntervalSource.Diatonic) {
+        if (!(await this.playIntervalCadenceInline(this.intervalToken))) return;
+        await sleep(300);
+        if (!live()) return;
+        this.deps.audio.chokeChords();
+      }
+      await this.soundInterval(this.intervalTonicMidi(), this.intervalTargetMidiFor(), this.intervalHarmonic, live);
+    });
   }
 
   exitIntervalChallenge() { this.intervalChActive = false; this.intervalChIndex = 0; this.intervalChAnswered = false; this.notify(); }
