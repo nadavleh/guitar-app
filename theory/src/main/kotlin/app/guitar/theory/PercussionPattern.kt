@@ -466,6 +466,19 @@ object PercussionBuiltins {
             "bongo=0,2,3,0,1,-,1,-,0,2,3,0,1,-,1,-",
     )
 
+    /** Son 3:2 — Nadav's chart, 2 bars of 4/4 in eighths. Clave 3-side (1, 2&, 4) then
+     *  2-side (2, 3); timbales cáscara; conga tumbao (H = heel → mute ◐, T = toe →
+     *  tip ·, S = slap, Hi = open on the conga, Lo = open on the tumba, bar 2's 4&);
+     *  bongo martillo (t = thumb → hi ▲, m = finger → rim ◇, S = slap, O = open → lo ▼). */
+    val SON_3_2: PercussionPattern = builtin(
+        "M:2,4,4,8;" +
+            "claves=0,-,-,0,-,-,0,-,-,-,0,-,0,-,-,-" + "|" +
+            "timbales=2,-,2,2,-,2,2,-,2,-,2,2,-,2,-,2" + "|" +
+            "conga=1,3,2,3,1,3,0,0,1,3,2,3,1,3,0,-" + "|" +
+            "tumba=-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,0" + "|" +
+            "bongo=0,2,3,2,0,2,1,2,0,2,3,2,0,2,1,2",
+    )
+
     /** A loadable groove for the Load… menu; [bpm] (when non-null) is applied on
      *  load; [opening] (when non-null) is a one-shot entrada played before the loop. */
     data class BuiltinPattern(
@@ -699,6 +712,7 @@ object PercussionBuiltins {
         BuiltinPattern("Forró (Bongo)", FORRO, bpm = 95),
         BuiltinPattern("Xaxado (Bongo)", XAXADO, bpm = 100),
         BuiltinPattern("Arrasta-pé (Bongo)", ARRASTA_PE, bpm = 100),
+        BuiltinPattern("Son 3:2", SON_3_2, bpm = 100),
     )
 }
 

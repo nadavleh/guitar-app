@@ -565,6 +565,19 @@ export const ARRASTA_PE = builtin(
   "bongo=0,2,3,0,1,-,1,-,0,2,3,0,1,-,1,-",
 );
 
+/** Son 3:2 — Nadav's chart, 2 bars of 4/4 in eighths. Clave 3-side (1, 2&, 4) then
+ *  2-side (2, 3); timbales cáscara; conga tumbao (H = heel → mute ◐, T = toe →
+ *  tip ·, S = slap, Hi = open on the conga, Lo = open on the tumba, bar 2's 4&);
+ *  bongo martillo (t = thumb → hi ▲, m = finger → rim ◇, S = slap, O = open → lo ▼). */
+export const SON_3_2 = builtin(
+  "M:2,4,4,8;" +
+  "claves=0,-,-,0,-,-,0,-,-,-,0,-,0,-,-,-" + "|" +
+  "timbales=2,-,2,2,-,2,2,-,2,-,2,2,-,2,-,2" + "|" +
+  "conga=1,3,2,3,1,3,0,0,1,3,2,3,1,3,0,-" + "|" +
+  "tumba=-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,0" + "|" +
+  "bongo=0,2,3,2,0,2,1,2,0,2,3,2,0,2,1,2",
+);
+
 /** A loadable groove for the Load… menu; `bpm` (when set) is applied on load;
  *  `opening` (when set) is a one-shot entrada played once before the loop. */
 export interface BuiltinPattern { name: string; pattern: PercussionPattern; bpm?: number; opening?: PercussionPattern; }
@@ -648,6 +661,7 @@ export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "Forró (Bongo)", pattern: FORRO, bpm: 95 },
   { name: "Xaxado (Bongo)", pattern: XAXADO, bpm: 100 },
   { name: "Arrasta-pé (Bongo)", pattern: ARRASTA_PE, bpm: 100 },
+  { name: "Son 3:2", pattern: SON_3_2, bpm: 100 },
 ];
 
 /** A one-press preset TRACK ("+ Add ▾" → presets, also the phrase "chunks" the

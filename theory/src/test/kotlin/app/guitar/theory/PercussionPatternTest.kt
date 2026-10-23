@@ -143,7 +143,7 @@ class PercussionPatternTest {
     }
 
     @Test fun `built-in grooves decode, are non-empty, and round-trip`() {
-        assertEquals(12, PercussionBuiltins.ALL.size)
+        assertEquals(13, PercussionBuiltins.ALL.size)
         for ((name, pat) in PercussionBuiltins.ALL) {
             assertTrue(!pat.isEmpty(), "$name is empty")
             assertEquals(16, pat.slots, "$name should be the default 16-slot meter")
@@ -155,6 +155,15 @@ class PercussionPatternTest {
                 assertTrue(pat.voiceAt(PercussionCatalog.Surdo, 8) != null, "$name surdo bar 2")
             }
         }
+    }
+
+    /** Son 3:2 — the clave is 3-side (1, 2&, 4) then 2-side (2, 3), in 4/4 eighths. */
+    @Test fun `son 3-2 clave sits on the 3-2 son clave slots`() {
+        val b = PercussionBuiltins.ALL.first { it.name == "Son 3:2" }
+        val claves = PercussionCatalog.byId("claves")!!
+        val hits = (0 until b.pattern.slots).filter { b.pattern.voiceAt(claves, it) != null }
+        assertEquals(listOf(0, 3, 6, 10, 12), hits)
+        assertEquals(PercussionMeter(2, 4, 4, 8), b.pattern.meter)
     }
 
     /** Nadav's Casa 2 export, the one groove with NO SURDO: two tamborims, the
