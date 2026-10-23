@@ -578,6 +578,17 @@ export const SON_V1 = builtin(
   "tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-",
 );
 
+/** Son v1 on a 2:3 RUMBA clave: the 3-side's last stroke moves from 4 to 4&
+ *  (clave 2, 3 | 1, 2&, 4&), and the cáscara's 3-side accents 3& and 4& to match
+ *  (per the 2-3 rumba-clave chart). Conga and tumba as in Son v1. */
+export const SON_V1_RUMBA = builtin(
+  "M:2,4,4,8;" +
+  "claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,-,0" + "|" +
+  "timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,102" + "|" +
+  "conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0" + "|" +
+  "tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-",
+);
+
 /** Son v2 (3:2) — Nadav's chart, 2 bars of 4/4 in eighths. Clave 3-side (1, 2&, 4) then
  *  2-side (2, 3); timbales cáscara; conga tumbao (H = heel → mute ◐, T = toe →
  *  tip ·, S = slap, Hi = open on the conga, Lo = open on the tumba, bar 2's 4&);
@@ -675,6 +686,7 @@ export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "Xaxado (Bongo)", pattern: XAXADO, bpm: 100 },
   { name: "Arrasta-pé (Bongo)", pattern: ARRASTA_PE, bpm: 100 },
   { name: "Son v1 (2:3)", pattern: SON_V1, bpm: 100 },
+  { name: "Son v1 (2:3 rumba clave)", pattern: SON_V1_RUMBA, bpm: 100 },
   { name: "Son v2 (3:2)", pattern: SON_3_2, bpm: 100 },
 ];
 

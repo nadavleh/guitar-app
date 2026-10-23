@@ -349,6 +349,11 @@ check("Son v1 (2:3) matches the Kotlin twin, clave on 2, 3 | 1, 2&, 4", (() => {
   return b !== undefined && b.bpm === 100 && b.pattern.encode() ===
     "M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,0,-|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,2|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-";
 })());
+check("Son v1 (2:3 rumba clave) matches the Kotlin twin, clave on 2, 3 | 1, 2&, 4&", (() => {
+  const b = BUILTIN_PATTERNS.find((x) => x.name === "Son v1 (2:3 rumba clave)");
+  return b !== undefined && b.bpm === 100 && b.pattern.encode() ===
+    "M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,-,0|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,102|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-";
+})());
 check("Son v2 (3:2) matches the Kotlin twin, clave on 1, 2&, 4 | 2, 3", (() => {
   const b = BUILTIN_PATTERNS.find((x) => x.name === "Son v2 (3:2)");
   return b !== undefined && b.bpm === 100 && b.pattern.encode() ===

@@ -143,7 +143,7 @@ class PercussionPatternTest {
     }
 
     @Test fun `built-in grooves decode, are non-empty, and round-trip`() {
-        assertEquals(14, PercussionBuiltins.ALL.size)
+        assertEquals(15, PercussionBuiltins.ALL.size)
         for ((name, pat) in PercussionBuiltins.ALL) {
             assertTrue(!pat.isEmpty(), "$name is empty")
             assertEquals(16, pat.slots, "$name should be the default 16-slot meter")
@@ -168,6 +168,13 @@ class PercussionPatternTest {
 
     /** Son v1 — the 2:3 chart: clave 2-side (2, 3) then 3-side (1, 2&, 4), tumba on
      *  bar 2's 2& and 3. Pinned here and in chorect-web/test/verify.ts. */
+    /** Son v1 on the 2:3 rumba clave (3-side 1, 2&, 4&). Mirrored in verify.ts. */
+    @Test fun `son v1 rumba-clave variant, exactly`() {
+        val b = PercussionBuiltins.ALL.first { it.name == "Son v1 (2:3 rumba clave)" }
+        assertEquals(100, b.bpm)
+        assertEquals("M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,-,0|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,102|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-", b.pattern.encode())
+    }
+
     @Test fun `son v1 is the 2-3 chart, exactly`() {
         val b = PercussionBuiltins.ALL.first { it.name == "Son v1 (2:3)" }
         assertEquals(100, b.bpm)
