@@ -45,6 +45,13 @@ android {
                 out.outputFile.parentFile
                     ?.listFiles { f -> f.name.startsWith("Chorect_beta_V") && f.name.endsWith(".apk") && f.name != current }
                     ?.forEach { it.delete() }
+                // Nadav wants the newest APK on his Desktop, and only the newest.
+                val desktop = File(System.getProperty("user.home"), "Desktop")
+                if (desktop.isDirectory && out.outputFile.isFile) {
+                    desktop.listFiles { f -> f.name.startsWith("Chorect_beta_V") && f.name.endsWith(".apk") && f.name != current }
+                        ?.forEach { it.delete() }
+                    out.outputFile.copyTo(File(desktop, current), overwrite = true)
+                }
             }
         }
     }
