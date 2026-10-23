@@ -472,11 +472,11 @@ object PercussionBuiltins {
      *  bongo martillo (t = thumb → hi ▲, m = finger → rim ◇, S = slap, O = open → lo ▼). */
     val SON_3_2: PercussionPattern = builtin(
         "M:2,4,4,8;" +
-            "claves=0,-,-,0,-,-,0,-,-,-,0,-,0,-,-,-" + "|" +
-            "timbales=2,-,2,2,-,2,2,-,2,-,2,2,-,2,-,2" + "|" +
-            "conga=1,3,2,3,1,3,0,0,1,3,2,3,1,3,0,-" + "|" +
-            "tumba=-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,0" + "|" +
-            "bongo=0,2,3,2,0,2,1,2,0,2,3,2,0,2,1,2",
+            "claves%60=0,-,-,0,-,-,0,-,-,-,0,-,0,-,-,-" + "|" +
+            "timbales%60=2,-,2,2,-,2,2,-,2,-,2,2,-,2,-,2" + "|" +
+            "conga%60=1,3,2,3,1,3,0,0,1,3,2,3,1,3,0,-" + "|" +
+            "tumba%60=-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,0" + "|" +
+            "bongo%60=0,2,3,2,0,2,1,2,0,2,3,2,0,2,1,2",
     )
 
     /** A loadable groove for the Load… menu; [bpm] (when non-null) is applied on

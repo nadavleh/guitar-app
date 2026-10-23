@@ -347,8 +347,8 @@ check("built-in grooves are valid & round-trip", builtinsOk);
 check("Son 3:2 matches the Kotlin twin, clave on 1, 2&, 4 | 2, 3", (() => {
   const b = BUILTIN_PATTERNS.find((x) => x.name === "Son 3:2");
   return b !== undefined && b.bpm === 100 && b.pattern.encode() ===
-    "M:2,4,4,8;claves=0,-,-,0,-,-,0,-,-,-,0,-,0,-,-,-|timbales=2,-,2,2,-,2,2,-,2,-,2,2,-,2,-,2|" +
-    "conga=1,3,2,3,1,3,0,0,1,3,2,3,1,3,0,-|tumba=-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,0|bongo=0,2,3,2,0,2,1,2,0,2,3,2,0,2,1,2";
+    "M:2,4,4,8;claves%60=0,-,-,0,-,-,0,-,-,-,0,-,0,-,-,-|timbales%60=2,-,2,2,-,2,2,-,2,-,2,2,-,2,-,2|" +
+    "conga%60=1,3,2,3,1,3,0,0,1,3,2,3,1,3,0,-|tumba%60=-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,0|bongo%60=0,2,3,2,0,2,1,2,0,2,3,2,0,2,1,2";
 })());
 // Pins the twin of PercussionBuiltins.CASA_2_LEVADA — his Casa 2 export, the one
 // groove with no surdo (two tamborims, the first at 97 %).
