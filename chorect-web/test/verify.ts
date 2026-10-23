@@ -31,7 +31,7 @@ import {
   INTERVAL_CHOICES, intervalTargetMidi, INTERVAL_DEGREES, intervalDegreeSemitones, intervalDegreeLabel,
   diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalRefFor, intervalChoiceFor, IntervalDirection,
   randomOtherKey, drawAvoiding,
-  INTERVAL_SONGS_ASCENDING, INTERVAL_SONGS_DESCENDING, melodyNotes, melodyContains,
+  INTERVAL_SONGS_ASCENDING, INTERVAL_SONGS_DESCENDING, melodyNotes, melodyContains, melodyNotesAnchored,
   CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
   MissedTake, encodeMissedTake, decodeMissedTake,
 } from "../src/theory";
@@ -430,6 +430,10 @@ check("diatonic answer set",
   check("melody parse centres + keeps lengths",
     melodyNotes("0/2 5/1.5 5/0.5", 66).map((n) => n.midi).join() === "64,69,69" &&
     melodyNotes("0/2 5/1.5 5/0.5", 66).map((n) => n.eighths).join() === "2,1.5,0.5");
+  check("anchored melody puts the leap on the question's tonic (= Kotlin)",
+    melodyNotesAnchored("0/2 5/1.5 5/0.5", 5, true, 62).map((n) => n.midi).join() === "62,67,67" &&
+    melodyNotesAnchored("0/4 12/4 11/2", 11, true, 60).map((n) => n.midi).join() === "60,72,71" &&
+    melodyNotesAnchored("0/4 12/4 11/2 7/1", 1, false, 60).map((n) => n.midi).join() === "48,60,59,55");
 }
 
 // --- Chord decomposition (#5): shell + a valid 3-note upper triad ---

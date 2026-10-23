@@ -25,14 +25,14 @@ function previewButton(ear: EarTrainingState, rerender: () => void, id: string, 
 
 /** One direction of an interval: ▶ the bare interval, then each song with its own ▶
  *  that plays a few notes of the melody containing the interval. */
-function directionBlock(ear: EarTrainingState, rerender: () => void, r: IntervalSongRef): HTMLElement {
+function directionBlock(ear: EarTrainingState, rerender: () => void, r: IntervalSongRef, anchorMidi: number | null): HTMLElement {
   const dirId = `${r.ascending ? "asc" : "desc"}:${r.interval}`;
   const dirWord = r.ascending ? "ascending" : "descending";
   const children: HTMLElement[] = [
     el("div", { style: "display:flex;gap:8px;align-items:baseline;margin-top:4px" }, [
       previewButton(ear, rerender, dirId, r.ascending ? "▶ ↑" : "▶ ↓",
-        `Play the ${r.intervalLong} ${dirWord} (from C4)`,
-        () => ear.playIntervalPreview(dirId, r.semitones, r.ascending)),
+        `Play the ${r.intervalLong} ${dirWord} (from ${anchorMidi === null ? "C4" : "this question's tonic"})`,
+        () => ear.playIntervalPreview(dirId, r.semitones, r.ascending, anchorMidi ?? 60)),
       el("span", { style: "font-weight:600" }, [r.ascending ? "Ascending" : "Descending"]),
       el("span", { class: "et-muted", style: "font-size:12px" }, [`(${r.inversion})`]),
     ]),
@@ -46,7 +46,7 @@ function directionBlock(ear: EarTrainingState, rerender: () => void, r: Interval
     links.style.flex = "1";
     children.push(el("div", { style: "display:flex;gap:8px;align-items:flex-start;padding-left:12px;margin-top:2px" }, [
       previewButton(ear, rerender, songId, "▶", `Play a few notes of ${song.title}`,
-        () => ear.playMelodySnippet(songId, song.melody)),
+        () => ear.playMelodySnippet(songId, song.melody, r.semitones, r.ascending, anchorMidi)),
       el("div", { style: "flex:1" }, [
         links,
         el("div", { class: "et-muted", style: "font-size:12px" }, [song.cue]),
@@ -58,7 +58,8 @@ function directionBlock(ear: EarTrainingState, rerender: () => void, r: Interval
 
 /** One interval, both directions; `firstAscending` picks which comes first (the
  *  trainer puts the direction you just heard on top). */
-function intervalCard(ear: EarTrainingState, rerender: () => void, semitones: number, firstAscending = true): HTMLElement {
+function intervalCard(ear: EarTrainingState, rerender: () => void, semitones: number, firstAscending = true,
+                      anchorMidi: number | null = null): HTMLElement {
   const first = intervalRefFor(semitones, firstAscending);
   const second = intervalRefFor(semitones, !firstAscending);
   if (!first || !second) return el("div");
@@ -67,25 +68,32 @@ function intervalCard(ear: EarTrainingState, rerender: () => void, semitones: nu
       el("span", { style: "font-weight:700;min-width:32px;color:var(--act)" }, [first.interval]),
       el("span", { style: "font-weight:700" }, [first.intervalLong]),
     ]),
-    directionBlock(ear, rerender, first),
-    directionBlock(ear, rerender, second),
+    directionBlock(ear, rerender, first, anchorMidi),
+    directionBlock(ear, rerender, second, anchorMidi),
   ]);
 }
 
-/** Just one interval — opened by the trainer's post-answer "♪ Songs for …" button. */
+/** Just one interval — opened by the trainer's post-answer "♪ Songs for …" button.
+ *  With `anchorMidi` (the question's tonic) each song's leap starts on that note. */
 export function intervalSongsContent(ear: EarTrainingState, rerender: () => void,
-                                     semitones: number, ascending: boolean): HTMLElement {
-  return intervalCard(ear, rerender, semitones, ascending);
+                                     semitones: number, ascending: boolean, anchorMidi: number | null = null): HTMLElement {
+  const card = intervalCard(ear, rerender, semitones, ascending, anchorMidi);
+  if (anchorMidi === null) return card;
+  return el("div", {}, [
+    el("div", { class: "et-muted", style: "font-size:12px" }, [
+      "Played from this question's tonic, so each song's leap is the one you just heard."]),
+    card,
+  ]);
 }
 
 /** The interval-reference block, shared by the Theory tab and the ear-training
  *  interval trainer's overlay. */
-export function intervalRefsContent(ear: EarTrainingState, rerender: () => void): HTMLElement {
+export function intervalRefsContent(ear: EarTrainingState, rerender: () => void, anchorMidi: number | null = null): HTMLElement {
   const cards: HTMLElement[] = [];
-  for (let st = 1; st <= 12; st++) cards.push(intervalCard(ear, rerender, st));
+  for (let st = 1; st <= 12; st++) cards.push(intervalCard(ear, rerender, st, true, anchorMidi));
   return el("div", {}, [
     el("div", { class: "et-muted", style: "font-size:12px;margin-bottom:4px" }, [
-      "▶ ↑ / ▶ ↓ play the bare interval (from C4): the two notes in turn, then together. The ▶ beside a song plays a few notes of its melody that contain the interval; YouTube/Spotify open the real recording.",
+      `▶ ↑ / ▶ ↓ play the bare interval (from ${anchorMidi === null ? "C4" : "this question's tonic"}): the two notes in turn, then together. The ▶ beside a song plays a few notes of its melody that contain the interval; YouTube/Spotify open the real recording.`,
     ]),
     ...cards,
     el("div", { class: "et-muted", style: "font-size:12px;font-style:italic;margin-top:8px" }, [INTERVAL_COMPLEMENT_NOTE]),

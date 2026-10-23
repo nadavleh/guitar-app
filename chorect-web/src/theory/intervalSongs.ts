@@ -200,13 +200,29 @@ export function melodyNotes(melody: string, centerMidi = 66): MelodyNote[] {
   return raw.map(([o, l]) => ({ midi: base + o, eighths: l }));
 }
 
-/** True when `melody` sounds `semitones` in the given direction between two notes at
- *  most two apart (adjacent, or 1st→3rd). */
-export function melodyContains(melody: string, semitones: number, ascending: boolean): boolean {
-  const n = melodyNotes(melody).map((x) => x.midi);
+/** Index of the first note that starts the leap (to the next note or the one after). */
+function leapStart(n: number[], semitones: number, ascending: boolean): number | null {
   const want = ascending ? semitones : -semitones;
   for (let i = 0; i < n.length; i++)
     for (let j = i + 1; j <= Math.min(i + 2, n.length - 1); j++)
-      if (n[j] - n[i] === want) return true;
-  return false;
+      if (n[j] - n[i] === want) return i;
+  return null;
+}
+
+/** Parse `melody` so its first `semitones`-in-this-direction leap starts on
+ *  `anchorMidi` — the trainer plays a song on the exact pitches of the question it
+ *  just asked. A snippet without that leap is centred on `anchorMidi` instead.
+ *  Mirror of Kotlin IntervalSongs.melodyNotesAnchored. */
+export function melodyNotesAnchored(melody: string, semitones: number, ascending: boolean, anchorMidi: number): MelodyNote[] {
+  const n = melodyNotes(melody);
+  const i = leapStart(n.map((x) => x.midi), semitones, ascending);
+  if (i === null) return melodyNotes(melody, anchorMidi);
+  const shift = anchorMidi - n[i].midi;
+  return n.map((x) => ({ midi: x.midi + shift, eighths: x.eighths }));
+}
+
+/** True when `melody` sounds `semitones` in the given direction between two notes at
+ *  most two apart (adjacent, or 1st→3rd). */
+export function melodyContains(melody: string, semitones: number, ascending: boolean): boolean {
+  return leapStart(melodyNotes(melody).map((x) => x.midi), semitones, ascending) !== null;
 }

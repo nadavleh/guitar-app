@@ -364,6 +364,15 @@ class EarTrainingTest {
         assertFalse(IntervalSongs.melodyContains("0/4 12/4 11/2", 11, ascending = false))
     }
 
+    @Test fun `anchored melody puts the leap on the question's tonic`() {
+        assertEquals(listOf(62, 67, 67),
+            IntervalSongs.melodyNotesAnchored("0/2 5/1.5 5/0.5", 5, true, 62).map { it.midi })
+        assertEquals(listOf(60, 72, 71),
+            IntervalSongs.melodyNotesAnchored("0/4 12/4 11/2", 11, true, 60).map { it.midi })
+        assertEquals(listOf(48, 60, 59, 55),
+            IntervalSongs.melodyNotesAnchored("0/4 12/4 11/2 7/1", 1, false, 60).map { it.midi })
+    }
+
     @Test fun `choiceFor maps semitones to the right interval`() {
         assertEquals("M3", IntervalTrainer.choiceFor(4).shortName)
         assertEquals("TT", IntervalTrainer.choiceFor(6).shortName)

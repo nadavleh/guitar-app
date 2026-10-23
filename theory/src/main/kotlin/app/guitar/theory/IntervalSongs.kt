@@ -194,14 +194,27 @@ object IntervalSongs {
         return raw.map { (o, l) -> MelodyNote(base + o, l) }
     }
 
-    /** True when [melody] sounds [semitones] in the given direction between two notes at
-     *  most two apart (adjacent, or 1st→3rd for the “count from the first note” cues). */
-    fun melodyContains(melody: String, semitones: Int, ascending: Boolean): Boolean {
-        val n = melodyNotes(melody).map { it.midi }
+    /** Parse [melody] so its first [semitones]-in-this-direction leap starts on
+     *  [anchorMidi] — the trainer plays a song on the exact pitches of the question it
+     *  just asked. A snippet without that leap is centred on [anchorMidi] instead. */
+    fun melodyNotesAnchored(melody: String, semitones: Int, ascending: Boolean, anchorMidi: Int): List<MelodyNote> {
+        val n = melodyNotes(melody)
+        val i = leapStart(n.map { it.midi }, semitones, ascending) ?: return melodyNotes(melody, anchorMidi)
+        val shift = anchorMidi - n[i].midi
+        return n.map { MelodyNote(it.midi + shift, it.eighths) }
+    }
+
+    /** Index of the first note that starts the leap (to the next note or the one after). */
+    private fun leapStart(n: List<Int>, semitones: Int, ascending: Boolean): Int? {
         val want = if (ascending) semitones else -semitones
         for (i in n.indices) for (j in i + 1..minOf(i + 2, n.lastIndex)) {
-            if (n[j] - n[i] == want) return true
+            if (n[j] - n[i] == want) return i
         }
-        return false
+        return null
     }
+
+    /** True when [melody] sounds [semitones] in the given direction between two notes at
+     *  most two apart (adjacent, or 1st→3rd for the “count from the first note” cues). */
+    fun melodyContains(melody: String, semitones: Int, ascending: Boolean): Boolean =
+        leapStart(melodyNotes(melody).map { it.midi }, semitones, ascending) != null
 }

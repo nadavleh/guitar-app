@@ -2636,134 +2636,188 @@ private fun IntervalGuessChips(ear: EarTrainingState) {
     }
 }
 
+/** Every interval-trainer setting. Shared by the setup screen and the in-challenge ⚙
+ *  dialog, so a running drill can be re-tuned without quitting it. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun IntervalSettings(ear: EarTrainingState, keyName: String) {
+    Text("Draw from", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FilterChip(selected = ear.intervalSource == IntervalSource.Diatonic,
+            onClick = { ear.intervalSource = IntervalSource.Diatonic },
+            label = { Text("Scale degrees") })
+        FilterChip(selected = ear.intervalSource == IntervalSource.Chromatic,
+            onClick = { ear.intervalSource = IntervalSource.Chromatic },
+            label = { Text("All 12 (chromatic)") })
+    }
+    if (ear.intervalSource == IntervalSource.Diatonic) {
+        Spacer(Modifier.height(8.dp))
+        Text("Scale", style = MaterialTheme.typography.labelMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (m in TrainingMode.entries) {
+                FilterChip(selected = ear.intervalMode == m,
+                    onClick = { ear.intervalMode = m },
+                    label = { Text(if (m == TrainingMode.Major) "Major" else "Minor") })
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("Degrees drawn (tap to switch one off; 1 = unison)", style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.height(4.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (d in IntervalTrainer.DEGREES) {
+                val on = d in ear.intervalDegrees
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (on) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                        .clickable { ear.toggleIntervalDegree(d) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(IntervalTrainer.degreeLabel(ear.intervalMode, d), fontWeight = FontWeight.Bold,
+                        color = if (on) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        Text("Descending plays the same degree an octave below the tonic, so every note stays in the key.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp))
+    } else {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FilterChip(selected = ear.intervalIncludeUnison,
+                onClick = { ear.intervalIncludeUnison = !ear.intervalIncludeUnison },
+                label = { Text("Include unison") })
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    Text("Direction", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for (dir in app.guitar.theory.IntervalDirection.entries) {
+            FilterChip(
+                selected = ear.intervalDirection == dir,
+                onClick = { ear.intervalDirection = dir },
+                label = { Text(dir.name) },
+            )
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    Text("Playback", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FilterChip(selected = !ear.intervalHarmonic,
+            onClick = { ear.intervalHarmonic = false },
+            label = { Text("Melodic (one after the other)") })
+        FilterChip(selected = ear.intervalHarmonic,
+            onClick = { ear.intervalHarmonic = true },
+            label = { Text("Harmonic (together)") })
+    }
+    Spacer(Modifier.height(8.dp))
+    Text("Key", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FilterChip(selected = ear.intervalRandomKey,
+            onClick = { ear.intervalRandomKey = true },
+            label = { Text("New random key each question") })
+        FilterChip(selected = !ear.intervalRandomKey,
+            onClick = { ear.intervalRandomKey = false },
+            label = { Text("Fixed key") })
+    }
+    if (!ear.intervalRandomKey) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Key: $keyName",
+                style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(150.dp))
+            OutlinedButton(onClick = { ear.intervalTranspose(-1) }) { Text("♭") }
+            Spacer(Modifier.width(6.dp))
+            OutlinedButton(onClick = { ear.intervalTranspose(1) }) { Text("♯") }
+            Spacer(Modifier.width(8.dp))
+            Text(transposeLabel(ear.intervalTransposeSteps), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text("Play I–V–I before each new key", style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f))
+        Switch(checked = ear.intervalCadence, onCheckedChange = { ear.intervalCadence = it })
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text("Show fretboard (tonic marked)", style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f))
+        Switch(checked = ear.intervalShowFretboard, onCheckedChange = { ear.intervalShowFretboard = it })
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun IntervalsView(state: AppState, ear: EarTrainingState) {
+    // Song dialogs play on this question's pitches (its tonic), not a fixed C4.
+    val anchor = if (ear.intervalChActive) ear.intervalTonicMidi() else null
     // "♪ Song refs" — the interval→song reference sheet (same content as the Theory tab).
     var refsOpen by remember { mutableStateOf(false) }
-    if (refsOpen) IntervalRefsDialog(ear, onDismiss = { refsOpen = false })
+    if (refsOpen) IntervalRefsDialog(ear, anchorMidi = anchor, onDismiss = { refsOpen = false })
     // "♪ Songs for M3" — after answering, just the answered interval's songs.
     var songsFor by remember { mutableStateOf<Int?>(null) }
     songsFor?.let { st ->
-        IntervalSongsDialog(ear, st, ear.intervalAscending, onDismiss = { songsFor = null })
+        IntervalSongsDialog(ear, st, ear.intervalAscending, anchorMidi = anchor, onDismiss = { songsFor = null })
     }
     val keyName = NoteSpeller.spell(ear.intervalKey) + " " +
         if (ear.intervalKeyMode == TrainingMode.Major) "major" else "minor"
+    // ⚙ in the challenge: change any setting mid-drill; it applies from the next
+    // question, or restart at once with it.
+    var settingsOpen by remember { mutableStateOf(false) }
+    if (settingsOpen) {
+        AlertDialog(
+            onDismissRequest = { settingsOpen = false },
+            title = { Text("Interval settings") },
+            text = {
+                Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+                    Text("Changes apply from the next question.", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(6.dp))
+                    IntervalSettings(ear, keyName)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { settingsOpen = false; ear.startIntervalChallenge() }) { Text("Restart with these") }
+            },
+            dismissButton = { TextButton(onClick = { settingsOpen = false }) { Text("Continue") } },
+        )
+    }
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         if (!ear.intervalChActive) {
-            Text("${ear.intervalChallengeTotal} questions. A cadence sets the key, then the " +
-                "tonic and a note sound — tap the interval you hear. The first tap is your answer, " +
-                "and every tap plays that interval so you can compare it with the real one.",
+            Text("${ear.intervalChallengeTotal} questions. The tonic and a note sound — tap the " +
+                "interval you hear. The first tap is your answer, and every tap plays that interval " +
+                "so you can compare it with the real one.",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(10.dp))
-            Text("Draw from", style = MaterialTheme.typography.labelMedium)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(selected = ear.intervalSource == IntervalSource.Diatonic,
-                    onClick = { ear.intervalSource = IntervalSource.Diatonic },
-                    label = { Text("Scale degrees") })
-                FilterChip(selected = ear.intervalSource == IntervalSource.Chromatic,
-                    onClick = { ear.intervalSource = IntervalSource.Chromatic },
-                    label = { Text("All 12 (chromatic)") })
-            }
-            if (ear.intervalSource == IntervalSource.Diatonic) {
-                Spacer(Modifier.height(8.dp))
-                Text("Scale", style = MaterialTheme.typography.labelMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (m in TrainingMode.entries) {
-                        FilterChip(selected = ear.intervalMode == m,
-                            onClick = { ear.intervalMode = m },
-                            label = { Text(if (m == TrainingMode.Major) "Major" else "Minor") })
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                Text("Degrees drawn (tap to switch one off)", style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.height(4.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    for (d in IntervalTrainer.DEGREES) {
-                        val on = d in ear.intervalDegrees
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (on) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                                .clickable { ear.toggleIntervalDegree(d) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(IntervalTrainer.degreeLabel(ear.intervalMode, d), fontWeight = FontWeight.Bold,
-                                color = if (on) MaterialTheme.colorScheme.onPrimary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-                Text("Descending plays the same degree an octave below the tonic, so every note stays in the key.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp))
-            }
-            Spacer(Modifier.height(10.dp))
-            Text("Direction", style = MaterialTheme.typography.labelMedium)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for (dir in app.guitar.theory.IntervalDirection.entries) {
-                    FilterChip(
-                        selected = ear.intervalDirection == dir,
-                        onClick = { ear.intervalDirection = dir },
-                        label = { Text(dir.name) },
-                    )
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Text("Playback", style = MaterialTheme.typography.labelMedium)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(selected = !ear.intervalHarmonic,
-                    onClick = { ear.intervalHarmonic = false },
-                    label = { Text("Melodic (one after the other)") })
-                FilterChip(selected = ear.intervalHarmonic,
-                    onClick = { ear.intervalHarmonic = true },
-                    label = { Text("Harmonic (together)") })
-            }
-            Spacer(Modifier.height(8.dp))
-            Text("Key", style = MaterialTheme.typography.labelMedium)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(selected = ear.intervalRandomKey,
-                    onClick = { ear.intervalRandomKey = true },
-                    label = { Text("New random key each question") })
-                FilterChip(selected = !ear.intervalRandomKey,
-                    onClick = { ear.intervalRandomKey = false },
-                    label = { Text("Fixed key") })
-            }
-            if (!ear.intervalRandomKey) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Key: $keyName",
-                        style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(150.dp))
-                    OutlinedButton(onClick = { ear.intervalTranspose(-1) }) { Text("♭") }
-                    Spacer(Modifier.width(6.dp))
-                    OutlinedButton(onClick = { ear.intervalTranspose(1) }) { Text("♯") }
-                    Spacer(Modifier.width(8.dp))
-                    Text(transposeLabel(ear.intervalTransposeSteps), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Button(onClick = { ear.startIntervalChallenge() }) { Text("Start challenge ▶") }
                 Spacer(Modifier.width(8.dp))
                 OutlinedButton(onClick = { refsOpen = true }) { Text("♪ Song refs") }
             }
+            Spacer(Modifier.height(12.dp))
+            IntervalSettings(ear, keyName)
+            Spacer(Modifier.height(20.dp))
             return@Column
         }
         if (ear.intervalChIndex >= ear.intervalChallengeTotal) {
             SimpleDoneCard(ear.intervalChScore, ear.intervalChallengeTotal,
                 onRestart = { ear.startIntervalChallenge() }, onExit = { ear.exitIntervalChallenge() })
+            OutlinedButton(onClick = { settingsOpen = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text("⚙ Settings")
+            }
             return@Column
         }
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("Q ${ear.intervalChIndex + 1} / ${ear.intervalChallengeTotal}",
-                style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.width(10.dp))
             Text("Score: ${ear.intervalChScore}", style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(4.dp))
+                color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+            IconButton(onClick = { settingsOpen = true }) {
+                Icon(Icons.Outlined.Tune, contentDescription = "Settings")
+            }
             IconButton(onClick = { ear.startIntervalChallenge() }) {
                 Icon(Icons.Rounded.RestartAlt, contentDescription = "Restart challenge")
             }
@@ -2771,33 +2825,44 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
                 Icon(Icons.Rounded.Close, contentDescription = "Quit challenge")
             }
         }
-        Spacer(Modifier.height(8.dp))
         Text("Key: $keyName", style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Button(onClick = { ear.playIntervalQuestion() }, enabled = !ear.intervalPlaying) { Text("Replay ▶") }
             OutlinedButton(onClick = { ear.playIntervalTonic() }) { Text("♪ Tonic") }
             OutlinedButton(onClick = { ear.playIntervalTarget() }) { Text("♪ Note") }
             OutlinedButton(onClick = { ear.playIntervalTogether() }) { Text("♪ Together") }
-            OutlinedButton(onClick = { ear.playIntervalTonicCadence() }) { Text("Hear I–V–I") }
-            OutlinedButton(onClick = { ear.intervalTranspose(-1) }) { Text("♭") }
-            OutlinedButton(onClick = { ear.intervalTranspose(1) }) { Text("♯") }
-            OutlinedButton(onClick = { refsOpen = true }) { Text("♪ Song refs") }
-            Text(transposeLabel(ear.intervalTransposeSteps), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.CenterVertically))
+            OutlinedButton(onClick = { ear.playIntervalTonicCadence() }) { Text("I–V–I") }
+            OutlinedButton(onClick = { refsOpen = true }) { Text("♪ Songs") }
+        }
+        Spacer(Modifier.height(8.dp))
+        IntervalGuessChips(ear)
+        if (ear.intervalChAnswered) {
+            Spacer(Modifier.height(8.dp))
+            val ok = ear.intervalGuess == ear.intervalSemitones
+            // A unison has no direction, so none is printed for it.
+            val dir = if (ear.intervalAscending) "ascending" else "descending"
+            val degree = ear.intervalDegree?.let { "degree ${IntervalTrainer.degreeLabel(ear.intervalMode, it)}" }
+            val detail = listOfNotNull(degree, dir.takeIf { ear.intervalSemitones > 0 }).joinToString(", ")
+            val choice = IntervalTrainer.choiceFor(ear.intervalSemitones)
+            Text((if (ok) "✔ correct" else "✘ answer: ${choice.longName}") +
+                    (if (detail.isNotEmpty()) "  ($detail)" else ""),
+                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(6.dp))
+            // Songs + Next on one row, right under the chips, so Next needs no scrolling.
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                if (ear.intervalSemitones > 0) {
+                    OutlinedButton(onClick = { songsFor = ear.intervalSemitones }) {
+                        Text("♪ Songs for ${choice.shortName} ${if (ear.intervalAscending) "↑" else "↓"}")
+                    }
+                }
+                Button(onClick = { ear.advanceIntervalChallenge() }, modifier = Modifier.weight(1f)) {
+                    Text(if (ear.intervalChIndex == ear.intervalChallengeTotal - 1) "See score →" else "Next →")
+                }
+            }
         }
         // Try it by hand: every tonic on the neck is marked; tapping any fret sounds it.
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("Show fretboard (tonic marked)", style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f))
-            Switch(checked = ear.intervalShowFretboard, onCheckedChange = { ear.intervalShowFretboard = it })
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("New random key each question", style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f))
-            Switch(checked = ear.intervalRandomKey, onCheckedChange = { ear.intervalRandomKey = it })
-        }
         if (ear.intervalShowFretboard) {
             val tuning = state.liveTuning
             val marks = remember(tuning, ear.intervalKey) {
@@ -2816,31 +2881,6 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
                     leftHanded = state.leftHanded,
                     camera = ear.intervalFretboardCamera,
                 )
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        IntervalGuessChips(ear)
-        Spacer(Modifier.height(10.dp))
-        if (ear.intervalChAnswered) {
-            val ok = ear.intervalGuess == ear.intervalSemitones
-            // A unison has no direction, so none is printed for it.
-            val dir = if (ear.intervalAscending) "ascending" else "descending"
-            val degree = ear.intervalDegree?.let { "degree ${IntervalTrainer.degreeLabel(ear.intervalMode, it)}" }
-            val detail = listOfNotNull(degree, dir.takeIf { ear.intervalSemitones > 0 }).joinToString(", ")
-            val choice = IntervalTrainer.choiceFor(ear.intervalSemitones)
-            Text((if (ok) "✔ correct" else "✘ answer: ${choice.longName}") +
-                    (if (detail.isNotEmpty()) "  ($detail)" else ""),
-                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary)
-            if (ear.intervalSemitones > 0) {
-                Spacer(Modifier.height(6.dp))
-                OutlinedButton(onClick = { songsFor = ear.intervalSemitones }) {
-                    Text("♪ Songs for ${choice.shortName} $dir")
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Button(onClick = { ear.advanceIntervalChallenge() }, modifier = Modifier.fillMaxWidth()) {
-                Text(if (ear.intervalChIndex == ear.intervalChallengeTotal - 1) "See score →" else "Next →")
             }
         }
         Spacer(Modifier.height(20.dp))

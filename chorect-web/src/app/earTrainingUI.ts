@@ -145,6 +145,8 @@ export class EarTrainingUI {
   private workoutRevealed = new Set<string>();
   /** Interval trainer's "♪ Song refs" overlay (same content as the Theory tab). */
   private intervalRefsOpen = false;
+  /** In-challenge ⚙ overlay with every interval setting. */
+  private intervalSettingsOpen = false;
   /** Post-answer "♪ Songs for M3" overlay: the answered interval's semitones, or null. */
   private intervalSongsFor: number | null = null;
 
@@ -779,6 +781,7 @@ export class EarTrainingUI {
     if (this.statsOpen) container.appendChild(this.statsOverlay());
     if (this.libraryOpen) container.appendChild(this.libraryOverlay());
     if (this.intervalRefsOpen) container.appendChild(this.intervalRefsOverlay());
+    if (this.intervalSettingsOpen) container.appendChild(this.intervalSettingsOverlay());
     if (this.intervalSongsFor !== null) container.appendChild(this.intervalSongsOverlay(this.intervalSongsFor));
     if (this.settingsSheetOpen) container.appendChild(this.generatorSettingsSheet(() => { this.settingsSheetOpen = false; this.rerender(); }));
     if (this.toneSheetOpen) container.appendChild(toneSheet(this.state, this.ear, () => { this.toneSheetOpen = false; this.rerender(); }));
@@ -2013,74 +2016,97 @@ export class EarTrainingUI {
 
   // ---------- #6 Interval identification ----------
 
+  /** Every interval-trainer setting. Shared by the setup screen and the in-challenge
+   *  ⚙ overlay, so a running drill can be re-tuned without quitting it. */
+  private intervalSettings(parent: HTMLElement, keyName: string): void {
+    const ear = this.ear;
+    parent.appendChild(labelSm("Draw from"));
+    parent.appendChild(chipsRow([
+      chip("Scale degrees", ear.intervalSource === IntervalSource.Diatonic, () => ear.setIntervalSource(IntervalSource.Diatonic)),
+      chip("All 12 (chromatic)", ear.intervalSource === IntervalSource.Chromatic, () => ear.setIntervalSource(IntervalSource.Chromatic)),
+    ]));
+    if (ear.intervalSource === IntervalSource.Diatonic) {
+      parent.appendChild(labelSm("Scale"));
+      parent.appendChild(chipsRow([TrainingMode.Major, TrainingMode.Minor].map((m) =>
+        chip(m === TrainingMode.Major ? "Major" : "Minor", ear.intervalMode === m, () => ear.setIntervalMode(m)))));
+      parent.appendChild(labelSm("Degrees drawn (tap to switch one off; 1 = unison)"));
+      const boxes = el("div", { style: "display:flex;gap:4px;margin:4px 0" });
+      for (const d of INTERVAL_DEGREES) {
+        const on = ear.intervalDegrees.has(d);
+        const box = el("button", {
+          style: `flex:1;height:40px;border-radius:8px;border:1px solid var(--line);font-weight:700;cursor:pointer;` +
+            (on ? "background:var(--act);color:var(--on-act, #fff)" : "background:var(--surface2);color:var(--muted, inherit);opacity:0.6"),
+          "aria-pressed": String(on),
+        }, [intervalDegreeLabel(ear.intervalMode, d)]);
+        box.addEventListener("click", () => ear.toggleIntervalDegree(d));
+        boxes.appendChild(box);
+      }
+      parent.appendChild(boxes);
+      parent.appendChild(el("div", { class: "et-muted", style: "font-size:12px" }, [
+        "Descending plays the same degree an octave below the tonic, so every note stays in the key.",
+      ]));
+    } else {
+      parent.appendChild(chipsRow([
+        chip("Include unison", ear.intervalIncludeUnison, () => ear.setIntervalIncludeUnison(!ear.intervalIncludeUnison)),
+      ]));
+    }
+    parent.appendChild(labelSm("Direction"));
+    parent.appendChild(chipsRow([IntervalDirection.Ascending, IntervalDirection.Descending, IntervalDirection.Mixed].map((d) =>
+      chip(d, ear.intervalDirection === d, () => ear.setIntervalDirection(d)))));
+    parent.appendChild(labelSm("Playback"));
+    parent.appendChild(chipsRow([
+      chip("Melodic (one after the other)", !ear.intervalHarmonic, () => ear.setIntervalHarmonic(false)),
+      chip("Harmonic (together)", ear.intervalHarmonic, () => ear.setIntervalHarmonic(true)),
+    ]));
+    parent.appendChild(labelSm("Key"));
+    parent.appendChild(chipsRow([
+      chip("New random key each question", ear.intervalRandomKey, () => ear.setIntervalRandomKey(true)),
+      chip("Fixed key", !ear.intervalRandomKey, () => ear.setIntervalRandomKey(false)),
+    ]));
+    if (!ear.intervalRandomKey) {
+      parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:8px" }, [
+        el("span", { class: "ans-label" }, [`Key: ${keyName}`]),
+        btn("♭", () => ear.intervalTranspose(-1)),
+        btn("♯", () => ear.intervalTranspose(1)),
+        el("span", { class: "et-muted" }, [transposeLabel(ear.intervalTransposeSteps)]),
+      ]));
+    }
+    parent.appendChild(switchRow("Play I–V–I before each new key", null, ear.intervalCadence,
+      (v) => ear.setIntervalCadence(v)));
+    parent.appendChild(switchRow("Show fretboard (tonic marked)", null, ear.intervalShowFretboard,
+      (v) => ear.setIntervalShowFretboard(v)));
+  }
+
   private intervalsView(parent: HTMLElement): void {
     const ear = this.ear;
     const keyName = `${spellPc(ear.intervalKey)} ${ear.intervalKeyMode === TrainingMode.Major ? "major" : "minor"}`;
+    const openRefs = () => { this.intervalRefsOpen = true; this.intervalOverlayScroll = 0; this.rerender(); };
     if (!ear.intervalChActive) {
       parent.appendChild(el("div", { class: "et-muted" }, [
-        `${ear.intervalChallengeTotal} questions. A cadence sets the key, then the tonic and a note sound — tap the interval you hear. The first tap is your answer, and every tap plays that interval so you can compare it with the real one.`,
+        `${ear.intervalChallengeTotal} questions. The tonic and a note sound — tap the interval you hear. The first tap is your answer, and every tap plays that interval so you can compare it with the real one.`,
       ]));
-      parent.appendChild(labelSm("Draw from"));
-      parent.appendChild(chipsRow([
-        chip("Scale degrees", ear.intervalSource === IntervalSource.Diatonic, () => ear.setIntervalSource(IntervalSource.Diatonic)),
-        chip("All 12 (chromatic)", ear.intervalSource === IntervalSource.Chromatic, () => ear.setIntervalSource(IntervalSource.Chromatic)),
-      ]));
-      if (ear.intervalSource === IntervalSource.Diatonic) {
-        parent.appendChild(labelSm("Scale"));
-        parent.appendChild(chipsRow([TrainingMode.Major, TrainingMode.Minor].map((m) =>
-          chip(m === TrainingMode.Major ? "Major" : "Minor", ear.intervalMode === m, () => ear.setIntervalMode(m)))));
-        parent.appendChild(labelSm("Degrees drawn (tap to switch one off)"));
-        const boxes = el("div", { style: "display:flex;gap:4px;margin:4px 0" });
-        for (const d of INTERVAL_DEGREES) {
-          const on = ear.intervalDegrees.has(d);
-          const box = el("button", {
-            style: `flex:1;height:40px;border-radius:8px;border:1px solid var(--line);font-weight:700;cursor:pointer;` +
-              (on ? "background:var(--act);color:var(--on-act, #fff)" : "background:var(--surface2);color:var(--muted, inherit);opacity:0.6"),
-            "aria-pressed": String(on),
-          }, [intervalDegreeLabel(ear.intervalMode, d)]);
-          box.addEventListener("click", () => ear.toggleIntervalDegree(d));
-          boxes.appendChild(box);
-        }
-        parent.appendChild(boxes);
-        parent.appendChild(el("div", { class: "et-muted", style: "font-size:12px" }, [
-          "Descending plays the same degree an octave below the tonic, so every note stays in the key.",
-        ]));
-      }
-      parent.appendChild(labelSm("Direction"));
-      parent.appendChild(chipsRow([IntervalDirection.Ascending, IntervalDirection.Descending, IntervalDirection.Mixed].map((d) =>
-        chip(d, ear.intervalDirection === d, () => ear.setIntervalDirection(d)))));
-      parent.appendChild(labelSm("Playback"));
-      parent.appendChild(chipsRow([
-        chip("Melodic (one after the other)", !ear.intervalHarmonic, () => ear.setIntervalHarmonic(false)),
-        chip("Harmonic (together)", ear.intervalHarmonic, () => ear.setIntervalHarmonic(true)),
-      ]));
-      parent.appendChild(labelSm("Key"));
-      parent.appendChild(chipsRow([
-        chip("New random key each question", ear.intervalRandomKey, () => ear.setIntervalRandomKey(true)),
-        chip("Fixed key", !ear.intervalRandomKey, () => ear.setIntervalRandomKey(false)),
-      ]));
-      if (!ear.intervalRandomKey) {
-        parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:8px" }, [
-          el("span", { class: "ans-label" }, [`Key: ${keyName}`]),
-          btn("♭", () => ear.intervalTranspose(-1)),
-          btn("♯", () => ear.intervalTranspose(1)),
-          el("span", { class: "et-muted" }, [transposeLabel(ear.intervalTransposeSteps)]),
-        ]));
-      }
-      parent.appendChild(el("div", { class: "v-gap-12" }));
+      parent.appendChild(el("div", { class: "v-gap-8" }));
       parent.appendChild(el("div", { class: "et-row-gap" }, [
         btn("Start challenge ▶", () => ear.startIntervalChallenge(), "btn primary"),
-        btn("♪ Song refs", () => { this.intervalRefsOpen = true; this.intervalOverlayScroll = 0; this.rerender(); }),
+        btn("♪ Song refs", openRefs),
       ]));
+      this.intervalSettings(parent, keyName);
       return;
     }
+    const openSettings = () => { this.intervalSettingsOpen = true; this.intervalOverlayScroll = 0; this.rerender(); };
     if (ear.intervalChIndex >= ear.intervalChallengeTotal) {
       this.simpleDone(parent, ear.intervalChScore, ear.intervalChallengeTotal,
         () => ear.startIntervalChallenge(), () => ear.exitIntervalChallenge());
+      parent.appendChild(el("div", { class: "row", style: "justify-content:center" }, [btn("⚙ Settings", openSettings)]));
       return;
     }
-    this.challengeHeader(parent, `Q ${ear.intervalChIndex + 1} / ${ear.intervalChallengeTotal}`, `Score: ${ear.intervalChScore}`,
-      () => ear.startIntervalChallenge(), () => ear.exitIntervalChallenge());
+    parent.appendChild(el("div", { class: "row" }, [
+      el("div", { style: "font-weight:600" }, [`Q ${ear.intervalChIndex + 1} / ${ear.intervalChallengeTotal}`]),
+      el("div", { style: "flex:1;color:var(--act);font-weight:600;margin-left:10px" }, [`Score: ${ear.intervalChScore}`]),
+      btn("⚙", openSettings, "btn text"),
+      btn("Restart", () => ear.startIntervalChallenge(), "btn text"),
+      btn("Quit", () => ear.exitIntervalChallenge(), "btn text"),
+    ]));
     const replay = btn("Replay ▶", () => ear.playIntervalQuestion(), "btn primary");
     if (ear.intervalPlaying) replay.disabled = true;
     parent.appendChild(el("div", { class: "et-muted", style: "font-size:12px" }, [`Key: ${keyName}`]));
@@ -2089,16 +2115,9 @@ export class EarTrainingUI {
       btn("♪ Tonic", () => ear.playIntervalTonic()),
       btn("♪ Note", () => ear.playIntervalTarget()),
       btn("♪ Together", () => ear.playIntervalTogether()),
-      btn("Hear I–V–I", () => ear.playIntervalTonicCadence()),
-      btn("♭", () => ear.intervalTranspose(-1)),
-      btn("♯", () => ear.intervalTranspose(1)),
-      btn("♪ Song refs", () => { this.intervalRefsOpen = true; this.intervalOverlayScroll = 0; this.rerender(); }),
-      el("span", { class: "et-muted" }, [transposeLabel(ear.intervalTransposeSteps)]),
+      btn("I–V–I", () => ear.playIntervalTonicCadence()),
+      btn("♪ Songs", openRefs),
     ]));
-    parent.appendChild(el("div", { class: "v-gap-8" }));
-    this.intervalFretboardPanel(parent);
-    parent.appendChild(switchRow("New random key each question", null, ear.intervalRandomKey,
-      (v) => ear.setIntervalRandomKey(v)));
     parent.appendChild(labelSm(ear.intervalChAnswered ? "Tap any interval to hear it from this tonic" : "Which interval? (tap = answer)"));
     parent.appendChild(chipsRow(ear.intervalAnswerChoices().map((iv) => {
       const isAnswer = ear.intervalChAnswered && iv.semitones === ear.intervalSemitones;
@@ -2108,8 +2127,8 @@ export class EarTrainingUI {
       if (isWrongPick) { c.style.background = "var(--primary-container)"; c.style.color = "var(--text-primary)"; }
       return c;
     })));
-    parent.appendChild(el("div", { class: "v-gap-8" }));
     if (ear.intervalChAnswered) {
+      parent.appendChild(el("div", { class: "v-gap-8" }));
       const ok = ear.intervalGuess === ear.intervalSemitones;
       // A unison has no direction, so none is printed for it.
       const dir = ear.intervalAscending ? "ascending" : "descending";
@@ -2120,15 +2139,20 @@ export class EarTrainingUI {
       parent.appendChild(el("div", { style: `font-weight:700;color:var(--act)` }, [
         `${ok ? "✔ correct" : `✘ answer: ${choice.longName}`}` + (parts.length ? `  (${parts.join(", ")})` : ""),
       ]));
+      // Songs + Next on one row, right under the chips, so Next needs no scrolling.
+      const next = btn(ear.intervalChIndex === ear.intervalChallengeTotal - 1 ? "See score →" : "Next →",
+        () => ear.advanceIntervalChallenge(), "btn primary");
+      next.style.flex = "1";
+      const row: HTMLElement[] = [];
       if (ear.intervalSemitones > 0) {
-        const songs = btn(`♪ Songs for ${choice.shortName} ${dir}`,
-          () => { this.intervalSongsFor = ear.intervalSemitones; this.intervalOverlayScroll = 0; this.rerender(); });
-        songs.style.margin = "6px 0";
-        parent.appendChild(songs);
+        row.push(btn(`♪ Songs for ${choice.shortName} ${ear.intervalAscending ? "↑" : "↓"}`,
+          () => { this.intervalSongsFor = ear.intervalSemitones; this.intervalOverlayScroll = 0; this.rerender(); }));
       }
-      parent.appendChild(btn(ear.intervalChIndex === ear.intervalChallengeTotal - 1 ? "See score →" : "Next →",
-        () => ear.advanceIntervalChallenge(), "btn primary"));
+      row.push(next);
+      parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:6px" }, row));
     }
+    // Try it by hand: every tonic on the neck is marked (toggle in ⚙).
+    if (ear.intervalShowFretboard) this.intervalFretboardPanel(parent);
   }
 
   // ---------- Drill (mistake repetition) ----------
@@ -2367,9 +2391,6 @@ export class EarTrainingUI {
   /** Try-it-yourself fretboard for the interval trainer: every tonic marked, any fret playable. */
   private intervalFretboardPanel(parent: HTMLElement): void {
     const ear = this.ear, s = this.state;
-    parent.appendChild(switchRow("Show fretboard (tonic marked)", null, ear.intervalShowFretboard,
-      (v) => ear.setIntervalShowFretboard(v)));
-    if (!ear.intervalShowFretboard) return;
     if (!this.fbCanvasEl) {
       this.fbCanvasEl = el("canvas", { class: "fretboard" });
       this.fb = new FretboardCanvas(this.fbCanvasEl);
@@ -2410,7 +2431,32 @@ export class EarTrainingUI {
         el("div", { style: "font-weight:700;font-size:16px;flex:1" }, [`Songs: ${intervalChoiceFor(semitones).longName}`]),
         btn("Close", close, "btn text"),
       ]),
-      intervalSongsContent(this.ear, () => this.rerender(), semitones, this.ear.intervalAscending),
+      intervalSongsContent(this.ear, () => this.rerender(), semitones, this.ear.intervalAscending,
+        this.ear.intervalChActive ? this.ear.intervalTonicMidi() : null),
+    ]);
+    const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:50" }, [body]);
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) close(); });
+    return scrim;
+  }
+
+  /** In-challenge ⚙ overlay: change any setting mid-drill. It applies from the next
+   *  question, or restart at once with it. */
+  private intervalSettingsOverlay(): HTMLElement {
+    const ear = this.ear;
+    const close = () => { this.intervalSettingsOpen = false; this.rerender(); };
+    const keyName = `${spellPc(ear.intervalKey)} ${ear.intervalKeyMode === TrainingMode.Major ? "major" : "minor"}`;
+    const settings = el("div");
+    this.intervalSettings(settings, keyName);
+    const body = this.intervalOverlayCard([
+      el("div", { style: "display:flex;align-items:baseline;gap:8px;margin-bottom:4px" }, [
+        el("div", { style: "font-weight:700;font-size:16px;flex:1" }, ["Interval settings"]),
+        btn("Continue", close, "btn text"),
+      ]),
+      el("div", { class: "et-muted", style: "font-size:12px" }, ["Changes apply from the next question."]),
+      settings,
+      el("div", { class: "row", style: "justify-content:flex-end;gap:8px;margin-top:10px" }, [
+        btn("Restart with these", () => { this.intervalSettingsOpen = false; ear.startIntervalChallenge(); this.rerender(); }, "btn primary"),
+      ]),
     ]);
     const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:50" }, [body]);
     scrim.addEventListener("click", (e) => { if (e.target === scrim) close(); });
@@ -2424,7 +2470,7 @@ export class EarTrainingUI {
         el("div", { style: "font-weight:700;font-size:16px;flex:1" }, ["Interval song references"]),
         btn("Close", () => { this.intervalRefsOpen = false; this.rerender(); }, "btn text"),
       ]),
-      intervalRefsContent(this.ear, () => this.rerender()),
+      intervalRefsContent(this.ear, () => this.rerender(), this.ear.intervalChActive ? this.ear.intervalTonicMidi() : null),
     ]);
     const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:50" }, [body]);
     scrim.addEventListener("click", (e) => { if (e.target === scrim) { this.intervalRefsOpen = false; this.rerender(); } });

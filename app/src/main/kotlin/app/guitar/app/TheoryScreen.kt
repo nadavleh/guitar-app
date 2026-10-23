@@ -86,11 +86,11 @@ private fun PreviewPlayButton(ear: EarTrainingState, id: String, label: String =
 /** One direction of an interval: ▶ the bare interval, then each song with its own ▶
  *  that plays a few notes of the melody containing the interval. */
 @Composable
-private fun IntervalDirectionBlock(ear: EarTrainingState, r: IntervalSongRef) {
+private fun IntervalDirectionBlock(ear: EarTrainingState, r: IntervalSongRef, anchorMidi: Int?) {
     val dirId = (if (r.ascending) "asc:" else "desc:") + r.interval
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
         PreviewPlayButton(ear, dirId, if (r.ascending) "▶ ↑" else "▶ ↓") {
-            ear.playIntervalPreview(dirId, r.semitones, r.ascending)
+            ear.playIntervalPreview(dirId, r.semitones, r.ascending, baseMidi = anchorMidi ?: 60)
         }
         Spacer(Modifier.width(8.dp))
         Text(if (r.ascending) "Ascending" else "Descending", fontWeight = FontWeight.SemiBold)
@@ -105,7 +105,9 @@ private fun IntervalDirectionBlock(ear: EarTrainingState, r: IntervalSongRef) {
     for ((i, song) in r.songs.withIndex()) {
         val songId = "$dirId:song$i"
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp, top = 2.dp)) {
-            PreviewPlayButton(ear, songId) { ear.playMelodySnippet(songId, song.melody) }
+            PreviewPlayButton(ear, songId) {
+                ear.playMelodySnippet(songId, song.melody, r.semitones, r.ascending, anchorMidi)
+            }
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
                 ExternalSongRow(song.title, song.artist)
@@ -119,7 +121,8 @@ private fun IntervalDirectionBlock(ear: EarTrainingState, r: IntervalSongRef) {
 /** One interval, both directions: name, then ↑ and ↓ blocks ([firstAscending] picks
  *  which comes first — the trainer puts the direction you just heard on top). */
 @Composable
-private fun IntervalCard(ear: EarTrainingState, semitones: Int, firstAscending: Boolean = true) {
+private fun IntervalCard(ear: EarTrainingState, semitones: Int, firstAscending: Boolean = true,
+                         anchorMidi: Int? = null) {
     val first = IntervalSongs.refFor(semitones, firstAscending) ?: return
     val second = IntervalSongs.refFor(semitones, !firstAscending) ?: return
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
@@ -128,21 +131,25 @@ private fun IntervalCard(ear: EarTrainingState, semitones: Int, firstAscending: 
                 modifier = Modifier.width(34.dp))
             Text(first.intervalLong, fontWeight = FontWeight.Bold)
         }
-        IntervalDirectionBlock(ear, first)
-        IntervalDirectionBlock(ear, second)
+        IntervalDirectionBlock(ear, first, anchorMidi)
+        IntervalDirectionBlock(ear, second, anchorMidi)
         HorizontalDivider(modifier = Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
-/** The interval-reference block, shared by the Theory tab and the interval trainer's dialog. */
+/** The interval-reference block, shared by the Theory tab and the interval trainer's dialog.
+ *  With [anchorMidi] (the trainer's tonic) everything plays from that note instead of C4,
+ *  and each song's leap starts on it. */
 @Composable
-internal fun IntervalRefsContent(ear: EarTrainingState) {
-    Text("▶ ↑ / ▶ ↓ play the bare interval (from C4): the two notes in turn, then together. " +
+internal fun IntervalRefsContent(ear: EarTrainingState, anchorMidi: Int? = null) {
+    Text("▶ ↑ / ▶ ↓ play the bare interval (from " +
+        (if (anchorMidi == null) "C4" else "this question's tonic") +
+        "): the two notes in turn, then together. " +
         "The ▶ beside a song plays a few notes of its melody that contain the interval; " +
         "YouTube/Spotify open the real recording.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(4.dp))
-    for (st in 1..12) IntervalCard(ear, st)
+    for (st in 1..12) IntervalCard(ear, st, anchorMidi = anchorMidi)
     Spacer(Modifier.height(8.dp))
     Text(IntervalSongs.COMPLEMENT_NOTE, style = MaterialTheme.typography.bodySmall,
         fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -150,28 +157,33 @@ internal fun IntervalRefsContent(ear: EarTrainingState) {
 
 /** The trainer's post-answer "♪ Songs for …" dialog: one interval, heard direction first. */
 @Composable
-internal fun IntervalSongsDialog(ear: EarTrainingState, semitones: Int, ascending: Boolean, onDismiss: () -> Unit) {
+internal fun IntervalSongsDialog(ear: EarTrainingState, semitones: Int, ascending: Boolean,
+                                 anchorMidi: Int? = null, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = { ear.stopIntervalPreview(); onDismiss() },
         confirmButton = { TextButton(onClick = { ear.stopIntervalPreview(); onDismiss() }) { Text("Close") } },
         title = { Text("Songs: ${IntervalSongs.refFor(semitones, ascending)?.intervalLong ?: ""}") },
         text = {
             Column(modifier = Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
-                IntervalCard(ear, semitones, firstAscending = ascending)
+                if (anchorMidi != null) {
+                    Text("Played from this question's tonic, so each song's leap is the one you just heard.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IntervalCard(ear, semitones, firstAscending = ascending, anchorMidi = anchorMidi)
             }
         },
     )
 }
 
 @Composable
-internal fun IntervalRefsDialog(ear: EarTrainingState, onDismiss: () -> Unit) {
+internal fun IntervalRefsDialog(ear: EarTrainingState, anchorMidi: Int? = null, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = { ear.stopIntervalPreview(); onDismiss() },
         confirmButton = { TextButton(onClick = { ear.stopIntervalPreview(); onDismiss() }) { Text("Close") } },
         title = { Text("Interval song references") },
         text = {
             Column(modifier = Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
-                IntervalRefsContent(ear)
+                IntervalRefsContent(ear, anchorMidi)
             }
         },
     )

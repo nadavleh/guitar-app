@@ -20,7 +20,7 @@ import {
   inversionCount, inversionMidis,
   pickMinMovement, defaultRng,
   IntervalDirection, INTERVAL_CHOICES, intervalTargetMidi, IntervalChoice, IntervalSource,
-  melodyNotes, INTERVAL_EIGHTH_MS,
+  melodyNotes, melodyNotesAnchored, INTERVAL_EIGHTH_MS,
   INTERVAL_DEGREES, diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalChoiceFor,
   randomOtherKey, drawAvoiding,
 } from "../theory";
@@ -2147,7 +2147,14 @@ export class EarTrainingState {
   intervalKey: PitchClass = 0;
   /** Net semitones the interval key has been transposed from C. */
   intervalTransposeSteps = 0;
-  intervalDirection = IntervalDirection.Ascending;
+  intervalDirection = IntervalDirection.Descending;
+  /** Play the I–V–I cadence before the first question and on every key change. Off by
+   *  default: a bare tonic is enough reference for interval work. */
+  intervalCadence = false;
+  setIntervalCadence(v: boolean) { this.intervalCadence = v; this.notify(); }
+  /** Chromatic draw may ask a unison (off by default — it is a giveaway). */
+  intervalIncludeUnison = false;
+  setIntervalIncludeUnison(v: boolean) { this.intervalIncludeUnison = v; this.notify(); }
   intervalChActive = false;
   intervalChIndex = 0;
   intervalChScore = 0;
@@ -2158,7 +2165,7 @@ export class EarTrainingState {
   intervalPlaying = false;
   private intervalToken = 0;
 
-  private intervalTonicMidi(): number { return 60 + (((this.intervalKey + 6) % 12) - 6); }
+  intervalTonicMidi(): number { return 60 + (((this.intervalKey + 6) % 12) - 6); }
 
   setIntervalDirection(d: IntervalDirection) { this.intervalDirection = d; this.notify(); }
   /** Draw from the key's scale degrees (default) or from all 13 chromatic intervals. */
@@ -2167,8 +2174,8 @@ export class EarTrainingState {
   /** Scale the diatonic draw uses — also picks the I–V–I vs i–V–i cadence. */
   intervalMode = TrainingMode.Major;
   setIntervalMode(m: TrainingMode) { this.intervalMode = m; this.notify(); }
-  /** Target degrees the diatonic draw may pick (1..8); all on by default. */
-  intervalDegrees = new Set<number>(INTERVAL_DEGREES);
+  /** Target degrees the diatonic draw may pick (1..8); all but 1 (the unison) by default. */
+  intervalDegrees = new Set<number>(INTERVAL_DEGREES.filter((d) => d !== 1));
   /** Show a fretboard under the question with every tonic marked, to try it by hand. */
   intervalShowFretboard = false;
   setIntervalShowFretboard(v: boolean) { this.intervalShowFretboard = v; this.notify(); }
@@ -2190,7 +2197,8 @@ export class EarTrainingState {
 
   /** The answer chips: every chromatic interval, or only what the diatonic draw can produce. */
   intervalAnswerChoices(): IntervalChoice[] {
-    if (this.intervalSource === IntervalSource.Chromatic) return INTERVAL_CHOICES;
+    if (this.intervalSource === IntervalSource.Chromatic)
+      return INTERVAL_CHOICES.filter((c) => this.intervalIncludeUnison || c.semitones > 0);
     return diatonicIntervalAnswerSet(this.intervalMode, this.intervalDegrees, this.intervalDirection)
       .map((st) => intervalChoiceFor(st));
   }
@@ -2257,7 +2265,8 @@ export class EarTrainingState {
     this.intervalKey = ((this.intervalKey + n) % 12 + 12) % 12;
     this.intervalTransposeSteps += n;
     this.notify();
-    if (this.intervalChActive) this.playIntervalTonicCadence();
+    if (!this.intervalChActive) return;
+    if (this.intervalCadence) this.playIntervalTonicCadence(); else this.playIntervalQuestion();
   }
 
   playIntervalTonicCadence() {
@@ -2296,7 +2305,9 @@ export class EarTrainingState {
 
   /** Play a song's few-note melody snippet (see `melodyNotes`); shares the ▶/■ state
    *  with `playIntervalPreview`, so starting one stops the other. */
-  playMelodySnippet(id: string, melody: string) {
+  /** With `anchorMidi`, the snippet's leap of `semitones` (`ascending`) starts on that
+   *  note — the trainer plays songs on the pitches of the question just asked. */
+  playMelodySnippet(id: string, melody: string, semitones = 0, ascending = true, anchorMidi: number | null = null) {
     this.intervalPreviewToken++;
     const token = this.intervalPreviewToken;
     this.intervalPreviewId = id;
@@ -2304,7 +2315,9 @@ export class EarTrainingState {
     void (async () => {
       const live = () => token === this.intervalPreviewToken;
       this.deps.audio.chokeChords();
-      for (const n of melodyNotes(melody)) {
+      const notes = anchorMidi === null ? melodyNotes(melody)
+        : melodyNotesAnchored(melody, semitones, ascending, anchorMidi);
+      for (const n of notes) {
         if (!live()) return;
         const ms = n.eighths * INTERVAL_EIGHTH_MS;
         // Gated just short of the next onset: detached, dry, no ring-over.
@@ -2318,13 +2331,15 @@ export class EarTrainingState {
     })();
   }
 
-  playIntervalPreview(id: string, semitones: number, ascending: boolean) {
+  /** `baseMidi` is the reference note: C4 on the Theory tab, the question's tonic in
+   *  the trainer's overlays. */
+  playIntervalPreview(id: string, semitones: number, ascending: boolean, baseMidi = 60) {
     this.intervalPreviewToken++;
     const token = this.intervalPreviewToken;
     this.intervalPreviewId = id;
     this.notify();
     void (async () => {
-      const base = 60;                                    // C4
+      const base = baseMidi;
       const target = ascending ? base + semitones : base - semitones;
       const live = () => token === this.intervalPreviewToken;
       this.deps.audio.chokeChords();   // start of a phrase
@@ -2368,7 +2383,8 @@ export class EarTrainingState {
         const degree = pool[this.rng.int(pool.length)];
         return { up, st: diatonicIntervalSemitones(this.intervalMode, degree, up), degree };
       }
-      return { up, st: this.rng.int(INTERVAL_CHOICES.length), degree: null };   // 0..12
+      const lo = this.intervalIncludeUnison ? 0 : 1;
+      return { up, st: lo + this.rng.int(INTERVAL_CHOICES.length - lo), degree: null };   // lo..12
     });
     this.intervalAscending = d.up;
     this.intervalSemitones = d.st;
@@ -2383,12 +2399,14 @@ export class EarTrainingState {
     this.intervalChActive = true; this.intervalChIndex = 0; this.intervalChScore = 0;
     this.markChallengeStart("intervals");
     this.drawIntervalQuestion();
-    // Anchor the key, then sound the first interval after the cadence.
+    // Anchor the key (when the cadence is on), then sound the first interval.
     this.launchIntervalSound(async (live) => {
-      if (!(await this.playIntervalCadenceInline(this.intervalToken))) return;
-      await sleep(300);
-      if (!live()) return;
-      this.deps.audio.chokeChords();   // the anchoring cadence must stop before the question
+      if (this.intervalCadence) {
+        if (!(await this.playIntervalCadenceInline(this.intervalToken))) return;
+        await sleep(300);
+        if (!live()) return;
+        this.deps.audio.chokeChords();   // the anchoring cadence must stop before the question
+      }
       await this.soundInterval(this.intervalTonicMidi(), this.intervalTargetMidiFor(), this.intervalHarmonic, live);
     });
   }
@@ -2415,7 +2433,7 @@ export class EarTrainingState {
     // A new key in diatonic mode is re-anchored by its cadence; a chromatic interval
     // needs no key, so it sounds straight away.
     this.launchIntervalSound(async (live) => {
-      if (keyChanged && this.intervalSource === IntervalSource.Diatonic) {
+      if (this.intervalCadence && keyChanged && this.intervalSource === IntervalSource.Diatonic) {
         if (!(await this.playIntervalCadenceInline(this.intervalToken))) return;
         await sleep(300);
         if (!live()) return;

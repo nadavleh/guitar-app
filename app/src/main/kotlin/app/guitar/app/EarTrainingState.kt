@@ -2480,13 +2480,18 @@ class EarTrainingState(
     /** Net semitones the interval key has been transposed from C (0 = C). */
     var intervalTransposeSteps by mutableStateOf(0)
         private set
-    var intervalDirection by mutableStateOf(IntervalDirection.Ascending)
+    var intervalDirection by mutableStateOf(IntervalDirection.Descending)
+    /** Play the I–V–I cadence before the first question and on every key change. Off by
+     *  default: a bare tonic is enough reference for interval work. */
+    var intervalCadence by mutableStateOf(false)
+    /** Chromatic draw may ask a unison (off by default — it is a giveaway). */
+    var intervalIncludeUnison by mutableStateOf(false)
     /** Draw from the key's scale degrees (default) or from all 13 chromatic intervals. */
     var intervalSource by mutableStateOf(IntervalSource.Diatonic)
     /** Scale the diatonic draw uses — also picks the I–V–I vs i–V–i cadence. */
     var intervalMode by mutableStateOf(TrainingMode.Major)
-    /** Target degrees the diatonic draw may pick (1..8); all on by default. */
-    var intervalDegrees by mutableStateOf(IntervalTrainer.DEGREES.toSet())
+    /** Target degrees the diatonic draw may pick (1..8); all but 1 (the unison) by default. */
+    var intervalDegrees by mutableStateOf(IntervalTrainer.DEGREES.toSet() - 1)
         private set
     /** Show a fretboard under the question with every tonic marked, to try it by hand. */
     var intervalShowFretboard by mutableStateOf(false)
@@ -2507,7 +2512,8 @@ class EarTrainingState(
 
     /** The answer chips: every chromatic interval, or only what the diatonic draw can produce. */
     fun intervalAnswerChoices(): List<IntervalChoice> =
-        if (intervalSource == IntervalSource.Chromatic) IntervalTrainer.INTERVALS
+        if (intervalSource == IntervalSource.Chromatic)
+            IntervalTrainer.INTERVALS.filter { intervalIncludeUnison || it.semitones > 0 }
         else IntervalTrainer.diatonicAnswerSet(intervalMode, intervalDegrees, intervalDirection)
             .map { IntervalTrainer.choiceFor(it) }
     /** Harmonic mode: sound tonic + target TOGETHER (else melodic: one after the other). */
@@ -2534,12 +2540,13 @@ class EarTrainingState(
 
     /** Tonic MIDI for the current key, anchored near C4 so intervals stay audible
      *  in both directions. */
-    private fun intervalTonicMidi(): Int = 60 + ((intervalKey.value + 6) % 12 - 6)
+    fun intervalTonicMidi(): Int = 60 + ((intervalKey.value + 6) % 12 - 6)
 
     fun intervalTranspose(n: Int) {
         intervalKey = PitchClass(((intervalKey.value + n) % 12 + 12) % 12)
         intervalTransposeSteps += n
-        if (intervalChActive) playIntervalTonicCadence()
+        if (!intervalChActive) return
+        if (intervalCadence) playIntervalTonicCadence() else playIntervalQuestion()
     }
 
     /** I–V–I in major, i–V–i (harmonic-minor dominant) in minor. */
@@ -2570,13 +2577,15 @@ class EarTrainingState(
         private set
     private var intervalPreviewJob: Job? = null
 
-    fun playIntervalPreview(id: String, semitones: Int, ascending: Boolean) {
+    /** [baseMidi] is the reference note: C4 on the Theory tab, the question's tonic in
+     *  the trainer's dialogs. */
+    fun playIntervalPreview(id: String, semitones: Int, ascending: Boolean, baseMidi: Int = 60) {
         intervalPreviewJob?.cancel()
         intervalPreviewId = id
         intervalPreviewJob = scope.launch {
             try {
                 audio.chokeChords()   // start of a phrase; the notes inside it may overlap
-                val base = 60                                   // C4
+                val base = baseMidi
                 val target = if (ascending) base + semitones else base - semitones
                 soundInterval(base, target, harmonic = false)
                 delay(150)
@@ -2589,13 +2598,18 @@ class EarTrainingState(
 
     /** Play a song's few-note [melody] snippet (see [IntervalSongs.melodyNotes]); shares the
      *  ▶/■ state with [playIntervalPreview], so starting one stops the other. */
-    fun playMelodySnippet(id: String, melody: String) {
+    /** With [anchorMidi], the snippet's leap of [semitones] ([ascending]) starts on that
+     *  note — the trainer plays songs on the pitches of the question just asked. */
+    fun playMelodySnippet(id: String, melody: String, semitones: Int = 0, ascending: Boolean = true,
+                          anchorMidi: Int? = null) {
         intervalPreviewJob?.cancel()
         intervalPreviewId = id
         intervalPreviewJob = scope.launch {
             try {
                 audio.chokeChords()
-                for (n in IntervalSongs.melodyNotes(melody)) {
+                val notes = if (anchorMidi == null) IntervalSongs.melodyNotes(melody)
+                    else IntervalSongs.melodyNotesAnchored(melody, semitones, ascending, anchorMidi)
+                for (n in notes) {
                     val ms = (n.eighths * IntervalSongs.EIGHTH_MS).toLong()
                     // Gated just short of the next onset: detached, dry, no ring-over.
                     audio.playNote(n.midi, durationMillis = (ms * 0.9).toInt().coerceAtLeast(60), timbre = Timbre.Soft)
@@ -2684,7 +2698,8 @@ class EarTrainingState(
                 val degree = pool[rng.nextInt(pool.size)]
                 IntervalDraw(up, IntervalTrainer.diatonicSemitones(intervalMode, degree, up), degree)
             } else {
-                IntervalDraw(up, rng.nextInt(IntervalTrainer.INTERVALS.size), null)   // 0..12
+                val lo = if (intervalIncludeUnison) 0 else 1
+                IntervalDraw(up, lo + rng.nextInt(IntervalTrainer.INTERVALS.size - lo), null)   // lo..12
             }
         }
         intervalAscending = d.ascending
@@ -2700,11 +2715,13 @@ class EarTrainingState(
         intervalChActive = true; intervalChIndex = 0; intervalChScore = 0
         markChallengeStart("intervals")
         drawIntervalQuestion()
-        // Anchor the key, then sound the first interval after the cadence.
+        // Anchor the key (when the cadence is on), then sound the first interval.
         launchIntervalSound {
-            playIntervalCadenceInline()
-            delay(300)
-            audio.chokeChords()   // the anchoring cadence must stop before the question
+            if (intervalCadence) {
+                playIntervalCadenceInline()
+                delay(300)
+                audio.chokeChords()   // the anchoring cadence must stop before the question
+            }
             soundInterval(intervalTonicMidi(), intervalTargetMidi(), intervalHarmonic)
         }
     }
@@ -2737,7 +2754,7 @@ class EarTrainingState(
         // A new key in diatonic mode is re-anchored by its cadence; a chromatic interval
         // needs no key, so it sounds straight away.
         launchIntervalSound {
-            if (keyChanged && intervalSource == IntervalSource.Diatonic) {
+            if (intervalCadence && keyChanged && intervalSource == IntervalSource.Diatonic) {
                 playIntervalCadenceInline()
                 delay(300)
                 audio.chokeChords()
