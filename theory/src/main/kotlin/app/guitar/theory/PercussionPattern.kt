@@ -466,7 +466,20 @@ object PercussionBuiltins {
             "bongo=0,2,3,0,1,-,1,-,0,2,3,0,1,-,1,-",
     )
 
-    /** Son 3:2 — Nadav's chart, 2 bars of 4/4 in eighths. Clave 3-side (1, 2&, 4) then
+    /** Son v1 (2:3) — Nadav's second chart, 2 bars of 4/4 in eighths. Clave 2-side
+     *  (2, 3) then 3-side (1, 2&, 4); conga tumbao on every eighth (H = heel → mute ◐,
+     *  T = toe → tip ·, S = slap, Hi = open on the conga), with bar 2 reaching over to
+     *  open tones on the tumba on 2& and 3 (Lo); timbales cáscara, the standard
+     *  3:2 shell pattern phrased to this 2:3 clave (2-side 1 2 3 3& 4&, 3-side 1 2 2& 3& 4&). */
+    val SON_V1: PercussionPattern = builtin(
+        "M:2,4,4,8;" +
+            "claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,0,-" + "|" +
+            "timbales%60=2,-,2,-,2,2,-,2,2,-,2,2,-,2,-,2" + "|" +
+            "conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0" + "|" +
+            "tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-",
+    )
+
+    /** Son v2 (3:2) — Nadav's chart, 2 bars of 4/4 in eighths. Clave 3-side (1, 2&, 4) then
      *  2-side (2, 3); timbales cáscara; conga tumbao (H = heel → mute ◐, T = toe →
      *  tip ·, S = slap, Hi = open on the conga, Lo = open on the tumba, bar 2's 4&);
      *  bongo martillo (t = thumb → hi ▲, m = finger → rim ◇, S = slap, O = open → lo ▼). */
@@ -712,7 +725,8 @@ object PercussionBuiltins {
         BuiltinPattern("Forró (Bongo)", FORRO, bpm = 95),
         BuiltinPattern("Xaxado (Bongo)", XAXADO, bpm = 100),
         BuiltinPattern("Arrasta-pé (Bongo)", ARRASTA_PE, bpm = 100),
-        BuiltinPattern("Son 3:2", SON_3_2, bpm = 100),
+        BuiltinPattern("Son v1 (2:3)", SON_V1, bpm = 100),
+        BuiltinPattern("Son v2 (3:2)", SON_3_2, bpm = 100),
     )
 }
 

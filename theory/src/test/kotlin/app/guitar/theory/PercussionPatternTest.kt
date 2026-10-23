@@ -143,7 +143,7 @@ class PercussionPatternTest {
     }
 
     @Test fun `built-in grooves decode, are non-empty, and round-trip`() {
-        assertEquals(13, PercussionBuiltins.ALL.size)
+        assertEquals(14, PercussionBuiltins.ALL.size)
         for ((name, pat) in PercussionBuiltins.ALL) {
             assertTrue(!pat.isEmpty(), "$name is empty")
             assertEquals(16, pat.slots, "$name should be the default 16-slot meter")
@@ -159,11 +159,22 @@ class PercussionPatternTest {
 
     /** Son 3:2 — the clave is 3-side (1, 2&, 4) then 2-side (2, 3), in 4/4 eighths. */
     @Test fun `son 3-2 clave sits on the 3-2 son clave slots`() {
-        val b = PercussionBuiltins.ALL.first { it.name == "Son 3:2" }
+        val b = PercussionBuiltins.ALL.first { it.name == "Son v2 (3:2)" }
         val claves = PercussionCatalog.byId("claves")!!
         val hits = (0 until b.pattern.slots).filter { b.pattern.voiceAt(claves, it) != null }
         assertEquals(listOf(0, 3, 6, 10, 12), hits)
         assertEquals(PercussionMeter(2, 4, 4, 8), b.pattern.meter)
+    }
+
+    /** Son v1 — the 2:3 chart: clave 2-side (2, 3) then 3-side (1, 2&, 4), tumba on
+     *  bar 2's 2& and 3. Pinned here and in chorect-web/test/verify.ts. */
+    @Test fun `son v1 is the 2-3 chart, exactly`() {
+        val b = PercussionBuiltins.ALL.first { it.name == "Son v1 (2:3)" }
+        assertEquals(100, b.bpm)
+        assertEquals(
+            "M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,0,-|timbales%60=2,-,2,-,2,2,-,2,2,-,2,2,-,2,-,2|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-",
+            b.pattern.encode(),
+        )
     }
 
     /** Nadav's Casa 2 export, the one groove with NO SURDO: two tamborims, the

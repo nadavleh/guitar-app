@@ -565,7 +565,20 @@ export const ARRASTA_PE = builtin(
   "bongo=0,2,3,0,1,-,1,-,0,2,3,0,1,-,1,-",
 );
 
-/** Son 3:2 — Nadav's chart, 2 bars of 4/4 in eighths. Clave 3-side (1, 2&, 4) then
+/** Son v1 (2:3) — Nadav's second chart, 2 bars of 4/4 in eighths. Clave 2-side
+ *  (2, 3) then 3-side (1, 2&, 4); conga tumbao on every eighth (H = heel → mute ◐,
+ *  T = toe → tip ·, S = slap, Hi = open on the conga), with bar 2 reaching over to
+ *  open tones on the tumba on 2& and 3 (Lo); timbales cáscara, the standard
+ *  3:2 shell pattern phrased to this 2:3 clave (2-side 1 2 3 3& 4&, 3-side 1 2 2& 3& 4&). */
+export const SON_V1 = builtin(
+  "M:2,4,4,8;" +
+  "claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,0,-" + "|" +
+  "timbales%60=2,-,2,-,2,2,-,2,2,-,2,2,-,2,-,2" + "|" +
+  "conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0" + "|" +
+  "tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-",
+);
+
+/** Son v2 (3:2) — Nadav's chart, 2 bars of 4/4 in eighths. Clave 3-side (1, 2&, 4) then
  *  2-side (2, 3); timbales cáscara; conga tumbao (H = heel → mute ◐, T = toe →
  *  tip ·, S = slap, Hi = open on the conga, Lo = open on the tumba, bar 2's 4&);
  *  bongo martillo (t = thumb → hi ▲, m = finger → rim ◇, S = slap, O = open → lo ▼). */
@@ -661,7 +674,8 @@ export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "Forró (Bongo)", pattern: FORRO, bpm: 95 },
   { name: "Xaxado (Bongo)", pattern: XAXADO, bpm: 100 },
   { name: "Arrasta-pé (Bongo)", pattern: ARRASTA_PE, bpm: 100 },
-  { name: "Son 3:2", pattern: SON_3_2, bpm: 100 },
+  { name: "Son v1 (2:3)", pattern: SON_V1, bpm: 100 },
+  { name: "Son v2 (3:2)", pattern: SON_3_2, bpm: 100 },
 ];
 
 /** A one-press preset TRACK ("+ Add ▾" → presets, also the phrase "chunks" the
