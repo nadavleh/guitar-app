@@ -569,11 +569,11 @@ export const ARRASTA_PE = builtin(
  *  (2, 3) then 3-side (1, 2&, 4); conga tumbao on every eighth (H = heel → mute ◐,
  *  T = toe → tip ·, S = slap, Hi = open on the conga), with bar 2 reaching over to
  *  open tones on the tumba on 2& and 3 (Lo); timbales cáscara, the standard
- *  3:2 shell pattern phrased to this 2:3 clave (2-side 1 2 3 3& 4&, 3-side 1 2 2& 3& 4&). */
+ *  3:2 shell pattern phrased to this 2:3 clave (2-side 1 2 3 3& 4&, 3-side 1 2 2& 3& 4&; accents per the 2-3 son-clave chart). */
 export const SON_V1 = builtin(
   "M:2,4,4,8;" +
   "claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,0,-" + "|" +
-  "timbales%60=2,-,2,-,2,2,-,2,2,-,2,2,-,2,-,2" + "|" +
+  "timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,2" + "|" +
   "conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0" + "|" +
   "tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-",
 );
