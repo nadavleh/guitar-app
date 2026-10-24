@@ -143,6 +143,8 @@ export const INTERVAL_SONGS_ASCENDING: IntervalSongRef[] = [
   asc("M7", "Major 7th", 11, "inverts to m2 descending", [
     s("Somewhere Over the Rainbow", "Harold Arlen", "1st note to 3rd note: “Some-(where) o-” — up an octave, then down a half step.",
       RAINBOW),
+    s("Take On Me", "a-ha", "“Take on me” — “Take” up to “on” (1 → 7), then “me” lands on the octave.",
+      "0/2 11/2 12/6 0/2 11/2 12/6"),
   ]),
   asc("P8", "Perfect octave", 12, "inverts to unison", [
     s("Somewhere Over the Rainbow", "Harold Arlen", "The octave leap on the very first two notes.",
