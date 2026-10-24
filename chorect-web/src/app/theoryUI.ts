@@ -1,7 +1,7 @@
 import { el, btn, externalSongRow } from "./dom";
 import { EarTrainingState } from "./earTrainingState";
 import {
-  IntervalSongRef, INTERVAL_COMPLEMENT_NOTE, intervalRefFor,
+  IntervalSongRef, intervalRefFor,
 } from "../theory";
 
 /** Theory tab — reference sheets. First section: interval → song lookup
@@ -114,8 +114,7 @@ export function intervalRefsContent(ear: EarTrainingState, rerender: () => void,
     chips.push(b);
   }
   const dirChips = [true, false].map((up) => {
-    const n = intervalRefFor(refSel, up)?.songs.length ?? 0;
-    const b = el("button", { class: up === refUp ? "chip selected" : "chip" }, [`${up ? "↑ Ascending" : "↓ Descending"} · ${n}`]);
+    const b = el("button", { class: up === refUp ? "chip selected" : "chip" }, [up ? "↑ Ascending" : "↓ Descending"]);
     b.addEventListener("click", () => pick(refSel, up));
     return b;
   });
@@ -136,12 +135,6 @@ export function intervalRefsContent(ear: EarTrainingState, rerender: () => void,
       directionBlock(ear, rerender, r, anchorMidi),
     );
   }
-  children.push(
-    el("div", { class: "et-muted", style: "font-size:12px;margin-top:10px" }, [
-      `▶ ↑ / ▶ ↓ play the bare interval (from ${anchorMidi === null ? "C4" : "this question's tonic"}): the two notes in turn, then together. The ▶ beside a song plays a few notes of its melody that contain the interval; YouTube/Spotify open the real recording.`,
-    ]),
-    el("div", { class: "et-muted", style: "font-size:12px;font-style:italic;margin-top:4px" }, [INTERVAL_COMPLEMENT_NOTE]),
-  );
   return el("div", {}, children);
 }
 

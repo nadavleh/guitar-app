@@ -32,7 +32,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.guitar.theory.IntervalSongRef
@@ -170,9 +169,8 @@ internal fun IntervalRefsContent(ear: EarTrainingState, anchorMidi: Int? = null,
     }
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         for (asc in listOf(true, false)) {
-            val n = IntervalSongs.refFor(sel, asc)?.songs?.size ?: 0
             FilterChip(selected = up == asc, onClick = { pick(sel, asc) },
-                label = { Text((if (asc) "↑ Ascending" else "↓ Descending") + " · $n") })
+                label = { Text(if (asc) "↑ Ascending" else "↓ Descending") })
         }
     }
     val r = IntervalSongs.refFor(sel, up) ?: return
@@ -186,16 +184,6 @@ internal fun IntervalRefsContent(ear: EarTrainingState, anchorMidi: Int? = null,
         TextButton(onClick = { pick(if (sel == 12) 1 else sel + 1, up) }) { Text("›") }
     }
     IntervalDirectionBlock(ear, r, anchorMidi)
-    Spacer(Modifier.height(10.dp))
-    Text("▶ ↑ / ▶ ↓ play the bare interval (from " +
-        (if (anchorMidi == null) "C4" else "this question's tonic") +
-        "): the two notes in turn, then together. " +
-        "The ▶ beside a song plays a few notes of its melody that contain the interval; " +
-        "YouTube/Spotify open the real recording.",
-        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Spacer(Modifier.height(4.dp))
-    Text(IntervalSongs.COMPLEMENT_NOTE, style = MaterialTheme.typography.bodySmall,
-        fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 /** The trainer's post-answer "♪ Songs for …" dialog: one interval, heard direction first. */
