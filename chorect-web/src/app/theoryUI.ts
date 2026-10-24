@@ -86,18 +86,63 @@ export function intervalSongsContent(ear: EarTrainingState, rerender: () => void
   ]);
 }
 
+/** Which interval/direction the reference block shows; shared by the Theory tab and
+ *  the trainer overlay, kept across rerenders (Compose: rememberSaveable). */
+let refSel = 1;
+let refUp = true;
+
+/** Preselect an interval (the trainer opens the overlay on the question just asked). */
+export function selectIntervalRef(semitones: number, ascending: boolean): void {
+  refSel = Math.min(12, Math.max(1, semitones));
+  refUp = ascending;
+}
+
 /** The interval-reference block, shared by the Theory tab and the ear-training
- *  interval trainer's overlay. */
+ *  interval trainer's overlay. Master–detail instead of one long list: a 12-chip
+ *  interval picker plus an ↑/↓ toggle select ONE interval in ONE direction, so any
+ *  interval is a single tap away. ‹ › step to the neighbouring interval.
+ *  Mirrors Android IntervalRefsContent. */
 export function intervalRefsContent(ear: EarTrainingState, rerender: () => void, anchorMidi: number | null = null): HTMLElement {
-  const cards: HTMLElement[] = [];
-  for (let st = 1; st <= 12; st++) cards.push(intervalCard(ear, rerender, st, true, anchorMidi));
-  return el("div", {}, [
-    el("div", { class: "et-muted", style: "font-size:12px;margin-bottom:4px" }, [
+  const pick = (st: number, up: boolean) => { ear.stopIntervalPreview(); refSel = st; refUp = up; rerender(); };
+  const chips: HTMLElement[] = [];
+  for (let st = 1; st <= 12; st++) {
+    const r = intervalRefFor(st, refUp);
+    if (!r) continue;
+    const b = el("button", { class: st === refSel ? "chip selected" : "chip", style: "font-weight:700;min-width:44px" }, [r.interval]);
+    b.title = r.intervalLong;
+    b.addEventListener("click", () => pick(st, refUp));
+    chips.push(b);
+  }
+  const dirChips = [true, false].map((up) => {
+    const n = intervalRefFor(refSel, up)?.songs.length ?? 0;
+    const b = el("button", { class: up === refUp ? "chip selected" : "chip" }, [`${up ? "↑ Ascending" : "↓ Descending"} · ${n}`]);
+    b.addEventListener("click", () => pick(refSel, up));
+    return b;
+  });
+  const r = intervalRefFor(refSel, refUp);
+  const children: HTMLElement[] = [
+    el("div", { class: "chip-row" }, chips),
+    el("div", { class: "chip-row", style: "margin-top:6px" }, dirChips),
+  ];
+  if (r) {
+    children.push(
+      el("div", { style: "display:flex;gap:8px;align-items:center;margin-top:8px" }, [
+        btn("‹", () => pick(refSel === 1 ? 12 : refSel - 1, refUp), "btn text"),
+        el("span", { style: "font-weight:700;min-width:32px;color:var(--act)" }, [r.interval]),
+        el("span", { style: "font-weight:700;flex:1" }, [r.intervalLong]),
+        el("span", { class: "et-muted", style: "font-size:12px" }, [`${r.semitones} st`]),
+        btn("›", () => pick(refSel === 12 ? 1 : refSel + 1, refUp), "btn text"),
+      ]),
+      directionBlock(ear, rerender, r, anchorMidi),
+    );
+  }
+  children.push(
+    el("div", { class: "et-muted", style: "font-size:12px;margin-top:10px" }, [
       `▶ ↑ / ▶ ↓ play the bare interval (from ${anchorMidi === null ? "C4" : "this question's tonic"}): the two notes in turn, then together. The ▶ beside a song plays a few notes of its melody that contain the interval; YouTube/Spotify open the real recording.`,
     ]),
-    ...cards,
-    el("div", { class: "et-muted", style: "font-size:12px;font-style:italic;margin-top:8px" }, [INTERVAL_COMPLEMENT_NOTE]),
-  ]);
+    el("div", { class: "et-muted", style: "font-size:12px;font-style:italic;margin-top:4px" }, [INTERVAL_COMPLEMENT_NOTE]),
+  );
+  return el("div", {}, children);
 }
 
 export class TheoryUI {

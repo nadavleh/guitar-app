@@ -11,7 +11,7 @@ import { el, btn, segmented, switchRow, labelSm, songLinkRow, externalSongRow, s
 import { transportDock, toneSheet } from "./transport";
 import { icon } from "./icons";
 import { renderChallengeStatsOverlay } from "./statsOverlay";
-import { intervalRefsContent, intervalSongsContent } from "./theoryUI";
+import { intervalRefsContent, intervalSongsContent, selectIntervalRef } from "./theoryUI";
 import { MarkKind, FretMark } from "./marks";
 import {
   spellPc, noteAt, TrainingMode, ChordTypeLevel, ChordTypeLevelName, PitchClass, decodeMissedTake,
@@ -2080,7 +2080,10 @@ export class EarTrainingUI {
   private intervalsView(parent: HTMLElement): void {
     const ear = this.ear;
     const keyName = `${spellPc(ear.intervalKey)} ${ear.intervalKeyMode === TrainingMode.Major ? "major" : "minor"}`;
-    const openRefs = () => { this.intervalRefsOpen = true; this.intervalOverlayScroll = 0; this.rerender(); };
+    const openRefs = () => {
+      if (ear.intervalChActive) selectIntervalRef(ear.intervalSemitones, ear.intervalAscending);
+      this.intervalRefsOpen = true; this.intervalOverlayScroll = 0; this.rerender();
+    };
     if (!ear.intervalChActive) {
       parent.appendChild(el("div", { class: "et-muted" }, [
         `${ear.intervalChallengeTotal} questions. The tonic and a note sound — tap the interval you hear. The first tap is your answer, and every tap plays that interval so you can compare it with the real one.`,

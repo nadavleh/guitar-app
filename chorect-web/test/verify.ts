@@ -419,7 +419,7 @@ check("diatonic answer set",
   check("interval song lookup", ok);
   const allRefs = [...INTERVAL_SONGS_ASCENDING, ...INTERVAL_SONGS_DESCENDING];
   // Pinned to Kotlin EarTrainingTest: same song count, every snippet sounds its interval.
-  check("interval song count = 37", allRefs.reduce((n, r) => n + r.songs.length, 0) === 37);
+  check("interval song count = 57", allRefs.reduce((n, r) => n + r.songs.length, 0) === 57);
   let melOk = true;
   for (const r of allRefs) for (const sg of r.songs) {
     const notes = melodyNotes(sg.melody);

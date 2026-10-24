@@ -341,7 +341,7 @@ class EarTrainingTest {
     }
 
     @Test fun `song count is pinned (web verify pins the same number)`() {
-        assertEquals(37, (IntervalSongs.ASCENDING + IntervalSongs.DESCENDING).sumOf { it.songs.size })
+        assertEquals(57, (IntervalSongs.ASCENDING + IntervalSongs.DESCENDING).sumOf { it.songs.size })
     }
 
     @Test fun `every song snippet actually sounds its interval in its direction`() {

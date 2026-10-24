@@ -259,6 +259,7 @@ When Loop / Tuner / Ear / Drums is active, the content column to the right of th
 - **Drums** — see §11.
 - **Songs** — see §12.
 - **Guitar practice** (guitar only) — see §13.
+- **Theory** — interval song references (`TheoryScreen.kt` / `theoryUI.ts`; the same block is the interval trainer's "♪ Song refs" dialog). **Master–detail, never one long list:** a wrapping row of 12 interval chips (m2 … P8), an `↑ Ascending · n` / `↓ Descending · n` chip pair (n = song count), then ONE interval in ONE direction: `‹ m2 Minor 2nd 1 st ›` header (‹ › wrap around), the bare-interval ▶, and its songs. From the trainer it opens preselected on the question just asked.
 
 ---
 

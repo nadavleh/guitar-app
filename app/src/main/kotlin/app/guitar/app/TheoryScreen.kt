@@ -1,6 +1,9 @@
 package app.guitar.app
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -21,6 +25,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
@@ -138,10 +147,46 @@ private fun IntervalCard(ear: EarTrainingState, semitones: Int, firstAscending: 
 }
 
 /** The interval-reference block, shared by the Theory tab and the interval trainer's dialog.
+ *  Master–detail instead of one long list: a 12-chip interval picker plus an ↑/↓ toggle
+ *  select ONE interval in ONE direction, so any interval is a single tap away and the
+ *  songs below never push the others off-screen. ‹ › step to the neighbouring interval.
  *  With [anchorMidi] (the trainer's tonic) everything plays from that note instead of C4,
- *  and each song's leap starts on it. */
+ *  and each song's leap starts on it; [initialSemitones]/[initialAscending] preselect
+ *  (the trainer opens on the question just asked). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun IntervalRefsContent(ear: EarTrainingState, anchorMidi: Int? = null) {
+internal fun IntervalRefsContent(ear: EarTrainingState, anchorMidi: Int? = null,
+                                 initialSemitones: Int = 1, initialAscending: Boolean = true) {
+    var sel by rememberSaveable { mutableIntStateOf(initialSemitones.coerceIn(1, 12)) }
+    var up by rememberSaveable { mutableStateOf(initialAscending) }
+    fun pick(st: Int, asc: Boolean) { ear.stopIntervalPreview(); sel = st; up = asc }
+
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        for (st in 1..12) {
+            val r = IntervalSongs.refFor(st, up) ?: continue
+            FilterChip(selected = st == sel, onClick = { pick(st, up) },
+                label = { Text(r.interval, fontWeight = FontWeight.Bold) })
+        }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for (asc in listOf(true, false)) {
+            val n = IntervalSongs.refFor(sel, asc)?.songs?.size ?: 0
+            FilterChip(selected = up == asc, onClick = { pick(sel, asc) },
+                label = { Text((if (asc) "↑ Ascending" else "↓ Descending") + " · $n") })
+        }
+    }
+    val r = IntervalSongs.refFor(sel, up) ?: return
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        TextButton(onClick = { pick(if (sel == 1) 12 else sel - 1, up) }) { Text("‹") }
+        Text(r.interval, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.width(34.dp))
+        Text(r.intervalLong, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text("${r.semitones} st", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(onClick = { pick(if (sel == 12) 1 else sel + 1, up) }) { Text("›") }
+    }
+    IntervalDirectionBlock(ear, r, anchorMidi)
+    Spacer(Modifier.height(10.dp))
     Text("▶ ↑ / ▶ ↓ play the bare interval (from " +
         (if (anchorMidi == null) "C4" else "this question's tonic") +
         "): the two notes in turn, then together. " +
@@ -149,8 +194,6 @@ internal fun IntervalRefsContent(ear: EarTrainingState, anchorMidi: Int? = null)
         "YouTube/Spotify open the real recording.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(4.dp))
-    for (st in 1..12) IntervalCard(ear, st, anchorMidi = anchorMidi)
-    Spacer(Modifier.height(8.dp))
     Text(IntervalSongs.COMPLEMENT_NOTE, style = MaterialTheme.typography.bodySmall,
         fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
@@ -176,14 +219,16 @@ internal fun IntervalSongsDialog(ear: EarTrainingState, semitones: Int, ascendin
 }
 
 @Composable
-internal fun IntervalRefsDialog(ear: EarTrainingState, anchorMidi: Int? = null, onDismiss: () -> Unit) {
+internal fun IntervalRefsDialog(ear: EarTrainingState, anchorMidi: Int? = null,
+                                initialSemitones: Int = 1, initialAscending: Boolean = true,
+                                onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = { ear.stopIntervalPreview(); onDismiss() },
         confirmButton = { TextButton(onClick = { ear.stopIntervalPreview(); onDismiss() }) { Text("Close") } },
         title = { Text("Interval song references") },
         text = {
             Column(modifier = Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
-                IntervalRefsContent(ear, anchorMidi)
+                IntervalRefsContent(ear, anchorMidi, initialSemitones, initialAscending)
             }
         },
     )
