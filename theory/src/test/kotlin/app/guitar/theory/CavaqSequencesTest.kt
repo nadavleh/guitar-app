@@ -21,6 +21,9 @@ class CavaqSequencesTest {
             CavaqSequences.byId("sou_mais_o_samba_b")!!.prog.resolve(PitchClass.C).map { it.symbol })
         assertEquals(listOf("quadradinho_maj", "sou_mais_o_samba_a", "sou_mais_o_samba_b"),
             CavaqSequences.ALL.take(3).map { it.id })
+        assertEquals(PitchClass.C, CavaqSequences.byId("sou_mais_o_samba_a")!!.defaultKey)
+        assertEquals(PitchClass.C, CavaqSequences.byId("sou_mais_o_samba_b")!!.defaultKey)
+        assertEquals(null, CavaqSequences.byId("quadradinho_maj")!!.defaultKey)
     }
 
     @Test fun `basic minor resolves to Cm C7 Fm G7 in C`() {

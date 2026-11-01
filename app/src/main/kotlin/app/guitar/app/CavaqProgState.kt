@@ -123,6 +123,7 @@ class CavaqProgState(
         if (id == sequenceId) return
         sequenceId = id
         positionIndex = 0
+        sequence.defaultKey?.let { chooseKey(it) }
         resetPreview()
     }
 

@@ -133,6 +133,8 @@ export class CavaqProgState {
     if (id === this.sequenceId) return;
     this.sequenceId = id;
     this.positionIndex = 0;
+    const dk = this.sequence.defaultKey;
+    if (dk !== undefined) this.chooseKey(dk);
     this.resetPreview();
     this.notify();
   }

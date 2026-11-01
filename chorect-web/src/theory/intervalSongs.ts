@@ -207,25 +207,22 @@ export const INTERVAL_SONGS_DESCENDING: IntervalSongRef[] = [
   desc("P5", "Perfect 5th", 7, "inverts to P4 ascending", [
     s("Game of Thrones — main theme", "Ramin Djawadi", "The prominent descending-fifth gesture of the theme.",
       "0/2 -7/2 -4/1 -2/1 0/2 -7/2 -4/1 -2/1 0/2 -7/2 -4/1 -2/1"),
+    s("Sweet Caroline", "Neil Diamond", "“Sweet Caroline…” then the horns’ “bah, bah, bah” — the 2nd hit drops a perfect 5th to the 3rd.",
+      "0/4 3/2 5/1.33 5/4.67 17/2 15/2 8/4"),
   ]),
-  // Every m6/M6 snippet except The Entertainer is the leap alone, three times — their
-  // surrounding melodies have not been transcribed.
+  // m6/M6 snippets transcribed from MIDI files of the recordings (Nadav's, 2026-11-01).
   desc("m6", "Minor 6th", 8, "inverts to M3 ascending", [
     ENTERTAINER_DOWN,
-    s("What If God Was One of Us", "Joan Osborne", "The first phrase of the chorus, “What if…”, drops a minor 6th.",
-      "0/2 -8/4 0/2 -8/4 0/2 -8/4"),
-    s("All Star", "Smash Mouth", "Verse: “…with her finger and her thumb” — “finger” down to “and”.",
-      "0/2 -8/4 0/2 -8/4 0/2 -8/4"),
-    s("In My Life", "The Beatles", "The opening guitar riff climbs, then drops back down a minor 6th on the third note.",
-      "0/2 -8/4 0/2 -8/4 0/2 -8/4"),
+    s("What If God Was One of Us", "Joan Osborne", "Chorus: “What if God | was one of us” — “God” drops a minor 6th to “was”.",
+      "0/1 2/1 3/2 -5/2 -5/1 -4/1 -2/8"),
+    s("In My Life", "The Beatles", "The opening guitar riff: up a minor 6th, then straight back down on the third note.",
+      "0/2 8/2 0/1 1/1 3/1 7/7"),
   ]),
   desc("M6", "Major 6th", 9, "inverts to m3 ascending", [
-    s("No Surprises", "Radiohead", "The bell-like opening guitar riff starts with a drop of a major 6th.",
-      "0/2 -9/4 0/2 -9/4 0/2 -9/4"),
-    s("Sweet Caroline", "Neil Diamond", "The horns’ “Bum, bum, bum!” after “Sweet Caroline” — first two notes drop a major 6th.",
-      "0/2 -9/4 0/2 -9/4 0/2 -9/4"),
+    s("No Surprises", "Radiohead", "The bell-like opening riff: high A drops to C, up to F, back to C.",
+      "0/1 -9/1 -4/1 -9/1 0/1 -9/1 -4/1 -9/1"),
     s("Crazy", "Patsy Cline", "The first two notes, “Cra-zy”, drop a major 6th.",
-      "0/2 -9/4 0/2 -9/4 0/2 -9/4"),
+      "0/1.33 -9/6.67 -7/1.33 -3/1.33 0/1.33 5/1.33 3/1.33 0/1.33"),
   ]),
   { ascending: false, interval: "m7", intervalLong: "Minor 7th", semitones: 10, inversion: "inverts to M2 ascending", songs: [],
     note: "No song whose melody can be transcribed reliably yet. The ▶ plays the interval; it is the octave complement of the ascending M2 (Happy Birthday, Frère Jacques)." },

@@ -2,12 +2,15 @@
 // CavaqSequences — one functional template per distinct sequence, in C, transposed
 // via resolveNamed(). AdvChord = semitone-above-tonic + quality + roman.
 import { AdvChord, NamedProgression, TrainingMode } from "./eartraining";
+import { PitchClass } from "./core";
 
 export interface CavaqSequence {
   id: string;
   namePt: string;
   nameEn: string;
   prog: NamedProgression;
+  /** Key the screen switches to when this sequence is picked (undefined = keep the current key). */
+  defaultKey?: PitchClass;
 }
 
 const ac = (semitone: number, quality: string, roman: string): AdvChord => ({ semitone, quality, roman });
@@ -17,11 +20,11 @@ const seq = (id: string, pt: string, en: string, mode: TrainingMode, chords: Adv
 export const CAVAQ_SEQUENCES: CavaqSequence[] = [
   seq("quadradinho_maj", "Quadradinho", "Quadradinho", TrainingMode.Major,
     [ac(0, "", "I"), ac(9, "7", "VI7"), ac(2, "m", "ii"), ac(7, "7", "V7")]),
-  seq("sou_mais_o_samba_a", "Sou Mais o Samba A", "Sou Mais o Samba A", TrainingMode.Major,
+  { ...seq("sou_mais_o_samba_a", "Sou Mais o Samba A", "Sou Mais o Samba A", TrainingMode.Major,
     [ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I"), ac(9, "7", "VI7"),
-     ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I"), ac(7, "7", "V7")]),
-  seq("sou_mais_o_samba_b", "Sou Mais o Samba B", "Sou Mais o Samba B", TrainingMode.Major,
-    [ac(0, "6", "I6"), ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I")]),
+     ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I"), ac(7, "7", "V7")]), defaultKey: 0 },
+  { ...seq("sou_mais_o_samba_b", "Sou Mais o Samba B", "Sou Mais o Samba B", TrainingMode.Major,
+    [ac(0, "6", "I6"), ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I")]), defaultKey: 0 },
   seq("basic_min", "Sequência Menor (Básico)", "Basic Minor", TrainingMode.Minor,
     [ac(0, "m", "i"), ac(0, "7", "I7"), ac(5, "m", "iv"), ac(7, "7", "V7")]),
   seq("medio_maj", "Sequência Médio (Maior)", "Extended Major (Médio)", TrainingMode.Major,

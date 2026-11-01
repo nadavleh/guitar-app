@@ -13,6 +13,8 @@ data class CavaqSequence(
     val namePt: String,
     val nameEn: String,
     val prog: EarTraining.NamedProgression,
+    /** Key the screen switches to when this sequence is picked (null = keep the current key). */
+    val defaultKey: PitchClass? = null,
 )
 
 object CavaqSequences {
@@ -25,6 +27,8 @@ object CavaqSequences {
         vararg chords: EarTraining.AdvChord,
     ) = CavaqSequence(id, pt, en, EarTraining.NamedProgression(pt, en, mode, chords.toList()))
 
+    private fun CavaqSequence.inKey(pc: PitchClass) = copy(defaultKey = pc)
+
     /** The sequences, in learning order. */
     val ALL: List<CavaqSequence> = listOf(
         // Quadradinho — the staple I VI7 ii V7 turnaround (C A7 Dm G7).
@@ -33,10 +37,10 @@ object CavaqSequences {
         // Sou Mais o Samba, part A — ii V7 I VI7 ii V7 I V7 (Dm G7 C A7 Dm G7 C G7).
         seq("sou_mais_o_samba_a", "Sou Mais o Samba A", "Sou Mais o Samba A", TrainingMode.Major,
             ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I"), ac(9, "7", "VI7"),
-            ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I"), ac(7, "7", "V7")),
+            ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I"), ac(7, "7", "V7")).inKey(PitchClass.C),
         // Sou Mais o Samba, part B — I6 ii V7 I (C6 Dm G7 C).
         seq("sou_mais_o_samba_b", "Sou Mais o Samba B", "Sou Mais o Samba B", TrainingMode.Major,
-            ac(0, "6", "I6"), ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I")),
+            ac(0, "6", "I6"), ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I")).inKey(PitchClass.C),
         // Basic minor — i I7 iv V7 (Cm C7 Fm G7).
         seq("basic_min", "Sequência Menor (Básico)", "Basic Minor", TrainingMode.Minor,
             ac(0, "m", "i"), ac(0, "7", "I7"), ac(5, "m", "iv"), ac(7, "7", "V7")),
