@@ -27,7 +27,7 @@ import { DrumBlock, BUILTIN_BLOCKS, PresetTrack } from "../src/theory";
 import { synthClick, clickAt } from "../src/app/woodClick";
 import {
   PercussionCatalog, PercussionPattern, PercussionMeter, swungSlotMs, slotMs, voiceCount, SwingModel,
-  movementCost, pickMinMovement, BUILTIN_PATTERNS,
+  movementCost, pickMinMovement, BUILTIN_PATTERNS, STUDY_PATTERNS, PRESET_TRACKS,
   INTERVAL_CHOICES, intervalTargetMidi, INTERVAL_DEGREES, intervalDegreeSemitones, intervalDegreeLabel,
   diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalRefFor, intervalChoiceFor, IntervalDirection,
   randomOtherKey, drawAvoiding,
@@ -338,6 +338,16 @@ check("the offbeat variant keeps its 25 % tamborim tap on the 'a' of beat 2",
       b.pattern.dynLevelAt(PercussionCatalog.Tamborim, 7) === 3;
   })());
 
+check("bongo grooves name their tamborim track Tamborim-Tresillo (round-trips, = Kotlin)",
+  BUILTIN_PATTERNS.filter((b) => b.name.endsWith("(Bongo)")).every((b) => {
+    const rt = PercussionPattern.decode(b.pattern.encode());
+    return b.pattern.instruments.find((i) => i.id === "tamborim")?.displayName === "Tamborim-Tresillo" &&
+      rt?.instruments.find((i) => i.id === "tamborim")?.displayName === "Tamborim-Tresillo" &&
+      rt.encode() === b.pattern.encode();
+  }) && !PercussionPattern.empty().encode().includes("!"));
+check("Samba Clap became the two-bar Tresillo track preset (= Kotlin)",
+  !STUDY_PATTERNS.some((b) => b.name.startsWith("Samba Clap")) &&
+  PRESET_TRACKS.find((p) => p.label === "Tresillo")?.template.map((v, i) => (v === null ? -1 : i)).filter((i) => i >= 0).join() === "0,3,6,8,11,14");
 let builtinsOk = BUILTIN_PATTERNS.length >= 5;
 for (const b of BUILTIN_PATTERNS) {
   const rt = PercussionPattern.decode(b.pattern.encode());
@@ -419,7 +429,7 @@ check("diatonic answer set",
   check("interval song lookup", ok);
   const allRefs = [...INTERVAL_SONGS_ASCENDING, ...INTERVAL_SONGS_DESCENDING];
   // Pinned to Kotlin EarTrainingTest: same song count, every snippet sounds its interval.
-  check("interval song count = 65", allRefs.reduce((n, r) => n + r.songs.length, 0) === 65);
+  check("interval song count = 64", allRefs.reduce((n, r) => n + r.songs.length, 0) === 64);
   let melOk = true;
   for (const r of allRefs) for (const sg of r.songs) {
     const notes = melodyNotes(sg.melody);

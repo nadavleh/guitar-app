@@ -217,6 +217,25 @@ class PercussionPatternTest {
         assertEquals(3, off.dynLevelAt(PercussionCatalog.Tamborim, 7))
     }
 
+    @Test fun `bongo grooves name their tamborim track Tamborim-Tresillo, and the name round-trips`() {
+        for (b in PercussionBuiltins.ALL.filter { it.name.endsWith("(Bongo)") }) {
+            val tamb = b.pattern.instruments.first { it.id == "tamborim" }
+            assertEquals("Tamborim-Tresillo", tamb.displayName, b.name)
+            val rt = PercussionPattern.decode(b.pattern.encode())!!
+            assertEquals("Tamborim-Tresillo", rt.instruments.first { it.id == "tamborim" }.displayName)
+            assertEquals(b.pattern, rt)
+        }
+        // A default-named track carries no suffix.
+        assertTrue("!" !in PercussionPattern.empty().encode())
+    }
+
+    @Test fun `Samba Clap became the two-bar Tresillo track preset`() {
+        assertTrue(PercussionBuiltins.STUDY.none { it.name.startsWith("Samba Clap") })
+        val t = PercussionBuiltins.presetByLabel("Tresillo")!!
+        assertEquals(PercussionCatalog.Tamborim, t.instrument)
+        assertEquals(listOf(0, 3, 6, 8, 11, 14), t.template.indices.filter { t.template[it] != null })
+    }
+
     @Test fun `beat file round-trips name, tempo, swing, and pattern`() {
         val original = BeatFile("Arrasta-pé", bpm = 100, swing = 25, pattern = PercussionBuiltins.ARRASTA_PE)
         val parsed = BeatFile.decode(original.encode())

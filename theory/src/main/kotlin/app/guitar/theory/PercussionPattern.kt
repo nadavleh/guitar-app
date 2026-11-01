@@ -302,9 +302,14 @@ data class PercussionPattern(
             // Per-track swing ("@N") and volume ("%N") ride as id suffixes; old
             // decoders fail to resolve "pandeiro@33%20" and skip the row rather
             // than mis-reading it.
+            // A custom track name ("!Name", e.g. "Tamborim-Tresillo") rides last, only
+            // when it differs from the instrument's default name.
             val sw = trackSwing[inst.id] ?: 0
             val vol = trackVolume[inst.id] ?: 100
-            val head = inst.id + (if (sw != 0) "@$sw" else "") + (if (vol < 100) "%$vol" else "")
+            val name = inst.displayName.filter { it !in ",|=;~!" }
+            val custom = name != PercussionCatalog.resolve(inst.id)?.displayName
+            val head = inst.id + (if (sw != 0) "@$sw" else "") + (if (vol < 100) "%$vol" else "") +
+                (if (custom) "!$name" else "")
             head + "=" + grid.getValue(inst.id).joinToString(",") { it?.toString() ?: "-" }
         }
         return m + body
@@ -346,7 +351,10 @@ data class PercussionPattern(
                 val eq = rowStr.indexOf('=')
                 if (eq < 0) return null
                 var id = rowStr.substring(0, eq)
-                // "id[@swing][%vol]" — per-track swing/volume suffixes (see encode).
+                // "id[@swing][%vol][!name]" — per-track swing/volume/name suffixes (see encode).
+                val tilde = id.indexOf('!')
+                val name = if (tilde > 0) id.substring(tilde + 1).takeIf { it.isNotBlank() } else null
+                if (tilde > 0) id = id.substring(0, tilde)
                 val pct = id.lastIndexOf('%')
                 val volume = if (pct > 0) id.substring(pct + 1).toIntOrNull() else null
                 if (volume != null) id = id.substring(0, pct)
@@ -355,7 +363,8 @@ data class PercussionPattern(
                 if (swing != null) id = id.substring(0, at)
                 // resolve() also reconstructs duplicated-track clones ("surdo#2");
                 // truly unknown instruments are skipped (forward compatibility).
-                val inst = PercussionCatalog.resolve(id) ?: continue
+                val inst = PercussionCatalog.resolve(id)?.let { if (name != null) it.copy(displayName = name) else it }
+                    ?: continue
                 if (grid.containsKey(id)) continue                  // ignore duplicate rows
                 val cells = rowStr.substring(eq + 1).split(",")
                 if (cells.size != meter.totalSlots) return null
@@ -443,7 +452,7 @@ object PercussionBuiltins {
     // Each uses the shared teleco-teco surdo (muted-bass ◐ + tap · pulse) and a
     // tamborim tresillo (3+3+2) under a bongo comp transcribed from the user's beats.
     private const val SURDO_TELECO = "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2"
-    private const val TAMB_TRESILLO = "tamborim=0,-,-,0,-,-,0,-,0,-,-,0,-,-,0,-"
+    private const val TAMB_TRESILLO = "tamborim!Tamborim-Tresillo=0,-,-,0,-,-,0,-,0,-,-,0,-,-,0,-"
 
     val XOTE: PercussionPattern = builtin(
         "M:2,2,4,16;" + SURDO_TELECO + "|" + TAMB_TRESILLO + "|" +
@@ -551,13 +560,11 @@ object PercussionBuiltins {
     // ---- Study rhythms. 2 bars of 2/4 on a 16th grid unless noted; single
     // tamborim line. An entrada is an OPENING played once before its loop.
     private val BOSSA_UP = tamborimLine(setOf(0, 3, 6, 10, 13))
-    private val SAMBA_CLAP = tamborimLine(setOf(0, 3, 6), bars = 1)
 
     /** Study grooves (the "Study" section). (The entrada → teleco-teco combos
      *  were removed: build them by adding an entrada preset as the opening.) */
     val STUDY: List<BuiltinPattern> = listOf(
         BuiltinPattern("Bossa Nova Clave", BOSSA_UP, bpm = 70),
-        BuiltinPattern("Samba Clap (Palma)", SAMBA_CLAP, bpm = 70),
     )
 
     /** Track presets — the single-instrument "chunks": added to the CURRENT beat
@@ -586,6 +593,11 @@ object PercussionBuiltins {
         PresetTrack(
             "Tamborim — Telecoteco Var 3", PercussionCatalog.Tamborim,
             listOf(3002, 0, 3002, 0, 3002, 2001, 0, 3002, 2001, 0, 3002, 2001, 0, 3002, 2001, 0),
+        ),
+        // Tresillo (3+3+2) on each 2/4 bar, two bars — was the "Samba Clap (Palma)" groove.
+        PresetTrack(
+            "Tresillo", PercussionCatalog.Tamborim,
+            listOf(0, null, null, 0, null, null, 0, null, 0, null, null, 0, null, null, 0, null),
         ),
         // Per Nadav: accented open clack, then tap (25%) + muted clack (50%) — the
         // teleco-teco attenuation, articulations swapped from the old reta.

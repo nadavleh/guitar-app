@@ -422,9 +422,14 @@ export class PercussionPattern {
         // Per-track swing ("@N") and volume ("%N") ride as id suffixes; old
         // decoders fail to resolve "pandeiro@33%20" and skip the row rather
         // than mis-reading it.
+        // A custom track name ("!Name", e.g. "Tamborim-Tresillo") rides last, only
+        // when it differs from the instrument's default name.
         const sw = this.trackSwing.get(i.id) ?? 0;
         const vol = this.trackVolume.get(i.id) ?? 100;
-        const head = i.id + (sw !== 0 ? `@${sw}` : "") + (vol < 100 ? `%${vol}` : "");
+        const name = i.displayName.replace(/[,|=;~!]/g, "");
+        const custom = name !== PercussionCatalog.resolve(i.id)?.displayName;
+        const head = i.id + (sw !== 0 ? `@${sw}` : "") + (vol < 100 ? `%${vol}` : "") +
+          (custom ? `!${name}` : "");
         return `${head}=` + this.grid.get(i.id)!.map((v) => (v === null ? "-" : String(v))).join(",");
       })
       .join("|");
@@ -462,7 +467,10 @@ export class PercussionPattern {
       const eq = rowStr.indexOf("=");
       if (eq < 0) return null;
       let id = rowStr.substring(0, eq);
-      // "id[@swing][%vol]" — per-track swing/volume suffixes (see encode).
+      // "id[@swing][%vol][!name]" — per-track swing/volume/name suffixes (see encode).
+      const tilde = id.indexOf("!");
+      const name = tilde > 0 && id.substring(tilde + 1).trim() ? id.substring(tilde + 1) : null;
+      if (tilde > 0) id = id.substring(0, tilde);
       const pct = id.lastIndexOf("%");
       const volume = pct > 0 ? parseInt(id.substring(pct + 1), 10) : NaN;
       if (!Number.isNaN(volume)) id = id.substring(0, pct);
@@ -471,8 +479,9 @@ export class PercussionPattern {
       if (!Number.isNaN(swing)) id = id.substring(0, at);
       // resolve() also reconstructs duplicated-track clones ("surdo#2"); truly
       // unknown instruments are skipped (forward compatibility).
-      const instrument = PercussionCatalog.resolve(id);
-      if (!instrument) continue;
+      const resolved = PercussionCatalog.resolve(id);
+      if (!resolved) continue;
+      const instrument = name ? { ...resolved, displayName: name } : resolved;
       if (g.has(id)) continue;            // ignore duplicate rows
       const cells = rowStr.substring(eq + 1).split(",");
       if (cells.length !== meter.totalSlots) return null;
@@ -542,7 +551,7 @@ export const BATIDA_CAVACO_1 = builtin(
 // Each uses the shared teleco-teco surdo (muted-bass ◐ + tap · pulse) and a tamborim
 // tresillo (3+3+2) under a bongo comp transcribed from the user's saved beats.
 const SURDO_TELECO = "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2";
-const TAMB_TRESILLO = "tamborim=0,-,-,0,-,-,0,-,0,-,-,0,-,-,0,-";
+const TAMB_TRESILLO = "tamborim!Tamborim-Tresillo=0,-,-,0,-,-,0,-,0,-,-,0,-,-,0,-";
 
 export const XOTE = builtin(
   "M:2,2,4,16;" + SURDO_TELECO + "|" + TAMB_TRESILLO + "|" +
@@ -707,6 +716,9 @@ export const PRESET_TRACKS: PresetTrack[] = [
     template: [3002, 0, 3002, 0, 3002, 2001, 0, 3002, 2001, 0, 0, 0, 0, 3002, 2001, 0] },
   { label: "Tamborim — Telecoteco Var 3", instrument: Tamborim,
     template: [3002, 0, 3002, 0, 3002, 2001, 0, 3002, 2001, 0, 3002, 2001, 0, 3002, 2001, 0] },
+  // Tresillo (3+3+2) on each 2/4 bar, two bars — was the "Samba Clap (Palma)" groove.
+  { label: "Tresillo", instrument: Tamborim,
+    template: [0, null, null, 0, null, null, 0, null, 0, null, null, 0, null, null, 0, null] },
   // Corrected per Nadav's export: each beat = ACCENTED clack, muted clack at
   // 75 % (dyn level 1), tap, clack — with a light 10 % swing.
   { label: "Tamborim — Levada Reta", instrument: Tamborim,
@@ -785,13 +797,11 @@ function tamborimLine(onsets: number[], accented: number[] = [], bars = 2): Perc
 // ---- Study rhythms. 2 bars of 2/4 on a 16th grid unless noted; single
 // tamborim line. An entrada is an OPENING played once before its loop.
 const BOSSA_UP = tamborimLine([0, 3, 6, 10, 13]);
-const SAMBA_CLAP = tamborimLine([0, 3, 6], [], 1);
 
 /** Study grooves (the "Study" section). (The entrada → teleco-teco combos were
  *  removed: build them by adding an entrada preset as the opening.) */
 export const STUDY_PATTERNS: BuiltinPattern[] = [
   { name: "Bossa Nova Clave", pattern: BOSSA_UP, bpm: 70 },
-  { name: "Samba Clap (Palma)", pattern: SAMBA_CLAP, bpm: 70 },
 ];
 
 // ---- Beat file (export / import) ----

@@ -215,8 +215,6 @@ object IntervalSongs {
         desc("M6", "Major 6th", 9, "inverts to m3 ascending",
             s("No Surprises", "Radiohead", "The bell-like opening guitar riff starts with a drop of a major 6th.",
                 "0/2 -9/4 0/2 -9/4 0/2 -9/4"),
-            s("Until I Found You", "Stephen Sanchez", "The retro opening guitar hook / vocal intro slides down a major 6th.",
-                "0/2 -9/4 0/2 -9/4 0/2 -9/4"),
             s("Sweet Caroline", "Neil Diamond", "The horns’ “Bum, bum, bum!” after “Sweet Caroline” — first two notes drop a major 6th.",
                 "0/2 -9/4 0/2 -9/4 0/2 -9/4"),
             s("Crazy", "Patsy Cline", "The first two notes, “Cra-zy”, drop a major 6th.",
