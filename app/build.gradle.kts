@@ -17,8 +17,8 @@ android {
         // releases are kept in /releases â€” never delete them. versionCode is a
         // monotonically increasing integer: major*10000 + minor*100 + patch
         // (e.g. 1.2.0 = 10200, 1.2.1 = 10201, 2.0.0 = 20000).
-        versionCode = 29202
-        versionName = "2.92.2"
+        versionCode = 29203
+        versionName = "2.92.3"
     }
 
     buildTypes {
@@ -45,13 +45,6 @@ android {
                 out.outputFile.parentFile
                     ?.listFiles { f -> f.name.startsWith("Chorect_beta_V") && f.name.endsWith(".apk") && f.name != current }
                     ?.forEach { it.delete() }
-                // Nadav wants the newest APK on his Desktop, and only the newest.
-                val desktop = File(System.getProperty("user.home"), "Desktop")
-                if (desktop.isDirectory && out.outputFile.isFile) {
-                    desktop.listFiles { f -> f.name.startsWith("Chorect_beta_V") && f.name.endsWith(".apk") && f.name != current }
-                        ?.forEach { it.delete() }
-                    out.outputFile.copyTo(File(desktop, current), overwrite = true)
-                }
             }
         }
     }

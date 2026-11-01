@@ -574,6 +574,12 @@ export const ARRASTA_PE = builtin(
   "bongo=0,2,3,0,1,-,1,-,0,2,3,0,1,-,1,-",
 );
 
+/** Campana (bongocero's cowbell), the standard pattern: open (◉ cowbell 1, mouth)
+ *  on 1 and 3, closed (◎ cowbell 2) on 2, 2&, 4, 4& — the 2-side rests on 2&.
+ *  Per timba.com ("0xcx|0xcc|0xcc|0xcc" for 2:3). Named "Campana" in the kit. */
+const CAMPANA_2_3 = "cowbell%60!Campana=0,-,1,-,0,-,1,1,0,-,1,1,0,-,1,1";
+const CAMPANA_3_2 = "cowbell%60!Campana=0,-,1,1,0,-,1,1,0,-,1,-,0,-,1,1";
+
 /** Son v1 (2:3) — Nadav's second chart, 2 bars of 4/4 in eighths. Clave 2-side
  *  (2, 3) then 3-side (1, 2&, 4); conga tumbao on every eighth (H = heel → mute ◐,
  *  T = toe → tip ·, S = slap, Hi = open on the conga), with bar 2 reaching over to
@@ -584,7 +590,7 @@ export const SON_V1 = builtin(
   "claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,0,-" + "|" +
   "timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,2" + "|" +
   "conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0" + "|" +
-  "tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-",
+  "tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-" + "|" + CAMPANA_2_3,
 );
 
 /** Son v1 on a 2:3 RUMBA clave: the 3-side's last stroke moves from 4 to 4&
@@ -595,7 +601,7 @@ export const SON_V1_RUMBA = builtin(
   "claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,-,0" + "|" +
   "timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,102" + "|" +
   "conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0" + "|" +
-  "tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-",
+  "tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-" + "|" + CAMPANA_2_3,
 );
 
 /** Son v2 (3:2) — Nadav's chart, 2 bars of 4/4 in eighths. Clave 3-side (1, 2&, 4) then
@@ -608,7 +614,7 @@ export const SON_3_2 = builtin(
   "timbales%60=2,-,2,2,-,2,2,-,2,-,2,2,-,2,-,2" + "|" +
   "conga%60=1,3,2,3,1,3,0,0,1,3,2,3,1,3,0,-" + "|" +
   "tumba%60=-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,0" + "|" +
-  "bongo%60=0,2,3,2,0,2,1,2,0,2,3,2,0,2,1,2",
+  "bongo%60=0,2,3,2,0,2,1,2,0,2,3,2,0,2,1,2" + "|" + CAMPANA_3_2,
 );
 
 /** A loadable groove for the Load… menu; `bpm` (when set) is applied on load;
@@ -675,7 +681,7 @@ export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "Xaxado (Bongo)", pattern: XAXADO, bpm: 100 },
   { name: "Arrasta-pé (Bongo)", pattern: ARRASTA_PE, bpm: 100 },
   { name: "Son v1 (2:3)", pattern: SON_V1, bpm: 100 },
-  { name: "Son v1 (2:3 rumba clave)", pattern: SON_V1_RUMBA, bpm: 100 },
+  { name: "Rumba v1 (2:3)", pattern: SON_V1_RUMBA, bpm: 100 },
   { name: "Son v2 (3:2)", pattern: SON_3_2, bpm: 100 },
 ];
 

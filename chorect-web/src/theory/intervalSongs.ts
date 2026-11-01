@@ -127,6 +127,8 @@ export const INTERVAL_SONGS_ASCENDING: IntervalSongRef[] = [
   ]),
   asc("m6", "Minor 6th", 8, "inverts to M3 descending", [
     ENTERTAINER_UP,
+    s("In My Life", "The Beatles", "The opening guitar riff: C♯ up a minor 6th to A on the first two notes.",
+      "0/2 8/2 0/1 1/1 3/1 7/7"),
   ]),
   asc("M6", "Major 6th", 9, "inverts to m3 descending", [
     s("My Bonnie Lies Over the Ocean", "traditional", "“My Bon-” — the opening leap.",
@@ -220,9 +222,9 @@ export const INTERVAL_SONGS_DESCENDING: IntervalSongRef[] = [
   ]),
   desc("M6", "Major 6th", 9, "inverts to m3 ascending", [
     s("No Surprises", "Radiohead", "The bell-like opening riff: high A drops to C, up to F, back to C.",
-      "0/1 -9/1 -4/1 -9/1 0/1 -9/1 -4/1 -9/1"),
+      "0/2 -9/2 -4/2 -9/2 0/2 -9/2 -4/2 -9/2"),
     s("Crazy", "Patsy Cline", "The first two notes, “Cra-zy”, drop a major 6th.",
-      "0/1.33 -9/6.67 -7/1.33 -3/1.33 0/1.33 5/1.33 3/1.33 0/1.33"),
+      "0/2.67 -9/13.33 -7/2.67 -3/2.67 0/2.67 5/2.67 3/2.67 0/2.67"),
   ]),
   { ascending: false, interval: "m7", intervalLong: "Minor 7th", semitones: 10, inversion: "inverts to M2 ascending", songs: [],
     note: "No song whose melody can be transcribed reliably yet. The ▶ plays the interval; it is the octave complement of the ascending M2 (Happy Birthday, Frère Jacques)." },

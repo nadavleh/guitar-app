@@ -357,18 +357,18 @@ check("built-in grooves are valid & round-trip", builtinsOk);
 check("Son v1 (2:3) matches the Kotlin twin, clave on 2, 3 | 1, 2&, 4", (() => {
   const b = BUILTIN_PATTERNS.find((x) => x.name === "Son v1 (2:3)");
   return b !== undefined && b.bpm === 100 && b.pattern.encode() ===
-    "M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,0,-|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,2|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-";
+    "M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,0,-|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,2|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-|cowbell%60!Campana=0,-,1,-,0,-,1,1,0,-,1,1,0,-,1,1";
 })());
-check("Son v1 (2:3 rumba clave) matches the Kotlin twin, clave on 2, 3 | 1, 2&, 4&", (() => {
-  const b = BUILTIN_PATTERNS.find((x) => x.name === "Son v1 (2:3 rumba clave)");
+check("Rumba v1 (2:3) matches the Kotlin twin, clave on 2, 3 | 1, 2&, 4&", (() => {
+  const b = BUILTIN_PATTERNS.find((x) => x.name === "Rumba v1 (2:3)");
   return b !== undefined && b.bpm === 100 && b.pattern.encode() ===
-    "M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,-,0|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,102|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-";
+    "M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,-,0|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,102|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-|cowbell%60!Campana=0,-,1,-,0,-,1,1,0,-,1,1,0,-,1,1";
 })());
 check("Son v2 (3:2) matches the Kotlin twin, clave on 1, 2&, 4 | 2, 3", (() => {
   const b = BUILTIN_PATTERNS.find((x) => x.name === "Son v2 (3:2)");
   return b !== undefined && b.bpm === 100 && b.pattern.encode() ===
     "M:2,4,4,8;claves%60=0,-,-,0,-,-,0,-,-,-,0,-,0,-,-,-|timbales%60=2,-,2,2,-,2,2,-,2,-,2,2,-,2,-,2|" +
-    "conga%60=1,3,2,3,1,3,0,0,1,3,2,3,1,3,0,-|tumba%60=-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,0|bongo%60=0,2,3,2,0,2,1,2,0,2,3,2,0,2,1,2";
+    "conga%60=1,3,2,3,1,3,0,0,1,3,2,3,1,3,0,-|tumba%60=-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,0|bongo%60=0,2,3,2,0,2,1,2,0,2,3,2,0,2,1,2|cowbell%60!Campana=0,-,1,1,0,-,1,1,0,-,1,-,0,-,1,1";
 })());
 // Pins the twin of PercussionBuiltins.CASA_2_LEVADA — his Casa 2 export, the one
 // groove with no surdo (two tamborims, the first at 97 %).
@@ -429,7 +429,7 @@ check("diatonic answer set",
   check("interval song lookup", ok);
   const allRefs = [...INTERVAL_SONGS_ASCENDING, ...INTERVAL_SONGS_DESCENDING];
   // Pinned to Kotlin EarTrainingTest: same song count, every snippet sounds its interval.
-  check("interval song count = 63", allRefs.reduce((n, r) => n + r.songs.length, 0) === 63);
+  check("interval song count = 64", allRefs.reduce((n, r) => n + r.songs.length, 0) === 64);
   let melOk = true;
   for (const r of allRefs) for (const sg of r.songs) {
     const notes = melodyNotes(sg.melody);

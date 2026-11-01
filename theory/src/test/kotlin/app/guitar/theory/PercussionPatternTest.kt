@@ -170,16 +170,29 @@ class PercussionPatternTest {
      *  bar 2's 2& and 3. Pinned here and in chorect-web/test/verify.ts. */
     /** Son v1 on the 2:3 rumba clave (3-side 1, 2&, 4&). Mirrored in verify.ts. */
     @Test fun `son v1 rumba-clave variant, exactly`() {
-        val b = PercussionBuiltins.ALL.first { it.name == "Son v1 (2:3 rumba clave)" }
+        val b = PercussionBuiltins.ALL.first { it.name == "Rumba v1 (2:3)" }
         assertEquals(100, b.bpm)
-        assertEquals("M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,-,0|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,102|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-", b.pattern.encode())
+        assertEquals("M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,-,0|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,102|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-|cowbell%60!Campana=0,-,1,-,0,-,1,1,0,-,1,1,0,-,1,1", b.pattern.encode())
+    }
+
+    @Test fun `every son and rumba groove has the campana, opposite the clave side`() {
+        val grooves = PercussionBuiltins.ALL.filter { it.name.startsWith("Son") || it.name.startsWith("Rumba") }
+        assertEquals(3, grooves.size)
+        for (b in grooves) {
+            val bell = b.pattern.instruments.first { it.id == "cowbell" }
+            assertEquals("Campana", bell.displayName, b.name)
+            // The 2-side rests on 2& (slot 3 in bar 1 for 2:3, slot 11 in bar 2 for 3:2).
+            val restSlot = if (b.name.contains("(3:2)")) 11 else 3
+            assertEquals(null, b.pattern.voiceAt(bell, restSlot), b.name)
+            assertEquals(11, (0 until 16).count { b.pattern.voiceAt(bell, it) != null }, b.name)
+        }
     }
 
     @Test fun `son v1 is the 2-3 chart, exactly`() {
         val b = PercussionBuiltins.ALL.first { it.name == "Son v1 (2:3)" }
         assertEquals(100, b.bpm)
         assertEquals(
-            "M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,0,-|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,2|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-",
+            "M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,0,-|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,2|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-|cowbell%60!Campana=0,-,1,-,0,-,1,1,0,-,1,1,0,-,1,1",
             b.pattern.encode(),
         )
     }
