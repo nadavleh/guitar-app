@@ -325,7 +325,7 @@ check("pickMinMovement returns the lowest-cost voicing", isMin && idx >= 0 && id
 check("Tantan NL + downbeat grooves are gone",
   !BUILTIN_PATTERNS.some((x) => x.name === "Tantan Teleco NL" || x.name === "Tantan Telco downbeat"));
 for (const [name, encoded] of [
-  ["Tantan Telco offbeat", "M:2,2,4,16;surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2|tamborim=-,0,-,0,-,-,0,3002,0,-,0,-,0,-,-,0"],
+  ["Tantan Telecoteco", "M:2,2,4,16;surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2|tamborim=-,0,-,0,-,-,0,3002,0,-,0,-,0,-,-,0"],
 ] as [string, string][]) {
   const b = BUILTIN_PATTERNS.find((x) => x.name === name);
   check(`built-in "${name}" is pinned as exported (67 BPM)`,
@@ -333,7 +333,7 @@ for (const [name, encoded] of [
 }
 check("the offbeat variant keeps its 25 % tamborim tap on the 'a' of beat 2",
   (() => {
-    const b = BUILTIN_PATTERNS.find((x) => x.name === "Tantan Telco offbeat")!;
+    const b = BUILTIN_PATTERNS.find((x) => x.name === "Tantan Telecoteco")!;
     return b.pattern.voiceAt(PercussionCatalog.Tamborim, 7) === 2 &&
       b.pattern.dynLevelAt(PercussionCatalog.Tamborim, 7) === 3;
   })());

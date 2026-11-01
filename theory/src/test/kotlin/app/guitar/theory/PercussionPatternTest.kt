@@ -202,7 +202,7 @@ class PercussionPatternTest {
     @Test fun `only the Tantan teleco offbeat groove is in the list, exactly as exported`() {
         assertTrue(PercussionBuiltins.ALL.none { it.name == "Tantan Teleco NL" || it.name == "Tantan Telco downbeat" })
         val expected = mapOf(
-            "Tantan Telco offbeat" to
+            "Tantan Telecoteco" to
                 "M:2,2,4,16;surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2|tamborim=-,0,-,0,-,-,0,3002,0,-,0,-,0,-,-,0",
         )
         for ((name, encoded) in expected) {

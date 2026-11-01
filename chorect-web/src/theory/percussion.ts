@@ -665,7 +665,7 @@ export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "Partido Alto Groove", pattern: PARTIDO_ALTO_OFFICIAL, bpm: 70 },
   { name: "Platinelas Pandeiro — Partido Alto Groove", pattern: PARTIDO_ALTO_PLATINELAS, bpm: 70 },
   { name: "Casa 2 — Cavaco Levada", pattern: CASA_2_LEVADA, bpm: 92 },
-  { name: "Tantan Telco offbeat", pattern: TANTAN_TELECO_OFFBEAT, bpm: 67 },
+  { name: "Tantan Telecoteco", pattern: TANTAN_TELECO_OFFBEAT, bpm: 67 },
   { name: "Xote (Bongo)", pattern: XOTE, bpm: 90 },
   { name: "Baião (Bongo)", pattern: BAIAO, bpm: 90 },
   { name: "Forró (Bongo)", pattern: FORRO, bpm: 95 },

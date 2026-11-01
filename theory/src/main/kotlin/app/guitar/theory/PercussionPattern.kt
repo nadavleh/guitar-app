@@ -716,7 +716,7 @@ object PercussionBuiltins {
         BuiltinPattern("Partido Alto Groove", PARTIDO_ALTO_OFFICIAL, bpm = 70),
         BuiltinPattern("Platinelas Pandeiro — Partido Alto Groove", PARTIDO_ALTO_PLATINELAS, bpm = 70),
         BuiltinPattern("Casa 2 — Cavaco Levada", CASA_2_LEVADA, bpm = 92),
-        BuiltinPattern("Tantan Telco offbeat", TANTAN_TELECO_OFFBEAT, bpm = 67),
+        BuiltinPattern("Tantan Telecoteco", TANTAN_TELECO_OFFBEAT, bpm = 67),
         BuiltinPattern("Xote (Bongo)", XOTE, bpm = 90),
         BuiltinPattern("Baião (Bongo)", BAIAO, bpm = 90),
         BuiltinPattern("Forró (Bongo)", FORRO, bpm = 95),
