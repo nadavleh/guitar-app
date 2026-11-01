@@ -700,23 +700,11 @@ object PercussionBuiltins {
             "bongo=0,0,-,0,1,-,0,-,1,-,0,-,3,1,2,0",
     )
 
-    /** Nadav's three tan-tan + teleco-teco studies, exported from his saved beats
-     *  (`Tantan_*.chorect.json`, all 67 BPM, straight). The low line is the surdo
-     *  voice standing in for his tan-tan; the three differ only in where the
-     *  tamborim clacks sit against it:
-     *    · "NL"       — a busier tan-tan line (open on 1 & the "e"), clacks off the beat
-     *    · "downbeat" — marcacao tan-tan, clacks ON the beat
-     *    · "offbeat"  — marcacao tan-tan, clacks pushed off it, with one 25 % tap (3002)
-     *                   on the "a" of beat 2. */
-    val TANTAN_TELECO_NL: PercussionPattern = builtin(
-        "M:2,2,4,16;" +
-            "surdo=1,1,-,1,0,-,0,1,1,-,1,-,0,-,0,-" + "|" +
-            "tamborim=0,-,0,-,-,0,-,0,-,0,-,0,-,-,0,-",
-    )
-    val TANTAN_TELECO_DOWNBEAT: PercussionPattern = builtin(
-        "M:2,2,4,16;" + SURDO_TELECO + "|" +
-            "tamborim=0,-,0,-,0,-,-,0,-,0,-,0,-,-,0,-",
-    )
+    /** Nadav's tan-tan + teleco-teco study, exported from his saved beat
+     *  (`Tantan_*.chorect.json`, 67 BPM, straight). The low line is the surdo voice
+     *  standing in for his tan-tan (marcação); the tamborim clacks are pushed off
+     *  the beat, with one 25 % tap (3002) on the "a" of beat 2. (The "NL" and
+     *  "downbeat" variants were removed at his request.) */
     val TANTAN_TELECO_OFFBEAT: PercussionPattern = builtin(
         "M:2,2,4,16;" + SURDO_TELECO + "|" +
             "tamborim=-,0,-,0,-,-,0,3002,0,-,0,-,0,-,-,0",
@@ -728,8 +716,6 @@ object PercussionBuiltins {
         BuiltinPattern("Partido Alto Groove", PARTIDO_ALTO_OFFICIAL, bpm = 70),
         BuiltinPattern("Platinelas Pandeiro — Partido Alto Groove", PARTIDO_ALTO_PLATINELAS, bpm = 70),
         BuiltinPattern("Casa 2 — Cavaco Levada", CASA_2_LEVADA, bpm = 92),
-        BuiltinPattern("Tantan Teleco NL", TANTAN_TELECO_NL, bpm = 67),
-        BuiltinPattern("Tantan Telco downbeat", TANTAN_TELECO_DOWNBEAT, bpm = 67),
         BuiltinPattern("Tantan Telco offbeat", TANTAN_TELECO_OFFBEAT, bpm = 67),
         BuiltinPattern("Xote (Bongo)", XOTE, bpm = 90),
         BuiltinPattern("Baião (Bongo)", BAIAO, bpm = 90),

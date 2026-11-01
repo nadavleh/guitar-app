@@ -126,6 +126,13 @@ class CavaqProgState(
         resetPreview()
     }
 
+    /** Scroll to the previous/next sequence in the list (wraps around). */
+    fun stepSequence(delta: Int) {
+        val all = CavaqSequences.ALL
+        val i = all.indexOfFirst { it.id == sequenceId }.coerceAtLeast(0)
+        setSequence(all[((i + delta) % all.size + all.size) % all.size].id)
+    }
+
     fun chooseKey(pc: PitchClass) {
         transpose += ((pc.value - key.value) % 12 + 12) % 12
         key = pc

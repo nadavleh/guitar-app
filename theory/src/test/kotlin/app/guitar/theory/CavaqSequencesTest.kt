@@ -14,6 +14,15 @@ class CavaqSequencesTest {
         assertEquals(listOf("C", "A7", "Dm", "G7"), chords)
     }
 
+    @Test fun `sou mais o samba A and B resolve in C`() {
+        assertEquals(listOf("Dm", "G7", "C", "A7", "Dm", "G7", "C", "G7"),
+            CavaqSequences.byId("sou_mais_o_samba_a")!!.prog.resolve(PitchClass.C).map { it.symbol })
+        assertEquals(listOf("C6", "Dm", "G7", "C"),
+            CavaqSequences.byId("sou_mais_o_samba_b")!!.prog.resolve(PitchClass.C).map { it.symbol })
+        assertEquals(listOf("quadradinho_maj", "sou_mais_o_samba_a", "sou_mais_o_samba_b"),
+            CavaqSequences.ALL.take(3).map { it.id })
+    }
+
     @Test fun `basic minor resolves to Cm C7 Fm G7 in C`() {
         val chords = CavaqSequences.byId("basic_min")!!.prog.resolve(PitchClass.C).map { it.symbol }
         assertEquals(listOf("Cm", "C7", "Fm", "G7"), chords)

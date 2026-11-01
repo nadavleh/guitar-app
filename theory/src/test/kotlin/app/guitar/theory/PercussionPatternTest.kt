@@ -143,7 +143,7 @@ class PercussionPatternTest {
     }
 
     @Test fun `built-in grooves decode, are non-empty, and round-trip`() {
-        assertEquals(15, PercussionBuiltins.ALL.size)
+        assertEquals(13, PercussionBuiltins.ALL.size)
         for ((name, pat) in PercussionBuiltins.ALL) {
             assertTrue(!pat.isEmpty(), "$name is empty")
             assertEquals(16, pat.slots, "$name should be the default 16-slot meter")
@@ -196,14 +196,12 @@ class PercussionPatternTest {
         assertTrue(PercussionCatalog.Surdo !in b.pattern.instruments)
     }
 
-    /** Nadav's three tan-tan studies, pinned exactly as his saved beats exported
-     *  them (`Tantan_*.chorect.json`, 67 BPM straight). Mirrored in verify.ts. */
-    @Test fun `the three Tantan teleco grooves are in the list, exactly as exported`() {
+    /** Nadav's tan-tan study, pinned exactly as his saved beat exported it
+     *  (`Tantan_*.chorect.json`, 67 BPM straight); NL + downbeat were removed.
+     *  Mirrored in verify.ts. */
+    @Test fun `only the Tantan teleco offbeat groove is in the list, exactly as exported`() {
+        assertTrue(PercussionBuiltins.ALL.none { it.name == "Tantan Teleco NL" || it.name == "Tantan Telco downbeat" })
         val expected = mapOf(
-            "Tantan Teleco NL" to
-                "M:2,2,4,16;surdo=1,1,-,1,0,-,0,1,1,-,1,-,0,-,0,-|tamborim=0,-,0,-,-,0,-,0,-,0,-,0,-,-,0,-",
-            "Tantan Telco downbeat" to
-                "M:2,2,4,16;surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2|tamborim=0,-,0,-,0,-,-,0,-,0,-,0,-,-,0,-",
             "Tantan Telco offbeat" to
                 "M:2,2,4,16;surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2|tamborim=-,0,-,0,-,-,0,3002,0,-,0,-,0,-,-,0",
         )

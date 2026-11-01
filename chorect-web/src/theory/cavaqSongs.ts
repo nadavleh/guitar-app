@@ -40,6 +40,8 @@ export const CAVAQ_SONGS: CavaqSong[] = [
 /** Functional families each taught sequence (by id) covers. */
 const SEQUENCE_FAMILIES: Record<string, string[]> = {
   quadradinho_maj: ["ii-V-I", "I-vi-ii-V"],
+  sou_mais_o_samba_a: ["ii-V-I", "I-vi-ii-V"],
+  sou_mais_o_samba_b: ["ii-V-I"],
   basic_min: ["minor-cadence"],
   medio_maj: ["ii-V-I", "circle"],
   medio_min: ["minor-cadence", "circle"],

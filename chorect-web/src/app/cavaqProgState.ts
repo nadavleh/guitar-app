@@ -122,6 +122,13 @@ export class CavaqProgState {
     });
   }
 
+  /** Scroll to the previous/next sequence in the list (wraps around). */
+  stepSequence(delta: number) {
+    const all = CAVAQ_SEQUENCES;
+    const i = Math.max(0, all.findIndex((s) => s.id === this.sequenceId));
+    this.setSequence(all[(((i + delta) % all.length) + all.length) % all.length].id);
+  }
+
   setSequence(id: string) {
     if (id === this.sequenceId) return;
     this.sequenceId = id;

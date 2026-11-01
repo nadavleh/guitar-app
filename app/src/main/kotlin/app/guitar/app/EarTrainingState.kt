@@ -106,10 +106,10 @@ class EarTrainingState(
     }
     // ---------- Progression trainer ----------
 
-    var progSubMode by mutableStateOf(EarSubMode.Progression)
+    var progSubMode by mutableStateOf(EarSubMode.Intervals)   // opens on descending major (diatonic) intervals
 
     /** Practice (free play) vs Challenge (scored rounds) — applies to the active tab. */
-    var earMode by mutableStateOf(EarMode.Challenge)   // opens in Progression Challenge by default
+    var earMode by mutableStateOf(EarMode.Challenge)
 
     /** Switch tabs: reset to Practice and stop any audio so modes don't bleed together. */
     fun switchTab(sub: EarSubMode) {

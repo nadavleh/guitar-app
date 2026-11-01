@@ -320,11 +320,11 @@ const isMin = cShapes.every((sh) => chosenCost <= movementCost(prev, sh));
 check("pickMinMovement returns the lowest-cost voicing", isMin && idx >= 0 && idx < cShapes.length);
 
 // --- Built-in grooves are valid (16 slots, in-range voice indices) ---
-// Nadav's three tan-tan studies, pinned exactly as his saved beats exported them
-// (mirrors the Kotlin test `the three Tantan teleco grooves are in the list...`).
+// Nadav's tan-tan study, pinned exactly as his saved beat exported it; NL + downbeat
+// were removed (mirrors the Kotlin test `only the Tantan teleco offbeat groove...`).
+check("Tantan NL + downbeat grooves are gone",
+  !BUILTIN_PATTERNS.some((x) => x.name === "Tantan Teleco NL" || x.name === "Tantan Telco downbeat"));
 for (const [name, encoded] of [
-  ["Tantan Teleco NL", "M:2,2,4,16;surdo=1,1,-,1,0,-,0,1,1,-,1,-,0,-,0,-|tamborim=0,-,0,-,-,0,-,0,-,0,-,0,-,-,0,-"],
-  ["Tantan Telco downbeat", "M:2,2,4,16;surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2|tamborim=0,-,0,-,0,-,-,0,-,0,-,0,-,-,0,-"],
   ["Tantan Telco offbeat", "M:2,2,4,16;surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2|tamborim=-,0,-,0,-,-,0,3002,0,-,0,-,0,-,-,0"],
 ] as [string, string][]) {
   const b = BUILTIN_PATTERNS.find((x) => x.name === name);
@@ -419,7 +419,7 @@ check("diatonic answer set",
   check("interval song lookup", ok);
   const allRefs = [...INTERVAL_SONGS_ASCENDING, ...INTERVAL_SONGS_DESCENDING];
   // Pinned to Kotlin EarTrainingTest: same song count, every snippet sounds its interval.
-  check("interval song count = 58", allRefs.reduce((n, r) => n + r.songs.length, 0) === 58);
+  check("interval song count = 65", allRefs.reduce((n, r) => n + r.songs.length, 0) === 65);
   let melOk = true;
   for (const r of allRefs) for (const sg of r.songs) {
     const notes = melodyNotes(sg.melody);

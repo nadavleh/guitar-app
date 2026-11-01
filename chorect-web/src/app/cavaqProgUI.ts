@@ -33,14 +33,18 @@ export class CavaqProgUI {
     screen.appendChild(topbar);
 
     // ---- Sequence picker ----
-    const sel = el("select", { class: "btn", style: "width:100%;margin-top:6px" });
+    const sel = el("select", { class: "btn", style: "flex:1;min-width:0" });
     for (const seq of CAVAQ_SEQUENCES) {
-      const opt = el("option", { value: seq.id }, [`${seq.nameEn}  ·  ${seq.namePt}`]);
+      const label = seq.nameEn === seq.namePt ? seq.nameEn : `${seq.nameEn}  ·  ${seq.namePt}`;
+      const opt = el("option", { value: seq.id }, [label]);
       if (seq.id === cp.sequenceId) opt.setAttribute("selected", "");
       sel.appendChild(opt);
     }
     sel.addEventListener("change", () => { cp.setSequence(sel.value); });
-    screen.appendChild(el("div", { style: "margin-top:8px" }, [labelSm("Sequence"), sel]));
+    const seqRow = el("div", { style: "display:flex;gap:6px;align-items:center;margin-top:6px" }, [
+      btn("◀", () => cp.stepSequence(-1), "btn"), sel, btn("▶", () => cp.stepSequence(+1), "btn"),
+    ]);
+    screen.appendChild(el("div", { style: "margin-top:8px" }, [labelSm("Sequence"), seqRow]));
 
     // ---- Key + transpose ----
     screen.appendChild(el("div", { class: "row", style: "margin-top:10px;align-items:center;gap:8px" }, [

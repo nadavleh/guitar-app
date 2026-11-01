@@ -75,7 +75,11 @@ fun CavaqProgressionsScreen(state: AppState, onBack: () -> Unit) {
         Spacer(Modifier.height(8.dp))
 
         // ---- Sequence picker ----
-        SequenceDropdown(cp, modifier = Modifier.fillMaxWidth())
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(onClick = { cp.stepSequence(-1) }) { Text("◀") }
+            SequenceDropdown(cp, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { cp.stepSequence(+1) }) { Text("▶") }
+        }
         Spacer(Modifier.height(10.dp))
 
         // ---- Key + transpose ----
@@ -196,7 +200,7 @@ private fun SequenceDropdown(cp: CavaqProgState, modifier: Modifier = Modifier) 
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             CavaqSequences.ALL.forEach { s ->
                 DropdownMenuItem(
-                    text = { Text("${s.nameEn}   ·   ${s.namePt}") },
+                    text = { Text(if (s.nameEn == s.namePt) s.nameEn else "${s.nameEn}   ·   ${s.namePt}") },
                     onClick = { cp.setSequence(s.id); open = false },
                 )
             }
