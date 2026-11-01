@@ -607,7 +607,7 @@ export const SON_3_2 = builtin(
 export interface BuiltinPattern { name: string; pattern: PercussionPattern; bpm?: number; opening?: PercussionPattern; }
 
 // Partido-alto grooves (from Nadav's exported beats): the teleco-teco
-// surdo/tamborim under three bongo comps.
+// surdo/tamborim under a pandeiro and a bongo comp.
 export const PARTIDO_ALTO_OFFICIAL = builtin(
   "M:2,2,4,16;" + SURDO_TELECO + "|" +
   "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
@@ -617,11 +617,6 @@ export const PARTIDO_ALTO_DEC = builtin(
   "M:2,2,4,16;" + SURDO_TELECO + "|" +
   "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
   "bongo=-,0,-,0,1,-,1,-,1,-,0,-,3,1,-,1",
-);
-export const PARTIDO_ALTO_PLATINELAS = builtin(
-  "M:2,2,4,16;" + SURDO_TELECO + "|" +
-  "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
-  "bongo=0,0,-,0,1,-,0,-,1,-,0,-,3,1,2,0",
 );
 
 // Nadav's samba groove (from his exported beat): reta pandeiro (track swing 33)
@@ -663,7 +658,6 @@ export const TANTAN_TELECO_OFFBEAT = builtin(
 export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "2 Tamborims, Pandeiro & Surdo", pattern: TRES_TAMBORINS, bpm: 80 },
   { name: "Partido Alto Groove", pattern: PARTIDO_ALTO_OFFICIAL, bpm: 70 },
-  { name: "Platinelas Pandeiro — Partido Alto Groove", pattern: PARTIDO_ALTO_PLATINELAS, bpm: 70 },
   { name: "Casa 2 — Cavaco Levada", pattern: CASA_2_LEVADA, bpm: 92 },
   { name: "Tantan Telecoteco", pattern: TANTAN_TELECO_OFFBEAT, bpm: 67 },
   { name: "Xote (Bongo)", pattern: XOTE, bpm: 90 },

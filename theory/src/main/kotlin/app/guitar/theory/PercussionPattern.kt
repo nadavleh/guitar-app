@@ -683,7 +683,7 @@ object PercussionBuiltins {
     )
 
     // Partido-alto grooves (from Nadav's exported beats): the teleco-teco
-    // surdo/tamborim under three bongo comps.
+    // surdo/tamborim under a pandeiro and a bongo comp.
     val PARTIDO_ALTO_OFFICIAL: PercussionPattern = builtin(
         "M:2,2,4,16;" + SURDO_TELECO + "|" +
             "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
@@ -693,11 +693,6 @@ object PercussionBuiltins {
         "M:2,2,4,16;" + SURDO_TELECO + "|" +
             "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
             "bongo=-,0,-,0,1,-,1,-,1,-,0,-,3,1,-,1",
-    )
-    val PARTIDO_ALTO_PLATINELAS: PercussionPattern = builtin(
-        "M:2,2,4,16;" + SURDO_TELECO + "|" +
-            "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
-            "bongo=0,0,-,0,1,-,0,-,1,-,0,-,3,1,2,0",
     )
 
     /** Nadav's tan-tan + teleco-teco study, exported from his saved beat
@@ -714,7 +709,6 @@ object PercussionBuiltins {
     val ALL: List<BuiltinPattern> = listOf(
         BuiltinPattern("2 Tamborims, Pandeiro & Surdo", TRES_TAMBORINS, bpm = 80),
         BuiltinPattern("Partido Alto Groove", PARTIDO_ALTO_OFFICIAL, bpm = 70),
-        BuiltinPattern("Platinelas Pandeiro — Partido Alto Groove", PARTIDO_ALTO_PLATINELAS, bpm = 70),
         BuiltinPattern("Casa 2 — Cavaco Levada", CASA_2_LEVADA, bpm = 92),
         BuiltinPattern("Tantan Telecoteco", TANTAN_TELECO_OFFBEAT, bpm = 67),
         BuiltinPattern("Xote (Bongo)", XOTE, bpm = 90),
