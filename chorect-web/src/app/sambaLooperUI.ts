@@ -1247,26 +1247,34 @@ export class SambaLooperUI {
     return wrap;
   }
 
-  /** Constantly-open, scrollable beats side panel: Grooves / Study / Saved.
+  /** Track presets / Compound grooves side-panel sections: folded until tapped open. */
+  private presetsOpen = false;
+  private groovesOpen = false;
+
+  /** Constantly-open, scrollable beats side panel: Track presets / Compound grooves / Saved.
    *  Replaces the old Load… popup; the loaded beat's row is highlighted. */
   private beatSidebar(): HTMLElement {
     const s = this.samba;
     const side = el("div", { class: "drum-side" });
     side.addEventListener("scroll", () => { this.sideScrollTop = side.scrollTop; });
     const header = (t: string) => side.appendChild(el("div", { class: "drum-side-head" }, [t]));
+    // A header that folds/unfolds its section (▸ folded, ▾ open); both start folded.
+    const foldHeader = (t: string, open: boolean, toggle: () => void) => {
+      const h = el("div", { class: "drum-side-head", style: "cursor:pointer" }, [(open ? "▾ " : "▸ ") + t]);
+      h.addEventListener("click", () => { toggle(); this.rerender(); });
+      side.appendChild(h);
+    };
     const beatRow = (b: BuiltinPattern): void => {
       const cls = s.loadedName === b.name ? "lrow sel" : "lrow";
       const row = el("div", { class: cls }, [b.name + (b.opening ? " ▶¹" : "")]);
       row.addEventListener("click", () => { s.loadPattern(b.pattern, b.name, b.bpm ?? null, null, b.opening ?? null); this.rerender(); });
       side.appendChild(row);
     };
-    header("Grooves");
-    for (const b of [...BUILTIN_PATTERNS, ...STUDY_PATTERNS]) beatRow(b);
     // Track presets: tap to ADD the chunk as a track to the current beat.
     // User-defined phrases (👤) can be deleted; save one via the track palette's 💾.
-    header("Track presets");
+    foldHeader("Track presets", this.presetsOpen, () => { this.presetsOpen = !this.presetsOpen; });
     const customs = this.blocks.customLabels();
-    for (const p of this.blocks.allPresets()) {
+    if (this.presetsOpen) for (const p of this.blocks.allPresets()) {
       const isCustom = customs.has(p.label);
       const label = `★ ${p.label}` + (p.swing ? ` ~${p.swing}%` : "") + (isCustom ? " 👤" : "");
       const row = el("div", { class: "lrow", title: p.note ?? "tap to add this track to the current beat" },
@@ -1288,6 +1296,8 @@ export class SambaLooperUI {
       row.addEventListener("click", () => { s.addPresetTrack(p); this.rerender(); });
       side.appendChild(row);
     }
+    foldHeader("Compound grooves", this.groovesOpen, () => { this.groovesOpen = !this.groovesOpen; });
+    if (this.groovesOpen) for (const b of [...BUILTIN_PATTERNS, ...STUDY_PATTERNS]) beatRow(b);
     header("Saved");
     const saved = s.savedPatterns();
     for (const [name, beat] of saved) {

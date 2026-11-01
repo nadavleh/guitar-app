@@ -1386,7 +1386,7 @@ private fun ExportWavDialog(samba: SambaLooperState, onDismiss: () -> Unit) {
     )
 }
 
-/** Load… control: a scrolling beats popup (Grooves + Saved) whose scroll
+/** Load… control: a scrolling beats popup (Track presets + Compound grooves + Saved) whose scroll
  *  position is REMEMBERED across openings — the phone keeps the grid full-width
  *  (web uses a constantly-open side panel with the same content). */
 @Composable
@@ -1397,12 +1397,16 @@ private fun LoadBeatsControl(
 ) {
     val saved by samba.savedPatterns.collectAsState(initial = emptyMap())
     var open by remember { mutableStateOf(false) }
-    // Hoisted above the menu so closing/reopening keeps the scroll position.
+    // Hoisted above the menu so closing/reopening keeps the scroll position and folds.
     val listScroll = rememberScrollState()
+    var presetsOpen by remember { mutableStateOf(false) }
+    var groovesOpen by remember { mutableStateOf(false) }
     Box {
         OutlinedButton(onClick = { open = true }) { Text("Load…") }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            BeatList(samba, blocks, saved, listScroll, onLoaded = { open = false }, onExportPhrase = onExportPhrase)
+            BeatList(samba, blocks, saved, listScroll, onLoaded = { open = false }, onExportPhrase = onExportPhrase,
+                presetsOpen = presetsOpen, onTogglePresets = { presetsOpen = !presetsOpen },
+                groovesOpen = groovesOpen, onToggleGrooves = { groovesOpen = !groovesOpen })
         }
     }
 }
@@ -1415,6 +1419,10 @@ private fun BeatList(
     listScroll: androidx.compose.foundation.ScrollState,
     onLoaded: () -> Unit,
     onExportPhrase: (app.guitar.theory.PercussionBuiltins.PresetTrack) -> Unit = {},
+    presetsOpen: Boolean,
+    onTogglePresets: () -> Unit,
+    groovesOpen: Boolean,
+    onToggleGrooves: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -1423,14 +1431,18 @@ private fun BeatList(
             .padding(6.dp)
             .verticalScroll(listScroll),
     ) {
+        /** Section header; with [onToggle] it folds/unfolds its section (▸ folded, ▾ open). */
         @Composable
-        fun header(t: String) {
+        fun header(t: String, open: Boolean = true, onToggle: (() -> Unit)? = null) {
             Text(
-                t.uppercase(),
+                (if (onToggle != null) (if (open) "▾ " else "▸ ") else "") + t.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (onToggle != null) Modifier.clickable(onClick = onToggle) else Modifier)
+                    .padding(start = 8.dp, top = 8.dp, bottom = 2.dp),
             )
             HorizontalDivider()
         }
@@ -1457,18 +1469,11 @@ private fun BeatList(
             }
         }
 
-        header("Grooves")
-        for (b in app.guitar.theory.PercussionBuiltins.ALL + app.guitar.theory.PercussionBuiltins.STUDY) {
-            beatRow(b.name + if (b.opening != null) " ▶¹" else "", samba.loadedName == b.name) {
-                samba.loadPattern(b.pattern, b.name, b.bpm, opening = b.opening)
-                onLoaded()
-            }
-        }
         // Track presets: tap to ADD the chunk as a track to the current beat.
         // User-defined phrases (👤) can be deleted; save one via the track palette's 💾.
-        header("Track presets")
+        header("Track presets", presetsOpen, onTogglePresets)
         val customs = blocks.customPresets.keys
-        for (p in blocks.allPresets()) {
+        if (presetsOpen) for (p in blocks.allPresets()) {
             val isCustom = p.label in customs
             beatRow(
                 "★ ${p.label}" + (if (p.swing > 0) " ~${p.swing}%" else "") + (if (isCustom) " 👤" else ""),
@@ -1511,6 +1516,13 @@ private fun BeatList(
                 },
             ) {
                 samba.addPresetTrack(p)
+            }
+        }
+        header("Compound grooves", groovesOpen, onToggleGrooves)
+        if (groovesOpen) for (b in app.guitar.theory.PercussionBuiltins.ALL + app.guitar.theory.PercussionBuiltins.STUDY) {
+            beatRow(b.name + if (b.opening != null) " ▶¹" else "", samba.loadedName == b.name) {
+                samba.loadPattern(b.pattern, b.name, b.bpm, opening = b.opening)
+                onLoaded()
             }
         }
         header("Saved")
