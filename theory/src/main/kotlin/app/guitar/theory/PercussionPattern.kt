@@ -507,14 +507,14 @@ object PercussionBuiltins {
 
     /** Son v2 (3:2) — Nadav's chart, 2 bars of 4/4 in eighths. Clave 3-side (1, 2&, 4) then
      *  2-side (2, 3); timbales cáscara; conga tumbao (H = heel → mute ◐, T = toe →
-     *  tip ·, S = slap, Hi = open on the conga, Lo = open on the tumba, bar 2's 4&);
+     *  tip ·, S = slap, Hi = open on the conga, Lo = open on the tumba on the bombo, 2& of the 3-side);
      *  bongo martillo (t = thumb → hi ▲, m = finger → rim ◇, S = slap, O = open → lo ▼). */
     val SON_3_2: PercussionPattern = builtin(
         "M:2,4,4,8;" +
             "claves%60=0,-,-,0,-,-,0,-,-,-,0,-,0,-,-,-" + "|" +
             "timbales%60=2,-,2,2,-,2,2,-,2,-,2,2,-,2,-,2" + "|" +
-            "conga%60=1,3,2,3,1,3,0,0,1,3,2,3,1,3,0,-" + "|" +
-            "tumba%60=-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,0" + "|" +
+            "conga%60=1,3,2,3,1,-,0,0,1,3,2,3,1,3,0,0" + "|" +
+            "tumba%60=-,-,-,-,-,0,-,-,-,-,-,-,-,-,-,-" + "|" +
             "bongo%60=0,2,3,2,0,2,1,2,0,2,3,2,0,2,1,2" + "|" + CAMPANA_3_2,
     )
 

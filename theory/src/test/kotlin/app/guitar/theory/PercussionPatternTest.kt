@@ -164,6 +164,9 @@ class PercussionPatternTest {
         val hits = (0 until b.pattern.slots).filter { b.pattern.voiceAt(claves, it) != null }
         assertEquals(listOf(0, 3, 6, 10, 12), hits)
         assertEquals(PercussionMeter(2, 4, 4, 8), b.pattern.meter)
+        // Two-drum tumbao: the tumba sounds the bombo (2& of the 3-side = slot 5).
+        val tumba = PercussionCatalog.byId("tumba")!!
+        assertEquals(listOf(5), (0 until b.pattern.slots).filter { b.pattern.voiceAt(tumba, it) != null })
     }
 
     /** Son v1 — the 2:3 chart: clave 2-side (2, 3) then 3-side (1, 2&, 4), tumba on
