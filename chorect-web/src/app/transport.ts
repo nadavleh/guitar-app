@@ -74,8 +74,32 @@ export function transportDock(opts: TransportDockOpts): HTMLElement {
         el("span", { class: "transport-bpm-unit" }, ["BPM"]),
       ]);
       vs.input.classList.add("transport-bpm-slider");
-      // Both steppers sit next to the BPM caption; the slider follows.
-      children.push(readout, bpmStep(vs.input, vs.label, "−", -5), bpmStep(vs.input, vs.label, "+", +5), vs.input);
+      // Two tiers (mirrors Kotlin TallDock): ▶ | BPM | − + | … | tone on top, the
+      // full-width tempo slider (+ master fader) below — one row squeezed the
+      // tempo slider to nothing on a phone.
+      const top = el("div", { class: "transport-row" }, [
+        playBtn, readout, bpmStep(vs.input, vs.label, "−", -5), bpmStep(vs.input, vs.label, "+", +5),
+        el("div", { class: "spacer" }),
+      ]);
+      const bottom = el("div", { class: "transport-row" }, [
+        el("span", { class: "transport-vol-icon", title: "Tempo" }, ["⏱"]), vs.input,
+      ]);
+      if (opts.volume !== undefined && opts.onVolume) {
+        const onVolume = opts.onVolume;
+        const vvs = valueSlider((v) => `${Math.round(v)}%`, 0, 100, Math.round(opts.volume * 100),
+          (v) => onVolume(Math.round(v) / 100));
+        vvs.label.className = "transport-vol-val";
+        vvs.input.classList.add("transport-vol-slider");
+        bottom.appendChild(el("div", { class: "transport-vol" }, [
+          el("span", { class: "transport-vol-icon", title: "Master volume" }, ["🔊"]),
+          vvs.input,
+          vvs.label,
+        ]));
+      }
+      const toneChip = el("button", { class: "tone-chip" }, [opts.toneLabel]);
+      toneChip.addEventListener("click", opts.onTone);
+      top.appendChild(toneChip);
+      return el("div", { class: "transport transport-tall" }, [top, bottom]);
     } else {
       // Both the summary readout and the popover label follow the drag live;
       // double-click either to type a tempo.

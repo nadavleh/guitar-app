@@ -734,9 +734,9 @@ object PercussionBuiltins {
         BuiltinPattern("Forró (Bongo)", FORRO, bpm = 95),
         BuiltinPattern("Xaxado (Bongo)", XAXADO, bpm = 100),
         BuiltinPattern("Arrasta-pé (Bongo)", ARRASTA_PE, bpm = 100),
-        BuiltinPattern("Son v1 (2:3)", SON_V1, bpm = 100),
-        BuiltinPattern("Rumba v1 (2:3)", SON_V1_RUMBA, bpm = 100),
-        BuiltinPattern("Son v2 (3:2)", SON_3_2, bpm = 100),
+        BuiltinPattern("Son v1 (2:3)", SON_V1, bpm = 140),
+        BuiltinPattern("Rumba v1 (2:3)", SON_V1_RUMBA, bpm = 140),
+        BuiltinPattern("Son v2 (3:2)", SON_3_2, bpm = 140),
     )
 }
 

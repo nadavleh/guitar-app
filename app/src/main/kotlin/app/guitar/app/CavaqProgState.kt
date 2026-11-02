@@ -169,13 +169,14 @@ class CavaqProgState(
         if (isPlaying) return
         isPlaying = true
         loopJob = scope.launch {
-            val beatMs = (60_000L / bpm.coerceAtLeast(10))
-            val barMs = beatMs * 4
-            val sustain = (barMs * 0.9).toInt().coerceAtLeast(200)
             while (isPlaying) {
                 val shs = shapes()
                 for (i in shs.indices) {
                     if (!isPlaying) break
+                    // One strum (one beat) per chord — a whole 4/4 bar each was far too
+                    // slow to hear the progression as a whole. Tempo is read live.
+                    val beatMs = (60_000L / bpm.coerceAtLeast(10))
+                    val sustain = (beatMs * 0.9).toInt().coerceAtLeast(200)
                     currentBar = i
                     val sh = shs[i]
                     currentShape = sh
@@ -185,7 +186,7 @@ class CavaqProgState(
                         audio.playChord(midis, strumDelayMillis = strumProvider(),
                             sustainMillis = sustain, timbre = timbreProvider())
                     }
-                    delay(barMs)
+                    delay(beatMs)
                 }
             }
         }

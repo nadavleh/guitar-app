@@ -680,9 +680,9 @@ export const BUILTIN_PATTERNS: BuiltinPattern[] = [
   { name: "Forró (Bongo)", pattern: FORRO, bpm: 95 },
   { name: "Xaxado (Bongo)", pattern: XAXADO, bpm: 100 },
   { name: "Arrasta-pé (Bongo)", pattern: ARRASTA_PE, bpm: 100 },
-  { name: "Son v1 (2:3)", pattern: SON_V1, bpm: 100 },
-  { name: "Rumba v1 (2:3)", pattern: SON_V1_RUMBA, bpm: 100 },
-  { name: "Son v2 (3:2)", pattern: SON_3_2, bpm: 100 },
+  { name: "Son v1 (2:3)", pattern: SON_V1, bpm: 140 },
+  { name: "Rumba v1 (2:3)", pattern: SON_V1_RUMBA, bpm: 140 },
+  { name: "Son v2 (3:2)", pattern: SON_3_2, bpm: 140 },
 ];
 
 /** A one-press preset TRACK ("+ Add ▾" → presets, also the phrase "chunks" the

@@ -180,13 +180,14 @@ export class CavaqProgState {
     const token = this.loopToken;
     this.notify();
     void (async () => {
-      const beatMs = 60000 / Math.max(this.bpm, 10);
-      const barMs = beatMs * 4;
-      const sustain = Math.max(Math.floor(barMs * 0.9), 200);
       while (this.isPlaying && token === this.loopToken) {
         const shs = this.shapes();
         for (let i = 0; i < shs.length; i++) {
           if (!this.isPlaying || token !== this.loopToken) break;
+          // One strum (one beat) per chord — a whole 4/4 bar each was far too
+          // slow to hear the progression as a whole. Tempo is read live.
+          const beatMs = 60000 / Math.max(this.bpm, 10);
+          const sustain = Math.max(Math.floor(beatMs * 0.9), 200);
           this.currentBar = i;
           const sh = shs[i];
           this.currentShape = sh;
@@ -196,7 +197,7 @@ export class CavaqProgState {
             this.deps.audio.playChord(midis, this.deps.strumProvider(), sustain, this.deps.timbreProvider());
           }
           this.notify();
-          await sleep(barMs);
+          await sleep(beatMs);
         }
       }
     })();

@@ -472,7 +472,7 @@ export class SambaLooperUI {
     }
     wrap.appendChild(el("div", { class: "drum-beat-header" }, [
       el("span", { class: "drum-beat-name" }, [s.loadedName ?? "Untitled beat"]),
-      el("span", { class: "drum-beat-bpm" }, [`${s.bpm} BPM`]),
+      // (Tempo lives in the dock — repeating it here collided with long names.)
       el("span", { style: "flex:1" }),
       editToggle,
     ]));

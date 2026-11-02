@@ -218,6 +218,12 @@ private fun signalColorScheme(dark: Boolean, palette: SignalPalette): ColorSchem
     // distinct-from-act-and-feedback color.
     val tertiary = if (dark) Accent.Blue.dark else Accent.Blue.light
 
+    // Selected FilterChips and the Slider's inactive track paint with
+    // secondaryContainer. It used to equal surface2 — the colour of every inset card
+    // and the transport dock — so on those surfaces a selected chip had no fill and a
+    // slider had no visible track (just a floating thumb). An act tint reads on both.
+    val actTint = androidx.compose.ui.graphics.lerp(palette.surface, palette.act, if (dark) 0.30f else 0.22f)
+
     return if (dark) {
         darkColorScheme(
             primary             = palette.act,
@@ -227,7 +233,7 @@ private fun signalColorScheme(dark: Boolean, palette: SignalPalette): ColorSchem
 
             secondary           = palette.feedback,
             onSecondary         = onSecondary,
-            secondaryContainer  = palette.surface2,
+            secondaryContainer  = actTint,
             onSecondaryContainer = palette.text,
 
             tertiary            = tertiary,
@@ -256,7 +262,7 @@ private fun signalColorScheme(dark: Boolean, palette: SignalPalette): ColorSchem
 
             secondary           = palette.feedback,
             onSecondary         = onSecondary,
-            secondaryContainer  = palette.surface2,
+            secondaryContainer  = actTint,
             onSecondaryContainer = palette.text,
 
             tertiary            = tertiary,

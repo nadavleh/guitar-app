@@ -174,7 +174,7 @@ class PercussionPatternTest {
     /** Son v1 on the 2:3 rumba clave (3-side 1, 2&, 4&). Mirrored in verify.ts. */
     @Test fun `son v1 rumba-clave variant, exactly`() {
         val b = PercussionBuiltins.ALL.first { it.name == "Rumba v1 (2:3)" }
-        assertEquals(100, b.bpm)
+        assertEquals(140, b.bpm)
         assertEquals("M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,-,0|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,102|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-|cowbell%60!Campana=0,-,1,-,0,-,1,1,0,-,1,1,0,-,1,1", b.pattern.encode())
     }
 
@@ -193,7 +193,7 @@ class PercussionPatternTest {
 
     @Test fun `son v1 is the 2-3 chart, exactly`() {
         val b = PercussionBuiltins.ALL.first { it.name == "Son v1 (2:3)" }
-        assertEquals(100, b.bpm)
+        assertEquals(140, b.bpm)
         assertEquals(
             "M:2,4,4,8;claves%60=-,-,0,-,0,-,-,-,0,-,-,0,-,-,0,-|timbales%60=102,-,102,-,2,102,-,102,102,-,2,102,-,102,-,2|conga%60=1,3,2,3,1,3,0,0,1,3,2,-,-,3,0,0|tumba%60=-,-,-,-,-,-,-,-,-,-,-,0,0,-,-,-|cowbell%60!Campana=0,-,1,-,0,-,1,1,0,-,1,1,0,-,1,1",
             b.pattern.encode(),

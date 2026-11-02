@@ -88,6 +88,10 @@ fun TransportDock(
     onVolume: ((Float) -> Unit)? = null,
 ) {
     val palette = LocalSignal.current
+    if (inlineBpm && bpm != null && onBpm != null) {
+        TallDock(playing, onPlayStop, bpm, onBpm, toneLabel, onTone, modifier, volume, onVolume)
+        return
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -223,6 +227,107 @@ fun TransportDock(
     }
 }
 
+/**
+ * Drum-machine dock (inlineBpm): two tiers so nothing is squeezed on a phone.
+ *  Top:    ▶ | 120 BPM | − + | ........ | tone chip
+ *  Bottom: full-width tempo slider, then the master fader (🔊 slider %).
+ * The old single-row pill gave the tempo slider whatever was left after the
+ * fader and chips — about 0 dp on a 412 dp-wide phone.
+ */
+@Composable
+private fun TallDock(
+    playing: Boolean,
+    onPlayStop: () -> Unit,
+    bpm: Int,
+    onBpm: (Int) -> Unit,
+    toneLabel: String,
+    onTone: () -> Unit,
+    modifier: Modifier,
+    volume: Float?,
+    onVolume: ((Float) -> Unit)?,
+) {
+    val palette = LocalSignal.current
+    val shape = RoundedCornerShape(22.dp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .padding(start = 10.dp, end = 12.dp, top = 8.dp, bottom = 2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable(onClick = onPlayStop),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (playing) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+                    contentDescription = if (playing) "Stop" else "Play",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            // Double-tap the number to type an exact tempo.
+            NumericValueText(
+                "$bpm", value = bpm.toFloat(), min = 10f, max = 300f,
+                onSet = { onBpm(it.toInt()) },
+                style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.width(3.dp))
+            Text("BPM", style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(10.dp))
+            BpmStep("−") { onBpm((bpm - 5).coerceAtLeast(10)) }
+            Spacer(Modifier.width(6.dp))
+            BpmStep("+") { onBpm((bpm + 5).coerceAtMost(300)) }
+            Spacer(Modifier.weight(1f))
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .border(1.dp, palette.feedback, RoundedCornerShape(999.dp))
+                    .clickable(onClick = onTone)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Text(toneLabel, style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold, color = palette.feedback, maxLines = 1)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Outlined.Timer, contentDescription = "Tempo",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            Slider(
+                value = bpm.toFloat(),
+                onValueChange = { onBpm(it.toInt()) },
+                valueRange = 10f..300f,
+                modifier = Modifier.weight(if (volume != null) 1.5f else 1f).padding(horizontal = 6.dp),
+            )
+            if (volume != null && onVolume != null) {
+                Spacer(Modifier.width(6.dp))
+                Text("🔊", style = MaterialTheme.typography.labelMedium)
+                Slider(
+                    value = volume,
+                    onValueChange = onVolume,
+                    valueRange = 0f..1f,
+                    modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
+                )
+                Text(
+                    "${(volume * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    modifier = Modifier.width(34.dp),
+                )
+            }
+        }
+    }
+}
+
 // ---------- Shared small helpers ----------
 
 /** Compact circular −/+ tempo stepper: a 30dp tap target with a subtle outline,
@@ -231,7 +336,7 @@ fun TransportDock(
 private fun BpmStep(symbol: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(30.dp)
+            .size(34.dp)
             .clip(CircleShape)
             .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
             .clickable(onClick = onClick),

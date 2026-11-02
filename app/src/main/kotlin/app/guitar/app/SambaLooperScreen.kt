@@ -155,35 +155,41 @@ fun SambaLooperScreen(state: AppState, onBack: () -> Unit) {
             Text(
                 "DRUMS",
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
-                modifier = Modifier.weight(1f),
             )
+            Spacer(Modifier.width(12.dp))
+            // [Beat | Blocks] — one segmented pill, in the header row so it costs no
+            // vertical space of its own.
+            SegmentedRow(
+                options = listOf(false, true),
+                selected = blocksMode,
+                onSelect = { b ->
+                    blocksMode = b
+                    if (b) samba.stop() else blocks.stop()
+                },
+                label = { if (it) "Blocks" else "Beat" },
+                modifier = Modifier.weight(1f).height(36.dp),
+            )
+            Spacer(Modifier.width(8.dp))
             // Manual rotate (no auto-rotate on this screen): toggle portrait ⇄ landscape.
-            OutlinedButton(
-                onClick = { landscape = !landscape; applyOrientation() },
-                contentPadding = STEP_PAD,
-                modifier = STEP_MOD,
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(999.dp))
+                    .clickable { landscape = !landscape; applyOrientation() },
             ) {
-                Icon(ShellIcons.Rotate, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(if (landscape) "Portrait" else "Rotate")
+                Icon(ShellIcons.Rotate, contentDescription = if (landscape) "Portrait" else "Rotate",
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(6.dp))
             OutlinedButton(onClick = { samba.stop(); blocks.stop(); onBack() }, contentPadding = STEP_PAD,
-                modifier = STEP_MOD) { Text("Back") }
+                modifier = Modifier.height(36.dp)) { Text("Back") }
         }
-
-        Spacer(Modifier.height(6.dp))
-
-        // [Beat | Blocks] toggle.
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(selected = !blocksMode, modifier = STEP_MOD,
-                onClick = { blocksMode = false; blocks.stop() }, label = { Text("Beat") })
-            FilterChip(selected = blocksMode, modifier = STEP_MOD,
-                onClick = { blocksMode = true; samba.stop() }, label = { Text("Blocks") })
-        }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
 
         // ----- Scrollable body: the pattern grid + its controls. (On the phone a
         // permanent side panel squeezes the grid, so beats load from a scrolling
@@ -370,17 +376,11 @@ private fun PatternSection(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            NumericValueText(
-                "${samba.bpm} BPM",
-                value = samba.bpm.toFloat(), min = 10f, max = 300f,
-                onSet = { samba.bpm = it.toInt() },
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.width(10.dp))
+            // (Tempo lives in the dock below — repeating it here collided with long names.)
+            Spacer(Modifier.width(8.dp))
             // The opening (when present) renders as its own grid section above the
             // loop; "＋ Opening ▾" starts one empty or pre-filled with a preset chunk.
             if (samba.opening == null) {
@@ -426,10 +426,12 @@ private fun PatternSection(
     // Left: the three cell-editing tools (Erase/Accent/Dyn) as small toggles.
     // Right: the two things you reach for constantly — Load and + Add — then a "⋯"
     // overflow holding everything else (Save/Clear/Undo/Notes/Export/Import/Help).
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+    // One row that never wraps (it used to spill "More" onto a second line on a
+    // phone); horizontally scrollable as a last resort on very narrow screens.
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         ToolToggle("Erase", eraseMode) { onEraseMode(!eraseMode); onAccentMode(false); onDynMode(false) }
         ToolToggle("Accent", accentMode) { onAccentMode(!accentMode); onEraseMode(false); onDynMode(false) }
@@ -470,7 +472,7 @@ private fun PatternSection(
 
         // Overflow: everything secondary, so the toolbar stays one line.
         Box {
-            OutlinedButton(onClick = { moreMenu = true }, contentPadding = STEP_PAD, modifier = STEP_MOD) { Text("⋯ More") }
+            OutlinedButton(onClick = { moreMenu = true }, contentPadding = STEP_PAD, modifier = STEP_MOD) { Text("⋯") }
             DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                 DropdownMenuItem(text = { Text("💾 Save beat…") },
                     onClick = { saveName = samba.loadedName ?: ""; saveDialog = true; moreMenu = false })
@@ -748,17 +750,20 @@ private fun PatternSection(
     val swingActive = samba.meter.beatUnit == 4 && samba.meter.division == 16
     val zoomed = scaleX.floatValue > 1.001f || scaleY.floatValue > 1.001f ||
         offsetX.floatValue != 0f || offsetY.floatValue != 0f
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 // Tap-tempo: tap along; BPM follows the average tap interval.
-                OutlinedButton(onClick = { samba.tapTempo() }) { Text("Tap tempo") }
+                OutlinedButton(onClick = { samba.tapTempo() }, contentPadding = STEP_PAD, modifier = STEP_MOD) { Text("Tap tempo") }
                 Spacer(Modifier.width(8.dp))
                 // Metronome: overlay a wood click on the loop (higher click on beat 1).
                 if (samba.metronomeOn) {
-                    Button(onClick = { samba.toggleMetronome() }) { Text("Metronome ✓") }
+                    Button(onClick = { samba.toggleMetronome() }, contentPadding = STEP_PAD, modifier = STEP_MOD) { Text("Metronome ✓") }
                 } else {
-                    OutlinedButton(onClick = { samba.toggleMetronome() }) { Text("Metronome") }
+                    OutlinedButton(onClick = { samba.toggleMetronome() }, contentPadding = STEP_PAD, modifier = STEP_MOD) { Text("Metronome") }
                 }
                 Spacer(Modifier.weight(1f))
                 if (zoomed) {
@@ -826,7 +831,7 @@ private const val COUNT_ROW_DP = 16    // "1 e & a…" count strip above each gr
 private const val OPENING_DIVIDER_DP = 30  // bold rule + LOOP label between sections
 private const val LONG_PRESS_CLEAR_MS = 1500L  // hold this long on a cell to clear it
 
-private val STEP_PAD = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+private val STEP_PAD = androidx.compose.foundation.layout.PaddingValues(horizontal = 9.dp, vertical = 2.dp)
 
 /** Height for every STEP_PAD button. Material defaults a Button to a 40dp minimum,
  *  which no contentPadding can undo — and this screen stacks four rows of them
@@ -1402,7 +1407,7 @@ private fun LoadBeatsControl(
     var presetsOpen by remember { mutableStateOf(false) }
     var groovesOpen by remember { mutableStateOf(false) }
     Box {
-        OutlinedButton(onClick = { open = true }) { Text("Load…") }
+        OutlinedButton(onClick = { open = true }, contentPadding = STEP_PAD, modifier = STEP_MOD) { Text("Load…") }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             BeatList(samba, blocks, saved, listScroll, onLoaded = { open = false }, onExportPhrase = onExportPhrase,
                 presetsOpen = presetsOpen, onTogglePresets = { presetsOpen = !presetsOpen },

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -349,13 +350,16 @@ private fun TuningRefRow(state: AppState, tuner: TunerState) {
         (samePc.ifEmpty { strings.indices.toList() })
             .minByOrNull { abs(strings[it].midi.value - m) }
     }
+    // Up to 7 strings share the width equally (a fixed 56 dp + 10 dp gap overflowed
+    // a 412 dp phone by half a circle); more than that scroll.
+    val fit = state.liveTuning.openStrings.size <= 7
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
-            .horizontalScroll(rememberScrollState())
+            .then(if (fit) Modifier else Modifier.horizontalScroll(rememberScrollState()))
             .padding(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (fit) 6.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Each open string of the current tuning, low → high (left → right), as an
@@ -369,8 +373,7 @@ private fun TuningRefRow(state: AppState, tuner: TunerState) {
             val ringColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
             val textColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
             Box(
-                modifier = Modifier
-                    .size(56.dp)
+                modifier = (if (fit) Modifier.weight(1f).widthIn(max = 64.dp).aspectRatio(1f) else Modifier.size(56.dp))
                     .clip(CircleShape)
                     .border(if (selected) 2.dp else 1.dp, ringColor, CircleShape)
                     .clickable {

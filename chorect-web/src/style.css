@@ -914,7 +914,7 @@ select.et-select {
   margin: 2px 0 8px; padding: 6px 12px;
   background: var(--surface2); border-radius: 10px; border: 1px solid var(--divider);
 }
-.drum-beat-name { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.drum-beat-name { font-size: 16px; font-weight: 700; color: var(--text-primary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .drum-beat-bpm { font-size: 12px; font-weight: 600; color: var(--primary); font-variant-numeric: tabular-nums; }
 .drum-edit-toggle { display: flex; gap: 4px; align-items: center; }
 .drum-edit-toggle .btn { padding: 4px 10px; font-size: 12px; }
@@ -1130,6 +1130,14 @@ select.et-select {
 .transport-vol-icon { font-size: 13px; line-height: 1; }
 .transport-vol-slider { flex: 0 1 96px; min-width: 56px; margin: 0; }
 .transport-vol-val { font-size: 11px; color: var(--muted); min-width: 30px; text-align: right; }
+/* Two-tier drum-machine dock (mirrors Kotlin TallDock). */
+.transport-tall { flex-direction: column; align-items: stretch; gap: 4px; border-radius: 22px; padding: 8px 12px 6px 10px; }
+.transport-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.transport-tall .transport-play { width: 44px; height: 44px; }
+.transport-tall .transport-bpm-val { font-size: 24px; }
+.transport-tall .transport-bpm-slider { flex: 3 1 0; min-width: 0; }
+.transport-tall .transport-vol { flex: 2 1 0; }
+.transport-tall .transport-vol-slider { flex: 1 1 auto; }
 .transport-bpm-pop {
   position: absolute;
   bottom: 100%;
