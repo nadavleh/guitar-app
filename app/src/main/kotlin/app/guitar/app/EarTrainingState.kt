@@ -114,7 +114,8 @@ class EarTrainingState(
     /** Switch tabs: reset to Practice and stop any audio so modes don't bleed together. */
     fun switchTab(sub: EarSubMode) {
         progSubMode = sub
-        earMode = EarMode.Practice
+        // Progressions land on the scored Challenge; every other tab on Practice.
+        earMode = if (sub == EarSubMode.Progression) EarMode.Challenge else EarMode.Practice
         stopLoop()
         stopDrill()
     }
@@ -187,9 +188,6 @@ class EarTrainingState(
     // louder, tapering to none at the top, so chords sit on a fuller low end.
     private val EAR_BASS_BOOST = 0.4f
 
-    /** Thin a guitar voicing for EAR TRAINING playback: keep only the LOWEST occurrence
-     *  of each pitch class, so a 6-string barre grip collapses to its 3–4 distinct chord
-     *  tones instead of sounding all doubled strings at once (a cacophony by ear). */
     /** Ear-training voicing candidates: NEVER a full 6-string grip (its doubled low
      *  strings scramble into mud by ear), and prefer voicings whose bass sits at or
      *  above ~A2 (MIDI 45). Each filter falls back rather than emptying the list. */
@@ -200,11 +198,12 @@ class EarTrainingState(
         }.ifEmpty { compact }
     }
 
-    private fun earMidis(shape: app.guitar.theory.ChordShape): List<Int> {
-        val midis = shape.notes.mapNotNull { it?.midi?.value }.sorted()
-        val seen = HashSet<Int>()
-        return midis.filter { seen.add(((it % 12) + 12) % 12) }
-    }
+    /** The pitches of an ear-training voicing: the CAGED grip exactly as a guitarist
+     *  strums it (octave doublings kept — thinning them to one note per pitch class gave
+     *  odd spread voicings), only exact unisons removed. The 6-string-barre cacophony is
+     *  avoided by [earShapes], which skips full 6-string grips. */
+    private fun earMidis(shape: app.guitar.theory.ChordShape): List<Int> =
+        shape.notes.mapNotNull { it?.midi?.value }.distinct().sorted()
 
     /** Sound [midis] as an ear-training chord. When [earBoostTonic] is on, the lowest
      *  note matching [rootPc] is played separately and louder (and left out of the
@@ -2490,31 +2489,47 @@ class EarTrainingState(
     var intervalSource by mutableStateOf(IntervalSource.Diatonic)
     /** Scale the diatonic draw uses — also picks the I–V–I vs i–V–i cadence. */
     var intervalMode by mutableStateOf(TrainingMode.Major)
-    /** Target degrees the diatonic draw may pick (1..8); all but 1 (the unison) by default. */
-    var intervalDegrees by mutableStateOf(IntervalTrainer.DEGREES.toSet() - 1)
+    /** Draw from major AND minor together: the boxes show 3 and ♭3, 6 and ♭6, 7 and ♭7. */
+    var intervalBoth by mutableStateOf(false)
+    /** Target STEPS (semitones above the tonic, 0..12) the diatonic draw may pick. Only
+     *  the steps shown for the current scale count; the tritone (6) is off by default. */
+    var intervalSteps by mutableStateOf(IntervalTrainer.DEFAULT_STEPS)
         private set
+    /** The boxes shown for the current scale choice (always including the tritone). */
+    val intervalBoxSteps: List<Int>
+        get() = IntervalTrainer.boxSteps(intervalMode, intervalBoth)
+    /** The selected steps that actually apply to the current scale choice. */
+    private val intervalActiveSteps: Set<Int>
+        get() = intervalSteps.intersect(intervalBoxSteps.toSet())
+            .ifEmpty { IntervalTrainer.DEFAULT_STEPS.intersect(intervalBoxSteps.toSet()) }
+    /** In Both, the scale the current question's cadence is played in. */
+    private var intervalQuestionMode by mutableStateOf(TrainingMode.Major)
     /** Show a fretboard under the question with every tonic marked, to try it by hand. */
     var intervalShowFretboard by mutableStateOf(false)
     val intervalFretboardCamera = FretboardCamera()
-    /** Scale degree the current diatonic question targets (null in chromatic mode). */
-    var intervalDegree by mutableStateOf<Int?>(null)
+    /** Scale step the current diatonic question targets (null in chromatic mode). */
+    var intervalStep by mutableStateOf<Int?>(null)
         private set
 
     /** Mode the key is heard in: the chosen scale when diatonic, else major. */
     val intervalKeyMode: TrainingMode
-        get() = if (intervalSource == IntervalSource.Diatonic) intervalMode else TrainingMode.Major
+        get() = when {
+            intervalSource != IntervalSource.Diatonic -> TrainingMode.Major
+            intervalBoth -> intervalQuestionMode
+            else -> intervalMode
+        }
 
-    /** Switch a degree box on/off; the last one left on stays on. */
-    fun toggleIntervalDegree(degree: Int) {
-        val next = if (degree in intervalDegrees) intervalDegrees - degree else intervalDegrees + degree
-        if (next.isNotEmpty()) intervalDegrees = next
+    /** Switch a step box on/off; the last box left on (among those shown) stays on. */
+    fun toggleIntervalStep(step: Int) {
+        val next = if (step in intervalSteps) intervalSteps - step else intervalSteps + step
+        if (next.intersect(intervalBoxSteps.toSet()).isNotEmpty()) intervalSteps = next
     }
 
     /** The answer chips: every chromatic interval, or only what the diatonic draw can produce. */
     fun intervalAnswerChoices(): List<IntervalChoice> =
         if (intervalSource == IntervalSource.Chromatic)
             IntervalTrainer.INTERVALS.filter { intervalIncludeUnison || it.semitones > 0 }
-        else IntervalTrainer.diatonicAnswerSet(intervalMode, intervalDegrees, intervalDirection)
+        else IntervalTrainer.stepAnswerSet(intervalActiveSteps, intervalDirection)
             .map { IntervalTrainer.choiceFor(it) }
     /** Harmonic mode: sound tonic + target TOGETHER (else melodic: one after the other). */
     var intervalHarmonic by mutableStateOf(false)
@@ -2680,12 +2695,13 @@ class EarTrainingState(
     /** Semitones of the question before this one, so the next draw can avoid it. */
     private var lastIntervalSemitones: Int? = null
 
-    private data class IntervalDraw(val ascending: Boolean, val semitones: Int, val degree: Int?)
+    private data class IntervalDraw(val ascending: Boolean, val semitones: Int, val step: Int?)
 
     /** Draw the next question. Returns true when the key changed (the cadence should
      *  re-anchor it before the question sounds). */
     private fun drawIntervalQuestion(): Boolean {
         val oldKey = intervalKey
+        val oldMode = intervalKeyMode
         if (intervalRandomKey) intervalKey = IntervalTrainer.randomOtherKey(intervalKey, rng)
         val d = IntervalTrainer.drawAvoiding(lastIntervalSemitones, { it.semitones }) {
             val up = when (intervalDirection) {
@@ -2694,9 +2710,9 @@ class EarTrainingState(
                 IntervalDirection.Mixed -> rng.nextBoolean()
             }
             if (intervalSource == IntervalSource.Diatonic) {
-                val pool = intervalDegrees.sorted()
-                val degree = pool[rng.nextInt(pool.size)]
-                IntervalDraw(up, IntervalTrainer.diatonicSemitones(intervalMode, degree, up), degree)
+                val pool = intervalActiveSteps.sorted()
+                val step = pool[rng.nextInt(pool.size)]
+                IntervalDraw(up, IntervalTrainer.stepSemitones(step, up), step)
             } else {
                 val lo = if (intervalIncludeUnison) 0 else 1
                 IntervalDraw(up, lo + rng.nextInt(IntervalTrainer.INTERVALS.size - lo), null)   // lo..12
@@ -2704,11 +2720,14 @@ class EarTrainingState(
         }
         intervalAscending = d.ascending
         intervalSemitones = d.semitones
-        intervalDegree = d.degree
+        intervalStep = d.step
+        // Both: anchor the key in the scale the target belongs to (♭3 → minor, 3 → major);
+        // a shared step (or the tritone) keeps whichever scale the last question used.
+        if (intervalBoth) d.step?.let { IntervalTrainer.stepMode(it) }?.let { intervalQuestionMode = it }
         lastIntervalSemitones = d.semitones
         intervalGuess = null
         intervalChAnswered = false
-        return intervalKey != oldKey
+        return intervalKey != oldKey || intervalKeyMode != oldMode
     }
 
     fun startIntervalChallenge() {

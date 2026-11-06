@@ -335,6 +335,25 @@ class EarTrainingTest {
             IntervalTrainer.diatonicAnswerSet(M, IntervalTrainer.DEGREES.toSet(), IntervalDirection.Ascending))
     }
 
+    @Test fun `step boxes cover major, minor, both, and always the tritone`() {
+        assertEquals(listOf(0, 2, 4, 5, 6, 7, 9, 11, 12), IntervalTrainer.boxSteps(TrainingMode.Major, false))
+        assertEquals(listOf(0, 2, 3, 5, 6, 7, 8, 10, 12), IntervalTrainer.boxSteps(TrainingMode.Minor, false))
+        assertEquals((0..12).toList() - 1, IntervalTrainer.boxSteps(TrainingMode.Minor, true))
+        assertEquals("1 2 ♭3 3 4 ♭5 5 ♭6 6 ♭7 7 8",
+            IntervalTrainer.boxSteps(TrainingMode.Major, true).joinToString(" ") { IntervalTrainer.stepLabel(it) })
+        assertTrue(IntervalTrainer.TRITONE_STEP !in IntervalTrainer.DEFAULT_STEPS)
+        assertEquals(8, IntervalTrainer.stepSemitones(4, ascending = false))   // 3 down = m6
+        assertEquals(6, IntervalTrainer.stepSemitones(6, ascending = false))   // tritone either way
+        assertEquals(listOf(4, 6, 8), IntervalTrainer.stepAnswerSet(setOf(4, 6), IntervalDirection.Mixed))
+        assertEquals(TrainingMode.Minor, IntervalTrainer.stepMode(8))
+        assertEquals(TrainingMode.Major, IntervalTrainer.stepMode(9))
+        assertEquals(null, IntervalTrainer.stepMode(6))
+        // The step draw agrees with the degree draw on each scale's own steps.
+        for (mode in TrainingMode.entries) for (d in IntervalTrainer.DEGREES) for (up in listOf(true, false))
+            assertEquals(IntervalTrainer.diatonicSemitones(mode, d, up),
+                IntervalTrainer.stepSemitones(IntervalTrainer.degreeSemitones(mode, d), up))
+    }
+
     @Test fun `every interval has a reference row in both directions`() {
         for (st in 1..12) for (up in listOf(true, false))
             assertEquals(st, IntervalSongs.refFor(st, up)?.semitones)

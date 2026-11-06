@@ -381,6 +381,34 @@ const CAGED: Record<string, Partial<Record<CagedShape, Tmpl>>> = {
   add9: {
     C: [null, 0, -1, -3, 0, -3], A: [null, 0, 2, 4, 2, 0], G: [0, -1, -3, -1, -3, 0],
     E: [0, 2, 4, 1, 0, 0], D: [null, null, 0, 2, 3, 0],
+  },  // Ear-training extensions: the standard guitar grips, CAGED-named by root string.
+  // maj9 (1 3 7 9 — no 5th)
+  maj9: {
+    C: [null, 0, -1, 1, 0, -3], A: [null, 0, -1, 1, 0, null], E: [0, null, 1, 1, null, 2],
+  },
+  // maj13 (1 3 7 13)
+  maj13: {
+    A: [null, 0, null, 1, 2, 2], E: [0, null, 1, 1, 2, null],
+  },
+  // maj7#11 (1 3 7 #11)
+  maj7s11: {
+    A: [null, 0, -1, 1, null, -1], E: [0, null, 1, 1, -1, null],
+  },
+  // m9 (1 b3 b7 9)
+  m9: {
+    A: [null, 0, -2, 0, 0, null], E: [0, null, 0, 0, null, 2],
+  },
+  // m11 (1 b3 b7 11)
+  m11: {
+    A: [null, 0, 0, 0, 1, null], E: [0, 0, 0, 0, 3, 0], D: [null, null, 0, 0, 1, 1],
+  },
+  // 11 / 7sus4 (1 4 5 b7) — the classic 7sus4 grips
+  sus7: {
+    A: [null, 0, 2, 0, 3, 0], E: [0, 2, 0, 2, 0, 0], D: [null, null, 0, 2, 1, 3],
+  },
+  // m(maj7) (1 b3 5 7)
+  mMaj7: {
+    A: [null, 0, 2, 1, 1, 0], E: [0, 2, 1, 0, 0, 0], D: [null, null, 0, 2, 2, 1],
   },
 };
 
@@ -402,6 +430,13 @@ function cagedTemplatesFor(symbol: string): Partial<Record<CagedShape, Tmpl>> | 
     case "9": return CAGED.ninth;
     case "add9": return CAGED.add9;
     case "13": return CAGED.thirteen;
+    case "maj9": return CAGED.maj9;
+    case "maj13": return CAGED.maj13;
+    case "maj7#11": return CAGED.maj7s11;
+    case "m9": return CAGED.m9;
+    case "m11": return CAGED.m11;
+    case "11": case "7sus4": return CAGED.sus7;
+    case "mMaj7": return CAGED.mMaj7;
     default: return null;
   }
 }

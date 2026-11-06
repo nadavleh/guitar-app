@@ -21,7 +21,7 @@ import {
   pickMinMovement, defaultRng,
   IntervalDirection, INTERVAL_CHOICES, intervalTargetMidi, IntervalChoice, IntervalSource,
   melodyNotes, melodyNotesAnchored, INTERVAL_EIGHTH_MS,
-  INTERVAL_DEGREES, diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalChoiceFor,
+  INTERVAL_DEFAULT_STEPS, intervalBoxSteps, intervalStepSemitones, intervalStepAnswerSet, intervalStepMode, intervalChoiceFor,
   randomOtherKey, drawAvoiding,
 } from "../theory";
 import { WebAudioEngine, Timbres, renderCueBeep } from "../audio";
@@ -163,7 +163,8 @@ export class EarTrainingState {
 
   switchTab(sub: EarSubMode) {
     this.progSubMode = sub;
-    this.earMode = EarMode.Practice;
+    // Progressions land on the scored Challenge; every other tab on Practice.
+    this.earMode = sub === EarSubMode.Progression ? EarMode.Challenge : EarMode.Practice;
     this.stopLoop();
     this.stopDrill();
     this.notify();
@@ -381,10 +382,6 @@ export class EarTrainingState {
     this.notify();
   }
 
-  /** Thin a guitar voicing for EAR TRAINING playback: keep only the LOWEST occurrence
-   *  of each pitch class, so a 6-string barre grip collapses to its 3–4 distinct chord
-   *  tones instead of sounding all doubled strings at once (a cacophony by ear).
-   *  (Mirrors EarTrainingState.earMidis on Android.) */
   /** Ear-training voicing candidates: NEVER a full 6-string grip (doubled low strings
    *  scramble into mud by ear), and prefer voicings whose bass sits at/above ~A2
    *  (MIDI 45). Each filter falls back rather than emptying. (Mirrors Android.) */
@@ -395,15 +392,12 @@ export class EarTrainingState {
     return high.length > 0 ? high : compact;
   }
 
+  /** The pitches of an ear-training voicing: the CAGED grip exactly as a guitarist strums
+   *  it (octave doublings kept), only exact unisons removed. earShapes skips full 6-string
+   *  grips. (Mirrors EarTrainingState.earMidis on Android.) */
   private earMidis(shape: ChordShape): number[] {
-    const midis = shape.notes.filter((n) => n !== null).map((n) => n!.midi).sort((a, b) => a - b);
-    const seen = new Set<number>();
-    return midis.filter((m) => {
-      const pc = ((m % 12) + 12) % 12;
-      if (seen.has(pc)) return false;
-      seen.add(pc);
-      return true;
-    });
+    const midis = shape.notes.filter((n) => n !== null).map((n) => n!.midi);
+    return [...new Set(midis)].sort((a, b) => a - b);
   }
 
   /** Sound midis as an ear-training chord. When earBoostTonic is on, the lowest note
@@ -2173,25 +2167,40 @@ export class EarTrainingState {
   setIntervalSource(v: IntervalSource) { this.intervalSource = v; this.notify(); }
   /** Scale the diatonic draw uses — also picks the I–V–I vs i–V–i cadence. */
   intervalMode = TrainingMode.Major;
-  setIntervalMode(m: TrainingMode) { this.intervalMode = m; this.notify(); }
-  /** Target degrees the diatonic draw may pick (1..8); all but 1 (the unison) by default. */
-  intervalDegrees = new Set<number>(INTERVAL_DEGREES.filter((d) => d !== 1));
+  setIntervalMode(m: TrainingMode) { this.intervalMode = m; this.intervalBoth = false; this.notify(); }
+  /** Draw from major AND minor together: the boxes show 3 and ♭3, 6 and ♭6, 7 and ♭7. */
+  intervalBoth = false;
+  setIntervalBoth(v: boolean) { this.intervalBoth = v; this.notify(); }
+  /** Target STEPS (semitones above the tonic, 0..12) the diatonic draw may pick. Only the
+   *  steps shown for the current scale count; the tritone (6) is off by default. */
+  intervalSteps = new Set<number>(INTERVAL_DEFAULT_STEPS);
+  /** The boxes shown for the current scale choice (always including the tritone). */
+  get intervalBoxSteps(): number[] { return intervalBoxSteps(this.intervalMode, this.intervalBoth); }
+  /** The selected steps that actually apply to the current scale choice. */
+  private get intervalActiveSteps(): Set<number> {
+    const shown = this.intervalBoxSteps;
+    const on = shown.filter((s) => this.intervalSteps.has(s));
+    return new Set(on.length > 0 ? on : shown.filter((s) => INTERVAL_DEFAULT_STEPS.includes(s)));
+  }
+  /** In Both, the scale the current question's cadence is played in. */
+  private intervalQuestionMode: TrainingMode = TrainingMode.Major;
   /** Show a fretboard under the question with every tonic marked, to try it by hand. */
   intervalShowFretboard = false;
   setIntervalShowFretboard(v: boolean) { this.intervalShowFretboard = v; this.notify(); }
-  /** Scale degree the current diatonic question targets (null in chromatic mode). */
-  intervalDegree: number | null = null;
+  /** Scale step the current diatonic question targets (null in chromatic mode). */
+  intervalStep: number | null = null;
 
   /** Mode the key is heard in: the chosen scale when diatonic, else major. */
   get intervalKeyMode(): TrainingMode {
-    return this.intervalSource === IntervalSource.Diatonic ? this.intervalMode : TrainingMode.Major;
+    if (this.intervalSource !== IntervalSource.Diatonic) return TrainingMode.Major;
+    return this.intervalBoth ? this.intervalQuestionMode : this.intervalMode;
   }
 
-  /** Switch a degree box on/off; the last one left on stays on. */
-  toggleIntervalDegree(degree: number) {
-    const next = new Set(this.intervalDegrees);
-    if (next.has(degree)) next.delete(degree); else next.add(degree);
-    if (next.size > 0) this.intervalDegrees = next;
+  /** Switch a step box on/off; the last box left on (among those shown) stays on. */
+  toggleIntervalStep(step: number) {
+    const next = new Set(this.intervalSteps);
+    if (next.has(step)) next.delete(step); else next.add(step);
+    if (this.intervalBoxSteps.some((s) => next.has(s))) this.intervalSteps = next;
     this.notify();
   }
 
@@ -2199,7 +2208,7 @@ export class EarTrainingState {
   intervalAnswerChoices(): IntervalChoice[] {
     if (this.intervalSource === IntervalSource.Chromatic)
       return INTERVAL_CHOICES.filter((c) => this.intervalIncludeUnison || c.semitones > 0);
-    return diatonicIntervalAnswerSet(this.intervalMode, this.intervalDegrees, this.intervalDirection)
+    return intervalStepAnswerSet(this.intervalActiveSteps, this.intervalDirection)
       .map((st) => intervalChoiceFor(st));
   }
 
@@ -2373,26 +2382,33 @@ export class EarTrainingState {
    *  re-anchor it before the question sounds). */
   private drawIntervalQuestion(): boolean {
     const oldKey = this.intervalKey;
+    const oldMode = this.intervalKeyMode;
     if (this.intervalRandomKey) this.intervalKey = randomOtherKey(this.intervalKey, this.rng);
-    const d = drawAvoiding(this.lastIntervalSemitones, (x: { up: boolean; st: number; degree: number | null }) => x.st, () => {
+    const d = drawAvoiding(this.lastIntervalSemitones, (x: { up: boolean; st: number; step: number | null }) => x.st, () => {
       const up = this.intervalDirection === IntervalDirection.Ascending ? true
         : this.intervalDirection === IntervalDirection.Descending ? false
         : this.rng.int(2) === 0;
       if (this.intervalSource === IntervalSource.Diatonic) {
-        const pool = [...this.intervalDegrees].sort((x, y) => x - y);
-        const degree = pool[this.rng.int(pool.length)];
-        return { up, st: diatonicIntervalSemitones(this.intervalMode, degree, up), degree };
+        const pool = [...this.intervalActiveSteps].sort((x, y) => x - y);
+        const step = pool[this.rng.int(pool.length)];
+        return { up, st: intervalStepSemitones(step, up), step };
       }
       const lo = this.intervalIncludeUnison ? 0 : 1;
-      return { up, st: lo + this.rng.int(INTERVAL_CHOICES.length - lo), degree: null };   // lo..12
+      return { up, st: lo + this.rng.int(INTERVAL_CHOICES.length - lo), step: null };   // lo..12
     });
     this.intervalAscending = d.up;
     this.intervalSemitones = d.st;
-    this.intervalDegree = d.degree;
+    this.intervalStep = d.step;
+    // Both: anchor the key in the scale the target belongs to (♭3 → minor, 3 → major);
+    // a shared step (or the tritone) keeps whichever scale the last question used.
+    if (this.intervalBoth && d.step !== null) {
+      const m = intervalStepMode(d.step);
+      if (m !== null) this.intervalQuestionMode = m;
+    }
     this.lastIntervalSemitones = d.st;
     this.intervalGuess = null;
     this.intervalChAnswered = false;
-    return this.intervalKey !== oldKey;
+    return this.intervalKey !== oldKey || this.intervalKeyMode !== oldMode;
   }
 
   startIntervalChallenge() {

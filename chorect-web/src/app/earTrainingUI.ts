@@ -17,7 +17,7 @@ import {
   spellPc, noteAt, TrainingMode, ChordTypeLevel, ChordTypeLevelName, PitchClass, decodeMissedTake,
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
   parseChord, ChordShapeGenerator, CagedShape, notesFrom, midiPitchClass, fp, fpKey,
-  IntervalDirection, intervalChoiceFor, IntervalSource, INTERVAL_DEGREES, intervalDegreeLabel, allPositions,
+  IntervalDirection, intervalChoiceFor, IntervalSource, intervalStepLabel, allPositions,
   Progression, CarMode,
   MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, MINOR_HARMONIC_PROGRESSIONS, ADVANCED_PROGRESSIONS, ADVANCED2_PROGRESSIONS,
   SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor, progressionFromKey,
@@ -2027,18 +2027,21 @@ export class EarTrainingUI {
     ]));
     if (ear.intervalSource === IntervalSource.Diatonic) {
       parent.appendChild(labelSm("Scale"));
-      parent.appendChild(chipsRow([TrainingMode.Major, TrainingMode.Minor].map((m) =>
-        chip(m === TrainingMode.Major ? "Major" : "Minor", ear.intervalMode === m, () => ear.setIntervalMode(m)))));
-      parent.appendChild(labelSm("Degrees drawn (tap to switch one off; 1 = unison)"));
-      const boxes = el("div", { style: "display:flex;gap:4px;margin:4px 0" });
-      for (const d of INTERVAL_DEGREES) {
-        const on = ear.intervalDegrees.has(d);
+      parent.appendChild(chipsRow([
+        ...[TrainingMode.Major, TrainingMode.Minor].map((m) =>
+          chip(m === TrainingMode.Major ? "Major" : "Minor", !ear.intervalBoth && ear.intervalMode === m, () => ear.setIntervalMode(m))),
+        chip("Both", ear.intervalBoth, () => ear.setIntervalBoth(true)),
+      ]));
+      parent.appendChild(labelSm("Degrees drawn (tap to switch one off; 1 = unison, ♭5 = tritone)"));
+      const boxes = el("div", { style: `display:flex;gap:${ear.intervalBoth ? 2 : 4}px;margin:4px 0` });
+      for (const d of ear.intervalBoxSteps) {
+        const on = ear.intervalSteps.has(d);
         const box = el("button", {
-          style: `flex:1;height:40px;border-radius:8px;border:1px solid var(--line);font-weight:700;cursor:pointer;` +
+          style: `flex:1;min-width:0;padding:0;height:40px;border-radius:8px;border:1px solid var(--line);font-weight:700;cursor:pointer;white-space:nowrap;` +
             (on ? "background:var(--act);color:var(--on-act, #fff)" : "background:var(--surface2);color:var(--muted, inherit);opacity:0.6"),
           "aria-pressed": String(on),
-        }, [intervalDegreeLabel(ear.intervalMode, d)]);
-        box.addEventListener("click", () => ear.toggleIntervalDegree(d));
+        }, [intervalStepLabel(d)]);
+        box.addEventListener("click", () => ear.toggleIntervalStep(d));
         boxes.appendChild(box);
       }
       parent.appendChild(boxes);
@@ -2136,7 +2139,7 @@ export class EarTrainingUI {
       // A unison has no direction, so none is printed for it.
       const dir = ear.intervalAscending ? "ascending" : "descending";
       const parts: string[] = [];
-      if (ear.intervalDegree !== null) parts.push(`degree ${intervalDegreeLabel(ear.intervalMode, ear.intervalDegree)}`);
+      if (ear.intervalStep !== null) parts.push(`degree ${intervalStepLabel(ear.intervalStep)}`);
       if (ear.intervalSemitones > 0) parts.push(dir);
       const choice = intervalChoiceFor(ear.intervalSemitones);
       parent.appendChild(el("div", { style: `font-weight:700;color:var(--act)` }, [

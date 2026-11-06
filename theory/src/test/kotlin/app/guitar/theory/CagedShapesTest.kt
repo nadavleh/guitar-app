@@ -202,4 +202,16 @@ class CagedShapesTest {
             }
         }
     }
+
+    /** Every extension the ear trainer plays has real CAGED grips in every key, so it
+     *  never falls to the brute-force search (which produced odd voicings). */
+    @Test fun `ear-training extensions have CAGED grips in every key`() {
+        for (sym in listOf("maj9", "maj13", "maj7#11", "m9", "m11", "11", "7sus4", "mMaj7")) {
+            val quality = ChordLibrary.qualities[sym]!!
+            for (rootVal in 0..11) {
+                val n = cagedShapesFor(PitchClass(rootVal), quality, std, frets).size
+                assertTrue(n >= 2, "$sym at root $rootVal has only $n CAGED grip(s)")
+            }
+        }
+    }
 }

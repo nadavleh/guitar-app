@@ -2655,17 +2655,20 @@ private fun IntervalSettings(ear: EarTrainingState, keyName: String) {
         Text("Scale", style = MaterialTheme.typography.labelMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (m in TrainingMode.entries) {
-                FilterChip(selected = ear.intervalMode == m,
-                    onClick = { ear.intervalMode = m },
+                FilterChip(selected = !ear.intervalBoth && ear.intervalMode == m,
+                    onClick = { ear.intervalMode = m; ear.intervalBoth = false },
                     label = { Text(if (m == TrainingMode.Major) "Major" else "Minor") })
             }
+            FilterChip(selected = ear.intervalBoth,
+                onClick = { ear.intervalBoth = true },
+                label = { Text("Both") })
         }
         Spacer(Modifier.height(8.dp))
-        Text("Degrees drawn (tap to switch one off; 1 = unison)", style = MaterialTheme.typography.labelMedium)
+        Text("Degrees drawn (tap to switch one off; 1 = unison, ♭5 = tritone)", style = MaterialTheme.typography.labelMedium)
         Spacer(Modifier.height(4.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            for (d in IntervalTrainer.DEGREES) {
-                val on = d in ear.intervalDegrees
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (ear.intervalBoth) 2.dp else 4.dp)) {
+            for (d in ear.intervalBoxSteps) {
+                val on = d in ear.intervalSteps
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -2674,10 +2677,10 @@ private fun IntervalSettings(ear: EarTrainingState, keyName: String) {
                         .background(if (on) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                         .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                        .clickable { ear.toggleIntervalDegree(d) },
+                        .clickable { ear.toggleIntervalStep(d) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(IntervalTrainer.degreeLabel(ear.intervalMode, d), fontWeight = FontWeight.Bold,
+                    Text(IntervalTrainer.stepLabel(d), fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false,
                         color = if (on) MaterialTheme.colorScheme.onPrimary
                                 else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -2845,7 +2848,7 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
             val ok = ear.intervalGuess == ear.intervalSemitones
             // A unison has no direction, so none is printed for it.
             val dir = if (ear.intervalAscending) "ascending" else "descending"
-            val degree = ear.intervalDegree?.let { "degree ${IntervalTrainer.degreeLabel(ear.intervalMode, it)}" }
+            val degree = ear.intervalStep?.let { "degree ${IntervalTrainer.stepLabel(it)}" }
             val detail = listOfNotNull(degree, dir.takeIf { ear.intervalSemitones > 0 }).joinToString(", ")
             val choice = IntervalTrainer.choiceFor(ear.intervalSemitones)
             Text((if (ok) "✔ correct" else "✘ answer: ${choice.longName}") +

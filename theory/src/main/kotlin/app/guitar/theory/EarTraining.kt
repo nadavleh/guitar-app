@@ -1011,4 +1011,48 @@ object IntervalTrainer {
         }
         return degrees.flatMap { d -> dirs.map { diatonicSemitones(mode, d, it) } }.distinct().sorted()
     }
+
+    // ---- Scale-STEP boxes: a target named by its semitones above the tonic (0..12) ----
+    // Lets one box row carry major, minor, BOTH (3 and ♭3 side by side) and the tritone.
+
+    /** The tritone box (♭5) — in neither scale, so it is shown always but off by default. */
+    const val TRITONE_STEP = 6
+
+    /** Default selection: every step except the unison and the tritone. */
+    val DEFAULT_STEPS: Set<Int> = setOf(2, 3, 4, 5, 7, 8, 9, 10, 11, 12)
+
+    /** The boxes shown: the scale's steps (both scales' union when [both]) + the tritone. */
+    fun boxSteps(mode: TrainingMode, both: Boolean): List<Int> {
+        val modes = if (both) TrainingMode.entries else listOf(mode)
+        return (modes.flatMap { m -> DEGREES.map { degreeSemitones(m, it) } } + TRITONE_STEP).distinct().sorted()
+    }
+
+    /** Box label for a step: "1", "2", "♭3", "3", "4", "♭5", "5", "♭6", "6", "♭7", "7", "8". */
+    fun stepLabel(step: Int): String = when (step) {
+        0 -> "1"; 1 -> "♭2"; 2 -> "2"; 3 -> "♭3"; 4 -> "3"; 5 -> "4"; 6 -> "♭5"
+        7 -> "5"; 8 -> "♭6"; 9 -> "6"; 10 -> "♭7"; 11 -> "7"; else -> "8"
+    }
+
+    /** Heard interval for a step target: up = the step itself; down = the same note an
+     *  octave below (its complement). Unison and octave are the same either way. */
+    fun stepSemitones(step: Int, ascending: Boolean): Int =
+        if (ascending || step == 0 || step == 12) step else 12 - step
+
+    /** Every interval the step draw can produce from [steps] in [direction] (sorted). */
+    fun stepAnswerSet(steps: Set<Int>, direction: IntervalDirection): List<Int> {
+        val dirs = when (direction) {
+            IntervalDirection.Ascending -> listOf(true)
+            IntervalDirection.Descending -> listOf(false)
+            IntervalDirection.Mixed -> listOf(true, false)
+        }
+        return steps.flatMap { s -> dirs.map { stepSemitones(s, it) } }.distinct().sorted()
+    }
+
+    /** The scale a step belongs to ONLY in: ♭3/♭6/♭7 → minor, 3/6/7 → major; null when
+     *  both scales share it (1, 2, 4, 5, 8) or neither has it (the tritone). */
+    fun stepMode(step: Int): TrainingMode? = when (step) {
+        3, 8, 10 -> TrainingMode.Minor
+        4, 9, 11 -> TrainingMode.Major
+        else -> null
+    }
 }

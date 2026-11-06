@@ -876,3 +876,48 @@ export function diatonicIntervalAnswerSet(mode: TrainingMode, degrees: Set<numbe
   for (const d of degrees) for (const up of dirs) out.add(diatonicIntervalSemitones(mode, d, up));
   return [...out].sort((a, b) => a - b);
 }
+
+// ---- Scale-STEP boxes: a target named by its semitones above the tonic (0..12) ----
+// One box row carries major, minor, BOTH (3 and ♭3 side by side) and the tritone.
+
+/** The tritone box (♭5) — in neither scale, so it is shown always but off by default. */
+export const INTERVAL_TRITONE_STEP = 6;
+
+/** Default selection: every step except the unison and the tritone. */
+export const INTERVAL_DEFAULT_STEPS: number[] = [2, 3, 4, 5, 7, 8, 9, 10, 11, 12];
+
+/** The boxes shown: the scale's steps (both scales' union when `both`) + the tritone. */
+export function intervalBoxSteps(mode: TrainingMode, both: boolean): number[] {
+  const modes = both ? [TrainingMode.Major, TrainingMode.Minor] : [mode];
+  const out = new Set<number>([INTERVAL_TRITONE_STEP]);
+  for (const m of modes) for (const d of INTERVAL_DEGREES) out.add(intervalDegreeSemitones(m, d));
+  return [...out].sort((a, b) => a - b);
+}
+
+/** Box label for a step: "1", "2", "♭3", "3", "4", "♭5", "5", "♭6", "6", "♭7", "7", "8". */
+export function intervalStepLabel(step: number): string {
+  return ["1", "♭2", "2", "♭3", "3", "4", "♭5", "5", "♭6", "6", "♭7", "7", "8"][step] ?? "8";
+}
+
+/** Heard interval for a step target: up = the step; down = the same note an octave
+ *  below (its complement). Unison and octave are the same either way. */
+export function intervalStepSemitones(step: number, ascending: boolean): number {
+  return ascending || step === 0 || step === 12 ? step : 12 - step;
+}
+
+/** Every interval the step draw can produce from `steps` in `direction` (sorted). */
+export function intervalStepAnswerSet(steps: Set<number>, direction: IntervalDirection): number[] {
+  const dirs = direction === IntervalDirection.Ascending ? [true]
+    : direction === IntervalDirection.Descending ? [false] : [true, false];
+  const out = new Set<number>();
+  for (const s of steps) for (const up of dirs) out.add(intervalStepSemitones(s, up));
+  return [...out].sort((a, b) => a - b);
+}
+
+/** The scale a step belongs to ONLY in: ♭3/♭6/♭7 → minor, 3/6/7 → major; null when both
+ *  scales share it (1, 2, 4, 5, 8) or neither has it (the tritone). */
+export function intervalStepMode(step: number): TrainingMode | null {
+  if (step === 3 || step === 8 || step === 10) return TrainingMode.Minor;
+  if (step === 4 || step === 9 || step === 11) return TrainingMode.Major;
+  return null;
+}

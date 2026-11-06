@@ -29,7 +29,8 @@ import {
   PercussionCatalog, PercussionPattern, PercussionMeter, swungSlotMs, slotMs, voiceCount, SwingModel,
   movementCost, pickMinMovement, BUILTIN_PATTERNS, STUDY_PATTERNS, PRESET_TRACKS,
   INTERVAL_CHOICES, intervalTargetMidi, INTERVAL_DEGREES, intervalDegreeSemitones, intervalDegreeLabel,
-  diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalRefFor, intervalChoiceFor, IntervalDirection,
+  diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalRefFor,
+  intervalBoxSteps, intervalStepLabel, intervalStepSemitones, intervalStepAnswerSet, intervalStepMode, intervalChoiceFor, IntervalDirection,
   randomOtherKey, drawAvoiding,
   INTERVAL_SONGS_ASCENDING, INTERVAL_SONGS_DESCENDING, melodyNotes, melodyContains, melodyNotesAnchored,
   CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval,
@@ -65,7 +66,8 @@ check("every Cmaj7 shape contains all chord tones", allContain);
 // --- CAGED template purity: templates must not ADD foreign tones (e.g. the old
 // dim E-shape sneaked in the dim7's maj6) ---
 let templatesPure = true;
-for (const sym of ["", "m", "7", "maj7", "m7", "m7b5", "dim7", "dim", "aug", "sus2", "sus4", "6", "m6"]) {
+for (const sym of ["", "m", "7", "maj7", "m7", "m7b5", "dim7", "dim", "aug", "sus2", "sus4", "6", "m6",
+    "maj9", "maj13", "maj7#11", "m9", "m11", "11", "7sus4", "mMaj7"]) {
   const q = QUALITIES.get(sym)!;
   for (let r = 0; r < 12; r++) {
     const allowed = new Set(notesFrom(q, r));
@@ -75,6 +77,13 @@ for (const sym of ["", "m", "7", "maj7", "m7", "m7b5", "dim7", "dim", "aug", "su
   }
 }
 check("every CAGED template sounds only chord tones", templatesPure);
+// Every ear-training extension has real CAGED grips (no brute-force voicing), in every key.
+{
+  let ok = true;
+  for (const sym of ["maj9", "maj13", "maj7#11", "m9", "m11", "11", "7sus4", "mMaj7"])
+    for (let r = 0; r < 12; r++) if (cagedShapesFor(r, QUALITIES.get(sym)!, standard, 14).length < 2) ok = false;
+  check("ear-training extensions have CAGED grips in every key", ok);
+}
 
 // --- CAGED templates: C major → 5 ascending shapes ---
 const cMajCaged = cagedShapesFor(0, parseChord("C")![1], standard, 14);
@@ -418,6 +427,14 @@ check("unison/octave names", intervalChoiceFor(0).shortName === "Unison" && inte
   for (let i = 0; i < 300; i++) { const k = randomOtherKey(0); if (k === 0) ok = false; keys.add(k); }
   check("no repeated interval; random key always changes", ok && keys.size === 11);
 }
+check("interval step boxes: major/minor/both + tritone",
+  intervalBoxSteps(TrainingMode.Major, false).join() === "0,2,4,5,6,7,9,11,12" &&
+  intervalBoxSteps(TrainingMode.Minor, false).join() === "0,2,3,5,6,7,8,10,12" &&
+  intervalBoxSteps(TrainingMode.Major, true).join() === "0,2,3,4,5,6,7,8,9,10,11,12" &&
+  intervalBoxSteps(TrainingMode.Major, true).map(intervalStepLabel).join(" ") === "1 2 ♭3 3 4 ♭5 5 ♭6 6 ♭7 7 8" &&
+  intervalStepSemitones(4, false) === 8 && intervalStepSemitones(6, false) === 6 && intervalStepSemitones(12, false) === 12 &&
+  intervalStepAnswerSet(new Set([4, 6]), IntervalDirection.Mixed).join() === "4,6,8" &&
+  intervalStepMode(3) === TrainingMode.Minor && intervalStepMode(11) === TrainingMode.Major && intervalStepMode(6) === null);
 check("diatonic answer set",
   diatonicIntervalAnswerSet(TrainingMode.Major, new Set([3, 5]), IntervalDirection.Mixed).join() === "4,5,7,8" &&
   diatonicIntervalAnswerSet(TrainingMode.Major, new Set(INTERVAL_DEGREES), IntervalDirection.Ascending).join() === "0,2,4,5,7,9,11,12");
