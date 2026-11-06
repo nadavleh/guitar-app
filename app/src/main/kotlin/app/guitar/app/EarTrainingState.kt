@@ -1565,21 +1565,26 @@ class EarTrainingState(
         flavorStarted = true
         flavorJob?.cancel()
         flavorPlaying = true
+        // A cancelled job's `finally` runs after this one set flavorPlaying=true: only
+        // the newest job may clear it (else Replay would cut the new question short).
+        val gen = ++flavorGen
         flavorJob = scope.launch {
             try {
                 playCadenceInline()
                 delay(400)
                 playSymbolOnce(flavorChordSymbol(), sustainProvider())
-            } finally { flavorPlaying = false }
+            } finally { if (gen == flavorGen) flavorPlaying = false }
         }
     }
+    private var flavorGen = 0
 
     /** Replay just the I-V-I cadence (does not redraw the chord). */
     fun replayFlavorCadence() {
         if (flavorPlaying) return
         flavorJob?.cancel()
         flavorPlaying = true
-        flavorJob = scope.launch { try { playCadenceInline() } finally { flavorPlaying = false } }
+        val gen = ++flavorGen
+        flavorJob = scope.launch { try { playCadenceInline() } finally { if (gen == flavorGen) flavorPlaying = false } }
     }
 
     /** Replay the currently-drawn flavor chord. */
@@ -2559,12 +2564,16 @@ class EarTrainingState(
     var intervalPreviewId by mutableStateOf<String?>(null)
         private set
     private var intervalPreviewJob: Job? = null
+    /** Bumped per preview launch: a cancelled preview's `finally` only clears the ▶/■
+     *  state while it is still the newest one (the replacement already set its own id). */
+    private var intervalPreviewGen = 0
 
     /** [baseMidi] is the reference note: C4 on the Theory tab, the question's tonic in
      *  the trainer's dialogs. */
     fun playIntervalPreview(id: String, semitones: Int, ascending: Boolean, baseMidi: Int = 60) {
         intervalPreviewJob?.cancel()
         intervalPreviewId = id
+        val gen = ++intervalPreviewGen
         intervalPreviewJob = scope.launch {
             try {
                 audio.chokeChords()   // start of a phrase; the notes inside it may overlap
@@ -2574,7 +2583,7 @@ class EarTrainingState(
                 delay(150)
                 soundInterval(base, target, harmonic = true)
             } finally {
-                if (intervalPreviewId == id) intervalPreviewId = null
+                if (gen == intervalPreviewGen) intervalPreviewId = null
             }
         }
     }
@@ -2587,6 +2596,7 @@ class EarTrainingState(
                           anchorMidi: Int? = null) {
         intervalPreviewJob?.cancel()
         intervalPreviewId = id
+        val gen = ++intervalPreviewGen
         intervalPreviewJob = scope.launch {
             try {
                 audio.chokeChords()
@@ -2600,13 +2610,14 @@ class EarTrainingState(
                 }
                 delay(200)
             } finally {
-                if (intervalPreviewId == id) intervalPreviewId = null
+                if (gen == intervalPreviewGen) intervalPreviewId = null
             }
         }
     }
 
     fun stopIntervalPreview() {
         intervalPreviewJob?.cancel()
+        intervalPreviewGen++
         intervalPreviewId = null
     }
 
@@ -2634,10 +2645,14 @@ class EarTrainingState(
     private fun launchIntervalSound(block: suspend () -> Unit) {
         intervalJob?.cancel()
         intervalPlaying = true
+        // The cancelled job's `finally` runs after this one set intervalPlaying=true:
+        // only the newest job may clear it.
+        val gen = ++intervalSoundGen
         intervalJob = scope.launch {
-            try { audio.chokeChords(); block() } finally { intervalPlaying = false }
+            try { audio.chokeChords(); block() } finally { if (gen == intervalSoundGen) intervalPlaying = false }
         }
     }
+    private var intervalSoundGen = 0
 
     /** Re-sound just the tonic note (the reference). */
     fun playIntervalTonic() = launchIntervalSound {

@@ -1372,7 +1372,11 @@ export class EarTrainingState {
         await this.playCadenceInline(token, this.flavorMode, this.flavorKey);
         await sleep(400);
         if (token === this.flavorToken) this.playSymbolOnce(this.flavorChordSymbol(), this.deps.sustainProvider());
-      } finally { this.flavorPlaying = false; this.notify(); }
+      } finally {
+        // A superseded run must not clear the newer question's flag (else Replay could
+        // bump the token and silence the new question's chord).
+        if (token === this.flavorToken) { this.flavorPlaying = false; this.notify(); }
+      }
     })();
   }
 
@@ -1384,7 +1388,7 @@ export class EarTrainingState {
     this.notify();
     void (async () => {
       try { await this.playCadenceInline(token, this.flavorMode, this.flavorKey); }
-      finally { this.flavorPlaying = false; this.notify(); }
+      finally { if (token === this.flavorToken) { this.flavorPlaying = false; this.notify(); } }
     })();
   }
 
@@ -2471,5 +2475,8 @@ export class EarTrainingState {
     this.stopDrill();
     this.cadenceToken++; this.flavorToken++; this.n2cToken++; this.invToken++; this.adToken++;
     this.intervalToken++;
+    // The bumped tokens stop the runs' finally blocks from clearing these.
+    this.flavorPlaying = false;
+    this.intervalPlaying = false;
   }
 }
