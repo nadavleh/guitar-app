@@ -64,7 +64,7 @@ data class Progression(
 data class ResolvedChord(
     /** Chord symbol parseable by [ChordLibrary.parse], e.g. "Cmaj7", "Am", "Bm7b5". */
     val symbol: String,
-    /** Roman-numeral display, e.g. "Imaj7", "ii7", "vii°7". */
+    /** Roman-numeral display, e.g. "Imaj7", "ii7", "viiø7". */
     val romanLabel: String,
     /** The diatonic root pitch class. */
     val root: PitchClass,
@@ -82,7 +82,7 @@ object EarTraining {
         5 to DegreeInfo("V",    "",    "7",    "9",    listOf("6" to "6", "9" to "9", "11" to "11", "13" to "13")),
         6 to DegreeInfo("vi",   "m",   "m7",   "m9",   listOf("m9" to "9", "m11" to "11")),
         // Extended diminished extensions are rarely written; keep vii° at the ø7 sound.
-        7 to DegreeInfo("vii°", "dim", "m7b5", "m7b5", listOf("m7b5" to "7")),
+        7 to DegreeInfo("vii°", "dim", "m7b5", "m7b5", listOf("m7b5" to HALF_DIM_SUFFIX)),
     )
 
     val MINOR_DEGREES: Map<Int, DegreeInfo> = mapOf(
@@ -132,6 +132,25 @@ object EarTraining {
     private val MAJOR_SCALE_SEMITONES = intArrayOf(0, 2, 4, 5, 7, 9, 11)
     private val NATURAL_MINOR_SEMITONES = intArrayOf(0, 2, 3, 5, 7, 8, 10)
 
+    /** How a key's chord roots are spelled: flats for F, Bb, Eb, Ab, Db, Gb major and
+     *  their relative minors (D, G, C, F, Bb, Eb minor); sharps otherwise. */
+    fun keyAccidental(key: PitchClass, mode: TrainingMode): Accidental {
+        val majorTonic = if (mode == TrainingMode.Major) key.value else (key.value + 3) % 12
+        return if (majorTonic in FLAT_MAJOR_TONICS) Accidental.FLAT else Accidental.SHARP
+    }
+    private val FLAT_MAJOR_TONICS = setOf(5, 10, 3, 8, 1, 6)
+
+    /** Bar [bar]'s Roman label for a chord of [quality] (a symbol's quality suffix),
+     *  read in [prog]'s key — e.g. a saved take's "Gmaj7" on degree 5 → "V" + "maj7". */
+    fun romanLabelForQuality(prog: Progression, bar: Int, quality: String): String? {
+        val deg = prog.degrees.getOrNull(bar) ?: return null
+        val info = if (prog.mode == TrainingMode.Minor && bar in prog.dominantBars) MINOR_DOMINANT
+            else (if (prog.mode == TrainingMode.Major) MAJOR_DEGREES else MINOR_DEGREES)[deg] ?: return null
+        if (quality == info.triadQuality) return info.roman
+        info.extendedOptions.firstOrNull { it.first == quality }?.let { return joinRoman(info.roman, it.second) }
+        return romanLabel(info.roman, quality)
+    }
+
     /** Pitch class of the diatonic root for [degree] in [key] under [mode]. */
     fun degreeRoot(key: PitchClass, degree: Int, mode: TrainingMode): PitchClass {
         require(degree in 1..7) { "degree must be 1..7, got $degree" }
@@ -147,14 +166,33 @@ object EarTraining {
     fun degreeRefMidi(key: PitchClass, degree: Int, mode: TrainingMode): Int =
         52 + key.value + ((degreeRoot(key, degree, mode).value - key.value + 12) % 12)
 
+    /** Roman suffix of a half-diminished 7th (m7b5): "vii°" + "ø7" reads "viiø7". */
+    const val HALF_DIM_SUFFIX = "ø7"
+
+    /** Append a Roman [suffix] to a triad Roman: a half-diminished "ø…" replaces the
+     *  triad's "°" ("vii°" + "ø7" → "viiø7"); anything else is plain concatenation. */
+    fun joinRoman(triadRoman: String, suffix: String): String =
+        if (triadRoman.endsWith("°") && suffix.startsWith("ø")) triadRoman.dropLast(1) + suffix
+        else triadRoman + suffix
+
+    /** Inverse of [joinRoman]: the suffix of [label] after [triadRoman] ("viiø7" after
+     *  "vii°" → "ø7"), or null when [label] isn't built on [triadRoman]. */
+    fun romanSuffix(triadRoman: String, label: String): String? = when {
+        label.startsWith(triadRoman) -> label.removePrefix(triadRoman)
+        triadRoman.endsWith("°") && label.startsWith(triadRoman.dropLast(1) + "ø") ->
+            label.removePrefix(triadRoman.dropLast(1))
+        else -> null
+    }
+
     /** Build the displayed Roman label for a non-triad level: e.g. "ii"+"m7" → "ii7", "V"+"7" → "V7". */
     fun romanLabel(triadRoman: String, quality: String): String {
         // Ignore any leading accidental (b/#) when deciding major/minor case, so
         // "bIII"+"maj7" → "bIIImaj7" (major) and "v"+"m7" → "v7" (minor).
         val core = triadRoman.trimStart('b', '#')
         return when {
-            // Diminished: "vii°" / "ii°" + m7b5 → "vii°7" / "ii°7"
-            triadRoman.endsWith("°") -> if (quality == "m7b5") "${triadRoman}7" else triadRoman + quality
+            // Half-diminished: "vii°" / "ii°" + m7b5 → "viiø7" / "iiø7" ("°7" is the
+            // FULLY diminished dim7).
+            triadRoman.endsWith("°") -> if (quality == "m7b5") joinRoman(triadRoman, HALF_DIM_SUFFIX) else triadRoman + quality
             // Lowercase (minor) Roman: the "m" prefix is redundant — strip it (but never
             // from "maj7"/"maj9"). "ii" + "m7" → "ii7"; "vi" + "m9" → "vi9".
             core.isNotEmpty() && core[0].isLowerCase() &&
@@ -194,11 +232,12 @@ object EarTraining {
             else (if (mode == TrainingMode.Major) MAJOR_DEGREES else MINOR_DEGREES)[degree]
                 ?: error("invalid degree $degree")
         val root = degreeRoot(key, degree, mode)
-        val rootName = NoteSpeller.spell(root)
+        // Spelled by the key: F major's IV is "Bb", not "A#"; C minor's bIII "Ebmaj7".
+        val rootName = NoteSpeller.spell(root, keyAccidental(key, mode))
         // Extended level with a diatonic allowed-extension set → choose one at random.
         if (level == ChordTypeLevel.Extended && info.extendedOptions.isNotEmpty()) {
             val (qual, romanSuffix) = info.extendedOptions[rng.nextInt(info.extendedOptions.size)]
-            return ResolvedChord("$rootName$qual", info.roman + romanSuffix, root)
+            return ResolvedChord("$rootName$qual", joinRoman(info.roman, romanSuffix), root)
         }
         val quality = when (level) {
             ChordTypeLevel.Triads    -> info.triadQuality
@@ -870,7 +909,7 @@ object EarTraining {
      * [label] (bar [bar]'s Roman, as resolved in [prog]'s own key) renamed from the
      * relative tonic when [prog] opens on it ([openingRelativeMode]); [label] unchanged
      * otherwise. Only the numeral changes — a chord keeps its quality across the two
-     * readings (vi↔i, ii↔iv, IV↔bVI, vii°↔ii°), so the suffix ("7", "maj9", "°7"…)
+     * readings (vi↔i, ii↔iv, IV↔bVI, vii°↔ii°), so the suffix ("7", "maj9", "ø7"…)
      * carries over verbatim. A harmonic-minor dominant becomes a major III in the
      * relative major.
      */
@@ -880,10 +919,10 @@ object EarTraining {
         val dominant = prog.mode == TrainingMode.Minor && bar in prog.dominantBars
         val own = if (dominant) MINOR_DOMINANT
                   else (if (prog.mode == TrainingMode.Major) MAJOR_DEGREES else MINOR_DEGREES)[deg] ?: return label
-        if (!label.startsWith(own.roman)) return label
+        val suffix = romanSuffix(own.roman, label) ?: return label
         val relDeg = degreeFromMajorRelative(majorRelativeDegree(deg, prog.mode), rel)
         val relRoman = (if (rel == TrainingMode.Major) MAJOR_DEGREES else MINOR_DEGREES)[relDeg]?.roman ?: return label
-        return (if (dominant) relRoman.uppercase() else relRoman) + label.removePrefix(own.roman)
+        return joinRoman(if (dominant) relRoman.uppercase() else relRoman, suffix)
     }
 
     /** A run of chords moving round the circle: [length] chords from bar index [start]

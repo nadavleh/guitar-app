@@ -133,10 +133,10 @@ class EarTrainingTest {
         assertEquals("ii7", r.romanLabel)    // not "iim7"
     }
 
-    @Test fun `vii°7 in C major is Bm7b5`() {
+    @Test fun `viiø7 in C major is Bm7b5`() {
         val r = EarTraining.resolve(7, PitchClass.C, TrainingMode.Major, ChordTypeLevel.Sevenths)
         assertEquals("Bm7b5", r.symbol)
-        assertEquals("vii°7", r.romanLabel)
+        assertEquals("viiø7", r.romanLabel)   // half-diminished, not the dim7 "°7"
     }
 
     @Test fun `i in A minor triad is Am`() {
@@ -159,10 +159,10 @@ class EarTrainingTest {
         assertEquals("v7", r.romanLabel)
     }
 
-    @Test fun `ii°7 in A minor is Bm7b5`() {
+    @Test fun `iiø7 in A minor is Bm7b5`() {
         val r = EarTraining.resolve(2, PitchClass.A, TrainingMode.Minor, ChordTypeLevel.Sevenths)
         assertEquals("Bm7b5", r.symbol)
-        assertEquals("ii°7", r.romanLabel)
+        assertEquals("iiø7", r.romanLabel)
     }
 
     @Test fun `bIIImaj7 in A minor is Cmaj7`() {
@@ -222,6 +222,43 @@ class EarTrainingTest {
         assertEquals("V7b9", dom.romanLabel)
         val (root, q) = ChordLibrary.parse(dom.symbol)!!
         assertTrue(q.notesFrom(root).all { it in harmonic }, "${dom.symbol} leaves A harmonic minor")
+    }
+
+    @Test fun `diatonic chords are spelled by the key`() {
+        // F major's IV is Bb (not A#); C minor's bIII is Eb, its bVI Ab, its bVII Bb.
+        assertEquals("Bb", EarTraining.resolve(4, PitchClass.F, TrainingMode.Major, ChordTypeLevel.Triads).symbol)
+        assertEquals("Ebmaj7", EarTraining.resolve(3, PitchClass.C, TrainingMode.Minor, ChordTypeLevel.Sevenths).symbol)
+        assertEquals("Abmaj7", EarTraining.resolve(6, PitchClass.C, TrainingMode.Minor, ChordTypeLevel.Sevenths).symbol)
+        // Sharp keys keep sharps.
+        assertEquals("F#m", EarTraining.resolve(3, PitchClass.D, TrainingMode.Major, ChordTypeLevel.Triads).symbol)
+        assertEquals("C#dim", EarTraining.resolve(2, PitchClass.B, TrainingMode.Minor, ChordTypeLevel.Triads).symbol)
+        // Every key/mode/degree/level still parses back to the right root.
+        for (k in 0 until 12) for (mode in TrainingMode.entries) for (deg in 1..7) for (lvl in ChordTypeLevel.entries) {
+            val r = EarTraining.resolve(deg, PitchClass.of(k), mode, lvl)
+            val parsed = ChordLibrary.parse(r.symbol)
+            assertTrue(parsed != null && parsed.first == r.root, "unparseable or wrong root: ${r.symbol}")
+        }
+    }
+
+    @Test fun `half-diminished suffix joins and splits around the degree sign`() {
+        assertEquals("viiø7", EarTraining.joinRoman("vii°", "ø7"))
+        assertEquals("V7", EarTraining.joinRoman("V", "7"))
+        assertEquals("ø7", EarTraining.romanSuffix("vii°", "viiø7"))
+        assertEquals("7", EarTraining.romanSuffix("V", "V7"))
+        assertEquals("", EarTraining.romanSuffix("vii°", "vii°"))
+        assertNull(EarTraining.romanSuffix("V", "iv7"))
+    }
+
+    @Test fun `drill labels come from the saved symbols`() {
+        val p = Progression(TrainingMode.Minor, listOf(1, 2, 5, 1), dominantBars = setOf(2))
+        assertEquals("i", EarTraining.romanLabelForQuality(p, 0, "m"))
+        assertEquals("i7", EarTraining.romanLabelForQuality(p, 0, "m7"))
+        assertEquals("iiø7", EarTraining.romanLabelForQuality(p, 1, "m7b5"))
+        assertEquals("V7", EarTraining.romanLabelForQuality(p, 2, "7"))
+        val maj = Progression(TrainingMode.Major, listOf(1, 2, 7, 1))
+        assertEquals("ii6", EarTraining.romanLabelForQuality(maj, 1, "m6"))
+        assertEquals("viiø7", EarTraining.romanLabelForQuality(maj, 2, "m7b5"))
+        assertEquals("Imaj9", EarTraining.romanLabelForQuality(maj, 3, "maj9"))
     }
 
     // ----- progression library -----
@@ -737,7 +774,7 @@ class EarTrainingTest {
         val p = Progression(TrainingMode.Minor, listOf(3, 2, 5, 1), dominantBars = setOf(2))
         assertEquals(TrainingMode.Major, EarTraining.openingRelativeMode(p))
         assertEquals("Imaj7", EarTraining.openingRelativeLabel(p, 0, "bIIImaj7"))
-        assertEquals("vii°7", EarTraining.openingRelativeLabel(p, 1, "ii°7"))
+        assertEquals("viiø7", EarTraining.openingRelativeLabel(p, 1, "iiø7"))
         assertEquals("III7", EarTraining.openingRelativeLabel(p, 2, "V7"))   // harmonic dominant
         assertEquals("vi7", EarTraining.openingRelativeLabel(p, 3, "i7"))
     }

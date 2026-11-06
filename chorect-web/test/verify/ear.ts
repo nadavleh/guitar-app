@@ -1,7 +1,7 @@
 // Area "ear" of the web parity checks (split out of the old monolithic verify.ts).
 // Run alone: npm run verify -- ear
 
-import { parseChord, parsePitchClass, TrainingMode, ChordTypeLevel, resolve as resolveDegree, degreeRoot, romanLabel, ADVANCED_PROGRESSIONS, resolveNamed, romanIsModeAmbiguous, MAJOR_DEGREES, MINOR_DEGREES, ProgFocus, randomProgression, hasOneSixStep, thirdSixthPrimaryPool, thirdSixthContrastPool, THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode, progressionLacksTonic, progressionRelativeTonicMode, progressionRelativeTonicBar, progressionHomeIsObvious, relativeRomanLineFor, openingRelativeMode, openingRelativeLabel, circleRun, circleRunBars, MissedTake, encodeMissedTake, decodeMissedTake, resolveProgressionMixed } from "../../src/theory";
+import { parseChord, parsePitchClass, TrainingMode, ChordTypeLevel, resolve as resolveDegree, degreeRoot, romanLabel, ADVANCED_PROGRESSIONS, resolveNamed, romanIsModeAmbiguous, MAJOR_DEGREES, MINOR_DEGREES, ProgFocus, randomProgression, hasOneSixStep, thirdSixthPrimaryPool, thirdSixthContrastPool, THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode, progressionLacksTonic, progressionRelativeTonicMode, progressionRelativeTonicBar, progressionHomeIsObvious, relativeRomanLineFor, openingRelativeMode, openingRelativeLabel, circleRun, circleRunBars, MissedTake, encodeMissedTake, decodeMissedTake, resolveProgressionMixed, joinRoman, romanSuffix, keyAccidental, romanLabelForQuality } from "../../src/theory";
 import { check } from "./harness";
 
 export function run(): void {
@@ -12,7 +12,7 @@ export function run(): void {
   const iiChord = resolveDegree(2, parsePitchClass("C"), TrainingMode.Major, ChordTypeLevel.Sevenths);
   check("ii7 in C major = Dm7, labelled ii7 (not iim7)", iiChord.symbol === "Dm7" && iiChord.romanLabel === "ii7");
   check("degreeRoot vi in C major = A", degreeRoot(parsePitchClass("C"), 6, TrainingMode.Major) === 9);
-  check("romanLabel vii°+m7b5 = vii°7", romanLabel("vii°", "m7b5") === "vii°7");
+  check("romanLabel vii°+m7b5 = viiø7 (half-diminished)", romanLabel("vii°", "m7b5") === "viiø7");
 
   // --- "Mix all" keeps the harmonic-minor dominant (mirrors Kotlin
   // `mix-all resolution plays dominant bars as a major V`) ---
@@ -46,6 +46,43 @@ export function run(): void {
     const dom = resolveDegree(5, 9, TrainingMode.Minor, ChordTypeLevel.Extended, undefined, true);
     check("harmonic V at Extended = E7b9 / V7b9 inside harmonic minor",
       dom.symbol === "E7b9" && dom.romanLabel === "V7b9" && pcsOf(dom.symbol).every((pc) => harmonic.has(pc)));
+  }
+
+  // --- Key spelling, ø7 join/split, drill labels from saved symbols (mirror Kotlin
+  // `diatonic chords are spelled by the key` / `half-diminished suffix …` / `drill labels …`) ---
+  check("F major IV is Bb", resolveDegree(4, 5, TrainingMode.Major, ChordTypeLevel.Triads).symbol === "Bb");
+  check("C minor bIII7 is Ebmaj7, bVI7 Abmaj7",
+    resolveDegree(3, 0, TrainingMode.Minor, ChordTypeLevel.Sevenths).symbol === "Ebmaj7" &&
+    resolveDegree(6, 0, TrainingMode.Minor, ChordTypeLevel.Sevenths).symbol === "Abmaj7");
+  check("sharp keys keep sharps",
+    resolveDegree(3, 2, TrainingMode.Major, ChordTypeLevel.Triads).symbol === "F#m" &&
+    resolveDegree(2, 11, TrainingMode.Minor, ChordTypeLevel.Triads).symbol === "C#dim");
+  check("keyAccidental: F/Bb/Eb/Ab/Db/Gb major + relative minors are flat",
+    [5, 10, 3, 8, 1, 6].every((k) => keyAccidental(k, TrainingMode.Major) === "flat") &&
+    [2, 7, 0, 5, 10, 3].every((k) => keyAccidental(k, TrainingMode.Minor) === "flat") &&
+    keyAccidental(9, TrainingMode.Minor) === "sharp" && keyAccidental(7, TrainingMode.Major) === "sharp");
+  {
+    let ok = true;
+    for (let k = 0; k < 12; k++) for (const mode of [TrainingMode.Major, TrainingMode.Minor]) for (let deg = 1; deg <= 7; deg++)
+      for (const lvl of [ChordTypeLevel.Triads, ChordTypeLevel.Sevenths, ChordTypeLevel.Extended]) {
+        const r = resolveDegree(deg, k, mode, lvl);
+        const parsed = parseChord(r.symbol);
+        if (!parsed || parsed[0] !== r.root) ok = false;
+      }
+    check("every key-spelled diatonic symbol parses back to its root", ok);
+  }
+  check("joinRoman / romanSuffix handle the half-diminished ø",
+    joinRoman("vii°", "ø7") === "viiø7" && joinRoman("V", "7") === "V7" &&
+    romanSuffix("vii°", "viiø7") === "ø7" && romanSuffix("V", "V7") === "7" &&
+    romanSuffix("vii°", "vii°") === "" && romanSuffix("V", "iv7") === null);
+  {
+    const p: Progression = { mode: TrainingMode.Minor, degrees: [1, 2, 5, 1], dominantBars: [2] };
+    const maj: Progression = { mode: TrainingMode.Major, degrees: [1, 2, 7, 1] };
+    check("drill labels come from the saved symbols",
+      romanLabelForQuality(p, 0, "m") === "i" && romanLabelForQuality(p, 0, "m7") === "i7" &&
+      romanLabelForQuality(p, 1, "m7b5") === "iiø7" && romanLabelForQuality(p, 2, "7") === "V7" &&
+      romanLabelForQuality(maj, 1, "m6") === "ii6" && romanLabelForQuality(maj, 2, "m7b5") === "viiø7" &&
+      romanLabelForQuality(maj, 3, "maj9") === "Imaj9");
   }
 
   // --- Major/minor-ambiguous Romans (challenge answer disambiguation) ---
@@ -238,7 +275,7 @@ export function run(): void {
   check("speechFor speaks every Roman the diatonic library can print",
     [...Object.values(MAJOR_DEGREES), ...Object.values(MINOR_DEGREES)].every((info) =>
       [info.roman, romanLabel(info.roman, info.seventhQuality), romanLabel(info.roman, info.extendedQuality),
-        ...info.extendedOptions.map(([, suffix]) => info.roman + suffix)]
+        ...info.extendedOptions.map(([, suffix]) => joinRoman(info.roman, suffix))]
         .every((r) => CarMode.speechFor(r).length > 0)));
 
   check("the spoken level defaults high and clamps into the slider range",
@@ -289,7 +326,7 @@ export function run(): void {
   check("a minor progression opening on bIII is answered in major numerals",
     openingRelativeMode(bIIIOpener) === TrainingMode.Major &&
     openingRelativeLabel(bIIIOpener, 0, "bIIImaj7") === "Imaj7" &&
-    openingRelativeLabel(bIIIOpener, 1, "ii°7") === "vii°7" &&
+    openingRelativeLabel(bIIIOpener, 1, "iiø7") === "viiø7" &&
     openingRelativeLabel(bIIIOpener, 2, "V7") === "III7" &&
     openingRelativeLabel(bIIIOpener, 3, "i7") === "vi7");
   check("a progression opening anywhere else keeps its own numerals",

@@ -10,7 +10,7 @@ import {
   TrainingMode, ChordTypeLevel, Progression, ResolvedChord, NamedProgression,
   EarTrainingDegrees, degreeRoot, degreeRefMidi, resolve as resolveDegree, resolveProgression, resolveProgressionMixed,
   randomProgression, ProgFocus, CarMode, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
-  MINOR_DOMINANT, DegreeInfo, romanModeTag, romanIsModeAmbiguous, progressionKey, progressionFromKey,
+  MINOR_DOMINANT, DegreeInfo, joinRoman, romanSuffix, romanLabelForQuality, keyAccidental, romanModeTag, romanIsModeAmbiguous, progressionKey, progressionFromKey,
   MissedTake, MissedBar, encodeMissedTake, decodeMissedTake,
   majorRelativeDegree, degreeFromMajorRelative,
   openingRelativeLabel, circleRun as findCircleRun, CircleRun,
@@ -253,7 +253,7 @@ export class EarTrainingState {
       if (!parsed) return rc;
       const [root, q] = parsed;
       const newRoot = pc(root);
-      return { symbol: spellPc(newRoot) + q.symbol, romanLabel: rc.romanLabel, root: newRoot };
+      return { symbol: spellPc(newRoot, keyAccidental(this.progKey, this.progMode)) + q.symbol, romanLabel: rc.romanLabel, root: newRoot };
     });
     if (this.isLooping) { this.stopLoop(); this.startLoop(); }
     this.notify();
@@ -598,13 +598,16 @@ export class EarTrainingState {
     this.drillKey = progKey;
     this.drillProg = prog;
     this.drillTake = take;
-    // Roman labels come from a fresh resolve at the take's key; the SYMBOLS come from the
-    // take, so an extension the quiz rolled (Imaj7 vs I) is drilled as heard.
+    // The SYMBOLS come from the take, so an extension the quiz rolled (Imaj7 vs I) is
+    // drilled as heard — and the Roman labels are derived from those symbols, not from
+    // today's chord-type level.
     const fresh = resolveProgression(prog, tonic, this.chordTypeLevel, this.rng);
     this.drillResolved = take === null ? fresh : fresh.map((rc, i) => {
       const sym = take.bars[i].symbol;
       const parsed = parseChord(sym);
-      return parsed ? { ...rc, symbol: sym, root: parsed[0] } : rc;
+      return parsed
+        ? { ...rc, symbol: sym, root: parsed[0], romanLabel: romanLabelForQuality(prog, i, parsed[1].symbol) ?? rc.romanLabel }
+        : rc;
     });
     this.drillInversions = this.drillResolved.map(() => null);
     this.rebuildDrillVoicing();
@@ -1070,25 +1073,30 @@ export class EarTrainingState {
     return infos;
   }
 
+  /** The extension suffix `info`'s degree takes with `quality` ("7", "maj9", "ø7"…). */
+  private extSuffix(info: DegreeInfo, quality: string): string {
+    return romanSuffix(info.roman, romanLabel(info.roman, quality)) ?? "";
+  }
+
   challengeExtOptions(): string[] {
     if (!this.challengeNeedsExt) return [];
     const infos = this.extDegreeInfos();
     if (this.earMixAll) {
       const labels = new Set<string>([""]);
       for (const info of infos) {
-        labels.add(romanLabel(info.roman, info.seventhQuality).replace(info.roman, ""));
+        labels.add(this.extSuffix(info, info.seventhQuality));
         if (info.extendedOptions.length) info.extendedOptions.forEach(([, suffix]) => labels.add(suffix));
-        else labels.add(romanLabel(info.roman, info.extendedQuality).replace(info.roman, ""));
+        else labels.add(this.extSuffix(info, info.extendedQuality));
       }
       return [...labels].sort();
     }
     const out: string[] = [];
     for (const info of infos) {
       if (this.chordTypeLevel === ChordTypeLevel.Sevenths) {
-        out.push(romanLabel(info.roman, info.seventhQuality).replace(info.roman, ""));
+        out.push(this.extSuffix(info, info.seventhQuality));
       } else if (this.chordTypeLevel === ChordTypeLevel.Extended) {
         if (info.extendedOptions.length) info.extendedOptions.forEach(([, suffix]) => out.push(suffix));
-        else out.push(romanLabel(info.roman, info.extendedQuality).replace(info.roman, ""));
+        else out.push(this.extSuffix(info, info.extendedQuality));
       }
     }
     return [...new Set(out.filter((x) => x.length))].sort();
@@ -1104,11 +1112,11 @@ export class EarTrainingState {
     if (!info) return [];
     const own = info.extendedOptions.length
       ? [...new Set(info.extendedOptions.map(([, suffix]) => suffix))]
-      : [romanLabel(info.roman, info.extendedQuality).replace(info.roman, "")];
+      : [this.extSuffix(info, info.extendedQuality)];
     // Degree 5 in minor may be the harmonic dominant (V7b9): offer its suffix too.
     if (deg !== 5 || !this.dominantInPlay) return own;
     const dom = MINOR_DOMINANT;
-    return [...new Set([...own, romanLabel(dom.roman, dom.extendedQuality).replace(dom.roman, "")])];
+    return [...new Set([...own, this.extSuffix(dom, dom.extendedQuality)])];
   }
 
   correctExtLabel(i: number): string {
@@ -1118,7 +1126,8 @@ export class EarTrainingState {
     const dominant = this.progMode === TrainingMode.Minor && (this.progProgression?.dominantBars ?? []).includes(i);
     const info = dominant ? MINOR_DOMINANT : EarTrainingDegrees(this.progMode).get(deg);
     if (!info) return "";
-    return this.progResolved[i]?.romanLabel.replace(info.roman, "") ?? "";
+    const label = this.progResolved[i]?.romanLabel;
+    return label === undefined ? "" : romanSuffix(info.roman, label) ?? "";
   }
 
   challengeBarCorrect(i: number): boolean | null {
@@ -1265,10 +1274,10 @@ export class EarTrainingState {
     // mode (from keyboardKeys), so don't append the suffix again there.
     let label = roman;
     if (this.challengeCombinedMode) {
-      this.challengeGuessExt[bar] = info ? romanLabel(info.roman, info.seventhQuality).replace(info.roman, "") : "";
+      this.challengeGuessExt[bar] = info ? this.extSuffix(info, info.seventhQuality) : "";
     } else if (this.challengeNeedsExt) {
       this.challengeGuessExt[bar] = ext ?? "";
-      label = roman + (ext ?? "");
+      label = joinRoman(roman, ext ?? "");
     }
     this.challengeGuessLabel[bar] = label;
     this.maybeAutoMark();

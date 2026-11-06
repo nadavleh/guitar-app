@@ -194,13 +194,18 @@ class CarModeTest {
         assertEquals("6 minor 9", CarMode.speechFor("vi9"))
     }
 
+    @Test fun `half-diminished Romans are spoken as half diminished`() {
+        assertEquals("7 half diminished 7", CarMode.speechFor("viiø7"))
+        assertEquals("2 half diminished 7", CarMode.speechFor("iiø7"))
+    }
+
     @Test fun `every Roman the diatonic library can print is speakable`() {
         val romans = (EarTraining.MAJOR_DEGREES.values + EarTraining.MINOR_DEGREES.values)
             .flatMap { info ->
                 listOf(info.roman,
                     EarTraining.romanLabel(info.roman, info.seventhQuality),
                     EarTraining.romanLabel(info.roman, info.extendedQuality)) +
-                    info.extendedOptions.map { info.roman + it.second }
+                    info.extendedOptions.map { EarTraining.joinRoman(info.roman, it.second) }
             }
         for (r in romans) {
             val spoken = CarMode.speechFor(r)

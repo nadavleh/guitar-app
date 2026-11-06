@@ -340,7 +340,8 @@ class EarTrainingState(
             val parsed = ChordLibrary.parse(rc.symbol) ?: return@map rc
             val (root, q) = parsed
             val newRoot = PitchClass.of(root.value + n)
-            ResolvedChord(NoteSpeller.spell(newRoot) + q.symbol, rc.romanLabel, newRoot)
+            ResolvedChord(NoteSpeller.spell(newRoot, EarTraining.keyAccidental(progKey, progMode)) + q.symbol,
+                rc.romanLabel, newRoot)
         }
         if (isLooping) { stopLoop(); startLoop() }
     }
@@ -675,13 +676,17 @@ class EarTrainingState(
         drillKey = progKey
         drillProg = prog
         drillTake = take
-        // Roman labels come from a fresh resolve at the take's key; the SYMBOLS come from
-        // the take, so an extension the quiz rolled (Imaj7 vs I) is drilled as heard.
+        // The SYMBOLS come from the take, so an extension the quiz rolled (Imaj7 vs I) is
+        // drilled as heard — and the Roman labels are derived from those symbols, not from
+        // today's chord-type level.
         drillResolved = EarTraining.resolveProgression(prog, tonic, chordTypeLevel, rng).let { fresh ->
             if (take == null) fresh
             else fresh.mapIndexed { i, rc ->
                 val sym = take.bars[i].symbol
-                ChordLibrary.parse(sym)?.let { rc.copy(symbol = sym, root = it.first) } ?: rc
+                ChordLibrary.parse(sym)?.let { (root, q) ->
+                    rc.copy(symbol = sym, root = root,
+                        romanLabel = EarTraining.romanLabelForQuality(prog, i, q.symbol) ?: rc.romanLabel)
+                } ?: rc
             }
         }
         drillInversions = drillResolved.map { null }
@@ -1202,25 +1207,29 @@ class EarTrainingState(
     private fun extDegreeInfos(): List<DegreeInfo> =
         degreesMap().values.toList() + (if (dominantInPlay) listOf(EarTraining.MINOR_DOMINANT) else emptyList())
 
+    /** The extension suffix [info]'s degree takes with [quality] ("7", "maj9", "ø7"…). */
+    private fun extSuffix(info: DegreeInfo, quality: String): String =
+        EarTraining.romanSuffix(info.roman, EarTraining.romanLabel(info.roman, quality)) ?: ""
+
     fun challengeExtOptions(): List<String> {
         if (!challengeNeedsExt) return emptyList()
         val infos = extDegreeInfos()
         if (earMixAll) {
             val labels = linkedSetOf("")   // "" = triad / no extension
             for (info in infos) {
-                labels.add(EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman))
+                labels.add(extSuffix(info, info.seventhQuality))
                 if (info.extendedOptions.isNotEmpty()) info.extendedOptions.forEach { labels.add(it.second) }
-                else labels.add(EarTraining.romanLabel(info.roman, info.extendedQuality).removePrefix(info.roman))
+                else labels.add(extSuffix(info, info.extendedQuality))
             }
             return labels.sorted()
         }
         return infos.flatMap { info ->
             when (chordTypeLevel) {
                 ChordTypeLevel.Sevenths ->
-                    listOf(EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman))
+                    listOf(extSuffix(info, info.seventhQuality))
                 ChordTypeLevel.Extended ->
                     if (info.extendedOptions.isNotEmpty()) info.extendedOptions.map { it.second }
-                    else listOf(EarTraining.romanLabel(info.roman, info.extendedQuality).removePrefix(info.roman))
+                    else listOf(extSuffix(info, info.extendedQuality))
                 else -> emptyList()
             }
         }.filter { it.isNotEmpty() }.distinct().sorted()
@@ -1232,7 +1241,7 @@ class EarTrainingState(
         val deg = progProgression?.degrees?.getOrNull(i) ?: return ""
         val dominant = progMode == TrainingMode.Minor && progProgression?.dominantBars?.contains(i) == true
         val info = if (dominant) EarTraining.MINOR_DOMINANT else degreesMap()[deg] ?: return ""
-        return progResolved.getOrNull(i)?.romanLabel?.removePrefix(info.roman) ?: ""
+        return progResolved.getOrNull(i)?.romanLabel?.let { EarTraining.romanSuffix(info.roman, it) } ?: ""
     }
 
     /** null = bar not fully answered yet; true/false = correct/incorrect. */
@@ -1381,11 +1390,11 @@ class EarTrainingState(
         val deg = EarTraining.degreeFromMajorRelative(majorRelativeDegree, progMode)
         val info = degreesMap()[deg] ?: return emptyList()
         val own = if (info.extendedOptions.isNotEmpty()) info.extendedOptions.map { it.second }.distinct()
-            else listOf(EarTraining.romanLabel(info.roman, info.extendedQuality).removePrefix(info.roman))
+            else listOf(extSuffix(info, info.extendedQuality))
         // Degree 5 in minor may be the harmonic dominant (V7b9): offer its suffix too.
         if (deg != 5 || !dominantInPlay) return own
         val dom = EarTraining.MINOR_DOMINANT
-        return (own + EarTraining.romanLabel(dom.roman, dom.extendedQuality).removePrefix(dom.roman)).distinct()
+        return (own + extSuffix(dom, dom.extendedQuality)).distinct()
     }
 
     fun toggleKeyboardShift() { keyboardMinor = !keyboardMinor }
@@ -1421,13 +1430,13 @@ class EarTrainingState(
         val label: String = when {
             challengeCombinedMode -> {
                 val e = if (info != null)
-                    EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman) else ""
+                    extSuffix(info, info.seventhQuality) else ""
                 challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = e }
                 roman
             }
             challengeNeedsExt -> {
                 challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = ext ?: "" }
-                roman + (ext ?: "")
+                EarTraining.joinRoman(roman, ext ?: "")
             }
             else -> roman
         }

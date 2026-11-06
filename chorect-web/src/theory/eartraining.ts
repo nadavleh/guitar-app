@@ -48,6 +48,9 @@ export interface Progression {
   dominantBars?: number[];
 }
 
+/** Roman suffix of a half-diminished 7th (m7b5): "vii°" + "ø7" reads "viiø7". */
+export const HALF_DIM_SUFFIX = "ø7";
+
 export const MAJOR_DEGREES: Map<number, DegreeInfo> = new Map([
   [1, di("I", "", "maj7", "maj9", [["6", "6"], ["add9", "add9"], ["maj9", "maj9"], ["maj13", "maj13"]])],
   [2, di("ii", "m", "m7", "m9", [["m6", "6"], ["m9", "9"], ["m11", "11"]])],
@@ -55,7 +58,7 @@ export const MAJOR_DEGREES: Map<number, DegreeInfo> = new Map([
   [4, di("IV", "", "maj7", "maj9", [["6", "6"], ["add9", "add9"], ["maj9", "maj9"], ["maj7#11", "maj7#11"], ["maj13", "maj13"]])],
   [5, di("V", "", "7", "9", [["6", "6"], ["9", "9"], ["11", "11"], ["13", "13"]])],
   [6, di("vi", "m", "m7", "m9", [["m9", "9"], ["m11", "11"]])],
-  [7, di("vii°", "dim", "m7b5", "m7b5", [["m7b5", "7"]])],
+  [7, di("vii°", "dim", "m7b5", "m7b5", [["m7b5", HALF_DIM_SUFFIX]])],
 ]);
 
 export const MINOR_DEGREES: Map<number, DegreeInfo> = new Map([
@@ -103,6 +106,29 @@ export function romanIsModeAmbiguous(roman: string): boolean {
   return /^V\d*$/.test(roman);
 }
 
+/** How a key's chord roots are spelled: flats for F, Bb, Eb, Ab, Db, Gb major and their
+ *  relative minors (D, G, C, F, Bb, Eb minor); sharps otherwise. Mirrors
+ *  EarTraining.keyAccidental. */
+export function keyAccidental(key: PitchClass, mode: TrainingMode): Accidental {
+  const majorTonic = mode === TrainingMode.Major ? key : (key + 3) % 12;
+  return [5, 10, 3, 8, 1, 6].includes(majorTonic) ? "flat" : "sharp";
+}
+
+/** Bar `bar`'s Roman label for a chord of `quality` (a symbol's quality suffix), read in
+ *  `prog`'s key — e.g. a saved take's "Gmaj7" on degree 5 → "V" + "maj7". Mirrors
+ *  EarTraining.romanLabelForQuality. */
+export function romanLabelForQuality(prog: Progression, bar: number, quality: string): string | null {
+  const deg = prog.degrees[bar];
+  if (deg === undefined) return null;
+  const info = prog.mode === TrainingMode.Minor && (prog.dominantBars ?? []).includes(bar)
+    ? MINOR_DOMINANT : degreesMapFor(prog.mode).get(deg);
+  if (!info) return null;
+  if (quality === info.triadQuality) return info.roman;
+  const opt = info.extendedOptions.find(([q]) => q === quality);
+  if (opt) return joinRoman(info.roman, opt[1]);
+  return romanLabel(info.roman, quality);
+}
+
 const MAJOR_SCALE_SEMITONES = [0, 2, 4, 5, 7, 9, 11];
 const NATURAL_MINOR_SEMITONES = [0, 2, 3, 5, 7, 8, 10];
 
@@ -121,10 +147,25 @@ export function degreeRefMidi(key: PitchClass, degree: number, mode: TrainingMod
   return 52 + key + ((degreeRoot(key, degree, mode) - key + 12) % 12);
 }
 
+/** Append a Roman `suffix` to a triad Roman: a half-diminished "ø…" replaces the triad's
+ *  "°" ("vii°" + "ø7" → "viiø7"); anything else is plain concatenation. */
+export function joinRoman(triadRoman: string, suffix: string): string {
+  return triadRoman.endsWith("°") && suffix.startsWith("ø") ? triadRoman.slice(0, -1) + suffix : triadRoman + suffix;
+}
+
+/** Inverse of joinRoman: the suffix of `label` after `triadRoman` ("viiø7" after "vii°" →
+ *  "ø7"), or null when `label` isn't built on `triadRoman`. */
+export function romanSuffix(triadRoman: string, label: string): string | null {
+  if (label.startsWith(triadRoman)) return label.slice(triadRoman.length);
+  if (triadRoman.endsWith("°") && label.startsWith(triadRoman.slice(0, -1) + "ø")) return label.slice(triadRoman.length - 1);
+  return null;
+}
+
 /** Build the displayed Roman label for a non-triad level. */
 export function romanLabel(triadRoman: string, quality: string): string {
   if (triadRoman.endsWith("°")) {
-    return quality === "m7b5" ? `${triadRoman}7` : triadRoman + quality;
+    // Half-diminished: "vii°"/"ii°" + m7b5 → "viiø7"/"iiø7" ("°7" is the FULLY diminished dim7).
+    return quality === "m7b5" ? joinRoman(triadRoman, HALF_DIM_SUFFIX) : triadRoman + quality;
   }
   // Ignore any leading accidental (b/#) when deciding major/minor case, so
   // "bIII"+"maj7" → "bIIImaj7" (major) and "v"+"m7" → "v7" (minor).
@@ -161,10 +202,11 @@ export function resolve(degree: number, key: PitchClass, mode: TrainingMode, lev
   // Harmonic-minor dominant: degree 5 sounded as a major V (see MINOR_DOMINANT).
   const info = (asDominant && mode === TrainingMode.Minor) ? MINOR_DOMINANT : degreesMapFor(mode).get(degree)!;
   const root = degreeRoot(key, degree, mode);
-  const rootName = spellPc(root);
+  // Spelled by the key: F major's IV is "Bb", not "A#"; C minor's bIII "Ebmaj7".
+  const rootName = spellPc(root, keyAccidental(key, mode));
   if (level === ChordTypeLevel.Extended && info.extendedOptions.length > 0) {
-    const [qual, romanSuffix] = info.extendedOptions[rng.int(info.extendedOptions.length)];
-    return { symbol: `${rootName}${qual}`, romanLabel: info.roman + romanSuffix, root };
+    const [qual, suffix] = info.extendedOptions[rng.int(info.extendedOptions.length)];
+    return { symbol: `${rootName}${qual}`, romanLabel: joinRoman(info.roman, suffix), root };
   }
   const quality =
     level === ChordTypeLevel.Triads ? info.triadQuality :
@@ -750,10 +792,12 @@ export function openingRelativeLabel(p: Progression, bar: number, label: string)
   if (deg === undefined) return label;
   const dominant = p.mode === TrainingMode.Minor && (p.dominantBars ?? []).includes(bar);
   const own = dominant ? MINOR_DOMINANT : degreesMapFor(p.mode).get(deg);
-  if (!own || !label.startsWith(own.roman)) return label;
+  if (!own) return label;
+  const suffix = romanSuffix(own.roman, label);
+  if (suffix === null) return label;
   const relRoman = degreesMapFor(rel).get(degreeFromMajorRelative(majorRelativeDegree(deg, p.mode), rel))?.roman;
   if (!relRoman) return label;
-  return (dominant ? relRoman.toUpperCase() : relRoman) + label.slice(own.roman.length);
+  return joinRoman(dominant ? relRoman.toUpperCase() : relRoman, suffix);
 }
 
 /** A run of chords moving round the circle: `length` chords from bar index `start`
