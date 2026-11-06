@@ -89,6 +89,7 @@ import app.guitar.theory.ProgressionSongs
 import app.guitar.theory.ResolvedChord
 import app.guitar.theory.SongExample
 import app.guitar.theory.TrainingMode
+import app.guitar.theory.eShapeOrFirst
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -799,8 +800,7 @@ private fun ChordOnFretboard(
             val (root, q) = parsed
             val shapes = app.guitar.theory.ChordShapeGenerator()
                 .shapesFor(root, q, state.liveTuning, frets = DISPLAY_FRETS)
-            val shape = shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E }
-                ?: shapes.firstOrNull()
+            val shape = shapes.eShapeOrFirst()
             // Show ONLY the chord's own tones: some CAGED grips (e.g. the "dim" shape is
             // really a dim7 voicing) carry an extra note that would otherwise render a
             // phantom extension on the neck for a plain triad.
@@ -3309,7 +3309,7 @@ private fun previewShape(state: AppState, symbol: String): app.guitar.theory.Cho
     val (root, q) = parsed
     val shapes = app.guitar.theory.ChordShapeGenerator()
         .shapesFor(root, q, state.liveTuning, frets = DISPLAY_FRETS)
-    return shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.firstOrNull()
+    return shapes.eShapeOrFirst()
 }
 
 /** A progression row in the library. Always clickable (▸/▾ chevron): tapping expands an

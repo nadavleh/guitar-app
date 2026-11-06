@@ -30,6 +30,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
+import app.guitar.theory.eShapeOrFirst
 
 /**
  * State + scheduler for the Ear-Training screen.
@@ -192,7 +193,7 @@ class EarTrainingState(
     private fun earShapes(shapes: List<app.guitar.theory.ChordShape>): List<app.guitar.theory.ChordShape> {
         val compact = shapes.filter { sh -> sh.notes.count { it != null } <= 5 }.ifEmpty { shapes }
         return compact.filter { sh ->
-            (sh.notes.mapNotNull { it?.midi?.value }.minOrNull() ?: 0) >= 45
+            (sh.midis.minOrNull() ?: 0) >= 45
         }.ifEmpty { compact }
     }
 
@@ -201,7 +202,7 @@ class EarTrainingState(
      *  odd spread voicings), only exact unisons removed. The 6-string-barre cacophony is
      *  avoided by [earShapes], which skips full 6-string grips. */
     private fun earMidis(shape: app.guitar.theory.ChordShape): List<Int> =
-        shape.notes.mapNotNull { it?.midi?.value }.distinct().sorted()
+        shape.midis.distinct().sorted()
 
     /** Sound [midis] as an ear-training chord. When [earBoostTonic] is on, the lowest
      *  note matching [rootPc] is played separately and louder (and left out of the
@@ -812,9 +813,8 @@ class EarTrainingState(
                 val (root, q) = parsed
                 val tuning = tuningProvider()
                 val shapes = ChordShapeGenerator().shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
-                val shape = shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E }
-                    ?: shapes.firstOrNull() ?: return@launch
-                val midis = shape.notes.mapNotNull { it?.midi?.value }
+                val shape = shapes.eShapeOrFirst() ?: return@launch
+                val midis = shape.midis
                 val sustain = sustainProvider()
                 audio.chokeChords()   // only here: the test note below is MEANT to ring over the triad
                 audio.playChord(midis, strumDelayMillis = 0, sustainMillis = sustain)
@@ -835,9 +835,8 @@ class EarTrainingState(
         val parsed = ChordLibrary.parse(c.chordSymbol) ?: return emptyList()
         val (root, q) = parsed
         val shapes = ChordShapeGenerator().shapesFor(root, q, tuningProvider(), frets = DISPLAY_FRETS)
-        val shape = shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E }
-            ?: shapes.firstOrNull() ?: return emptyList()
-        return shape.notes.mapNotNull { it?.midi?.value }
+        val shape = shapes.eShapeOrFirst() ?: return emptyList()
+        return shape.midis
     }
 
     /** #2: play just the triad (no test note). */
@@ -1632,7 +1631,7 @@ class EarTrainingState(
         val parsed = ChordLibrary.parse(EarTraining.resolve(deg, progKey, progMode, level, rng).symbol) ?: return
         val (root, q) = parsed
         val shapes = earShapes(ChordShapeGenerator(style = earStyle()).shapesFor(root, q, tuningProvider(), frets = DISPLAY_FRETS))
-        val shape = shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E } ?: shapes.firstOrNull()
+        val shape = shapes.eShapeOrFirst()
         if (shape != null) playEarChord(earMidis(shape), root.value, sustainProvider())
         else playEarChord(q.intervals.map { 52 + root.value + it.semitones }, root.value, sustainProvider())
     }
@@ -2760,9 +2759,8 @@ class EarTrainingState(
         val (root, q) = parsed
         val tuning = tuningProvider()
         val shapes = ChordShapeGenerator().shapesFor(root, q, tuning, frets = DISPLAY_FRETS)
-        val shape = shapes.firstOrNull { it.cagedShape == app.guitar.theory.CagedShape.E }
-            ?: shapes.firstOrNull() ?: return
-        val midis = shape.notes.mapNotNull { it?.midi?.value }
+        val shape = shapes.eShapeOrFirst() ?: return
+        val midis = shape.midis
         if (midis.isEmpty()) return
         audio.chokeChords()      // one chord at a time — see playEarChord
         audio.playChord(midis, strumDelayMillis = strumProvider(), sustainMillis = sustainMs, timbre = Timbre.Clarity)

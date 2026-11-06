@@ -193,7 +193,7 @@ export class CavaqProgState {
           this.currentBar = i;
           const sh = shs[i];
           this.currentShape = sh;
-          const midis = sh ? sh.notes.filter((n) => n !== null).map((n) => n!.midi) : [];
+          const midis = sh ? sh.midis : [];
           if (midis.length) {
             this.deps.audio.chokeChords();   // one bar's chord must not ring into the next
             this.deps.audio.playChord(midis, this.deps.strumProvider(), sustain, this.deps.timbreProvider());
@@ -220,7 +220,7 @@ export class CavaqProgState {
     if (!sh) return;
     this.currentBar = i;
     this.currentShape = sh;
-    const midis = sh.notes.filter((n) => n !== null).map((n) => n!.midi);
+    const midis = sh.midis;
     if (midis.length) {
       this.deps.audio.chokeChords();
       this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), this.deps.timbreProvider());
@@ -279,7 +279,7 @@ export class CavaqProgState {
     const sh = this.formShape(i);
     if (!sh) return;
     this.formPlaying = i;
-    const midis = sh.notes.filter((n) => n !== null).map((n) => n!.midi);
+    const midis = sh.midis;
     this.deps.audio.chokeChords();
     this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), this.deps.timbreProvider());
     this.notify();

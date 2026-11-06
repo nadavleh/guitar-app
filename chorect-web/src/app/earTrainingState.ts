@@ -5,7 +5,7 @@
 // stopped, which replaces structured-concurrency cancellation.
 
 import {
-  Tuning, PitchClass, ChordShape, ChordShapeGenerator, VoicingStyle, CagedShape,
+  Tuning, PitchClass, ChordShape, ChordShapeGenerator, VoicingStyle, eShapeOrFirst,
   parseChord, QUALITIES, spellPc,
   TrainingMode, ChordTypeLevel, Progression, ResolvedChord, NamedProgression,
   EarTrainingDegrees, degreeRoot, degreeRefMidi, resolve as resolveDegree, resolveProgression,
@@ -284,7 +284,7 @@ export class EarTrainingState {
       const shapes = this.earShapes(this.gen(style).shapesFor(root, q, tuning, DISPLAY_FRETS));
       if (shapes.length === 0) return null;
       const shape = prev == null
-        ? (shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0])
+        ? eShapeOrFirst(shapes)
         : shapes[pickMinMovement(prev, shapes)];
       prev = shape;
       return shape;
@@ -388,7 +388,7 @@ export class EarTrainingState {
   private earShapes(shapes: ChordShape[]): ChordShape[] {
     const compact0 = shapes.filter((sh) => sh.notes.filter((n) => n !== null).length <= 5);
     const compact = compact0.length > 0 ? compact0 : shapes;
-    const high = compact.filter((sh) => Math.min(...sh.notes.filter((n) => n !== null).map((n) => n!.midi)) >= 45);
+    const high = compact.filter((sh) => Math.min(...sh.midis) >= 45);
     return high.length > 0 ? high : compact;
   }
 
@@ -396,7 +396,7 @@ export class EarTrainingState {
    *  it (octave doublings kept), only exact unisons removed. earShapes skips full 6-string
    *  grips. (Mirrors EarTrainingState.earMidis on Android.) */
   private earMidis(shape: ChordShape): number[] {
-    const midis = shape.notes.filter((n) => n !== null).map((n) => n!.midi);
+    const midis = shape.midis;
     return [...new Set(midis)].sort((a, b) => a - b);
   }
 
@@ -499,7 +499,7 @@ export class EarTrainingState {
       return;
     }
     const shape = this.libPrevShape == null
-      ? (shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0])
+      ? eShapeOrFirst(shapes)
       : shapes[pickMinMovement(this.libPrevShape, shapes)];
     this.libPrevShape = shape;
     this.libShape = shape;
@@ -681,7 +681,7 @@ export class EarTrainingState {
       const shapes = this.earShapes(this.gen(style).shapesFor(root, q, tuning, DISPLAY_FRETS));
       if (shapes.length === 0) { const rm = 52 + root; return q.intervals.map((iv) => rm + iv); }
       const shape = prev == null
-        ? (shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0])
+        ? eShapeOrFirst(shapes)
         : shapes[pickMinMovement(prev, shapes)];
       prev = shape;
       // "auto" means AS HEARD when a take exists — the shape chain above still runs so that
@@ -756,9 +756,9 @@ export class EarTrainingState {
     if (!parsed) return [];
     const [root, q] = parsed;
     const shapes = this.gen(VoicingStyle.Standard).shapesFor(root, q, this.deps.tuningProvider(), DISPLAY_FRETS);
-    const shape = shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0];
+    const shape = eShapeOrFirst(shapes);
     if (!shape) return [];
-    return shape.notes.filter((n) => n !== null).map((n) => n!.midi);
+    return shape.midis;
   }
 
   playN2cChord() {
@@ -1417,7 +1417,7 @@ export class EarTrainingState {
     if (!parsed) return;
     const [root, q] = parsed;
     const shapes = this.earShapes(this.gen(this.earStyle()).shapesFor(root, q, this.deps.tuningProvider(), DISPLAY_FRETS));
-    const shape = shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0] ?? null;
+    const shape = eShapeOrFirst(shapes) ?? null;
     if (shape) this.playEarChord(this.earMidis(shape), root, this.deps.sustainProvider());
     else this.playEarChord(q.intervals.map((iv) => 52 + root + iv), root, this.deps.sustainProvider());
   }
@@ -2445,9 +2445,9 @@ export class EarTrainingState {
     const [root, q] = parsed;
     const tuning = this.deps.tuningProvider();
     const shapes = this.gen(VoicingStyle.Standard).shapesFor(root, q, tuning, DISPLAY_FRETS);
-    const shape = shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0];
+    const shape = eShapeOrFirst(shapes);
     if (!shape) return;
-    const midis = shape.notes.filter((n) => n !== null).map((n) => n!.midi);
+    const midis = shape.midis;
     if (midis.length === 0) return;
     this.deps.audio.chokeChords();      // one chord at a time — see playEarChord
     this.deps.audio.playChord(midis, this.deps.strumProvider(), sustainMs, Timbres.Clarity);

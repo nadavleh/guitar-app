@@ -208,7 +208,7 @@ class CavaqProgState(
         val sh = shapes().getOrNull(i) ?: return
         currentBar = i
         currentShape = sh
-        val midis = sh.notes.mapNotNull { it?.midi?.value }
+        val midis = sh.midis
         if (midis.isEmpty()) return
         scope.launch {
             audio.chokeChords()
@@ -267,7 +267,7 @@ class CavaqProgState(
     fun playForm(i: Int) {
         val sh = formShape(i) ?: return
         formPlaying = i
-        val midis = sh.notes.mapNotNull { it?.midi?.value }
+        val midis = sh.midis
         scope.launch {
             audio.chokeChords()
             audio.playChord(midis, strumDelayMillis = strumProvider(),

@@ -223,7 +223,7 @@ export class LoopState {
         const shape = shapes[s.voicingIndex] ?? shapes[0];
         if (shape) {
           this.playingShape = shape;
-          const midis = shape.notes.filter((n) => n !== null).map((n) => n!.midi);
+          const midis = shape.midis;
           const ordered = s.strum === StrumPattern.Up ? midis.slice().reverse() : midis;
           // Sustain is already excluded by the guard above; only Down/Up/Arpeggio reach here.
           const strumDelay = s.strum === StrumPattern.Arpeggio ? Math.max(this.deps.strumProvider() * 4, 100) : this.deps.strumProvider();

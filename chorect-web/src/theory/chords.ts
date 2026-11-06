@@ -290,13 +290,19 @@ export class ChordShape {
     return this.frets.map((f, i) => (f === null ? null : noteAt(this.tuning, fp(i, f))));
   }
 
+  /** MIDI numbers of the sounding strings, low string first (a fresh array). */
+  get midis(): number[] {
+    return this.notes.filter((n): n is Note => n !== null).map((n) => n.midi);
+  }
+
   get intervals(): (Interval | null)[] {
     return this.notes.map((n) => (n === null ? null : pcInterval(midiPitchClass(n.midi), this.root)));
   }
 
   get bassPitchClass(): PitchClass | null {
-    const first = this.notes.find((n) => n !== null);
-    return first ? midiPitchClass(first.midi) : null;
+    // Only the lowest sounding string is needed — rankers call this per comparison.
+    const i = this.frets.findIndex((f) => f !== null);
+    return i < 0 ? null : midiPitchClass(noteAt(this.tuning, fp(i, this.frets[i]!)).midi);
   }
 
   get hasRootInBass(): boolean {
@@ -310,6 +316,13 @@ export class ChordShape {
   get playedCount(): number {
     return this.played.length;
   }
+}
+
+/** The E-shape grip if there is one, else the first shape — the default "show me this
+ *  chord" voicing (E-shape is the canonical movable barre). Typed like `shapes[0]`:
+ *  undefined at runtime when the list is empty. */
+export function eShapeOrFirst(shapes: ReadonlyArray<ChordShape>): ChordShape {
+  return shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0];
 }
 
 // ---------- CAGED templates ----------

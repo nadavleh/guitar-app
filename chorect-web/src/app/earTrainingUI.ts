@@ -16,7 +16,7 @@ import { MarkKind, FretMark } from "./marks";
 import {
   spellPc, noteAt, TrainingMode, ChordTypeLevel, ChordTypeLevelName, PitchClass, decodeMissedTake,
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
-  parseChord, ChordShapeGenerator, CagedShape, notesFrom, midiPitchClass, fp, fpKey,
+  parseChord, ChordShapeGenerator, eShapeOrFirst, notesFrom, midiPitchClass, fp, fpKey,
   IntervalDirection, intervalChoiceFor, IntervalSource, intervalStepLabel, allPositions,
   Progression, CarMode,
   MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, MINOR_HARMONIC_PROGRESSIONS, ADVANCED_PROGRESSIONS, ADVANCED2_PROGRESSIONS,
@@ -940,7 +940,7 @@ export class EarTrainingUI {
     if (!parsed) return null;
     const [root, q] = parsed;
     const shapes = new ChordShapeGenerator().shapesFor(root, q, this.state.liveTuning, DISPLAY_FRETS);
-    return shapes.find((s) => s.cagedShape === CagedShape.E) ?? shapes[0] ?? null;
+    return eShapeOrFirst(shapes) ?? null;
   }
 
   /** The library overlay's own follow-along fretboard (separate canvas from the main
@@ -1056,7 +1056,7 @@ export class EarTrainingUI {
     if (parsed) {
       const [root, q] = parsed;
       const shapes = new ChordShapeGenerator().shapesFor(root, q, s.liveTuning, DISPLAY_FRETS);
-      const shape = shapes.find((sh) => sh.cagedShape === CagedShape.E) ?? shapes[0];
+      const shape = eShapeOrFirst(shapes);
       if (shape) {
         // Show ONLY the chord's own tones: some CAGED templates (e.g. the "dim" grip
         // is really a dim7 voicing) carry an extra note, which would otherwise render

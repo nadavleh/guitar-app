@@ -1063,7 +1063,7 @@ class AppState(
                 val shape = shapes.getOrNull(slot.voicingIndex) ?: shapes.firstOrNull()
                 if (shape != null) {
                     loopPlayingShape = shape
-                    val midis = shape.notes.mapNotNull { it?.midi?.value }
+                    val midis = shape.midis
                     val ordered = if (slot.strum == StrumPattern.Up) midis.asReversed() else midis
                     val strumDelay = when (slot.strum) {
                         StrumPattern.Down -> strumMs

@@ -20,8 +20,9 @@ data class ChordShape(
         }
     }
 
-    private val frettedNonZero: List<Int> get() = frets.filterNotNull().filter { it > 0 }
-    private val played: List<Int> get() = frets.filterNotNull()
+    // Derived views are computed once per shape: the generators' rankers and the UI read
+    // them repeatedly (every comparator call used to rebuild `notes`).
+    private val frettedNonZero: List<Int> by lazy(LazyThreadSafetyMode.PUBLICATION) { frets.filterNotNull().filter { it > 0 } }
 
     val position: Int get() = frettedNonZero.minOrNull() ?: 0
 
@@ -30,9 +31,12 @@ data class ChordShape(
         return if (f.isEmpty()) 0 else (f.max() - f.min())
     }
 
-    val notes: List<Note?> get() = frets.mapIndexed { i, f ->
-        if (f == null) null else Fretboard.noteAt(tuning, FretPosition(i, f))
+    val notes: List<Note?> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        frets.mapIndexed { i, f -> if (f == null) null else Fretboard.noteAt(tuning, FretPosition(i, f)) }
     }
+
+    /** MIDI numbers of the sounding strings, low string first. */
+    val midis: List<Int> get() = notes.mapNotNull { it?.midi?.value }
 
     val intervals: List<Interval?> get() = notes.map { n ->
         if (n == null) null else Interval(((n.pitchClass.value - root.value) % 12 + 12) % 12)
@@ -44,5 +48,9 @@ data class ChordShape(
 
     val mutedCount: Int get() = frets.count { it == null }
 
-    val playedCount: Int get() = played.size
+    val playedCount: Int get() = frets.count { it != null }
 }
+
+/** The E-shape grip if there is one, else the first shape — the default "show me this
+ *  chord" voicing (E-shape is the canonical movable barre). Null only when empty. */
+fun List<ChordShape>.eShapeOrFirst(): ChordShape? = firstOrNull { it.cagedShape == CagedShape.E } ?: firstOrNull()

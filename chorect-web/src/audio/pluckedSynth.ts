@@ -4,7 +4,8 @@
 // The Kotlin version seeds kotlin.random.Random for reproducible per-voice noise;
 // we use a small seeded mulberry32 RNG to keep chord voices decorrelated the same way.
 
-function mulberry32(seed: number): () => number {
+/** Small seeded PRNG in [0, 1) — shared with percussionSynth.ts. */
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a |= 0;
