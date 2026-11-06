@@ -195,6 +195,7 @@ class CavaqProgState(
     }
 
     fun stop() {
+        stopForms()
         isPlaying = false
         loopJob?.cancel()
         loopJob = null
@@ -223,7 +224,10 @@ class CavaqProgState(
     // ---------- Shapes tab: the cavaquinho's movable forms of one chord ----------
 
     /** Which tab of the screen is showing: the sequence looper or the chord-forms view. */
-    var showShapes by mutableStateOf(false)
+    var showShapes: Boolean
+        get() = showShapesState
+        set(v) { if (!v) stopForms(); showShapesState = v }
+    private var showShapesState by mutableStateOf(false)
     var formRoot by mutableStateOf(PitchClass.C)
         private set
     var formQuality by mutableStateOf("")
@@ -247,8 +251,15 @@ class CavaqProgState(
         return f
     }
 
-    fun chooseFormRoot(pc: PitchClass) { formRoot = pc; formPick = emptyMap(); formPlaying = -1 }
-    fun chooseFormQuality(sym: String) { formQuality = sym; formPick = emptyMap(); formPlaying = -1 }
+    fun chooseFormRoot(pc: PitchClass) { stopForms(); formRoot = pc; formPick = emptyMap() }
+    fun chooseFormQuality(sym: String) { stopForms(); formQuality = sym; formPick = emptyMap() }
+
+    /** Cancel a running "Play all" (stop, tab switch, new root/quality, leaving the screen). */
+    private fun stopForms() {
+        formsJob?.cancel()
+        formsJob = null
+        formPlaying = -1
+    }
     fun shiftFormRoot(d: Int) = chooseFormRoot(PitchClass.of(formRoot.value + d))
 
     /** The grip shown for form [i] (main or the picked branch-out). */

@@ -628,7 +628,7 @@ export class App {
     }
     if (route !== Sheet.SambaLooper && this.samba.isPlaying) this.samba.stop();
     if (route !== Sheet.SambaLooper && this.drumBlocks.isPlaying) this.drumBlocks.stop();
-    if (route !== Sheet.CavaqProgressions && this.cavaq.isPlaying) this.cavaq.stop();
+    if (route !== Sheet.CavaqProgressions && (this.cavaq.isPlaying || this.cavaq.formsRunning)) this.cavaq.stop();
     if (route !== Sheet.RhythmUnits && this.rhythmUnits.isPlaying) this.rhythmUnits.stop();
     if (route !== Sheet.RhythmUnits && this.rhythmPhrase.isPlaying) this.rhythmPhrase.stop();
     if (route !== Sheet.Metronome && this.metronome.isPlaying) this.metronome.stop();

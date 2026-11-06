@@ -206,6 +206,7 @@ export class CavaqProgState {
   }
 
   stop() {
+    this.stopForms();
     this.isPlaying = false;
     this.loopToken++;
     this.currentBar = -1;
@@ -244,7 +245,17 @@ export class CavaqProgState {
   private formsCache: { sig: string; forms: CavaqForm[] } | null = null;
   private formsToken = 0;
 
-  setShowShapes(v: boolean) { if (v) this.stop(); this.showShapes = v; this.notify(); }
+  /** True while "Play all" is stepping through the forms. */
+  formsRunning = false;
+
+  setShowShapes(v: boolean) { if (v) this.stop(); else this.stopForms(); this.showShapes = v; this.notify(); }
+
+  /** Cancel a running "Play all" (stop, tab switch, new root/quality, leaving the screen). */
+  private stopForms() {
+    this.formsToken++;
+    this.formsRunning = false;
+    this.formPlaying = -1;
+  }
 
   forms(): CavaqForm[] {
     const t = this.deps.tuningProvider();
@@ -257,8 +268,8 @@ export class CavaqProgState {
     return forms;
   }
 
-  chooseFormRoot(pc: PitchClass) { this.formRoot = pc; this.formPick = new Map(); this.formPlaying = -1; this.notify(); }
-  chooseFormQuality(sym: string) { this.formQuality = sym; this.formPick = new Map(); this.formPlaying = -1; this.notify(); }
+  chooseFormRoot(pc: PitchClass) { this.stopForms(); this.formRoot = pc; this.formPick = new Map(); this.notify(); }
+  chooseFormQuality(sym: string) { this.stopForms(); this.formQuality = sym; this.formPick = new Map(); this.notify(); }
   shiftFormRoot(d: number) { this.chooseFormRoot(pcOf(this.formRoot + d)); }
 
   /** The grip shown for form i (main or the picked branch-out). */
@@ -288,6 +299,7 @@ export class CavaqProgState {
   /** Strum each form in turn, up the neck (two beats each at the screen tempo). */
   playAllForms() {
     const token = ++this.formsToken;
+    this.formsRunning = true;
     void (async () => {
       const n = this.forms().length;
       for (let i = 0; i < n; i++) {
@@ -295,7 +307,7 @@ export class CavaqProgState {
         this.playForm(i);
         await sleep((60_000 / Math.max(this.bpm, 10)) * 2);
       }
-      if (token === this.formsToken) { this.formPlaying = -1; this.notify(); }
+      if (token === this.formsToken) { this.formsRunning = false; this.formPlaying = -1; this.notify(); }
     })();
   }
 }
