@@ -392,26 +392,6 @@ object PercussionBuiltins {
     private fun builtin(encoded: String): PercussionPattern =
         requireNotNull(PercussionPattern.decode(encoded)) { "invalid built-in pattern: $encoded" }
 
-    /** Teleco-teco — the two classic phrasings. Surdo + pandeiro are shared; the
-     *  tamborim and agogô are phase-shifted between the two. */
-    val TELECOTECO_1: PercussionPattern = builtin(
-        "M:2,2,4,16;" +
-            "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
-            "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
-            "pandeiro=0,3,2,0,0,3,2,0,0,3,2,0,0,3,2,0" + "|" +
-            // Agogô (#12): low bell ▼ (voice 0) on steps 1,7,9,16; high bell ▲ (voice 1)
-            // on steps 4,5,11,13,14 — 0-indexed slots below.
-            "agogo=0,-,-,1,1,-,0,-,0,-,1,-,1,1,-,0",
-    )
-
-    val TELECOTECO_2: PercussionPattern = builtin(
-        "M:2,2,4,16;" +
-            "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
-            "tamborim=0,1,0,1,0,1,2,0,1,0,1,0,1,2,0,1" + "|" +
-            "pandeiro=0,3,2,0,0,3,2,0,0,3,2,0,0,3,2,0" + "|" +
-            "agogo=0,-,0,-,1,-,-,0,-,0,-,1,-,-,0,-",
-    )
-
     /** Nadav's samba groove (from his exported beat): reta pandeiro (track
      *  swing 33) + marcação surdo + three tamborims — teleco-teco, levada reta
      *  (track swing 10) and palmas. (Samba 1's agogô line lives in the phrase
@@ -706,11 +686,6 @@ object PercussionBuiltins {
         "M:2,2,4,16;" + SURDO_TELECO + "|" +
             "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
             "pandeiro=-,2,-,-,0,-,0,-,0,-,2,-,-,0,-,0",   // "Pandeiro — Partido Alto" phrase
-    )
-    val PARTIDO_ALTO_DEC: PercussionPattern = builtin(
-        "M:2,2,4,16;" + SURDO_TELECO + "|" +
-            "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
-            "bongo=-,0,-,0,1,-,1,-,1,-,0,-,3,1,-,1",
     )
 
     /** Nadav's tan-tan + teleco-teco study, exported from his saved beat

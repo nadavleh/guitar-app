@@ -30,10 +30,6 @@ export interface IntervalSongRef {
 /** One melody note: absolute MIDI pitch and length in eighth notes. */
 export interface MelodyNote { midi: number; eighths: number; }
 
-export const INTERVAL_COMPLEMENT_NOTE =
-  "The inversion listed is the octave complement — not the same two pitches played backward. " +
-  "Major and minor switch, perfect intervals stay perfect, the tritone inverts to itself.";
-
 /** Playback length of one eighth note in a melody snippet (150 bpm). */
 export const INTERVAL_EIGHTH_MS = 200;
 

@@ -938,7 +938,6 @@ export class EarTrainingState {
 
   exitChallenge() { this.challengeActive = false; this.challengeRevealed = false; this.challengeIndex = 0; this.stopLoop(); this.notify(); }
 
-  challengeScore(): number { return this.challengeAnswers.filter((a) => a === true).length; }
   challengeBarScore(): number { return this.challengeBarsCorrect.reduce((a, b) => a + b, 0); }
   challengeBarTotal(): number { return this.challengeTotal * 4; }
 
@@ -1058,10 +1057,6 @@ export class EarTrainingState {
 
   get challengeNeedsExt(): boolean { return this.earMixAll || this.chordTypeLevel !== ChordTypeLevel.Triads; }
 
-  challengeDegreeOptions(): [number, string][] {
-    return [...EarTrainingDegrees(this.progMode).entries()].sort((a, b) => a[0] - b[0]).map(([deg, info]) => [deg, info.roman]);
-  }
-
   challengeExtOptions(): string[] {
     if (!this.challengeNeedsExt) return [];
     const m = EarTrainingDegrees(this.progMode);
@@ -1177,36 +1172,7 @@ export class EarTrainingState {
     return romanModeTag(this.challengeGuessDominant[i]);
   }
 
-  guessChallengeDegree(bar: number, degree: number) {
-    if (!this.challengeActive) return;
-    this.challengeGuessDegree[bar] = degree;
-    this.maybeAutoMark();
-    this.notify();
-  }
-  guessChallengeExt(bar: number, ext: string) {
-    if (!this.challengeActive) return;
-    this.challengeGuessExt[bar] = ext;
-    this.maybeAutoMark();
-    this.notify();
-  }
-
   get challengeCombinedMode(): boolean { return !this.earMixAll && this.chordTypeLevel === ChordTypeLevel.Sevenths; }
-
-  challengeCombinedOptions(): [number, string][] {
-    return [...EarTrainingDegrees(this.progMode).entries()].sort((a, b) => a[0] - b[0])
-      .map(([deg, info]) => [deg, romanLabel(info.roman, info.seventhQuality)] as [number, string]);
-  }
-
-  guessChallengeCombined(bar: number, degree: number) {
-    if (!this.challengeActive) return;
-    const info = EarTrainingDegrees(this.progMode).get(degree);
-    if (!info) return;
-    const ext = romanLabel(info.roman, info.seventhQuality).replace(info.roman, "");
-    this.challengeGuessDegree[bar] = degree;
-    this.challengeGuessExt[bar] = ext;
-    this.maybeAutoMark();
-    this.notify();
-  }
 
   /** Labels for the "hear the degrees" reference palette — PLAIN Arabic numbers
    *  1..7, never Roman numerals / qualities, so hearing a degree doesn't give away

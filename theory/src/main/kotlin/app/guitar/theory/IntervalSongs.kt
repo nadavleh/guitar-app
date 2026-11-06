@@ -43,10 +43,6 @@ data class MelodyNote(val midi: Int, val eighths: Double)
 
 object IntervalSongs {
 
-    const val COMPLEMENT_NOTE =
-        "The inversion listed is the octave complement — not the same two pitches played backward. " +
-            "Major and minor switch, perfect intervals stay perfect, the tritone inverts to itself."
-
     /** Playback length of one eighth note in a melody snippet (150 bpm). */
     const val EIGHTH_MS = 200
 

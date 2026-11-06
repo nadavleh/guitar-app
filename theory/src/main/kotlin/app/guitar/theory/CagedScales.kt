@@ -74,11 +74,6 @@ data class DrillStep(
 
 object CagedScales {
 
-    val MAJOR_SCALE = Scale(
-        "Major",
-        listOf(Interval.P1, Interval.maj2, Interval.maj3, Interval.P4, Interval.P5, Interval.maj6, Interval.maj7),
-    )
-
     val BOXES: List<CagedBox> = CagedBox.entries.toList()
 
     /** Root of the active mode: the SAME [tonic] for both major and parallel minor. */

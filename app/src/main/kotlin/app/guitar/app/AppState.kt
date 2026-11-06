@@ -118,18 +118,6 @@ class AppState(
         chordPositionIndex = 0
     }
 
-    /** A/B test toggle: true = new voice-graph audio engine, false = legacy engine.
-     *  Backed by [SwitchableAudioEngine] when the app supplies one (a no-op otherwise,
-     *  e.g. under tests using a plain engine). Temporary — remove with the A/B scaffolding. */
-    var useModernAudio by mutableStateOf(true)
-        private set
-
-    @JvmName("applyUseModernAudio")
-    fun setUseModernAudio(value: Boolean) {
-        useModernAudio = value
-        (audio as? app.guitar.audio.SwitchableAudioEngine)?.setUseModern(value)
-    }
-
     /** Selected guitar voice (Task 4). Synth = Karplus-Strong; the others load a
      *  sample bank onto the modern engine's [app.guitar.audio.AudioTrackEngine.voiceInstrument]
      *  (falls back to Synth if no bank is bundled). Persisted. */
@@ -394,12 +382,10 @@ class AppState(
     fun closeMore() { moreOpen = false }
 
     var chordInput by mutableStateOf("Cmaj7")
-    var chordFretRange by mutableStateOf(0..DISPLAY_FRETS)
     var selectedShapeIndex by mutableStateOf<Int?>(null)
 
     var scaleRoot by mutableStateOf("A")
     var scaleType by mutableStateOf("minor pentatonic")
-    var scaleFretRange by mutableStateOf(0..DISPLAY_FRETS)
 
     var highlight by mutableStateOf(Highlight.Chord)
     // Default to interval labels (1, b3, 5…) rather than note names.
@@ -737,14 +723,6 @@ class AppState(
         audio.playNote(note.midi.value, durationMillis = ringSustainMs, timbre = timbre)
     }
 
-    /** Play all (non-muted) notes of a chord shape as a strummed arpeggio low → high. */
-    fun playShape(shape: ChordShape) {
-        val midis = shape.notes.mapNotNull { it?.midi?.value }
-        if (midis.isNotEmpty()) {
-            audio.playChord(midis, strumDelayMillis = strumMs, sustainMillis = ringSustainMs, timbre = timbre)
-        }
-    }
-
     /** Tuner-specific: play a pluck at a specific MIDI note under the user's A4 ref,
      *  with the active instrument's timbre. */
     fun playReferencePitch(midi: Int) {
@@ -949,16 +927,6 @@ class AppState(
         setLoopSlot(barIdx, slotIdx, current.copy(chordSymbol = cleaned, voicingIndex = 0))
         // Re-normalize so the new chord and its neighbors get min-movement voicings.
         normalizeLoopVoicings()
-    }
-
-    /** Pick the index of the E-shape voicing for [chordSymbol], or 0 if none exists.
-     *  E-shape is the canonical movable barre — typically the easiest "default" voicing. */
-    fun defaultVoicingIndexFor(chordSymbol: String?): Int {
-        val parsed = chordSymbol?.let { ChordLibrary.parse(it) } ?: return 0
-        val (r, q) = parsed
-        val shapes = loopShapeGen.shapesFor(r, q, liveTuning, frets = DISPLAY_FRETS)
-        val idx = shapes.indexOfFirst { it.cagedShape == CagedShape.E }
-        return if (idx >= 0) idx else 0
     }
 
     /** Tracks whether we've already normalized the initial progression's voicings to the

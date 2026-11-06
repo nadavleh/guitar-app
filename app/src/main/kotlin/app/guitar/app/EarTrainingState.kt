@@ -12,8 +12,6 @@ import app.guitar.theory.ChordLibrary
 import app.guitar.theory.ChordShapeGenerator
 import app.guitar.theory.ChordTypeLevel
 import app.guitar.theory.EarTraining
-import app.guitar.theory.Fretboard
-import app.guitar.theory.FretPosition
 import app.guitar.theory.IntervalChoice
 import app.guitar.theory.IntervalDirection
 import app.guitar.theory.IntervalSongs
@@ -522,9 +520,6 @@ class EarTrainingState(
         progBarRevealed = if (idx in progBarRevealed) progBarRevealed - idx else progBarRevealed + idx
     }
 
-    fun toggleKeyReveal() { keyRevealed = !keyRevealed }
-    fun toggleModeReveal() { modeRevealed = !modeRevealed }
-
     /** Reveal/hide key and mode together — they share a single card in the UI. */
     fun toggleKeyModeReveal() { val v = !keyRevealed; keyRevealed = v; modeRevealed = v }
 
@@ -1012,8 +1007,6 @@ class EarTrainingState(
         stopLoop()
     }
 
-    /** Current score so far (number of questions with all bars correct). */
-    val challengeScore: Int get() = challengeAnswers.count { it == true }
     /** Partial-credit score: total correctly-identified bars across all questions. */
     val challengeBarScore: Int get() = challengeBarsCorrect.sum()
     /** Maximum possible bar score (4 bars × every question). */
@@ -1196,10 +1189,6 @@ class EarTrainingState(
     private fun degreesMap() =
         if (progMode == TrainingMode.Major) EarTraining.MAJOR_DEGREES else EarTraining.MINOR_DEGREES
 
-    /** Degree-button options for the current mode: (degree 1..7, Roman label). */
-    fun challengeDegreeOptions(): List<Pair<Int, String>> =
-        degreesMap().entries.sortedBy { it.key }.map { it.key to it.value.roman }
-
     /** Distinct extension-label options for the current mode + level. In mix mode the
      *  union spans triad ("") + 7th + extended suffixes so every possible bar is answerable. */
     fun challengeExtOptions(): List<String> {
@@ -1312,18 +1301,6 @@ class EarTrainingState(
         return EarTraining.romanModeTag(challengeGuessDominant.getOrNull(i) == true)
     }
 
-    fun guessChallengeDegree(bar: Int, degree: Int) {
-        if (!challengeActive) return
-        challengeGuessDegree = challengeGuessDegree.toMutableList().also { it[bar] = degree }
-        maybeAutoMarkChallenge()
-    }
-
-    fun guessChallengeExt(bar: Int, ext: String) {
-        if (!challengeActive) return
-        challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = ext }
-        maybeAutoMarkChallenge()
-    }
-
     /**
      * #3: When the level is fixed Sevenths (not mix), each scale degree has exactly
      * ONE diatonic 7th (ii→ii7, V→V7, etc.), so the user shouldn't pick degree and
@@ -1333,23 +1310,6 @@ class EarTrainingState(
      */
     val challengeCombinedMode: Boolean
         get() = !earMixAll && chordTypeLevel == ChordTypeLevel.Sevenths
-
-    /** Combined diatonic-7th options for the current mode: (degree, "V7"-style label). */
-    fun challengeCombinedOptions(): List<Pair<Int, String>> =
-        degreesMap().entries.sortedBy { it.key }.map { (deg, info) ->
-            deg to EarTraining.romanLabel(info.roman, info.seventhQuality)
-        }
-
-    /** Pick a combined diatonic-7th answer — sets both the degree and its (forced)
-     *  diatonic extension for [bar], then auto-scores if the question is complete. */
-    fun guessChallengeCombined(bar: Int, degree: Int) {
-        if (!challengeActive) return
-        val info = degreesMap()[degree] ?: return
-        val ext = EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman)
-        challengeGuessDegree = challengeGuessDegree.toMutableList().also { it[bar] = degree }
-        challengeGuessExt = challengeGuessExt.toMutableList().also { it[bar] = ext }
-        maybeAutoMarkChallenge()
-    }
 
     /** #3: labels for the dedicated "hear the degrees" reference palette — PLAIN
      *  Arabic numbers 1..7, never Roman numerals / qualities, so hearing a degree

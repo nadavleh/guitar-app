@@ -14,7 +14,6 @@ import app.guitar.theory.PercussionPattern
 import app.guitar.theory.PercussionRender
 import app.guitar.theory.PercussionTiming
 import app.guitar.theory.WavFile
-import app.guitar.theory.PercussionVoices
 import app.guitar.theory.SavedBeat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -402,10 +401,6 @@ class SambaLooperState(
     /** Clear a single cell (long-press) without cycling through the voices. */
     fun clearCell(instrument: PercussionInstrument, slot: Int) {
         commit(editPattern.withCell(instrument, slot, null))
-    }
-
-    fun clearRow(instrument: PercussionInstrument) {
-        commit(editPattern.clearedRow(instrument))
     }
 
     fun clearAll() {

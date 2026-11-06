@@ -78,8 +78,6 @@ class CagedTrainerState(
     val stepCount: Int get() = run.size
     val step: DrillStep get() = run[stepIndex.coerceIn(0, stepCount - 1)]
     val box: CagedBox get() = step.box
-    /** 0-based index of the current box, for the "Box 3 of 5" readout. */
-    val boxIndex: Int get() = step.box.ordinal
     /** Position of the current step within its own box, and that box's length. */
     val drillIndex: Int get() = stepIndex - run.indexOfFirst { it.box == step.box }
     val drillCount: Int get() = run.count { it.box == step.box }

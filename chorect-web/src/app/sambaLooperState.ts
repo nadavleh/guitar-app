@@ -547,7 +547,6 @@ export class SambaLooperState {
   }
 
   clearCell(instrument: PercussionInstrument, slot: number) { this.commit(this.editPattern.withCell(instrument, slot, null)); }
-  clearRow(instrument: PercussionInstrument) { this.commit(this.editPattern.clearedRow(instrument)); }
   clearAll() { this.commit(PercussionPattern.empty(this.editPattern.instruments, this.editPattern.meter)); }
 
   // ---- kit: add / remove instruments ----

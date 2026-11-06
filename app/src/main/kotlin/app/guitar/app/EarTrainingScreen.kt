@@ -80,7 +80,6 @@ import app.guitar.theory.ChordTypeLevel
 import app.guitar.theory.CarMode
 import app.guitar.theory.EarTraining
 import app.guitar.theory.Fretboard
-import app.guitar.theory.FretPosition
 import app.guitar.theory.IntervalSource
 import app.guitar.theory.IntervalTrainer
 import app.guitar.theory.NoteSpeller

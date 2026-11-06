@@ -52,7 +52,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -434,5 +433,3 @@ private fun noteLabel(midi: Int): Pair<String, String> {
     val name = NoteSpeller.spell(app.guitar.theory.PitchClass(pc))
     return name to "$octave"
 }
-
-private fun noteOctave(midi: Int): Int = midi / 12 - 1

@@ -60,8 +60,6 @@ export class CagedTrainerState {
   get stepCount(): number { return this.run.length; }
   get step(): DrillStep { return this.run[Math.min(Math.max(this.stepIndex, 0), this.stepCount - 1)]; }
   get box(): CagedBox { return this.step.box; }
-  /** 0-based index of the current box, for the "Box 3 of 5" readout. */
-  get boxIndex(): number { return CAGED_BOXES.indexOf(this.step.box); }
   /** Position of the current step within its own box, and that box's length. */
   get drillIndex(): number { return this.stepIndex - this.run.findIndex((s) => s.box === this.step.box); }
   get drillCount(): number { return this.run.filter((s) => s.box === this.step.box).length; }

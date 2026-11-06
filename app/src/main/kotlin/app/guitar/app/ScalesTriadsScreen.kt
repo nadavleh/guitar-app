@@ -37,7 +37,6 @@ import app.guitar.theory.CagedScales
 import app.guitar.theory.Fretboard
 import app.guitar.theory.FretPosition
 import app.guitar.theory.Interval
-import app.guitar.theory.NoteSpeller
 import app.guitar.theory.ScaleSubset
 
 private const val TRAINER_FRETS = 22

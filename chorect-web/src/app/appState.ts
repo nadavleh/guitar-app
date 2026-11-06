@@ -6,9 +6,9 @@
 // app's Compose recomposition is replaced by an explicit render pass.)
 
 import {
-  Instrument, InstrumentInfo, Tuning, Note, note, FretPosition, fp, fpKey,
+  Instrument, InstrumentInfo, Tuning, note, FretPosition, fp, fpKey,
   noteAt, stringCount, parseNote,
-  ChordShape, VoicingStyle, parseChord, ChordShapeGenerator,
+  VoicingStyle, parseChord, ChordShapeGenerator,
 } from "../theory";
 import * as Tunings from "../theory/tunings";
 import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../audio";
@@ -546,7 +546,6 @@ export class AppState {
   setLabelMode(m: LabelMode): void { this.commit(() => { this.labelMode = m; }); }
   toggleLeftHanded(v: boolean): void { this.commit(() => { this.leftHanded = v; }); }
   setAppearanceExpanded(v: boolean): void { this.commit(() => { this.appearanceExpanded = v; }); }
-  toggleDarkTheme(v: boolean): void { this.commit(() => { this.darkTheme = v; }); }
   /** Persist the chosen Theme mode (Personalize's segmented Dark/Light/Auto).
    *  Resolving "Auto" against the live system preference happens in ui.ts's
    *  render() (a DOM/`matchMedia` concern, not state). */
@@ -714,11 +713,6 @@ export class AppState {
     const n = noteAt(this.liveTuning, pos);
     this.audio.playNote(n.midi, this.ringSustainMs, this.timbre);
     this.notify();
-  }
-
-  playShape(shape: ChordShape): void {
-    const midis = shape.notes.filter((n): n is Note => n !== null).map((n) => n.midi);
-    if (midis.length) this.audio.playChord(midis, this.strumMs, this.ringSustainMs, this.timbre);
   }
 
   playReferencePitch(midi: number): void {

@@ -1,15 +1,11 @@
 package app.guitar.app
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,12 +16,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.guitar.theory.ChordQuality
 import app.guitar.theory.ChordShape
-import app.guitar.theory.Fingering
 import app.guitar.theory.FretPosition
 import app.guitar.theory.Fretboard
 import app.guitar.theory.FretboardOverlay
@@ -175,46 +169,6 @@ fun shapeMarks(
         )
     }
     return result
-}
-
-@Composable
-fun ShapeCard(
-    shape: ChordShape,
-    selected: Boolean = false,
-    onClick: () -> Unit = {},
-    modifier: Modifier = Modifier,
-) {
-    val reversedFrets = shape.frets.reversed()
-    val reversedNotes = shape.notes.reversed()
-    val reversedIntervals = shape.intervals.reversed()
-    val reversedFingering = Fingering.suggest(shape).reversed()
-
-    val fretsLine = reversedFrets.joinToString(" ") { f -> if (f == null) " x" else f.toString().padStart(2, ' ') }
-    val notesLine = reversedNotes.joinToString(" ") { n -> if (n == null) " x" else NoteSpeller.spell(n.pitchClass).padStart(2, ' ') }
-    val intervalsLine = reversedIntervals.joinToString(" ") { iv -> if (iv == null) " x" else intervalName(iv).padStart(2, ' ') }
-    val fingersLine = reversedFingering.joinToString(" ") { f -> if (f == null) " ·" else f.toString().padStart(2, ' ') }
-
-    val rootTag = if (shape.hasRootInBass) " · root in bass" else ""
-    val positionLabel = if (shape.position == 0) "open position" else "position ${shape.position}"
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = if (selected) androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                 else androidx.compose.material3.CardDefaults.cardColors(),
-        onClick = onClick,
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                "${shape.chordName}  ·  $positionLabel  ·  span ${shape.fretSpan}$rootTag",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Spacer(Modifier.height(6.dp))
-            Text("frets     $fretsLine", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-            Text("notes     $notesLine", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-            Text("intervals $intervalsLine", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-            Text("fingers   $fingersLine", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-        }
-    }
 }
 
 @Composable

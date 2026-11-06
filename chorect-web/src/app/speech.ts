@@ -26,11 +26,6 @@ function synth(): SpeechSynthesis | null {
   }
 }
 
-/** True when an utterance would actually be heard. */
-export function speechAvailable(): boolean {
-  return synth() !== null && typeof SpeechSynthesisUtterance !== "undefined";
-}
-
 /** Speak `text` at `volume` (0..1, clamped), cutting off whatever is still sounding.
  *  No-op when empty or unavailable. An empty string is therefore also the "stop
  *  talking" call. */

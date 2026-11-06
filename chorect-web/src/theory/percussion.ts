@@ -519,26 +519,6 @@ function builtin(encoded: string): PercussionPattern {
   return p;
 }
 
-// Teleco-teco — the two classic phrasings. Surdo + pandeiro are shared; the tamborim
-// and agogô are phase-shifted between the two. (Rows: surdo|tamborim|pandeiro|agogo.)
-export const TELECOTECO_1 = builtin(
-  "M:2,2,4,16;" +
-  "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
-  "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
-  "pandeiro=0,3,2,0,0,3,2,0,0,3,2,0,0,3,2,0" + "|" +
-  // Agogô (#12): low bell ▼ (voice 0) on steps 1,7,9,16; high bell ▲ (voice 1)
-  // on steps 4,5,11,13,14 — 0-indexed slots below.
-  "agogo=0,-,-,1,1,-,0,-,0,-,1,-,1,1,-,0",
-);
-
-export const TELECOTECO_2 = builtin(
-  "M:2,2,4,16;" +
-  "surdo=1,-,-,2,0,-,-,2,1,-,-,2,0,-,-,2" + "|" +
-  "tamborim=0,1,0,1,0,1,2,0,1,0,1,0,1,2,0,1" + "|" +
-  "pandeiro=0,3,2,0,0,3,2,0,0,3,2,0,0,3,2,0" + "|" +
-  "agogo=0,-,0,-,1,-,-,0,-,0,-,1,-,-,0,-",
-);
-
 // Batida do cavaco 1 — default groove for the new kit (surdo + tamborim + bongo).
 export const BATIDA_CAVACO_1 = builtin(
   "M:2,2,4,16;" +
@@ -627,11 +607,6 @@ export const PARTIDO_ALTO_OFFICIAL = builtin(
   "M:2,2,4,16;" + SURDO_TELECO + "|" +
   "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
   "pandeiro=-,2,-,-,0,-,0,-,0,-,2,-,-,0,-,0",   // "Pandeiro — Partido Alto" phrase
-);
-export const PARTIDO_ALTO_DEC = builtin(
-  "M:2,2,4,16;" + SURDO_TELECO + "|" +
-  "tamborim=1,0,1,0,1,2,0,1,0,1,0,1,0,1,2,0" + "|" +
-  "bongo=-,0,-,0,1,-,1,-,1,-,0,-,3,1,-,1",
 );
 
 // Nadav's samba groove (from his exported beat): reta pandeiro (track swing 33)
