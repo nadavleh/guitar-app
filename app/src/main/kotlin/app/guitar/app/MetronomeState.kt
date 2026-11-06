@@ -45,17 +45,8 @@ class MetronomeState(
 
     fun toggle() { if (isPlaying) stop() else start() }
 
-    // Tap-tempo: average the intervals of the recent taps (2 s window, last 6).
-    private val tapTimes = ArrayList<Long>()
-    fun tapTempo(nowMs: Long = System.currentTimeMillis()) {
-        if (tapTimes.isNotEmpty() && nowMs - tapTimes.last() > 2000) tapTimes.clear()
-        tapTimes.add(nowMs)
-        while (tapTimes.size > 6) tapTimes.removeAt(0)
-        if (tapTimes.size >= 2) {
-            val avg = (tapTimes.last() - tapTimes.first()).toDouble() / (tapTimes.size - 1)
-            bpm = (60_000.0 / avg).toInt().coerceIn(10, 300)
-        }
-    }
+    private val taps = TapTempo()
+    fun tapTempo(nowMs: Long = System.currentTimeMillis()) { taps.tap(nowMs)?.let { bpm = it } }
 
     fun start() {
         if (isPlaying) return
@@ -102,5 +93,21 @@ class MetronomeState(
     companion object {
         /** Time signatures offered (beatsPerBar to beatUnit). Cadence uses beatsPerBar. */
         val TIME_SIGNATURES = listOf(2 to 4, 3 to 4, 4 to 4, 5 to 4, 6 to 8, 7 to 8, 3 to 8, 12 to 8, 2 to 2)
+    }
+}
+
+/** Tap-tempo: average the intervals of the recent taps (2 s window, last 6). Shared by
+ *  the metronome and the samba looper. */
+class TapTempo {
+    private val times = ArrayList<Long>()
+
+    /** Record a tap; returns the tapped BPM (10..300) once two taps are in, else null. */
+    fun tap(nowMs: Long): Int? {
+        if (times.isNotEmpty() && nowMs - times.last() > 2000) times.clear()
+        times.add(nowMs)
+        while (times.size > 6) times.removeAt(0)
+        if (times.size < 2) return null
+        val avg = (times.last() - times.first()).toDouble() / (times.size - 1)
+        return (60_000.0 / avg).toInt().coerceIn(10, 300)
     }
 }

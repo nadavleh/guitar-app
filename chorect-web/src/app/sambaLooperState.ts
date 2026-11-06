@@ -10,6 +10,7 @@ import {
 } from "../theory";
 import { WebAudioEngine, PercussionSynth } from "../audio";
 import { clickAt, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
+import { TapTempo } from "./metronomeState";
 import { pandeiroEq } from "./pandeiroEq";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -209,16 +210,10 @@ export class SambaLooperState {
   /** Reorder the kit: move the track at `from` to index `to`. */
   reorderInstrument(from: number, to: number) { this.commit(this.editPattern.movedInstrument(from, to)); }
 
-  // Tap-tempo: average the intervals of the recent taps (2 s window, last 6).
-  private tapTimes: number[] = [];
+  private taps = new TapTempo();
   tapTempo(nowMs: number = Date.now()) {
-    if (this.tapTimes.length && nowMs - this.tapTimes[this.tapTimes.length - 1] > 2000) this.tapTimes = [];
-    this.tapTimes.push(nowMs);
-    while (this.tapTimes.length > 6) this.tapTimes.shift();
-    if (this.tapTimes.length >= 2) {
-      const avg = (this.tapTimes[this.tapTimes.length - 1] - this.tapTimes[0]) / (this.tapTimes.length - 1);
-      this.bpm = Math.min(Math.max(Math.round(60000 / avg), 10), 300);
-    }
+    const bpm = this.taps.tap(nowMs);
+    if (bpm !== null) this.bpm = bpm;
     this.notify();
   }
   /** Seconds until a buffer first reaches 90% of its peak (crescendos bloom late). */

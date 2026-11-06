@@ -4,7 +4,7 @@
 import {
   Interval, PitchClass, Tuning, ChordQuality, Scale, ScalePosition, ChordShape,
   fp, fpKey, noteAt, midiPitchClass, pcInterval, spellPc, stringCount,
-  chordOverlay, scaleOverlay,
+  chordOverlay, scaleOverlay, FretboardHighlight,
 } from "../theory";
 import { AppState, DisplayMode, LabelMode, ChordScaleView } from "./appState";
 
@@ -43,19 +43,18 @@ function labelFor(mode: LabelMode, pc: PitchClass, interval: Interval): string {
 }
 
 export function chordMarks(root: PitchClass, quality: ChordQuality, tuning: Tuning, numFrets: number, labelMode: LabelMode): Map<string, FretMark> {
-  const overlay = chordOverlay(root, quality, tuning, numFrets);
-  const out = new Map<string, FretMark>();
-  for (const [key, h] of overlay) {
-    out.set(key, { label: labelFor(labelMode, h.pitchClass, h.interval), isRoot: h.isRoot, kind: MarkKind.Chord });
-  }
-  return out;
+  return overlayMarks(chordOverlay(root, quality, tuning, numFrets), labelMode, MarkKind.Chord);
 }
 
 export function scaleMarks(root: PitchClass, scale: Scale, tuning: Tuning, numFrets: number, labelMode: LabelMode): Map<string, FretMark> {
-  const overlay = scaleOverlay(root, scale, tuning, numFrets);
+  return overlayMarks(scaleOverlay(root, scale, tuning, numFrets), labelMode, MarkKind.Scale);
+}
+
+/** Chord/scale overlay -> labelled marks (mirrors Common.kt overlayMarks). */
+function overlayMarks(overlay: Map<string, FretboardHighlight>, labelMode: LabelMode, kind: MarkKind): Map<string, FretMark> {
   const out = new Map<string, FretMark>();
   for (const [key, h] of overlay) {
-    out.set(key, { label: labelFor(labelMode, h.pitchClass, h.interval), isRoot: h.isRoot, kind: MarkKind.Scale });
+    out.set(key, { label: labelFor(labelMode, h.pitchClass, h.interval), isRoot: h.isRoot, kind });
   }
   return out;
 }

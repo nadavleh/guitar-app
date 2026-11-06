@@ -66,6 +66,15 @@ private const val OPEN_MARK_FRAC = 0.7f
 private const val NUT_FRAC = 0.022f
 private const val STRING_DP = 42
 private const val FRET_NUMBER_DP = 18   // extra height below for fret-number row
+/** Wood-grain streaks: (y fraction, alpha). Hoisted out of the draw pass, which runs
+ *  every animation frame while a pluck is fading. */
+private val GRAIN_BANDS = listOf(
+    0.07f to 0.10f, 0.18f to 0.06f, 0.27f to 0.08f, 0.38f to 0.05f,
+    0.49f to 0.09f, 0.61f to 0.06f, 0.73f to 0.08f, 0.84f to 0.05f, 0.92f to 0.07f,
+)
+private val SINGLE_DOT_FRETS = intArrayOf(3, 5, 7, 9, 15, 17, 19, 21)
+private val DOUBLE_DOT_FRETS = intArrayOf(12, 24)
+private val MARKER_FRETS = SINGLE_DOT_FRETS + DOUBLE_DOT_FRETS
 
 /**
  * Realistic horizontal fretboard.
@@ -359,11 +368,7 @@ fun FretboardView(
         )
         // Subtle horizontal grain — a few low-alpha streaks at varying y, varying alpha
         val grainColor = board.woodGrain
-        val grainBands = listOf(
-            0.07f to 0.10f, 0.18f to 0.06f, 0.27f to 0.08f, 0.38f to 0.05f,
-            0.49f to 0.09f, 0.61f to 0.06f, 0.73f to 0.08f, 0.84f to 0.05f, 0.92f to 0.07f
-        )
-        for ((yFrac, alpha) in grainBands) {
+        for ((yFrac, alpha) in GRAIN_BANDS) {
             drawLine(
                 color = grainColor.copy(alpha = alpha),
                 start = Offset(0f, h * yFrac),
@@ -397,14 +402,12 @@ fun FretboardView(
         }
 
         // ---------- Inlays (between frets, vertically centered) ----------
-        val singleDots = listOf(3, 5, 7, 9, 15, 17, 19, 21)
-        val doubleDots = listOf(12, 24)
         val inlayR = max(3f, unit * 0.12f)
-        for (f in singleDots) if (f <= numFrets) {
+        for (f in SINGLE_DOT_FRETS) if (f <= numFrets) {
             val x = mx(openWidth + nutWidth + (f - 0.5f) * fretSpacing)
             drawCircle(board.inlay.copy(alpha = 0.6f), radius = inlayR, center = Offset(x, h / 2))
         }
-        for (f in doubleDots) if (f <= numFrets) {
+        for (f in DOUBLE_DOT_FRETS) if (f <= numFrets) {
             val x = mx(openWidth + nutWidth + (f - 0.5f) * fretSpacing)
             drawCircle(board.inlay.copy(alpha = 0.6f), radius = inlayR, center = Offset(x, h * 0.32f))
             drawCircle(board.inlay.copy(alpha = 0.6f), radius = inlayR, center = Offset(x, h * 0.68f))
@@ -418,7 +421,7 @@ fun FretboardView(
             fontSize = (stringSpacing * 0.28f).toSp(),
             fontWeight = FontWeight.SemiBold,
         )
-        for (f in singleDots + doubleDots) if (f <= numFrets) {
+        for (f in MARKER_FRETS) if (f <= numFrets) {
             val x = mx(openWidth + nutWidth + (f - 0.5f) * fretSpacing)
             val measured = measurer.measure(text = "$f", style = fretNumStyle)
             drawText(

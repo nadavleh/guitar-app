@@ -202,17 +202,8 @@ class SambaLooperState(
     var isPlaying by mutableStateOf(false)
         private set
 
-    // Tap-tempo: average the intervals of the recent taps (2 s window, last 6).
-    private val tapTimes = ArrayList<Long>()
-    fun tapTempo(nowMs: Long = System.currentTimeMillis()) {
-        if (tapTimes.isNotEmpty() && nowMs - tapTimes.last() > 2000) tapTimes.clear()
-        tapTimes.add(nowMs)
-        while (tapTimes.size > 6) tapTimes.removeAt(0)
-        if (tapTimes.size >= 2) {
-            val avg = (tapTimes.last() - tapTimes.first()).toDouble() / (tapTimes.size - 1)
-            bpm = (60_000.0 / avg).toInt().coerceIn(10, 300)
-        }
-    }
+    private val taps = TapTempo()
+    fun tapTempo(nowMs: Long = System.currentTimeMillis()) { taps.tap(nowMs)?.let { bpm = it } }
     /** Slot currently sounding (0..15), or -1 when stopped. Drives the playhead. */
     var currentSlot by mutableStateOf(-1)
         private set

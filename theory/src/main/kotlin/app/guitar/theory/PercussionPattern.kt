@@ -715,6 +715,15 @@ object PercussionBuiltins {
     )
 }
 
+/** JSON string-literal escaping shared by the hand-rolled beat/phrase/block encoders. */
+private fun esc(s: String) = buildString {
+    for (c in s) when (c) {
+        '"' -> append("\\\""); '\\' -> append("\\\\")
+        '\n' -> append("\\n"); '\r' -> append("\\r"); '\t' -> append("\\t")
+        else -> append(c)
+    }
+}
+
 /**
  * Beat file (export / import): a self-describing JSON envelope around a pattern
  * plus its name / tempo, so a beat can be saved to disk and loaded back (here or
@@ -733,13 +742,6 @@ data class BeatFile(
 ) {
     /** Pretty-printed JSON envelope written to disk. */
     fun encode(): String {
-        fun esc(s: String) = buildString {
-            for (c in s) when (c) {
-                '"' -> append("\\\""); '\\' -> append("\\\\")
-                '\n' -> append("\\n"); '\r' -> append("\\r"); '\t' -> append("\\t")
-                else -> append(c)
-            }
-        }
         return buildString {
             append("{\n")
             append("  \"format\": \"chorect-beat\",\n")
@@ -787,13 +789,6 @@ object PhraseFile {
     const val FORMAT = "chorect-phrase"
 
     fun encode(p: PercussionBuiltins.PresetTrack): String {
-        fun esc(s: String) = buildString {
-            for (c in s) when (c) {
-                '"' -> append("\\\""); '\\' -> append("\\\\")
-                '\n' -> append("\\n"); '\r' -> append("\\r"); '\t' -> append("\\t")
-                else -> append(c)
-            }
-        }
         return buildString {
             append("{\n")
             append("  \"format\": \"").append(FORMAT).append("\",\n")
@@ -821,13 +816,6 @@ object BlockFile {
     const val FORMAT = "chorect-block"
 
     fun encode(blockEncoded: String, customPhrases: List<PercussionBuiltins.PresetTrack>): String {
-        fun esc(s: String) = buildString {
-            for (c in s) when (c) {
-                '"' -> append("\\\""); '\\' -> append("\\\\")
-                '\n' -> append("\\n"); '\r' -> append("\\r"); '\t' -> append("\\t")
-                else -> append(c)
-            }
-        }
         return buildString {
             append("{\n")
             append("  \"format\": \"").append(FORMAT).append("\",\n")

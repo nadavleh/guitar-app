@@ -22,6 +22,7 @@ import app.guitar.theory.ChordQuality
 import app.guitar.theory.ChordShape
 import app.guitar.theory.FretPosition
 import app.guitar.theory.Fretboard
+import app.guitar.theory.FretboardHighlight
 import app.guitar.theory.FretboardOverlay
 import app.guitar.theory.Interval
 import app.guitar.theory.NoteSpeller
@@ -43,21 +44,8 @@ fun chordMarks(
     numFrets: Int,
     labelMode: LabelMode,
     fretRange: IntRange? = null,
-): Map<FretPosition, FretMark> {
-    val overlay = FretboardOverlay.chord(root, quality, tuning, numFrets)
-    val filtered = if (fretRange == null) overlay else overlay.filterKeys { it.fret in fretRange }
-    return filtered.mapValues { (_, h) ->
-        FretMark(
-            label = when (labelMode) {
-                LabelMode.Notes -> NoteSpeller.spell(h.pitchClass)
-                LabelMode.Intervals -> intervalName(h.interval)
-                LabelMode.Empty -> ""
-            },
-            isRoot = h.isRoot,
-            kind = MarkKind.Chord,
-        )
-    }
-}
+): Map<FretPosition, FretMark> =
+    overlayMarks(FretboardOverlay.chord(root, quality, tuning, numFrets), labelMode, fretRange, MarkKind.Chord)
 
 fun scaleMarks(
     root: PitchClass,
@@ -66,8 +54,16 @@ fun scaleMarks(
     numFrets: Int,
     labelMode: LabelMode,
     fretRange: IntRange? = null,
+): Map<FretPosition, FretMark> =
+    overlayMarks(FretboardOverlay.scale(root, scale, tuning, numFrets), labelMode, fretRange, MarkKind.Scale)
+
+/** Chord/scale overlay -> labelled marks, optionally clipped to [fretRange]. */
+private fun overlayMarks(
+    overlay: Map<FretPosition, FretboardHighlight>,
+    labelMode: LabelMode,
+    fretRange: IntRange?,
+    kind: MarkKind,
 ): Map<FretPosition, FretMark> {
-    val overlay = FretboardOverlay.scale(root, scale, tuning, numFrets)
     val filtered = if (fretRange == null) overlay else overlay.filterKeys { it.fret in fretRange }
     return filtered.mapValues { (_, h) ->
         FretMark(
@@ -77,7 +73,7 @@ fun scaleMarks(
                 LabelMode.Empty -> ""
             },
             isRoot = h.isRoot,
-            kind = MarkKind.Scale,
+            kind = kind,
         )
     }
 }
@@ -201,11 +197,6 @@ fun SelectedPositionInfo(
 }
 
 /**
- * One song-list row shared by every "Songs" popup. The "Title — Artist" text opens a
- * YouTube search for the song (tap); long-press copies "Title — Artist" to the clipboard
- * so you can search it yourself. [suffix] is appended to the label (e.g. "  (A)").
- */
-/**
  * A song row for surfaces where ▶ means "the app plays audio" (Theory tab, Workout
  * curriculum): the title is plain text and the two search links are explicitly
  * labelled, so nothing here looks like an in-app play button.
@@ -215,14 +206,7 @@ internal fun ExternalSongRow(title: String, artist: String, suffix: String = "")
     val context = LocalContext.current
     val label = if (artist.isNotEmpty()) "$title — $artist$suffix" else "$title$suffix"
     val q = android.net.Uri.encode("$title $artist".trim())
-    val open = { url: String ->
-        runCatching {
-            context.startActivity(
-                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)),
-            )
-        }
-        Unit
-    }
+    val open = { url: String -> openUrl(context, url) }
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -239,20 +223,25 @@ internal fun ExternalSongRow(title: String, artist: String, suffix: String = "")
     }
 }
 
+/** Open [url] in whatever app handles it; silently ignored if nothing does. */
+private fun openUrl(context: android.content.Context, url: String) {
+    runCatching {
+        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+    }
+}
+
+/**
+ * One song-list row shared by every "Songs" popup. The "Title — Artist" text opens a
+ * YouTube search for the song (tap); long-press copies "Title — Artist" to the clipboard
+ * so you can search it yourself. [suffix] is appended to the label (e.g. "  (A)").
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun SongLinkRow(title: String, artist: String, suffix: String = "") {
     val context = LocalContext.current
     val label = "$title — $artist$suffix"
     val q = android.net.Uri.encode("$title $artist")
-    val open = { url: String ->
-        runCatching {
-            context.startActivity(
-                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)),
-            )
-        }
-        Unit
-    }
+    val open = { url: String -> openUrl(context, url) }
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,

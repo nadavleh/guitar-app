@@ -15,6 +15,13 @@ const OPEN_MARK_FRAC = 0.7;
 const NUT_FRAC = 0.022;
 const STRING_DP = 42;
 const FRET_NUMBER_DP = 18;
+/** Wood-grain streaks: [y fraction, alpha]. Hoisted out of the per-frame draw. */
+const GRAIN_BANDS: ReadonlyArray<readonly [number, number]> = [
+  [0.07, 0.10], [0.18, 0.06], [0.27, 0.08], [0.38, 0.05], [0.49, 0.09],
+  [0.61, 0.06], [0.73, 0.08], [0.84, 0.05], [0.92, 0.07],
+];
+const SINGLE_DOT_FRETS: ReadonlyArray<number> = [3, 5, 7, 9, 15, 17, 19, 21];
+const DOUBLE_DOT_FRETS: ReadonlyArray<number> = [12, 24];
 const TAP_SLOP = 6; // px of movement before a press becomes a drag, not a tap
 const PLUCK_LIFE_MS = 1400; // lifetime of a pluck's ripple/glow feedback (Fretboard v3)
 
@@ -428,12 +435,8 @@ export class FretboardCanvas {
     woodGrad.addColorStop(1, board.woodA);
     ctx.fillStyle = woodGrad;
     ctx.fillRect(0, 0, w, h);
-    const grain: [number, number][] = [
-      [0.07, 0.10], [0.18, 0.06], [0.27, 0.08], [0.38, 0.05], [0.49, 0.09],
-      [0.61, 0.06], [0.73, 0.08], [0.84, 0.05], [0.92, 0.07],
-    ];
     ctx.lineWidth = 1.2;
-    for (const [yFrac, alpha] of grain) {
+    for (const [yFrac, alpha] of GRAIN_BANDS) {
       ctx.strokeStyle = withAlpha(board.woodGrain, alpha);
       ctx.beginPath();
       ctx.moveTo(0, h * yFrac);
@@ -459,16 +462,14 @@ export class FretboardCanvas {
     }
 
     // inlays
-    const singleDots = [3, 5, 7, 9, 15, 17, 19, 21];
-    const doubleDots = [12, 24];
     const inlayR = Math.max(3, unit * 0.12);
     ctx.fillStyle = withAlpha(board.inlay, 0.6);
-    for (const f of singleDots) {
+    for (const f of SINGLE_DOT_FRETS) {
       if (f > numFrets) continue;
       const x = mx(openWidth + nutWidth + (f - 0.5) * fretSpacing);
       circle(ctx, x, h / 2, inlayR);
     }
-    for (const f of doubleDots) {
+    for (const f of DOUBLE_DOT_FRETS) {
       if (f > numFrets) continue;
       const x = mx(openWidth + nutWidth + (f - 0.5) * fretSpacing);
       circle(ctx, x, h * 0.32, inlayR);
@@ -481,7 +482,7 @@ export class FretboardCanvas {
     ctx.font = `600 ${Math.max(9, stringSpacing * 0.28)}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
-    for (const f of [...singleDots, ...doubleDots]) {
+    for (const f of [...SINGLE_DOT_FRETS, ...DOUBLE_DOT_FRETS]) {
       if (f > numFrets) continue;
       const x = mx(openWidth + nutWidth + (f - 0.5) * fretSpacing);
       ctx.fillText(String(f), x, h - 1);

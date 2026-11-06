@@ -48,16 +48,10 @@ export class MetronomeState {
     this.deps.onChange();
   }
 
-  // Tap-tempo: average the intervals of the recent taps (2 s window, last 6).
-  private tapTimes: number[] = [];
+  private taps = new TapTempo();
   tapTempo(nowMs: number = Date.now()): void {
-    if (this.tapTimes.length && nowMs - this.tapTimes[this.tapTimes.length - 1] > 2000) this.tapTimes = [];
-    this.tapTimes.push(nowMs);
-    while (this.tapTimes.length > 6) this.tapTimes.shift();
-    if (this.tapTimes.length >= 2) {
-      const avg = (this.tapTimes[this.tapTimes.length - 1] - this.tapTimes[0]) / (this.tapTimes.length - 1);
-      this.bpm = Math.min(Math.max(Math.round(60000 / avg), 10), 300);
-    }
+    const bpm = this.taps.tap(nowMs);
+    if (bpm !== null) this.bpm = bpm;
     this.deps.onChange();
   }
 
@@ -91,5 +85,21 @@ export class MetronomeState {
       nextBeat += 60 / this.bpm;
       beat = (beat + 1) % this.beatsPerBar;
     }
+  }
+}
+
+/** Tap-tempo: average the intervals of the recent taps (2 s window, last 6). Shared by
+ *  the metronome and the samba looper (mirrors MetronomeState.kt TapTempo). */
+export class TapTempo {
+  private times: number[] = [];
+
+  /** Record a tap; returns the tapped BPM (10..300) once two taps are in, else null. */
+  tap(nowMs: number): number | null {
+    if (this.times.length && nowMs - this.times[this.times.length - 1] > 2000) this.times = [];
+    this.times.push(nowMs);
+    while (this.times.length > 6) this.times.shift();
+    if (this.times.length < 2) return null;
+    const avg = (this.times[this.times.length - 1] - this.times[0]) / (this.times.length - 1);
+    return Math.min(Math.max(Math.round(60000 / avg), 10), 300);
   }
 }
