@@ -8,6 +8,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  * Standalone metronome: clicks [beatsPerBar] wood clicks per bar at [bpm], the
@@ -62,20 +64,30 @@ class MetronomeState(
 
     fun release() = stop()
 
+    /**
+     * Lookahead scheduler: wake [LOOKAHEAD_MS] BEFORE each beat and queue its click at
+     * the beat's absolute time on the mixer clock (delayFrames), so coroutine wake-up
+     * jitter never moves a click. The beat dot updates at the onset itself.
+     */
     private suspend fun loop() {
         val sr = audio.sampleRate
         var nextBeatNanos = System.nanoTime()
         var beat = 0
         while (isPlaying) {
-            val beatMs = 60_000.0 / bpm
-            val baseDelayMs = ((nextBeatNanos - System.nanoTime()) / 1_000_000.0).coerceAtLeast(0.0)
-            val delayFrames = (baseDelayMs * sr / 1000.0).toInt().coerceAtLeast(0)
-            currentBeat = beat
+            val beatNanos = 60e9 / bpm
+            // Fell more than a beat behind (process paused): resync, don't burst.
+            if (System.nanoTime() - nextBeatNanos > beatNanos) nextBeatNanos = System.nanoTime()
+            val delayNanos = (nextBeatNanos - System.nanoTime()).coerceAtLeast(0)
+            val delayFrames = (delayNanos * sr / 1e9).roundToInt()
             if (beat == 0) audio.playSamplesAt(accentClick, 1.0f, delayFrames)
             else audio.playSamplesAt(click, 0.72f, delayFrames)
-            nextBeatNanos += (beatMs * 1_000_000).toLong()
+            delay(delayNanos / 1_000_000)
+            if (!isPlaying) break
+            currentBeat = beat
+            nextBeatNanos += beatNanos.roundToLong()
             beat = (beat + 1) % beatsPerBar
-            delay((baseDelayMs + beatMs).toLong().coerceAtLeast(1))
+            val wakeNanos = nextBeatNanos - LOOKAHEAD_MS * 1_000_000L - System.nanoTime()
+            if (wakeNanos > 0) delay(wakeNanos / 1_000_000)
         }
     }
 
@@ -91,6 +103,9 @@ class MetronomeState(
     }
 
     companion object {
+        /** How far ahead of each beat its click is queued (≥ worst-case wake-up jitter). */
+        private const val LOOKAHEAD_MS = 100L
+
         /** Time signatures offered (beatsPerBar to beatUnit). Cadence uses beatsPerBar. */
         val TIME_SIGNATURES = listOf(2 to 4, 3 to 4, 4 to 4, 5 to 4, 6 to 8, 7 to 8, 3 to 8, 12 to 8, 2 to 2)
     }
@@ -108,6 +123,6 @@ class TapTempo {
         while (times.size > 6) times.removeAt(0)
         if (times.size < 2) return null
         val avg = (times.last() - times.first()).toDouble() / (times.size - 1)
-        return (60_000.0 / avg).toInt().coerceIn(10, 300)
+        return (60_000.0 / avg).roundToInt().coerceIn(10, 300)
     }
 }

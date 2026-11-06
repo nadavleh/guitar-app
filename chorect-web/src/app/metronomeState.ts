@@ -7,6 +7,8 @@ import { WebAudioEngine } from "../audio";
 import { clickAt, ACCENT_CLICK_HZ, BEAT_CLICK_HZ } from "./woodClick";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** How far ahead of each beat its click is queued (≥ worst-case timer jitter). */
+const LOOKAHEAD_SEC = 0.1;
 
 export interface MetronomeDeps {
   audio: WebAudioEngine;
@@ -71,19 +73,27 @@ export class MetronomeState {
 
   release(): void { this.stop(); }
 
+  /** Lookahead scheduler: wake LOOKAHEAD_SEC BEFORE each beat and queue its click at
+   *  the beat's absolute AudioContext time, so setTimeout jitter never moves a click.
+   *  The beat dot updates at the onset itself. */
   private async loop(token: number): Promise<void> {
-    let nextBeat = this.deps.audio.now();
+    const audio = this.deps.audio;
+    const live = () => this.isPlaying && token === this.token;
+    let nextBeat = audio.now();
     let beat = 0;
-    while (this.isPlaying && token === this.token) {
-      const wait = Math.max(nextBeat - this.deps.audio.now(), 0);
-      await sleep(wait * 1000);
-      if (!this.isPlaying || token !== this.token) break;
-      this.currentBeat = beat;
+    while (live()) {
+      const beatSec = 60 / this.bpm;
+      // Fell more than a beat behind (tab throttled): resync, don't burst.
+      if (audio.now() - nextBeat > beatSec) nextBeat = audio.now();
       const accented = beat === 0;
-      this.deps.audio.playSamples(accented ? this.accent : this.click, accented ? 1.0 : 0.72, this.deps.audio.now());
+      audio.playSamples(accented ? this.accent : this.click, accented ? 1.0 : 0.72, nextBeat);
+      await sleep(Math.max(nextBeat - audio.now(), 0) * 1000);
+      if (!live()) break;
+      this.currentBeat = beat;
       this.deps.onChange();
-      nextBeat += 60 / this.bpm;
+      nextBeat += beatSec;
       beat = (beat + 1) % this.beatsPerBar;
+      await sleep(Math.max(nextBeat - LOOKAHEAD_SEC - audio.now(), 0) * 1000);
     }
   }
 }

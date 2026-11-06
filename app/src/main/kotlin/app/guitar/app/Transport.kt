@@ -51,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 /**
  * Shared transport chrome for the Ear / Rhythm / Loop screens (Signal redesign,
@@ -123,7 +124,7 @@ fun TransportDock(
                 // double-tap the number to type an exact tempo.
                 NumericValueText(
                     "$bpm", value = bpm.toFloat(), min = 10f, max = 300f,
-                    onSet = { onBpm(it.toInt()) },
+                    onSet = { onBpm(it.roundToInt()) },
                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.width(2.dp))
@@ -135,7 +136,7 @@ fun TransportDock(
                 BpmStep("+") { onBpm((bpm + 5).coerceAtMost(300)) }
                 Slider(
                     value = bpm.toFloat(),
-                    onValueChange = { onBpm(it.toInt()) },
+                    onValueChange = { onBpm(it.roundToInt()) },
                     valueRange = 10f..300f,
                     modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
                 )
@@ -166,7 +167,7 @@ fun TransportDock(
                             // Double-tap the label to type an exact tempo.
                             NumericValueText(
                                 "Tempo: $bpm BPM", value = bpm.toFloat(), min = 10f, max = 300f,
-                                onSet = { onBpm(it.toInt()) },
+                                onSet = { onBpm(it.roundToInt()) },
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -175,7 +176,7 @@ fun TransportDock(
                                 BpmStep("+") { onBpm((bpm + 5).coerceAtMost(300)) }
                                 Slider(
                                     value = bpm.toFloat(),
-                                    onValueChange = { onBpm(it.toInt()) },
+                                    onValueChange = { onBpm(it.roundToInt()) },
                                     valueRange = 10f..300f,
                                     modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
                                 )
@@ -275,7 +276,7 @@ private fun TallDock(
             // Double-tap the number to type an exact tempo.
             NumericValueText(
                 "$bpm", value = bpm.toFloat(), min = 10f, max = 300f,
-                onSet = { onBpm(it.toInt()) },
+                onSet = { onBpm(it.roundToInt()) },
                 style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.width(3.dp))
@@ -302,7 +303,7 @@ private fun TallDock(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             Slider(
                 value = bpm.toFloat(),
-                onValueChange = { onBpm(it.toInt()) },
+                onValueChange = { onBpm(it.roundToInt()) },
                 valueRange = 10f..300f,
                 modifier = Modifier.weight(if (volume != null) 1.5f else 1f).padding(horizontal = 6.dp),
             )
