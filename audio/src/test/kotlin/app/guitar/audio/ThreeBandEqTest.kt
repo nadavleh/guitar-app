@@ -57,4 +57,18 @@ class ThreeBandEqTest {
         eq.process(l, r, l.size)
         for (v in l) assertTrue(v.isFinite() && kotlin.math.abs(v) < 20f, "bounded: $v")
     }
+
+    @Test fun `speaker bass boost lifts lows, leaves highs, and is passthrough when off`() {
+        val b = SpeakerBassBoost(SR)
+        val off = tone(100.0, 1000); val offR = off.copyOf(); val ref = off.copyOf()
+        b.process(off, offR, off.size)
+        for (i in off.indices) assertEquals(ref[i], off[i], 0f)
+        b.enabled = true
+        fun gainAt(f: Double): Double {
+            val l = tone(f, SR); val r = tone(f, SR); val dry = rms(tone(f, SR))
+            b.process(l, r, l.size); return 20 * kotlin.math.log10(rms(l) / dry)
+        }
+        assertTrue(gainAt(80.0) > 4.5, "lows lifted")
+        assertTrue(kotlin.math.abs(gainAt(4000.0)) < 0.5, "highs untouched")
+    }
 }

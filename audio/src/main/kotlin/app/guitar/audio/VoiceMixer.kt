@@ -42,6 +42,7 @@ class VoiceMixer(val sampleRate: Int) {
     private val limiter = SoftLimiter(sampleRate)
     private val freeverb = Freeverb(sampleRate)
     private val eq = ThreeBandEq(sampleRate)
+    private val speakerBoost = SpeakerBassBoost(sampleRate)
     private val sendL = FloatArray(4096)
     private val sendR = FloatArray(4096)
 
@@ -68,6 +69,8 @@ class VoiceMixer(val sampleRate: Int) {
     }
 
     @Synchronized fun setEq(bassDb: Float, midDb: Float, trebleDb: Float) = eq.setGainsDb(bassDb, midDb, trebleDb)
+    /** Phone-speaker bass compensation (see [SpeakerBassBoost]); the app flips it on route changes. */
+    @Synchronized fun setSpeakerBassBoost(on: Boolean) { speakerBoost.enabled = on }
 
     /** Flush the reverb tail so a previous chord's ambience doesn't ring over the next. */
     @Synchronized fun clearReverb() = freeverb.clear()
@@ -142,6 +145,7 @@ class VoiceMixer(val sampleRate: Int) {
         freeverb.process(sendL, sendR, count)
         for (i in 0 until count) { outL[i] += sendL[i]; outR[i] += sendR[i] }
         eq.process(outL, outR, count)
+        speakerBoost.process(outL, outR, count)
         limiter.process(outL, outR, count)
     }
 }

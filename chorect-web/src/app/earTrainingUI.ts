@@ -2076,8 +2076,6 @@ export class EarTrainingUI {
     }
     parent.appendChild(switchRow("Play I–V–I before each new key", null, ear.intervalCadence,
       (v) => ear.setIntervalCadence(v)));
-    parent.appendChild(switchRow("Show fretboard (tonic marked)", null, ear.intervalShowFretboard,
-      (v) => ear.setIntervalShowFretboard(v)));
   }
 
   private intervalsView(parent: HTMLElement): void {
@@ -2157,7 +2155,10 @@ export class EarTrainingUI {
       row.push(next);
       parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:6px" }, row));
     }
-    // Try it by hand: every tonic on the neck is marked (toggle in ⚙).
+    // Try it by hand: every tonic on the neck is marked. The switch sits on the page,
+    // like the progression trainer's "Show chord on fretboard".
+    parent.appendChild(switchRow("Show on fretboard (tonic marked)", null, ear.intervalShowFretboard,
+      (v) => ear.setIntervalShowFretboard(v)));
     if (ear.intervalShowFretboard) this.intervalFretboardPanel(parent);
   }
 

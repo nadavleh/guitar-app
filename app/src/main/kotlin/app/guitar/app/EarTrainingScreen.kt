@@ -2744,11 +2744,6 @@ private fun IntervalSettings(ear: EarTrainingState, keyName: String) {
             modifier = Modifier.weight(1f))
         Switch(checked = ear.intervalCadence, onCheckedChange = { ear.intervalCadence = it })
     }
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Text("Show fretboard (tonic marked)", style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f))
-        Switch(checked = ear.intervalShowFretboard, onCheckedChange = { ear.intervalShowFretboard = it })
-    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -2869,6 +2864,13 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
             }
         }
         // Try it by hand: every tonic on the neck is marked; tapping any fret sounds it.
+        // The switch sits on the page, like the progression trainer's fretboard switch.
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Show on fretboard (tonic marked)", style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f))
+            Switch(checked = ear.intervalShowFretboard, onCheckedChange = { ear.intervalShowFretboard = it })
+        }
         if (ear.intervalShowFretboard) {
             val tuning = state.liveTuning
             val marks = remember(tuning, ear.intervalKey) {

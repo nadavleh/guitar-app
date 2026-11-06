@@ -92,3 +92,23 @@ class ThreeBandEq(private val sampleRate: Int) {
         }
     }
 }
+
+/**
+ * Phone-speaker bass compensation: a stereo low shelf at [SHELF_HZ] (+[GAIN_DB] dB),
+ * switched on only while sound goes out of the phone's own speaker. The corner sits
+ * well above the EQ's 120 Hz bass band on purpose — a phone speaker barely moves air
+ * below ~200 Hz, so lifting 250 Hz and down is what makes the low strings audible
+ * there. Off = exact passthrough, no filter state kept.
+ */
+class SpeakerBassBoost(private val sampleRate: Int) {
+    companion object { const val SHELF_HZ = 250.0; const val GAIN_DB = 6.0 }
+    private val l = Biquad().apply { lowShelf(SHELF_HZ, sampleRate, GAIN_DB) }
+    private val r = Biquad().apply { lowShelf(SHELF_HZ, sampleRate, GAIN_DB) }
+    var enabled = false
+        set(v) { if (v && !field) { l.reset(); r.reset() }; field = v }
+
+    fun process(outL: FloatArray, outR: FloatArray, count: Int) {
+        if (!enabled) return
+        for (i in 0 until count) { outL[i] = l.process(outL[i]); outR[i] = r.process(outR[i]) }
+    }
+}

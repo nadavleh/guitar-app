@@ -98,6 +98,9 @@ class MainActivity : ComponentActivity() {
     var speaker: Speaker? = null
         private set
 
+    /** Headphone/speaker watcher driving the phone-speaker bass boost. */
+    private var outputRoute: OutputRoute? = null
+
     /** The voice, starting the TTS engine on first ask. */
     fun orCreateSpeaker(): Speaker = speaker ?: Speaker(this).also { speaker = it }
 
@@ -111,6 +114,11 @@ class MainActivity : ComponentActivity() {
             modern = AudioTrackEngine(nativeRate, AudioRates.framesPerBuffer(this)),
             legacy = LegacyAudioTrackEngine(nativeRate),
         )
+        // Phone speaker → automatic bass shelf; headphones / BT / USB → flat. Re-checked
+        // on every plug, unplug, connect and disconnect.
+        outputRoute = OutputRoute(this) { onSpeaker ->
+            (audioEngine as? SwitchableAudioEngine)?.modernEngine?.setSpeakerBassBoost(onSpeaker)
+        }.also { it.start() }
         setContent {
             // Theme flag read straight from the repository so the theme wraps the
             // whole app (AppState is created inside App()).
@@ -138,6 +146,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        outputRoute?.stop()
         if (::audioEngine.isInitialized) audioEngine.close()
         speaker?.close()
         speaker = null

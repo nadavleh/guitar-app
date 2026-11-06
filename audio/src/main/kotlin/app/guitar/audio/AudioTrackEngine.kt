@@ -436,6 +436,7 @@ class AudioTrackEngine(
 
     /** Set the modern-bus tone EQ gains (dB). */
     fun setEq(bassDb: Float, midDb: Float, trebleDb: Float) = mixer.setEq(bassDb, midDb, trebleDb)
+    fun setSpeakerBassBoost(on: Boolean) = mixer.setSpeakerBassBoost(on)
 
     /** Per-voice reverb send (0..1) for guitar note/chord voices — set per selected
      *  Sound by the app. Drums (playSamples) stay dry regardless. */
