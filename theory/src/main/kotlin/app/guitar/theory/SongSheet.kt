@@ -30,8 +30,8 @@ object SongSheet {
      *  sharps, so the key decides rather than a global preference. */
     fun prefersFlats(key: SongKey?): Boolean {
         if (key == null) return false
-        // F, Bb, Eb, Ab, Db, Gb major and their relative minors are flat keys.
-        val flatTonics = if (key.minor) listOf(5, 10, 3, 8, 1, 2, 7) else listOf(5, 10, 3, 8, 1, 6)
+        // F, Bb, Eb, Ab, Db, Gb major and their relative minors (Dm Gm Cm Fm Bbm Ebm) are flat keys.
+        val flatTonics = if (key.minor) listOf(2, 7, 0, 5, 10, 3) else listOf(5, 10, 3, 8, 1, 6)
         return flatTonics.contains(key.tonic.value)
     }
 

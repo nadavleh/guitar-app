@@ -71,7 +71,8 @@ export function run(): void {
   check("nonsense is not a key", parseKey("") === null && parseKey("H") === null);
   check("flat keys prefer flat spelling",
     prefersFlats(parseKey("F")) && prefersFlats(parseKey("Bb")) &&
-    !prefersFlats(parseKey("G")) && !prefersFlats(null));
+    !prefersFlats(parseKey("G")) && !prefersFlats(null) &&
+    prefersFlats(parseKey("Cm")) && !prefersFlats(parseKey("C#m")));
   check("transposing keeps the quality",
     transposeSymbol("C", 2) === "D" && transposeSymbol("Cm7", 2) === "Dm7" &&
     transposeSymbol("Cmaj7", 2) === "Dmaj7");

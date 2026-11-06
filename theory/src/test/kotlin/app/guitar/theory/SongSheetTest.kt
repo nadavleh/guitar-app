@@ -43,6 +43,8 @@ class SongSheetTest {
         assertTrue(SongSheet.prefersFlats(SongSheet.parseKey("Bb")))
         assertFalse(SongSheet.prefersFlats(SongSheet.parseKey("G")))
         assertFalse(SongSheet.prefersFlats(null))
+        assertTrue(SongSheet.prefersFlats(SongSheet.parseKey("Cm")))
+        assertFalse(SongSheet.prefersFlats(SongSheet.parseKey("C#m")))
     }
 
     // ---------- transposition ----------

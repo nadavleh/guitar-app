@@ -32,8 +32,8 @@ export function parseKey(text: string): SongKey | null {
  *  sharps, so the key decides rather than a global preference. */
 export function prefersFlats(key: SongKey | null): boolean {
   if (key === null) return false;
-  // F, Bb, Eb, Ab, Db, Gb major and their relative minors are flat keys.
-  const flatTonics = key.minor ? [5, 10, 3, 8, 1, 2, 7] : [5, 10, 3, 8, 1, 6];
+  // F, Bb, Eb, Ab, Db, Gb major and their relative minors (Dm Gm Cm Fm Bbm Ebm) are flat keys.
+  const flatTonics = key.minor ? [2, 7, 0, 5, 10, 3] : [5, 10, 3, 8, 1, 6];
   return flatTonics.includes(key.tonic);
 }
 
