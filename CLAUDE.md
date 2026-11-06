@@ -50,7 +50,7 @@ There is **no POSIX `gradlew`** — only `gradlew.bat`. Use `./gradlew.bat`, nev
 ./launch-app.bat                      # emulator + install + launch
 ```
 
-**Run a subset (Kotlin).** Every test class carries a JUnit `@Tag`; `-Ptags=a,b` runs only those: `./gradlew.bat test -Ptags=cavaq,chords` (~4 s). Tags: `theory-core`, `chords`, `caged`, `cavaq`, `ear`, `drums`, `rhythm`, `songs`, `audio`. `--tests "*CavaqForms*"` still works; `:theory:test` and `:audio:test` run independently. Test classes run in parallel (`junit-platform.properties`), `audio` tests only the debug variant, and the configuration cache is on: full `./gradlew.bat test` is ~5 s warm (was ~18 s). **Tag every new test class.**
+**Run a subset (Kotlin).** Every test class carries a JUnit `@Tag`; `-Ptags=a,b` runs only those: `./gradlew.bat test -Ptags=cavaq,chords` (~4 s). Tags: `theory-core`, `chords`, `caged`, `cavaq`, `ear`, `drums`, `rhythm`, `songs`, `audio`. `--tests "*CavaqForms*"` still works; `:theory:test` and `:audio:test` run independently. Test classes run in parallel (`junit-platform.properties`), `audio` tests only the debug variant (the configuration cache is OFF — the app module's APK-copy doLast breaks it): full `./gradlew.bat test` is a few seconds warm (was ~18 s). **Tag every new test class.**
 
 **Run a subset (web).** `chorect-web/test/verify/<area>.ts` holds the checks, `test/verify.ts` is the runner: `npm run verify -- cavaq chords` runs only those areas; no args = all (what CI runs). Areas: `audio`, `caged`, `cavaq`, `chords`, `drums`, `ear`, `intervals`, `songs`, `theory`, `version`. A new area = new file + one line in the runner AREAS map.
 

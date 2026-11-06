@@ -1,7 +1,7 @@
 // Area "intervals" of the web parity checks (split out of the old monolithic verify.ts).
 // Run alone: npm run verify -- intervals
 
-import { TrainingMode, INTERVAL_CHOICES, intervalTargetMidi, INTERVAL_DEGREES, intervalDegreeSemitones, intervalDegreeLabel, diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalRefFor, intervalBoxSteps, intervalStepLabel, intervalStepSemitones, intervalStepAnswerSet, intervalStepMode, intervalChoiceFor, IntervalDirection, randomOtherKey, drawAvoiding, melodyNotes, melodyContains, melodyNotesAnchored } from "../../src/theory";
+import { TrainingMode, INTERVAL_CHOICES, intervalTargetMidi, INTERVAL_DEGREES, intervalDegreeSemitones, intervalDegreeLabel, diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalRefFor, intervalBoxSteps, intervalStepLabel, intervalStepSemitones, intervalStepAnswerSet, intervalStepMode, intervalChoiceFor, IntervalDirection, randomOtherKey, drawAvoiding, melodyNotes, melodyContains, melodyNotesAnchored, INTERVAL_SONGS_ASCENDING, INTERVAL_SONGS_DESCENDING } from "../../src/theory";
 import { check } from "./harness";
 
 export function run(): void {
