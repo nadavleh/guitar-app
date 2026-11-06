@@ -37,4 +37,18 @@ object Inversions {
         }
         return notes.sorted()
     }
+
+    /** True when every inversion of [quality] is a mere transposition of root
+     *  position (aug, dim7): with the root unknown they sound identical, so the
+     *  trainer can't ask which one it is. */
+    fun isSymmetric(quality: ChordQuality): Boolean {
+        fun shape(k: Int) = midis(0, quality, k).let { m -> m.map { it - m.first() } }
+        val root = shape(0)
+        return count(quality) > 1 && (1 until count(quality)).all { shape(it) == root }
+    }
+
+    /** Whether guessing inversion [guess] for a chord voiced in [actual] is right:
+     *  exact match, or ANY inversion of a [isSymmetric] quality. */
+    fun isCorrectGuess(quality: ChordQuality, guess: Int, actual: Int): Boolean =
+        guess == actual || isSymmetric(quality)
 }

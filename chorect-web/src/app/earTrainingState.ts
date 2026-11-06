@@ -17,7 +17,7 @@ import {
   SongExample, songsForDiatonic, songsForHarmonicMinor, songsForAdvanced, songsForCircleWindow, importedSongsForDiatonic, CIRCLE_WINDOWS, namedRomanLine,
   N2cChallenge, randomN2c, n2cAnswerLabel, n2cChordSymbol, n2cTestNote, n2cLabel,
   N2C_MAJOR_TEST_OFFSETS, N2C_MINOR_TEST_OFFSETS,
-  inversionCount, inversionMidis,
+  inversionCount, inversionMidis, inversionGuessCorrect,
   pickMinMovement, defaultRng,
   IntervalDirection, INTERVAL_CHOICES, intervalTargetMidi, IntervalChoice, IntervalSource,
   melodyNotes, melodyNotesAnchored, INTERVAL_EIGHTH_MS,
@@ -1949,6 +1949,13 @@ export class EarTrainingState {
     const q = QUALITIES.get(this.invQuality);
     return q ? inversionCount(q) : 3;
   }
+  /** The current guess is right: exact, or any inversion of a symmetric chord (aug,
+   *  dim7 — every inversion sounds the same). False with no guess. */
+  get invGuessCorrect(): boolean {
+    if (this.invGuess === null) return false;
+    const q = QUALITIES.get(this.invQuality);
+    return q ? inversionGuessCorrect(q, this.invGuess, this.invInversion) : this.invGuess === this.invInversion;
+  }
   private invMidis(inversion: number): number[] {
     const q = QUALITIES.get(this.invQuality);
     if (!q) return [];
@@ -2015,7 +2022,7 @@ export class EarTrainingState {
     if (!this.invChActive || this.invChAnswered) return;
     if (this.invGuess == null) return;
     this.invChAnswered = true; this.invRevealed = true;
-    if (this.invGuess === this.invInversion) this.invChScore++;
+    if (this.invGuessCorrect) this.invChScore++;
     this.notify();
   }
   advanceInvChallenge() {

@@ -2388,7 +2388,7 @@ private fun InversionsView(state: AppState, ear: EarTrainingState) {
         )
         if (ear.invRevealed && ear.invGuess != null) {
             Spacer(Modifier.height(6.dp))
-            Text(if (ear.invGuess == ear.invInversion) "✔ correct" else "✘ that was the ${app.guitar.theory.Inversions.name(ear.invGuess!!).lowercase()}",
+            Text(if (ear.invGuessCorrect) "✔ correct" else "✘ that was the ${app.guitar.theory.Inversions.name(ear.invGuess!!).lowercase()}",
                 style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.height(12.dp))
@@ -2441,7 +2441,7 @@ private fun InversionsChallengeView(state: AppState, ear: EarTrainingState) {
             Button(onClick = { ear.submitInvGuess() }, enabled = ear.invGuess != null,
                 modifier = Modifier.fillMaxWidth()) { Text("Submit") }
         } else {
-            val ok = ear.invGuess == ear.invInversion
+            val ok = ear.invGuessCorrect
             Text((if (ok) "✔ correct" else "✘ answer: ${app.guitar.theory.Inversions.name(ear.invInversion)}") +
                 "   (${NoteSpeller.spell(ear.invRoot)}${if (ear.invQuality.isEmpty()) "" else ear.invQuality})",
                 style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,

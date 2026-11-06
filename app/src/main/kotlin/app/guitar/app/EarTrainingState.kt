@@ -2287,6 +2287,14 @@ class EarTrainingState(
 
     fun toggleInvReveal() { invRevealed = !invRevealed }
 
+    /** The current guess is right: exact, or any inversion of a symmetric chord (aug,
+     *  dim7 — every inversion sounds the same). False with no guess. */
+    val invGuessCorrect: Boolean get() {
+        val g = invGuess ?: return false
+        val q = ChordLibrary.qualities[invQuality] ?: return g == invInversion
+        return app.guitar.theory.Inversions.isCorrectGuess(q, g, invInversion)
+    }
+
     // Inversions challenge (scored).
     val invChallengeTotal: Int = 10
     var invChActive by mutableStateOf(false)
@@ -2307,7 +2315,7 @@ class EarTrainingState(
         if (!invChActive || invChAnswered) return
         val g = invGuess ?: return
         invChAnswered = true; invRevealed = true
-        if (g == invInversion) invChScore++
+        if (invGuessCorrect) invChScore++
     }
     fun advanceInvChallenge() {
         if (!invChActive) return

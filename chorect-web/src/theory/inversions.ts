@@ -27,3 +27,21 @@ export function inversionMidis(rootMidi: number, quality: ChordQuality, inversio
   }
   return notes.slice().sort((a, b) => a - b);
 }
+
+/** True when every inversion of `quality` is a mere transposition of root position
+ *  (aug, dim7): with the root unknown they sound identical, so the trainer can't ask
+ *  which one it is. Mirrors Inversions.isSymmetric. */
+export function inversionIsSymmetric(quality: ChordQuality): boolean {
+  const shape = (k: number) => { const m = inversionMidis(0, quality, k); return m.map((x) => x - m[0]).join(","); };
+  const n = inversionCount(quality);
+  if (n <= 1) return false;
+  const root = shape(0);
+  for (let k = 1; k < n; k++) if (shape(k) !== root) return false;
+  return true;
+}
+
+/** Whether guessing inversion `guess` for a chord voiced in `actual` is right: exact
+ *  match, or ANY inversion of a symmetric quality. Mirrors Inversions.isCorrectGuess. */
+export function inversionGuessCorrect(quality: ChordQuality, guess: number, actual: number): boolean {
+  return guess === actual || inversionIsSymmetric(quality);
+}

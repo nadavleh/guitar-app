@@ -1,7 +1,7 @@
 // Area "chords" of the web parity checks (split out of the old monolithic verify.ts).
 // Run alone: npm run verify -- chords
 
-import { parseChord, parseChordFull, inversionOf, isInversion, effectiveQuality, impliesTone, ChordShapeGenerator, cagedShapesFor, VoicingStyle, notesFrom, parsePitchClass, midiPitchClass, QUALITIES, inversionMidis, randomN2c, n2cAnswerLabel, movementCost, pickMinMovement, CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval } from "../../src/theory";
+import { parseChord, parseChordFull, inversionOf, isInversion, effectiveQuality, impliesTone, ChordShapeGenerator, cagedShapesFor, VoicingStyle, notesFrom, parsePitchClass, midiPitchClass, QUALITIES, inversionMidis, inversionIsSymmetric, inversionGuessCorrect, randomN2c, n2cAnswerLabel, movementCost, pickMinMovement, CHORD_DECOMPOSITIONS, decompositionFor, upperRootInterval } from "../../src/theory";
 import { standard } from "../../src/theory/tunings";
 import { check } from "./harness";
 
@@ -30,6 +30,12 @@ export function run(): void {
   check("C major 1st inversion bass note is E (pc 4)", firstInv[0] % 12 === 4);
   const rootPos = inversionMidis(60, cTriad, 0);
   check("C major root position bass note is C (pc 0)", rootPos[0] % 12 === 0);
+  // Symmetric qualities (aug, dim7): every inversion is a transposition of root position,
+  // so any guess is right (mirrors Kotlin symmetricChordsAcceptAnyInversion).
+  check("only aug and dim7 are inversion-symmetric",
+    [...QUALITIES.entries()].every(([sym, q]) => inversionIsSymmetric(q) === (sym === "aug" || sym === "dim7")));
+  check("any inversion guess is right for aug", inversionGuessCorrect(QUALITIES.get("aug")!, 0, 2));
+  check("a wrong inversion guess is wrong for a major triad", !inversionGuessCorrect(cTriad, 0, 2) && inversionGuessCorrect(cTriad, 1, 1));
 
   // --- Note2Chord: random challenge has a valid label ---
   const n2c = randomN2c();

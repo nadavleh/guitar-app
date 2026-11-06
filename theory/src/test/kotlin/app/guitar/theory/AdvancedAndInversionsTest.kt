@@ -30,6 +30,20 @@ class AdvancedAndInversionsTest {
         assertEquals(71, third.first())   // B3 is the lowest note
     }
 
+    @Test fun symmetricChordsAcceptAnyInversion() {
+        // aug and dim7 inversions are transpositions of root position: indistinguishable.
+        val symmetric = listOf("aug", "dim7")
+        for (sym in ChordLibrary.qualities.keys) {
+            val q = ChordLibrary.qualities[sym]!!
+            assertEquals(sym in symmetric, Inversions.isSymmetric(q), "isSymmetric($sym)")
+        }
+        val aug = ChordLibrary.qualities["aug"]!!
+        val maj = ChordLibrary.qualities[""]!!
+        assertTrue(Inversions.isCorrectGuess(aug, 0, 2))
+        assertTrue(Inversions.isCorrectGuess(maj, 1, 1))
+        assertTrue(!Inversions.isCorrectGuess(maj, 0, 2))
+    }
+
     @Test fun inversionNames() {
         assertEquals("Root position", Inversions.name(0))
         assertEquals("1st inversion", Inversions.name(1))

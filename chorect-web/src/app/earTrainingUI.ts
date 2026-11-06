@@ -1886,7 +1886,7 @@ export class EarTrainingUI {
       inversionName(ear.invInversion) + "  ·  " + spellPc(ear.invRoot) + ear.invQuality,
       () => ear.toggleInvReveal(), false));
     if (ear.invRevealed && ear.invGuess !== null) {
-      parent.appendChild(el("div", { style: "font-weight:600;margin-top:6px" }, [ear.invGuess === ear.invInversion ? "✔ correct" : `✘ that was the ${inversionName(ear.invGuess).toLowerCase()}`]));
+      parent.appendChild(el("div", { style: "font-weight:600;margin-top:6px" }, [ear.invGuessCorrect ? "✔ correct" : `✘ that was the ${inversionName(ear.invGuess).toLowerCase()}`]));
     }
     parent.appendChild(el("div", { class: "v-gap-12" }));
     this.chordFretboardPanel(parent, spellPc(ear.invRoot) + ear.invQuality, ear.invShowFretboard,
@@ -1916,7 +1916,7 @@ export class EarTrainingUI {
       if (ear.invGuess == null) b.disabled = true;
       parent.appendChild(b);
     } else {
-      const ok = ear.invGuess === ear.invInversion;
+      const ok = ear.invGuessCorrect;
       parent.appendChild(el("div", { style: `font-weight:700;color:var(--act)` }, [`${ok ? "✔ correct" : `✘ answer: ${inversionName(ear.invInversion)}`}   (${spellPc(ear.invRoot)}${ear.invQuality})`]));
       parent.appendChild(btn(ear.invChIndex === ear.invChallengeTotal - 1 ? "See score →" : "Next →", () => ear.advanceInvChallenge(), "btn primary"));
       // Post-answer only: showing the chord earlier would leak the answer.
