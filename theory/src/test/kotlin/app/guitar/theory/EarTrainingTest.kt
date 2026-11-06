@@ -507,6 +507,9 @@ class EarTrainingTest {
         assertNull(EarTraining.MissedTake.decode("9|:57.60"))       // pitches with no symbol
         assertNull(EarTraining.MissedTake.decode("13|Am:57"))       // key out of range
         assertNull(EarTraining.MissedTake.decode("x|Am:57"))
+        assertNull(EarTraining.MissedTake.decode("|Am:57"))         // empty key
+        assertNull(EarTraining.MissedTake.decode("9|Am:"))          // empty pitch list
+        assertNull(EarTraining.MissedTake.decode("9|Am:1e1"))       // not an integer token
     }
 
     @Test fun `natural and harmonic minor with same degrees get distinct keys`() {

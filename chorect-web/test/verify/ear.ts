@@ -96,7 +96,9 @@ export function run(): void {
     check("MissedTake decode rejects junk instead of half-reading it",
       decodeMissedTake("") === null && decodeMissedTake("9") === null &&
       decodeMissedTake("9|Am") === null && decodeMissedTake("9|:57.60") === null &&
-      decodeMissedTake("13|Am:57") === null && decodeMissedTake("x|Am:57") === null);
+      decodeMissedTake("13|Am:57") === null && decodeMissedTake("x|Am:57") === null &&
+      decodeMissedTake("|Am:57") === null && decodeMissedTake("9|Am:") === null &&
+      decodeMissedTake("9|Am:1e1") === null);
   }
 
   // --- Ear training: every advanced progression resolves to parseable chords in any key ---

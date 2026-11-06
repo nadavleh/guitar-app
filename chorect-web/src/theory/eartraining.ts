@@ -628,18 +628,24 @@ export function encodeMissedTake(take: MissedTake): string | null {
   return String(take.keyPc) + take.bars.map((b) => `|${b.symbol}:${b.midis.join(".")}`).join("");
 }
 
+/** Kotlin's String.toIntOrNull: an optional sign and digits only. Number() alone would
+ *  read "" as 0 and accept " 5", "1e1", "0x1F". */
+function toIntOrNull(s: string): number | null {
+  return /^[+-]?\d+$/.test(s) ? Number(s) : null;
+}
+
 /** Inverse of [encodeMissedTake]; null when `raw` is empty, truncated or malformed. */
 export function decodeMissedTake(raw: string): MissedTake | null {
   const parts = raw.split("|");
   if (parts.length < 2) return null;
-  const keyPc = Number(parts[0]);
-  if (!Number.isInteger(keyPc) || keyPc < 0 || keyPc > 11) return null;
+  const keyPc = toIntOrNull(parts[0]);
+  if (keyPc === null || keyPc < 0 || keyPc > 11) return null;
   const bars: MissedBar[] = [];
   for (const row of parts.slice(1)) {
     const at = row.indexOf(":");
     if (at <= 0) return null;
     const symbol = row.slice(0, at);
-    const midis = row.slice(at + 1).split(".").map(Number).filter((n) => Number.isInteger(n));
+    const midis = row.slice(at + 1).split(".").map(toIntOrNull).filter((n): n is number => n !== null);
     if (!symbol || midis.length === 0) return null;
     bars.push({ symbol, midis });
   }
