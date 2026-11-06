@@ -20,6 +20,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  * State + scheduler for the samba percussion looper (drum-machine tab).
@@ -239,7 +241,16 @@ class SambaLooperState(
         scope.launch { runCatching { volumes = repo.drumVolumes.first() } }
     }
 
-    private fun voiceKey(inst: PercussionInstrument, voiceIndex: Int) = "${inst.id}:$voiceIndex"
+    /** Per (track id, voice): the mixer key and default level, built once — the hot
+     *  path asks for them on every hit and must not build strings there. */
+    private class VoiceSlot(val key: String, val defaultVolume: Float)
+    private val voiceSlots = HashMap<String, HashMap<Int, VoiceSlot>>()
+    private fun voiceSlot(inst: PercussionInstrument, voiceIndex: Int): VoiceSlot =
+        voiceSlots.getOrPut(inst.id) { HashMap() }.getOrPut(voiceIndex) {
+            VoiceSlot("${inst.id}:$voiceIndex", defaultVoiceVolume(PercussionCatalog.baseId(inst.id), voiceIndex))
+        }
+
+    private fun voiceKey(inst: PercussionInstrument, voiceIndex: Int) = voiceSlot(inst, voiceIndex).key
 
     /** TRACK level (0..1): lives on the pattern (PercussionPattern.trackVolume),
      *  so balance travels WITH the beat — saved, exported, undone. */
@@ -247,8 +258,10 @@ class SambaLooperState(
 
     /** Level of one voice (default full, or 50% for the soft tamborim voices);
      *  per-voice trims stay per-device (persisted). */
-    fun voiceVolumeOf(inst: PercussionInstrument, voiceIndex: Int): Float =
-        volumes[voiceKey(inst, voiceIndex)] ?: defaultVoiceVolume(PercussionCatalog.baseId(inst.id), voiceIndex)
+    fun voiceVolumeOf(inst: PercussionInstrument, voiceIndex: Int): Float {
+        val s = voiceSlot(inst, voiceIndex)
+        return volumes[s.key] ?: s.defaultVolume
+    }
 
     /** MASTER level (0..1): one output fader for the whole drum machine — hits,
      *  previews and the metronome click alike. Per-device like the voice trims
@@ -268,7 +281,7 @@ class SambaLooperState(
         masterVolume * (pat.trackVolumeOf(inst.id) / 100f) * voiceVolumeOf(inst, voiceIndex)
 
     fun setVolume(inst: PercussionInstrument, value: Float) {
-        commit(editPattern.withTrackVolume(inst.id, (value.coerceIn(0f, 1f) * 100).toInt()))
+        commit(editPattern.withTrackVolume(inst.id, (value.coerceIn(0f, 1f) * 100).roundToInt()))
     }
 
     fun setVoiceVolume(inst: PercussionInstrument, voiceIndex: Int, value: Float) {
@@ -328,6 +341,7 @@ class SambaLooperState(
             bpm = bpm,
             swing = swing,
             swingModel = swingModel,
+            trackSwingModel = { id -> effectiveTrackSwingModel(id) },
             onlyTrack = onlyTrack,
             includeTrack = { id -> pattern.instruments.firstOrNull { it.id == id }?.let { isAudible(it) } ?: true },
             cycles = exportCycles,
@@ -355,10 +369,12 @@ class SambaLooperState(
 
     private var job: Job? = null
     private val synth = PercussionSynth(audio.sampleRate)
-    private val cache = HashMap<Pair<PercussionInstrument, Int>, FloatArray>()
+    /** Keyed on track id → voice (not the whole instrument data class, which would
+     *  be hashed on every hit). Kit ids are unique per track. */
+    private val cache = HashMap<String, HashMap<Int, FloatArray>>()
 
     private fun buffer(instrument: PercussionInstrument, voiceIndex: Int): FloatArray =
-        cache.getOrPut(instrument to voiceIndex) {
+        cache.getOrPut(instrument.id) { HashMap() }.getOrPut(voiceIndex) {
             // Prefer a bundled sample; fall back to the on-device synth if absent.
             val raw = sampleLoader(instrument, voiceIndex) ?: synth.synthesize(instrument, voiceIndex)
             // Pandeiro voices are high-passed + brightened so they clear the surdo's
@@ -459,19 +475,34 @@ class SambaLooperState(
     /** Onset shift (ms, ≤ 0) of a track's slot vs the master clock's. The track term
      *  uses the TRACK's model (default V2); the master term uses the global one (and
      *  is straight whenever the global swing is 0, which is when this applies). */
-    private fun trackOnsetDeltaMs(snapshot: PercussionPattern, id: String, slot: Int): Long {
+    private fun trackOnsetDeltaMs(snapshot: PercussionPattern, id: String, slot: Int): Double {
         val s = effectiveTrackSwing(snapshot, id)
-        if (s == swing) return 0
+        if (s == swing) return 0.0
         val tm = effectiveTrackSwingModel(id)
         // Exact, so a track's own feel isn't quantised to whole milliseconds on top of
-        // the master clock's rounding (the two errors used to compound).
-        var d = 0.0
-        for (k in 0 until slot) {
-            d += PercussionTiming.swungSlotMsExact(k, bpm, s, snapshot.meter, tm) -
-                PercussionTiming.swungSlotMsExact(k, bpm, swing, snapshot.meter, swingModel)
+        // the master clock's rounding (the two errors used to compound). Prefix sums
+        // per (meter, tempo, swings, models): O(1) per hit, same summation order.
+        val key = OnsetDeltaKey(snapshot.meter, bpm, s, tm, swing, swingModel)
+        var prefix = onsetDeltaCache[key]
+        if (prefix == null) {
+            if (onsetDeltaCache.size > 64) onsetDeltaCache.clear()
+            val n = snapshot.slots
+            prefix = DoubleArray(n + 1)
+            for (k in 0 until n) {
+                prefix[k + 1] = prefix[k] + (PercussionTiming.swungSlotMsExact(k, bpm, s, snapshot.meter, tm) -
+                    PercussionTiming.swungSlotMsExact(k, bpm, swing, snapshot.meter, swingModel))
+            }
+            onsetDeltaCache[key] = prefix
         }
-        return Math.round(d)
+        return prefix[slot.coerceIn(0, prefix.size - 1)]
     }
+
+    private data class OnsetDeltaKey(
+        val meter: PercussionMeter, val bpm: Int,
+        val trackSwing: Int, val trackModel: app.guitar.theory.SwingModel,
+        val swing: Int, val model: app.guitar.theory.SwingModel,
+    )
+    private val onsetDeltaCache = HashMap<OnsetDeltaKey, DoubleArray>()
 
     /** MULTIPLE PLAYHEADS: tracks with their own swing carry their own playhead
      *  slot (they anticipate the master clock); straight tracks follow [currentSlot]. */
@@ -578,9 +609,9 @@ class SambaLooperState(
     /** Frames until a buffer first reaches 90 % of its peak. Aligned hits sit at
      *  ~3 ms; crescendo articulations (shake rolls, long scrapes) bloom much later
      *  and are started early so their accent lands on the grid. */
-    private val peakOffsetCache = HashMap<Pair<PercussionInstrument, Int>, Int>()
+    private val peakOffsetCache = HashMap<String, HashMap<Int, Int>>()
     private fun peakOffsetFrames(inst: PercussionInstrument, voiceIndex: Int, buf: FloatArray): Int =
-        peakOffsetCache.getOrPut(inst to voiceIndex) {
+        peakOffsetCache.getOrPut(inst.id) { HashMap() }.getOrPut(voiceIndex) {
             var peak = 0f
             for (s in buf) { val a = kotlin.math.abs(s); if (a > peak) peak = a }
             if (peak <= 0f) return@getOrPut 0
@@ -605,8 +636,8 @@ class SambaLooperState(
         isPlaying = true
         job = scope.launch {
             val sr = audio.sampleRate
-            fun scheduleSlot(snapshot: PercussionPattern, slot: Int, delayMs: Long) {
-                val baseFrames = (delayMs * sr / 1000).toInt()
+            fun scheduleSlot(snapshot: PercussionPattern, slot: Int, delayMs: Double) {
+                val baseFrames = (delayMs * sr / 1000).roundToInt()
                 // Metronome click track: one click per beat, higher click on each bar's "1".
                 if (metronomeOn) {
                     val m = snapshot.meter
@@ -627,7 +658,7 @@ class SambaLooperState(
                     // each hit by its clock's onset difference — ≤ 0.4 slot of
                     // ANTICIPATION, safely inside the one-slot lookahead.
                     val instFrames =
-                        (((delayMs + trackOnsetDeltaMs(snapshot, inst.id, slot)) * sr) / 1000).toInt()
+                        (((delayMs + trackOnsetDeltaMs(snapshot, inst.id, slot)) * sr) / 1000).roundToInt()
                     val buf = buffer(inst, v)
                     val peak = peakOffsetFrames(inst, v, buf)
                     val advance = if (peak > sr / 50) minOf(peak, instFrames) else 0
@@ -647,7 +678,7 @@ class SambaLooperState(
             // MULTIPLE PLAYHEADS: a track with its own swing gets its playhead
             // updated by a child coroutine at ITS onset (which anticipates the
             // master clock's). Children die with this scheduler job.
-            fun CoroutineScope.schedulePlayheads(snapshot: PercussionPattern, slot: Int, delayMs: Long) {
+            fun CoroutineScope.schedulePlayheads(snapshot: PercussionPattern, slot: Int, delayMs: Double) {
                 if (swing > 0) {
                     if (trackPlayhead.isNotEmpty()) trackPlayhead = emptyMap()
                     return
@@ -658,7 +689,7 @@ class SambaLooperState(
                     if (s > 0) groups.getOrPut(s) { mutableListOf() }.add(inst.id)
                 }
                 for ((_, ids) in groups) {
-                    val fireIn = (delayMs + trackOnsetDeltaMs(snapshot, ids[0], slot)).coerceAtLeast(0)
+                    val fireIn = (delayMs + trackOnsetDeltaMs(snapshot, ids[0], slot)).coerceAtLeast(0.0).roundToLong()
                     launch {
                         delay(fireIn)
                         if (isPlaying) trackPlayhead = trackPlayhead + ids.associateWith { slot }
@@ -673,12 +704,13 @@ class SambaLooperState(
                 for (slot in 0 until op.slots) {
                     if (!isPlaying) break
                     currentSlot = slot
-                    if (first) { scheduleSlot(op, slot, 0); first = false }
+                    if (first) { scheduleSlot(op, slot, 0.0); first = false }
                     // Exact (fractional ms) accumulated in NANOSECONDS, so the loop runs
                     // at the true tempo instead of drifting on rounded slot durations.
                     val slotMs = PercussionTiming.swungSlotMsExact(slot, bpm, swing, op.meter, swingModel)
                     nextOnsetNanos += Math.round(slotMs * 1_000_000)
-                    val delayMs = ((nextOnsetNanos - System.nanoTime()) / 1_000_000).coerceAtLeast(0)
+                    val delayNanos = (nextOnsetNanos - System.nanoTime()).coerceAtLeast(0)
+                    val delayMs = delayNanos / 1e6
                     // Next up: the opening's next slot, or the loop's downbeat when it ends.
                     if (slot + 1 < op.slots) {
                         scheduleSlot(op, slot + 1, delayMs)
@@ -687,7 +719,7 @@ class SambaLooperState(
                         scheduleSlot(pattern, 0, delayMs)
                         schedulePlayheads(pattern, 0, delayMs)
                     }
-                    delay(delayMs)
+                    delay(delayNanos / 1_000_000)
                 }
                 playingOpening = false
             }
@@ -697,17 +729,23 @@ class SambaLooperState(
                 for (slot in 0 until snapshot.slots) {
                     if (!isPlaying) break
                     currentSlot = slot
-                    if (first) { scheduleSlot(snapshot, slot, 0); first = false }
+                    if (first) { scheduleSlot(snapshot, slot, 0.0); first = false }
                     val slotMs = PercussionTiming.swungSlotMsExact(slot, bpm, swing, snapshot.meter, swingModel)
                     nextOnsetNanos += Math.round(slotMs * 1_000_000)
                     val nextSlot = (slot + 1) % snapshot.slots
-                    val nextSnapshot = if (nextSlot == 0) pattern else snapshot
-                    val delayMs = ((nextOnsetNanos - System.nanoTime()) / 1_000_000).coerceAtLeast(0)
+                    // The pass's timing stays on `snapshot`, but each slot's CELLS come
+                    // from the live pattern whenever its meter still matches — so a cell
+                    // toggled mid-pass sounds on its next slot, not after up to 8 bars.
+                    val live = pattern
+                    val nextSnapshot =
+                        if (nextSlot == 0 || (live.meter == snapshot.meter && nextSlot < live.slots)) live else snapshot
+                    val delayNanos = (nextOnsetNanos - System.nanoTime()).coerceAtLeast(0)
+                    val delayMs = delayNanos / 1e6
                     if (nextSlot < nextSnapshot.slots) {
                         scheduleSlot(nextSnapshot, nextSlot, delayMs)
                         schedulePlayheads(nextSnapshot, nextSlot, delayMs)
                     }
-                    delay(delayMs)
+                    delay(delayNanos / 1_000_000)
                 }
             }
         }

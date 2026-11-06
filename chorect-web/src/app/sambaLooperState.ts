@@ -377,6 +377,7 @@ export class SambaLooperState {
       bpm: this.bpm,
       swing: this.swing,
       swingModel: this.swingModel,
+      trackSwingModel: (id) => this.effectiveTrackSwingModel(id),
       onlyTrack,
       includeTrack: (id) => {
         const inst = this.pattern.instruments.find((i) => i.id === id);
@@ -757,7 +758,8 @@ export class SambaLooperState {
           this.playTick();
           await sleep(Math.max((nextOnset - this.deps.audio.now()) * 1000, 0));
         }
-        this.playingOpening = false;
+        // A stopped/restarted run must not clear the NEW run's opening flag.
+        if (token === this.token) this.playingOpening = false;
       }
 
       while (this.isPlaying && token === this.token) {
@@ -769,7 +771,12 @@ export class SambaLooperState {
           const slotSec = swungSlotMsExact(slot, this.bpm, this.swing, snapshot.meter, this.swingModel) / 1000;
           nextOnset += slotSec;
           const nextSlot = (slot + 1) % snapshot.slots;
-          const nextSnapshot = nextSlot === 0 ? this.pattern : snapshot;
+          // The pass's timing stays on `snapshot`, but each slot's CELLS come from the
+          // live pattern whenever its meter still matches — so a cell toggled mid-pass
+          // sounds on its next slot, not after up to 8 bars.
+          const live = this.pattern;
+          const nextSnapshot =
+            nextSlot === 0 || (live.meter.equals(snapshot.meter) && nextSlot < live.slots) ? live : snapshot;
           if (nextSlot < nextSnapshot.slots) {
             scheduleSlot(nextSnapshot, nextSlot, nextOnset);
             this.schedulePlayheads(nextSnapshot, nextSlot, nextOnset, token);
@@ -824,14 +831,24 @@ export class SambaLooperState {
     const s = this.effectiveTrackSwing(snapshot, id);
     if (s === this.swing) return 0;
     const tm = this.effectiveTrackSwingModel(id);
-    let delta = 0;
-    for (let k = 0; k < slot; k++) {
-      // Exact, so a track's own feel isn't quantised on top of the master clock's
-      // rounding (the two errors used to compound).
-      delta += swungSlotMsExact(k, this.bpm, s, snapshot.meter, tm) - swungSlotMsExact(k, this.bpm, this.swing, snapshot.meter, this.swingModel);
+    // Exact, so a track's own feel isn't quantised on top of the master clock's
+    // rounding (the two errors used to compound). Prefix sums per (meter, tempo,
+    // swings, models): O(1) per hit, same summation order.
+    const m = snapshot.meter;
+    const key = `${m.bars}|${m.beatsPerBar}|${m.beatUnit}|${m.division}|${this.bpm}|${s}|${tm}|${this.swing}|${this.swingModel}`;
+    let prefix = this.onsetDeltaCache.get(key);
+    if (!prefix) {
+      if (this.onsetDeltaCache.size > 64) this.onsetDeltaCache.clear();
+      const n = snapshot.slots;
+      prefix = new Float64Array(n + 1);
+      for (let k = 0; k < n; k++) {
+        prefix[k + 1] = prefix[k] + (swungSlotMsExact(k, this.bpm, s, m, tm) - swungSlotMsExact(k, this.bpm, this.swing, m, this.swingModel));
+      }
+      this.onsetDeltaCache.set(key, prefix);
     }
-    return delta / 1000;
+    return prefix[Math.min(Math.max(slot, 0), prefix.length - 1)] / 1000;
   }
+  private onsetDeltaCache = new Map<string, Float64Array>();
 
   /** MULTIPLE PLAYHEADS: tracks with their own swing get their own playhead
    *  slot, updated by a timer at THEIR onset (which anticipates the master's).
