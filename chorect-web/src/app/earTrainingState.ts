@@ -721,10 +721,13 @@ export class EarTrainingState {
   setN2cShowFretboard(v: boolean) { this.n2cShowFretboard = v; this.notify(); }
   toggleN2cReveal() { this.n2cRevealed = !this.n2cRevealed; this.notify(); }
 
-  playN2c() {
+  /** Plays the triad, waits, then the test note on top. A plain replay is ignored while
+   *  one is sounding; `restart` (a NEW question) cuts it off instead — otherwise the new
+   *  question would stay silent. */
+  playN2c(restart = false) {
     if (!this.n2cChallenge) this.nextN2cChallenge();
     const c = this.n2cChallenge!;
-    if (this.n2cPlaying) return;
+    if (this.n2cPlaying && !restart) return;
     this.n2cToken++;
     const token = this.n2cToken;
     this.n2cPlaying = true;
@@ -741,8 +744,8 @@ export class EarTrainingState {
         const testMidi = this.nearestMidiAboveChord(n2cTestNote(c), midis.length ? midis : [60]);
         this.deps.audio.playNote(testMidi, sustain);
       } finally {
-        this.n2cPlaying = false;
-        this.notify();
+        // A superseded run must not clear the newer run's flag.
+        if (token === this.n2cToken) { this.n2cPlaying = false; this.notify(); }
       }
     })();
   }
@@ -795,7 +798,7 @@ export class EarTrainingState {
     const set = new Set<number>([...N2C_MAJOR_TEST_OFFSETS, ...N2C_MINOR_TEST_OFFSETS]);
     return [...set].sort((a, b) => a - b).map((o) => n2cLabel(o));
   }
-  startN2cChallenge() { this.n2cChActive = true; this.n2cChIndex = 0; this.n2cChScore = 0; this.n2cChGuess = null; this.markChallengeStart("note2chord"); this.nextN2cChallenge(); this.playN2c(); }
+  startN2cChallenge() { this.n2cChActive = true; this.n2cChIndex = 0; this.n2cChScore = 0; this.n2cChGuess = null; this.markChallengeStart("note2chord"); this.nextN2cChallenge(); this.playN2c(true); }
   guessN2c(label: string) {
     if (!this.n2cChActive || this.n2cChGuess !== null) return;
     this.n2cChGuess = label;
@@ -805,7 +808,7 @@ export class EarTrainingState {
   advanceN2cChallenge() {
     if (!this.n2cChActive) return;
     if (this.n2cChIndex >= this.n2cChallengeTotal - 1) { this.n2cChIndex = this.n2cChallengeTotal; this.reportChallengeDone("note2chord", this.n2cChScore, this.n2cChallengeTotal); this.notify(); return; }
-    this.n2cChIndex++; this.n2cChGuess = null; this.nextN2cChallenge(); this.playN2c();
+    this.n2cChIndex++; this.n2cChGuess = null; this.nextN2cChallenge(); this.playN2c(true);
   }
   exitN2cChallenge() { this.n2cChActive = false; this.n2cChIndex = 0; this.n2cChGuess = null; this.notify(); }
 
@@ -2486,5 +2489,6 @@ export class EarTrainingState {
     // The bumped tokens stop the runs' finally blocks from clearing these.
     this.flavorPlaying = false;
     this.intervalPlaying = false;
+    this.n2cPlaying = false;
   }
 }

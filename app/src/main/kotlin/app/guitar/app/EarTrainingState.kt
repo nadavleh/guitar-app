@@ -799,12 +799,16 @@ class EarTrainingState(
 
     fun toggleN2cReveal() { n2cRevealed = !n2cRevealed }
 
-    /** Plays the triad, waits, then plays the test note on top. */
-    fun playN2c() {
+    /** Plays the triad, waits, then plays the test note on top. A plain replay is
+     *  ignored while one is sounding; [restart] (a NEW question) cuts it off instead —
+     *  otherwise the new question would stay silent. */
+    fun playN2c(restart: Boolean = false) {
         val c = n2cChallenge ?: run { nextN2cChallenge(); n2cChallenge!! }
-        if (n2cPlaying) return
+        if (n2cPlaying && !restart) return
         n2cJob?.cancel()
         n2cPlaying = true
+        // The cancelled job's finally runs after this; only the newest may clear the flag.
+        val gen = ++n2cGen
         n2cJob = scope.launch {
             try {
                 // Find a guitar voicing for the triad in the current tuning
@@ -823,10 +827,11 @@ class EarTrainingState(
                 val testMidi = nearestMidiAboveChord(c.testNote, midis)
                 audio.playNote(testMidi, durationMillis = sustain)
             } finally {
-                n2cPlaying = false
+                if (gen == n2cGen) n2cPlaying = false
             }
         }
     }
+    private var n2cGen = 0
 
     /** Midis of the current Note2Chord triad's E-shape (or first) voicing. */
     private fun n2cShapeMidis(): List<Int> {
@@ -887,7 +892,7 @@ class EarTrainingState(
     fun startN2cChallenge() {
         n2cChActive = true; n2cChIndex = 0; n2cChScore = 0; n2cChGuess = null
         markChallengeStart("note2chord")
-        nextN2cChallenge(); playN2c()
+        nextN2cChallenge(); playN2c(restart = true)
     }
     fun guessN2c(label: String) {
         if (!n2cChActive || n2cChGuess != null) return
@@ -901,7 +906,7 @@ class EarTrainingState(
             reportChallengeDone("note2chord", n2cChScore, n2cChallengeTotal)
             return
         }
-        n2cChIndex++; n2cChGuess = null; nextN2cChallenge(); playN2c()
+        n2cChIndex++; n2cChGuess = null; nextN2cChallenge(); playN2c(restart = true)
     }
     fun exitN2cChallenge() { n2cChActive = false; n2cChIndex = 0; n2cChGuess = null }
 

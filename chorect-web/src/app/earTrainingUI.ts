@@ -1703,10 +1703,10 @@ export class EarTrainingUI {
     const c = ear.n2cChallenge;
     parent.appendChild(el("div", { class: "et-muted" }, ["A triad plays, then a single note from its diatonic scale sounds above. Identify the test note's degree relative to the chord (e.g. 9, b7, maj7)."]));
     const replayN2c = btn(ear.n2cPlaying ? "Playing…" : "Replay both ▶", () => ear.playN2c(), "btn primary");
-    const prevN2c = btn("◀ Prev", () => { ear.n2cPrev(); ear.playN2c(); }); if (!ear.n2cHasPrev) prevN2c.disabled = true;
-    const nextN2c = btn("Next ▶", () => { ear.n2cNext(); ear.playN2c(); }); if (!ear.n2cHasNext) nextN2c.disabled = true;
+    const prevN2c = btn("◀ Prev", () => { ear.n2cPrev(); ear.playN2c(true); }); if (!ear.n2cHasPrev) prevN2c.disabled = true;
+    const nextN2c = btn("Next ▶", () => { ear.n2cNext(); ear.playN2c(true); }); if (!ear.n2cHasNext) nextN2c.disabled = true;
     parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:10px" }, [
-      replayN2c, prevN2c, nextN2c, btn("New +", () => { ear.nextN2cChallenge(); ear.playN2c(); }),
+      replayN2c, prevN2c, nextN2c, btn("New +", () => { ear.nextN2cChallenge(); ear.playN2c(true); }),
     ]));
     parent.appendChild(el("div", { class: "et-row-gap", style: "margin-top:8px" }, [
       btn("♪ Chord", () => ear.playN2cChord()), btn("• Note", () => ear.playN2cNote()),

@@ -1065,9 +1065,9 @@ private fun Note2ChordView(state: AppState, ear: EarTrainingState) {
                 onClick = { ear.playN2c() },
                 enabled = !ear.n2cPlaying,
             ) { Text(if (ear.n2cPlaying) "Playing…" else "Replay both ▶") }
-            OutlinedButton(onClick = { ear.n2cPrev(); ear.playN2c() }, enabled = ear.n2cHasPrev) { Text("◀ Prev") }
-            OutlinedButton(onClick = { ear.n2cNext(); ear.playN2c() }, enabled = ear.n2cHasNext) { Text("Next ▶") }
-            OutlinedButton(onClick = { ear.nextN2cChallenge(); ear.playN2c() }) { Text("New +") }
+            OutlinedButton(onClick = { ear.n2cPrev(); ear.playN2c(restart = true) }, enabled = ear.n2cHasPrev) { Text("◀ Prev") }
+            OutlinedButton(onClick = { ear.n2cNext(); ear.playN2c(restart = true) }, enabled = ear.n2cHasNext) { Text("Next ▶") }
+            OutlinedButton(onClick = { ear.nextN2cChallenge(); ear.playN2c(restart = true) }) { Text("New +") }
         }
         Spacer(Modifier.height(8.dp))
         // #2: audition the chord and the test note independently.
