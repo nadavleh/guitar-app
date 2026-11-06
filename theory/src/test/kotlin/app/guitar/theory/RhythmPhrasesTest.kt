@@ -1,10 +1,12 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@Tag("rhythm")
 class RhythmPhrasesTest {
     @Test fun `pool is 16th-grid units plus rests, no triplet`() {
         assertTrue(RhythmPhrases.POOL.isNotEmpty())

@@ -1,9 +1,11 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@Tag("chords")
 class VoiceLeadingTest {
 
     private val gen = ChordShapeGenerator()

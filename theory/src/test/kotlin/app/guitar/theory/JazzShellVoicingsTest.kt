@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -10,6 +11,7 @@ import kotlin.test.assertTrue
  * string and root on the 5th string. Cross-checked against jazzguitar.be's shell-chords
  * lesson.
  */
+@Tag("chords")
 class JazzShellVoicingsTest {
 
     private val std = Tunings.standard

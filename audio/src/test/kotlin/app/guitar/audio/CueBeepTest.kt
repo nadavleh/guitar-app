@@ -1,11 +1,13 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** The Car-mode lead-in cue: a soft-attack sine, synthesised so no asset ships. */
+@Tag("audio")
 class CueBeepTest {
 
     private val hz = 880.0

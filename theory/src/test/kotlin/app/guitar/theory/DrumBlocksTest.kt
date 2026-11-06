@@ -1,10 +1,12 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@Tag("drums")
 class DrumBlocksTest {
 
     private val teleco = PercussionBuiltins.presetByLabel("Tamborim — Teleco-teco")!!

@@ -19,9 +19,11 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    // -Ptags=cavaq,chords runs only tests carrying one of those @Tag values.
+    val tags = (project.findProperty("tags") as String?)?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+    useJUnitPlatform { if (!tags.isNullOrEmpty()) includeTags(*tags.toTypedArray()) }
     testLogging {
-        events("passed", "failed", "skipped")
+        events("failed", "skipped")
     }
 }
 

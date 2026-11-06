@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
 import kotlin.test.assertEquals
@@ -10,6 +11,7 @@ import kotlin.test.assertNotNull
  * String numbering follows guitar convention: string 6 = lowest pitch (low E in standard).
  * In code, openStrings[0] = string 6.
  */
+@Tag("theory-core")
 class RequirementsTest {
 
     @Test

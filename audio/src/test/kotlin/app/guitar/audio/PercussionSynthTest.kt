@@ -1,9 +1,11 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import app.guitar.theory.PercussionCatalog
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
+@Tag("audio")
 class PercussionSynthTest {
 
     @Test fun everyVoiceSynthesizesToAValidBuffer() {

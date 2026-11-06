@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.test.assertTrue
 
@@ -9,6 +10,7 @@ import kotlin.test.assertTrue
  * progression the trainer can present has a non-empty, well-formed song list —
  * so a progression added later without songs, or a key typo, fails the build.
  */
+@Tag("songs")
 class ProgressionSongsTest {
 
     private fun assertClean(where: String, songs: List<SongExample>) {

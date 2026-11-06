@@ -1,10 +1,12 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@Tag("audio")
 class PitchAnalysisTest {
 
     @Test fun `A4 = 440 Hz maps to MIDI 69 with 0 cents`() {

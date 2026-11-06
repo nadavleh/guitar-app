@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -9,6 +10,7 @@ import kotlin.test.assertTrue
  *  (a) match the canonical voicing for a representative chord (sanity), and
  *  (b) contain only chord tones of that quality (correctness).
  */
+@Tag("cavaq")
 class CavaquinhoShapesTest {
 
     private val dgbe = Tunings.cavaqDgbe

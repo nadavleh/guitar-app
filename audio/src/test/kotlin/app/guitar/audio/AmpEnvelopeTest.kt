@@ -1,10 +1,12 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 import org.junit.jupiter.api.Test
 
+@Tag("audio")
 class AmpEnvelopeTest {
     @Test
     fun `attack ramps from 0 up to 1 monotonically`() {

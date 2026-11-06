@@ -1,5 +1,6 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import app.guitar.theory.PercussionCatalog
 import kotlin.math.abs
 import kotlin.test.Test
@@ -12,6 +13,7 @@ import kotlin.test.assertTrue
  * handed. A producer that ignores it yields buffers that are ~8.8% sharp and short when
  * the engine is at 48 kHz — which is exactly the class of bug this locks out.
  */
+@Tag("audio")
 class SampleRateAgnosticTest {
 
     private val ratio = 48000.0 / 44100.0

@@ -1,10 +1,12 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 
+@Tag("cavaq")
 class CavaqSequencesTest {
 
     @Test fun `quadradinho resolves to C A7 Dm G7 in C`() {

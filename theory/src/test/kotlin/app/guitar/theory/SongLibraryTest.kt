@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,6 +10,7 @@ import kotlin.test.assertTrue
 /** The generated Songs-tab library. Everything here guards the GENERATOR
  *  (tools/build_song_library.py) — the .kt file itself is never hand-edited, so a
  *  failure means the generator or its two JSON inputs are wrong. */
+@Tag("songs")
 class SongLibraryTest {
 
     @Test fun `the library is non-empty and every entry is usable`() {

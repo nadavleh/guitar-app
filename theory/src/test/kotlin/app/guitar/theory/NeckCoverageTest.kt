@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.TestFactory
 import org.junit.jupiter.api.Test
@@ -18,6 +19,7 @@ import kotlin.test.assertTrue
  * (the quality "dim" wasn't in the map), so cagedShapesFor returned an empty
  * list and the brute-force fallback clustered every voicing near fret 0-3.
  */
+@Tag("theory-core")
 class NeckCoverageTest {
 
     private val std = Tunings.standard

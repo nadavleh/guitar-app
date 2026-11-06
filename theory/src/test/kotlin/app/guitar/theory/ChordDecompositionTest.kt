@@ -1,9 +1,11 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@Tag("chords")
 class ChordDecompositionTest {
 
     /** Pitch classes (0–11) of a list of root-relative intervals. */

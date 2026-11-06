@@ -1,10 +1,12 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import kotlin.math.sqrt
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 
+@Tag("audio")
 class PannerTest {
     @Test
     fun `constant power - center is equal and ~0point707`() {

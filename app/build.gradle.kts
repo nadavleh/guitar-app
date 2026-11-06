@@ -83,3 +83,8 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
+
+// app/ has no unit tests; keep the aggregate `test` task from compiling both variants for nothing.
+afterEvaluate {
+    tasks.named("test") { setDependsOn(listOf("testDebugUnitTest")) }
+}

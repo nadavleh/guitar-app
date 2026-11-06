@@ -1,5 +1,6 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -7,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 
+@Tag("audio")
 class ThreeBandEqTest {
     private val SR = 44100
     private fun tone(freq: Double, n: Int) = FloatArray(n) { (0.5 * sin(2 * PI * freq * it / SR)).toFloat() }

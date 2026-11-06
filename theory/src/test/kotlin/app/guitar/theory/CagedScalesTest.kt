@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -9,6 +10,7 @@ import kotlin.test.assertTrue
  * and the triad inversions. The shapes themselves are pinned by
  * [CagedShapeTableTest].
  */
+@Tag("caged")
 class CagedScalesTest {
 
     private val std = Tunings.standard

@@ -1,9 +1,11 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import kotlin.math.abs
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 
+@Tag("audio")
 class FreeverbTest {
     @Test
     fun `impulse produces a tail that develops then rings out`() {

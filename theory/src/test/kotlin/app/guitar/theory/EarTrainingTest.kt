@@ -1,11 +1,13 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
+@Tag("ear")
 class EarTrainingTest {
 
     // ----- relative major/minor degree equivalence (#6 answer keyboard) -----

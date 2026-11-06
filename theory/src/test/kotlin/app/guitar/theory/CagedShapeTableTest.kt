@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -10,6 +11,7 @@ import kotlin.test.assertTrue
  * or a hole in the neck coverage — none of which the app itself would complain
  * about.
  */
+@Tag("caged")
 class CagedShapeTableTest {
 
     private val std = Tunings.standard

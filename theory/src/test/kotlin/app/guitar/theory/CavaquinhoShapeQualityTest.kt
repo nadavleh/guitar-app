@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -12,6 +13,7 @@ import kotlin.test.assertTrue
  *  5. at most 5 canonical shapes per chord (CAGED-like set);
  *  6. the tonic is always present.
  */
+@Tag("cavaq")
 class CavaquinhoShapeQualityTest {
 
     private val tuning = Tunings.cavaqDgbd

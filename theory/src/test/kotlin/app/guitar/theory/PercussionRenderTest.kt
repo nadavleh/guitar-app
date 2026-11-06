@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.math.abs
 import kotlin.test.assertEquals
@@ -10,6 +11,7 @@ import kotlin.test.assertTrue
  * hit is exactly one non-zero sample and every assertion is about position and gain
  * rather than "does it sound about right".
  */
+@Tag("drums")
 class PercussionRenderTest {
 
     private val sr = 44_100

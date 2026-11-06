@@ -1,8 +1,10 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 
+@Tag("audio")
 class SoftLimiterTest {
     @Test
     fun `output never exceeds ceiling for a hot signal`() {

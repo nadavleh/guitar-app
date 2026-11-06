@@ -1,8 +1,10 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
+@Tag("theory-core")
 class FingeringTest {
 
     private fun shape(vararg frets: Int?): ChordShape {

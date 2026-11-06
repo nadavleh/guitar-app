@@ -1,10 +1,12 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.random.Random
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@Tag("chords")
 class Note2ChordTest {
 
     @Test fun `chordSymbol for C major is C`() {

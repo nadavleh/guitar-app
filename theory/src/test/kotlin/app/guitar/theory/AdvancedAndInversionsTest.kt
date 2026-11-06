@@ -1,10 +1,12 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.random.Random
 
+@Tag("chords")
 class AdvancedAndInversionsTest {
 
     // ----- Inversions -----

@@ -1,5 +1,6 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -10,6 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+@Tag("audio")
 class WavDecoderTest {
 
     /** Build a 16-bit PCM mono WAV in memory. */

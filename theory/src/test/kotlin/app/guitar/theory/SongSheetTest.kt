@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -13,6 +14,7 @@ import kotlin.test.assertFalse
  * Mirrored by chorect-web/src/theory/songSheet.ts; verify.ts asserts the same
  * results so the two platforms cannot label the same song differently.
  */
+@Tag("songs")
 class SongSheetTest {
 
     // ---------- keys ----------

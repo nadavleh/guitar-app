@@ -1,9 +1,11 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
 
+@Tag("theory-core")
 class TuningCodecTest {
 
     @Test fun `encode then decode round-trips a 6-string tuning`() {

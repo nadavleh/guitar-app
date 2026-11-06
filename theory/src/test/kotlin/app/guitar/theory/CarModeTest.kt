@@ -1,11 +1,13 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** The pure reveal/timing schedule behind hands-free Car mode. No audio, no UI —
  *  the platform state layers drive it, so this is the whole testable surface. */
+@Tag("ear")
 class CarModeTest {
 
     @Test fun `round 1 reveals nothing and round 5 reveals every slot`() {

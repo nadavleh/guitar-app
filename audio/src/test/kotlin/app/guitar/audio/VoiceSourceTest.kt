@@ -1,10 +1,12 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 
+@Tag("audio")
 class VoiceSourceTest {
     @Test
     fun `buffer source yields all samples then finishes`() {

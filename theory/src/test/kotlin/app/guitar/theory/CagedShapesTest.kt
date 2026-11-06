@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -12,6 +13,7 @@ import kotlin.test.assertTrue
  * Also tests scrolling along the neck: for any chord root R, the 5 CAGED shapes appear at
  * 5 distinct positions ascending the neck.
  */
+@Tag("caged")
 class CagedShapesTest {
 
     private val std = Tunings.standard

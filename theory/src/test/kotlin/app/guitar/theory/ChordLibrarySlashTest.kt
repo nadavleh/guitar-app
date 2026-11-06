@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -18,6 +19,7 @@ import kotlin.test.assertFalse
  * the symbol did not bother to spell, so it is folded in and the inversion index
  * always resolves — "C/D" is Cadd9 with the 9th in the bass, not a special case.
  */
+@Tag("chords")
 class ChordLibrarySlashTest {
 
     @Test fun `slash bass parses and keeps the base chord`() {

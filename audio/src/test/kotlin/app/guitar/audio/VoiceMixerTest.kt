@@ -1,9 +1,11 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 
+@Tag("audio")
 class VoiceMixerTest {
     // Center pan (default 0.0) applies constant-power gL = gR = cos(pi/4) to every
     // voice (Task 7). Values below are the M1 raw sums scaled by this factor.

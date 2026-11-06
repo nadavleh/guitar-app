@@ -1,5 +1,6 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import kotlin.math.abs
 import kotlin.math.ln
@@ -8,6 +9,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@Tag("audio")
 class PitchDetectorTest {
 
     private val sr = 44100

@@ -22,9 +22,16 @@ android {
 
     testOptions {
         unitTests.all {
-            it.useJUnitPlatform()
+            // -Ptags=audio runs only tests carrying one of those @Tag values.
+            val tags = (project.findProperty("tags") as String?)?.split(",")?.map { s -> s.trim() }?.filter { s -> s.isNotEmpty() }
+            it.useJUnitPlatform { if (!tags.isNullOrEmpty()) includeTags(*tags.toTypedArray()) }
         }
     }
+}
+
+// Only the debug variant is tested: the release variant runs the identical sources a second time.
+afterEvaluate {
+    tasks.named("test") { setDependsOn(listOf("testDebugUnitTest")) }
 }
 
 dependencies {

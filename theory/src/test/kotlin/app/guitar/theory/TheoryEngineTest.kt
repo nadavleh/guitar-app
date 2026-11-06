@@ -1,5 +1,6 @@
 package app.guitar.theory
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
@@ -7,6 +8,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@Tag("theory-core")
 class PitchClassTest {
 
     @Test fun `wraps additions past 12`() {
@@ -30,6 +32,7 @@ class PitchClassTest {
     }
 }
 
+@Tag("theory-core")
 class NoteTest {
 
     @Test fun `parse natural notes`() {
@@ -54,6 +57,7 @@ class NoteTest {
     }
 }
 
+@Tag("theory-core")
 class NoteSpellerTest {
 
     @Test fun `sharp spelling default`() {
@@ -81,6 +85,7 @@ class NoteSpellerTest {
     }
 }
 
+@Tag("theory-core")
 class FretboardTest {
 
     @Test fun `open strings match tuning`() {
@@ -114,6 +119,7 @@ class FretboardTest {
     }
 }
 
+@Tag("chords")
 class ChordLibraryTest {
 
     @Test fun `parse simple major chord`() {
@@ -161,6 +167,7 @@ class ChordLibraryTest {
     }
 }
 
+@Tag("theory-core")
 class ScaleLibraryTest {
 
     @Test fun `C major scale notes`() {
@@ -189,6 +196,7 @@ class ScaleLibraryTest {
     }
 }
 
+@Tag("theory-core")
 class TuningChangeTest {
 
     @Test fun `changing to drop D affects only string 6 open note`() {

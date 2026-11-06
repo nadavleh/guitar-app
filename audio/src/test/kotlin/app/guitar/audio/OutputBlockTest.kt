@@ -1,5 +1,6 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test
  * feels late. [nextOutputBlock] is therefore total: it always yields a full, well-formed
  * block, and only reports whether that block carries audio.
  */
+@Tag("audio")
 class OutputBlockTest {
 
     /** A freshly-built Freeverb reports "still ringing" until it has processed one block

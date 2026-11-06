@@ -1,5 +1,6 @@
 package app.guitar.audio
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import kotlin.math.abs
@@ -7,6 +8,7 @@ import kotlin.math.sqrt
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@Tag("audio")
 class PluckedSynthTest {
 
     @Test
