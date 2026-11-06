@@ -79,34 +79,30 @@ class PluckedSynth(val sampleRate: Int = 48000) {
         // die faster than the fundamental (bright attack, warmer tail). At brightnessDecay
         // = 1.0, `extra` is always 1.0, so `lp = cur` and the loop reproduces the original,
         // undamped-extra behavior exactly.
+        //
+        // Body: blend in a low-passed copy for more bottom end. A convex mix of two
+        // signals each within [-1, 1] stays within [-1, 1], so the amplitude bound and
+        // amplitude-linearity both hold (the shape is independent of `amplitude`).
         val numSamples = (sampleRate * durationSec).toInt().coerceAtLeast(1)
-        val ks = DoubleArray(numSamples)
+        val output = FloatArray(numSamples)
         var idx = 0
         var lp = 0.0
+        var body = 0.0
+        val bodyCoef = 0.12   // one-pole lowpass cutoff for the body component (lower = deeper)
+        val bodyMix = 0.32    // how much low-passed body to blend in
         val bright = brightnessDecay.coerceIn(0.0, 1.0)
         for (i in 0 until numSamples) {
+            val nextIdx = if (idx + 1 == n) 0 else idx + 1
             val cur = buf[idx]
-            val nxt = buf[(idx + 1) % n]
+            val nxt = buf[nextIdx]
             // progress 0..1 across the note; more smoothing toward the end
             val prog = i.toDouble() / numSamples
             val extra = bright + (1.0 - bright) * (1.0 - prog)
             lp = extra * cur + (1.0 - extra) * lp
-            ks[i] = lp
             buf[idx] = damping * 0.5 * (cur + nxt)
-            idx = (idx + 1) % n
-        }
-
-        // --- Body: blend in a low-passed copy for more bottom end. A convex mix of two
-        // signals each within [-1, 1] stays within [-1, 1], so the amplitude bound and
-        // amplitude-linearity both hold (the shape is independent of `amplitude`). ---
-        val output = FloatArray(numSamples)
-        var body = 0.0
-        val bodyCoef = 0.12   // one-pole lowpass cutoff for the body component (lower = deeper)
-        val bodyMix = 0.32    // how much low-passed body to blend in
-        for (i in 0 until numSamples) {
-            body = bodyCoef * ks[i] + (1.0 - bodyCoef) * body
-            val mix = (1.0 - bodyMix) * ks[i] + bodyMix * body
-            output[i] = (amplitude * mix).toFloat()
+            idx = nextIdx
+            body = bodyCoef * lp + (1.0 - bodyCoef) * body
+            output[i] = (amplitude * ((1.0 - bodyMix) * lp + bodyMix * body)).toFloat()
         }
 
         // Release fade-out so the note ends silently. A long (up to 350 ms, or 30% of

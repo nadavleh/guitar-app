@@ -331,19 +331,15 @@ class AudioTrackEngine(
                         brightnessDecay = brightnessFor(timbre),
                     ))
                 val gate = gateFrames(timbre, sustainMillis)
-                mixer.addAndCap(
-                    MixVoice(
-                        source,
-                        voiceGain * boost,
-                        strumFrames * i,
-                        AmpEnvelope(sampleRate, 3.0, timbre.releaseMs.toDouble()),
-                        reverbSend = sendFor(timbre),
-                        group = AudioEngine.PITCHED_GROUP,
-                    ).also {
-                        it.pan = Panner.forMidi(midi)
-                        if (gate >= 0) it.releaseIn = gate + strumFrames * i
-                    },
-                    MAX_VOICES,
+                addVoiceSource(
+                    source,
+                    gain = voiceGain * boost,
+                    delayFrames = strumFrames * i,
+                    pan = Panner.forMidi(midi),
+                    reverbSend = sendFor(timbre),
+                    releaseMs = timbre.releaseMs,
+                    group = AudioEngine.PITCHED_GROUP,
+                    releaseAfterFrames = if (gate >= 0) gate + strumFrames * i else -1,
                 )
             }
         }
@@ -369,11 +365,11 @@ class AudioTrackEngine(
         releaseMs: Int = 20,
         group: String? = null,
         releaseAfterFrames: Int = -1,
+        chokeKey: String? = null,
     ) {
         mixer.addAndCap(
             MixVoice(source, gain, delayFrames, AmpEnvelope(sampleRate, 3.0, releaseMs.toDouble()),
-                reverbSend = reverbSend, group = group).also {
-                it.pan = pan
+                pan, reverbSend, chokeKey, group).also {
                 if (releaseAfterFrames >= 0) it.releaseIn = releaseAfterFrames
             },
             MAX_VOICES,
@@ -395,7 +391,6 @@ class AudioTrackEngine(
         samples: FloatArray,
         gain: Float = 1f,
         delayFrames: Int = 0,
-        attackMs: Double = 3.0,
         releaseMs: Int = 20,
         pan: Double = 0.0,
         reverbSend: Float = 0f,
@@ -403,19 +398,7 @@ class AudioTrackEngine(
         group: String? = null,
     ) {
         if (samples.isEmpty()) return
-        mixer.addAndCap(
-            MixVoice(
-                BufferSource(samples),
-                gain,
-                delayFrames,
-                AmpEnvelope(sampleRate, attackMs, releaseMs.toDouble()),
-                pan,
-                reverbSend,
-                chokeKey,
-                group,
-            ),
-            MAX_VOICES,
-        )
+        addVoiceSource(BufferSource(samples), gain, delayFrames, pan, reverbSend, releaseMs, group, chokeKey = chokeKey)
     }
 
     // Fade out rather than hard-cut: releaseAll() ramps every voice's envelope to

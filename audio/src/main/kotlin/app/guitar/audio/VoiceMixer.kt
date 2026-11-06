@@ -102,7 +102,7 @@ class VoiceMixer(val sampleRate: Int) {
 
     /** Mix [count] frames. outL/outR must be >= count. */
     @Synchronized fun mixBlock(outL: FloatArray, outR: FloatArray, count: Int) {
-        for (i in 0 until count) { outL[i] = 0f; outR[i] = 0f; sendL[i] = 0f; sendR[i] = 0f }
+        outL.fill(0f, 0, count); outR.fill(0f, 0, count); sendL.fill(0f, 0, count); sendR.fill(0f, 0, count)
         val it = voices.iterator()
         while (it.hasNext()) {
             val v = it.next()
@@ -122,6 +122,8 @@ class VoiceMixer(val sampleRate: Int) {
             var produced = false
             var peak = 0f
             val (gL, gR) = Panner.gains(v.pan)
+            val gain = v.gain
+            val send = v.reverbSend
             while (i < count) {
                 val want = minOf(count - i, scratch.size)
                 val n = v.source.render(scratch, want)
@@ -129,12 +131,14 @@ class VoiceMixer(val sampleRate: Int) {
                 produced = true
                 v.envelope.applyInPlace(scratch, n)     // scratch now enveloped
                 for (j in 0 until n) {
-                    val s = scratch[j] * v.gain
+                    val s = scratch[j] * gain
                     val a = kotlin.math.abs(s); if (a > peak) peak = a
-                    outL[i + j] += s * gL
-                    outR[i + j] += s * gR
-                    sendL[i + j] += s * gL * v.reverbSend
-                    sendR[i + j] += s * gR * v.reverbSend
+                    val l = s * gL
+                    val r = s * gR
+                    outL[i + j] += l
+                    outR[i + j] += r
+                    sendL[i + j] += l * send
+                    sendR[i + j] += r * send
                 }
                 i += n
                 if (n < want) break

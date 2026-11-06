@@ -259,53 +259,13 @@ export class WebAudioEngine {
   private playModernVoice(samples: Float32Array, pan: number, reverbSend: number, level: number, releaseMs: number, startAt?: number, gateSec?: number): void {
     if (samples.length === 0) return;
     const ctx = this.ensure();
-    const startT = startAt ?? ctx.currentTime;
     const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
     buffer.getChannelData(0).set(samples);
-
-    const src = ctx.createBufferSource();
-    src.buffer = buffer;
-
-    const env = ctx.createGain();
-    env.gain.setValueAtTime(0, startT);
-    env.gain.linearRampToValueAtTime(level * this.voiceLevel, startT + 0.003);
-    let stopAt: number | undefined;
-    if (gateSec !== undefined) {
-      // Gated (Timbre.gated): hold, then fade over releaseMs and stop — no ring-over.
-      const endT = startT + Math.max(0.01, gateSec);
-      env.gain.setValueAtTime(level * this.voiceLevel, endT);
-      env.gain.linearRampToValueAtTime(0, endT + releaseMs / 1000);
-      stopAt = endT + releaseMs / 1000 + 0.01;
-    }
-
-    const panner = ctx.createStereoPanner();
-    panner.pan.value = pan;
-
-    const send = ctx.createGain();
-    send.gain.value = reverbSend;
-
-    src.connect(env);
-    env.connect(panner);
-    panner.connect(this.modernMaster!);
-    panner.connect(send);
-    send.connect(this.reverbBus!);
-
-    const entry: ActiveVoice = { src, env, releaseMs, pitched: true };
-    src.onended = () => {
-      this.active.delete(entry);
-      src.disconnect();
-      env.disconnect();
-      panner.disconnect();
-      send.disconnect();
-    };
-    this.active.add(entry);
-    src.start(startT);
-    if (stopAt !== undefined) src.stop(stopAt);
+    this.playModernSampleVoice(buffer, 1, pan, reverbSend, level, releaseMs, startAt, gateSec);
   }
 
-  /** MODERN, sampled variant of `playModernVoice`: identical envelope/panner/
-   *  dry+reverb-send graph, but the source is a decoded sample buffer re-pitched
-   *  via `playbackRate` instead of a synth-rendered buffer. */
+  /** MODERN voice graph shared by synth and sampled voices; a sampled voice is
+   *  re-pitched via `playbackRate` (1 = a synth-rendered buffer, as recorded). */
   private playModernSampleVoice(
     buffer: AudioBuffer,
     rate: number,
@@ -323,14 +283,15 @@ export class WebAudioEngine {
     src.buffer = buffer;
     src.playbackRate.value = rate;
 
+    const peak = level * this.voiceLevel;
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, startT);
-    env.gain.linearRampToValueAtTime(level * this.voiceLevel, startT + 0.003);
+    env.gain.linearRampToValueAtTime(peak, startT + 0.003);
     let stopAt: number | undefined;
     if (gateSec !== undefined) {
       // Gated (Timbre.gated): hold, then fade over releaseMs and stop — no ring-over.
       const endT = startT + Math.max(0.01, gateSec);
-      env.gain.setValueAtTime(level * this.voiceLevel, endT);
+      env.gain.setValueAtTime(peak, endT);
       env.gain.linearRampToValueAtTime(0, endT + releaseMs / 1000);
       stopAt = endT + releaseMs / 1000 + 0.01;
     }

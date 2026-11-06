@@ -72,32 +72,27 @@ export class PluckedSynth {
     // die faster than the fundamental (bright attack, warmer tail). At brightnessDecay
     // = 1.0, `extra` is always 1.0, so `lp = cur` and the loop reproduces the original,
     // undamped-extra behavior exactly.
+    // Body (fused into the same pass): blend in a low-passed copy for more bottom end.
     const numSamples = Math.max(Math.floor(this.sampleRate * durationSec), 1);
-    const ks = new Float64Array(numSamples);
+    const output = new Float32Array(numSamples);
     let idx = 0;
     let lp = 0.0;
+    let body = 0.0;
+    const bodyCoef = 0.12;
+    const bodyMix = 0.32;
     const bright = Math.min(1, Math.max(0, brightnessDecay));
     for (let i = 0; i < numSamples; i++) {
+      const nextIdx = idx + 1 === n ? 0 : idx + 1;
       const cur = buf[idx];
-      const nxt = buf[(idx + 1) % n];
+      const nxt = buf[nextIdx];
       // progress 0..1 across the note; more smoothing toward the end
       const prog = i / numSamples;
       const extra = bright + (1.0 - bright) * (1.0 - prog);
       lp = extra * cur + (1.0 - extra) * lp;
-      ks[i] = lp;
       buf[idx] = damping * 0.5 * (cur + nxt);
-      idx = (idx + 1) % n;
-    }
-
-    // Body: blend in a low-passed copy for more bottom end.
-    const output = new Float32Array(numSamples);
-    let body = 0.0;
-    const bodyCoef = 0.12;
-    const bodyMix = 0.32;
-    for (let i = 0; i < numSamples; i++) {
-      body = bodyCoef * ks[i] + (1.0 - bodyCoef) * body;
-      const mix = (1.0 - bodyMix) * ks[i] + bodyMix * body;
-      output[i] = amplitude * mix;
+      idx = nextIdx;
+      body = bodyCoef * lp + (1.0 - bodyCoef) * body;
+      output[i] = amplitude * ((1.0 - bodyMix) * lp + bodyMix * body);
     }
 
     // Release fade-out so the note ends silently. A long (up to 350 ms, or 30% of the
