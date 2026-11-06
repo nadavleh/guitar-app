@@ -31,6 +31,11 @@ interface ActiveVoice {
   pitched?: boolean;
 }
 
+/** A fresh 31-bit synth noise seed per strike (Kotlin seeds with System.nanoTime()). */
+function randomSeed(): number {
+  return Math.floor(Math.random() * 0x7fffffff);
+}
+
 export class WebAudioEngine {
   private ctx: AudioContext | null = null;
   private synth: PluckedSynth | null = null;
@@ -54,6 +59,8 @@ export class WebAudioEngine {
   /** Last scheduled sample per choke key (see playSamples) — the one a new
    *  same-key hit fades out at its own onset. */
   private chokeTails = new Map<string, { src: AudioBufferSourceNode; gain: GainNode }>();
+  /** playSamples' AudioBuffer per (immutable, cached) one-shot array. */
+  private sampleBuffers = new WeakMap<Float32Array, AudioBuffer>();
 
   // Currently selected sampled-guitar bank (MODERN chain only); null = synth voices.
   private currentBank: SampleBank | null = null;
@@ -299,7 +306,7 @@ export class WebAudioEngine {
       );
       return;
     }
-    const samples = synth.synthesize(midiNote, durationMillis / 1000, 1, timbre.damping, timbre.amplitude, brightnessFor(timbre));
+    const samples = synth.synthesize(midiNote, durationMillis / 1000, randomSeed(), timbre.damping, timbre.amplitude, brightnessFor(timbre));
     this.playModernVoice(samples, panForMidi(midiNote), this.sendFor(timbre), 1.0, timbre.releaseMs, undefined, gateFor(timbre, durationMillis));
   }
 
@@ -312,7 +319,7 @@ export class WebAudioEngine {
       this.playModernSampleVoice(buffer, rate, 0, this.voiceReverbSend, timbre.amplitude / 0.6, timbre.releaseMs);
       return;
     }
-    const samples = synth.synthesizeFrequency(freqHz, durationMillis / 1000, 1, timbre.damping, timbre.amplitude, 0.6);
+    const samples = synth.synthesizeFrequency(freqHz, durationMillis / 1000, randomSeed(), timbre.damping, timbre.amplitude, 0.6);
     this.playModernVoice(samples, 0, this.voiceReverbSend, 1.0, timbre.releaseMs);
   }
 
@@ -329,7 +336,9 @@ export class WebAudioEngine {
     const minMidi = Math.min(...notes), maxMidi = Math.max(...notes);
     const span = Math.max(1, maxMidi - minMidi);
     const startNow = ctx.currentTime;
-    const seedBase = 1;
+    // Fresh noise per strike (Kotlin seeds with nanoTime): a constant seed made every
+    // repeat of a note sound bit-identical.
+    const seedBase = randomSeed();
     const bank = this.currentBank;
     const gate = gateFor(timbre, sustainMillis);
     notes.forEach((midi, i) => {
@@ -387,8 +396,14 @@ export class WebAudioEngine {
   playSamples(samples: Float32Array, gain = 1, when = 0, chokeKey?: string): void {
     if (samples.length === 0) return;
     const ctx = this.ensure();
-    const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
-    buffer.getChannelData(0).set(samples);
+    // Drum one-shots are cached, immutable arrays: wrap each in an AudioBuffer once
+    // instead of allocating + copying a new one on every hit.
+    let buffer = this.sampleBuffers.get(samples);
+    if (!buffer || buffer.sampleRate !== ctx.sampleRate) {
+      buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+      buffer.getChannelData(0).set(samples);
+      this.sampleBuffers.set(samples, buffer);
+    }
     const src = ctx.createBufferSource();
     src.buffer = buffer;
     const g = ctx.createGain();

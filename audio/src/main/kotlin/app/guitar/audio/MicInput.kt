@@ -85,10 +85,12 @@ class MicInput(
     fun stop() {
         if (!running) return
         running = false
+        // stop() unblocks the reader's read(); join it BEFORE release() so the native
+        // AudioRecord is never freed under a thread still inside read().
         try { record?.stop() } catch (_: Exception) {}
-        try { record?.release() } catch (_: Exception) {}
-        record = null
         try { thread?.join(200) } catch (_: InterruptedException) {}
         thread = null
+        try { record?.release() } catch (_: Exception) {}
+        record = null
     }
 }
