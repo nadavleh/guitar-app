@@ -8,15 +8,9 @@ import kotlin.test.assertTrue
 @Tag("cavaq")
 class CavaquinhoTuningsTest {
 
-    @Test fun `DGBe has 4 strings`() {
-        assertEquals(4, Tunings.cavaqDgbe.stringCount)
-    }
-
-    @Test fun `DGBD has 4 strings`() {
-        assertEquals(4, Tunings.cavaqDgbd.stringCount)
-    }
-
     @Test fun `DGBe open pitches are D4 G4 B4 E5`() {
+        assertEquals(4, Tunings.cavaqDgbe.stringCount)
+        assertEquals(4, Tunings.cavaqDgbd.stringCount)
         val notes = Tunings.cavaqDgbe.openStrings
         // String 0 = lowest = D4
         assertEquals(Note.parse("D4"), notes[0])
