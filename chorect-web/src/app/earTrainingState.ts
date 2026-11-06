@@ -8,9 +8,9 @@ import {
   Tuning, PitchClass, ChordShape, ChordShapeGenerator, VoicingStyle, eShapeOrFirst,
   parseChord, QUALITIES, spellPc,
   TrainingMode, ChordTypeLevel, Progression, ResolvedChord, NamedProgression,
-  EarTrainingDegrees, degreeRoot, degreeRefMidi, resolve as resolveDegree, resolveProgression,
+  EarTrainingDegrees, degreeRoot, degreeRefMidi, resolve as resolveDegree, resolveProgression, resolveProgressionMixed,
   randomProgression, ProgFocus, CarMode, romanLabel, randomAdvanced, randomAdvanced2, randomSus, randomCircleOfFifths, resolveNamed,
-  MINOR_DOMINANT, romanModeTag, romanIsModeAmbiguous, progressionKey, progressionFromKey,
+  MINOR_DOMINANT, DegreeInfo, romanModeTag, romanIsModeAmbiguous, progressionKey, progressionFromKey,
   MissedTake, MissedBar, encodeMissedTake, decodeMissedTake,
   majorRelativeDegree, degreeFromMajorRelative,
   openingRelativeLabel, circleRun as findCircleRun, CircleRun,
@@ -229,10 +229,7 @@ export class EarTrainingState {
   }
 
   private resolveCurrent(prog: Progression, key: PitchClass): ResolvedChord[] {
-    if (this.earMixAll) {
-      const levels = [ChordTypeLevel.Triads, ChordTypeLevel.Sevenths, ChordTypeLevel.Extended];
-      return prog.degrees.map((deg) => resolveDegree(deg, key, prog.mode, levels[this.rng.int(levels.length)], this.rng));
-    }
+    if (this.earMixAll) return resolveProgressionMixed(prog, key, this.rng);
     return resolveProgression(prog, key, this.chordTypeLevel, this.rng);
   }
 
@@ -1057,12 +1054,24 @@ export class EarTrainingState {
 
   get challengeNeedsExt(): boolean { return this.earMixAll || this.chordTypeLevel !== ChordTypeLevel.Triads; }
 
+  /** The harmonic-minor dominant can be a bar: its suffixes (Extended "7b9") join the options. */
+  private get dominantInPlay(): boolean {
+    return this.progMode === TrainingMode.Minor && (this.earHarmonicMinor || (this.progProgression?.dominantBars ?? []).length > 0);
+  }
+
+  /** Degree rows whose suffixes the extension row must cover (+ the harmonic dominant). */
+  private extDegreeInfos(): DegreeInfo[] {
+    const infos = [...EarTrainingDegrees(this.progMode).values()];
+    if (this.dominantInPlay) infos.push(MINOR_DOMINANT);
+    return infos;
+  }
+
   challengeExtOptions(): string[] {
     if (!this.challengeNeedsExt) return [];
-    const m = EarTrainingDegrees(this.progMode);
+    const infos = this.extDegreeInfos();
     if (this.earMixAll) {
       const labels = new Set<string>([""]);
-      for (const info of m.values()) {
+      for (const info of infos) {
         labels.add(romanLabel(info.roman, info.seventhQuality).replace(info.roman, ""));
         if (info.extendedOptions.length) info.extendedOptions.forEach(([, suffix]) => labels.add(suffix));
         else labels.add(romanLabel(info.roman, info.extendedQuality).replace(info.roman, ""));
@@ -1070,7 +1079,7 @@ export class EarTrainingState {
       return [...labels].sort();
     }
     const out: string[] = [];
-    for (const info of m.values()) {
+    for (const info of infos) {
       if (this.chordTypeLevel === ChordTypeLevel.Sevenths) {
         out.push(romanLabel(info.roman, info.seventhQuality).replace(info.roman, ""));
       } else if (this.chordTypeLevel === ChordTypeLevel.Extended) {
@@ -1089,16 +1098,19 @@ export class EarTrainingState {
     const deg = degreeFromMajorRelative(majorRel, this.progMode);
     const info = EarTrainingDegrees(this.progMode).get(deg);
     if (!info) return [];
-    return info.extendedOptions.length
+    const own = info.extendedOptions.length
       ? [...new Set(info.extendedOptions.map(([, suffix]) => suffix))]
       : [romanLabel(info.roman, info.extendedQuality).replace(info.roman, "")];
+    // Degree 5 in minor may be the harmonic dominant (V7b9): offer its suffix too.
+    if (deg !== 5 || !this.dominantInPlay) return own;
+    const dom = MINOR_DOMINANT;
+    return [...new Set([...own, romanLabel(dom.roman, dom.extendedQuality).replace(dom.roman, "")])];
   }
 
   correctExtLabel(i: number): string {
     const deg = this.progProgression?.degrees[i];
     if (deg == null) return "";
-    // A harmonic-minor dominant bar strips the "V" prefix (its suffix "" / "7" / "9"
-    // matches the natural v's, so degree-5 answers score the same either way).
+    // A harmonic-minor dominant bar strips the "V" prefix ("" / "7" / "7b9").
     const dominant = this.progMode === TrainingMode.Minor && (this.progProgression?.dominantBars ?? []).includes(i);
     const info = dominant ? MINOR_DOMINANT : EarTrainingDegrees(this.progMode).get(deg);
     if (!info) return "";

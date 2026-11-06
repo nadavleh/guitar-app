@@ -65,16 +65,19 @@ export const MINOR_DEGREES: Map<number, DegreeInfo> = new Map([
   // a flat (bIII, bVI, bVII). Qualities are natural-minor diatonic (v is minor).
   [3, di("bIII", "", "maj7", "maj9")],
   [4, di("iv", "m", "m7", "m9")],
-  [5, di("v", "m", "m7", "m9")],
+  // Extended stays m7: an m9 on v adds the 6th degree raised (F# in A minor),
+  // which is in neither natural nor harmonic minor.
+  [5, di("v", "m", "m7", "m7")],
   [6, di("bVI", "", "maj7", "maj9")],
   [7, di("bVII", "", "7", "7")],
 ]);
 
 /** The HARMONIC-MINOR dominant: degree 5 played as a MAJOR V (raised leading tone),
  *  the classic V→i cadence. Same root as the natural-minor `v`, but major / dominant 7th.
- *  Per-level suffixes ("", "7", "9") deliberately match the natural `v`'s so the
- *  challenge scores a degree-5 answer identically for either. */
-export const MINOR_DOMINANT: DegreeInfo = di("V", "", "7", "9");
+ *  Its Extended form is 7b9 (the harmonic-minor b9 — F in A minor): a plain 9 would add
+ *  the raised 6th (F#), outside harmonic minor. The challenge offers its "7b9" suffix
+ *  next to the natural `v`'s when harmonic minor is on. */
+export const MINOR_DOMINANT: DegreeInfo = di("V", "", "7", "7b9");
 
 /** Markers appended to a Roman that prints the same in both keys, saying which one it is
  *  read in. BOTH readings are marked — leaving the major one bare made the answer
@@ -176,6 +179,14 @@ export function resolve(degree: number, key: PitchClass, mode: TrainingMode, lev
 export function resolveProgression(p: Progression, key: PitchClass, level: ChordTypeLevel, rng: Rng = defaultRng): ResolvedChord[] {
   const dom = p.dominantBars ?? [];
   return p.degrees.map((d, i) => resolve(d, key, p.mode, level, rng, dom.includes(i)));
+}
+
+/** "Mix all": resolve p with an independently random chord-type level per bar.
+ *  Harmonic-minor dominantBars still resolve as the major V. */
+export function resolveProgressionMixed(p: Progression, key: PitchClass, rng: Rng = defaultRng): ResolvedChord[] {
+  const dom = p.dominantBars ?? [];
+  const levels = [ChordTypeLevel.Triads, ChordTypeLevel.Sevenths, ChordTypeLevel.Extended];
+  return p.degrees.map((d, i) => resolve(d, key, p.mode, levels[rng.int(levels.length)], rng, dom.includes(i)));
 }
 
 export const MAJOR_PROGRESSIONS: Progression[] = [

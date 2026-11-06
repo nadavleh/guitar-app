@@ -1,7 +1,7 @@
 // Area "ear" of the web parity checks (split out of the old monolithic verify.ts).
 // Run alone: npm run verify -- ear
 
-import { parseChord, parsePitchClass, TrainingMode, ChordTypeLevel, resolve as resolveDegree, degreeRoot, romanLabel, ADVANCED_PROGRESSIONS, resolveNamed, romanIsModeAmbiguous, MAJOR_DEGREES, MINOR_DEGREES, ProgFocus, randomProgression, hasOneSixStep, thirdSixthPrimaryPool, thirdSixthContrastPool, THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode, progressionLacksTonic, progressionRelativeTonicMode, progressionRelativeTonicBar, progressionHomeIsObvious, relativeRomanLineFor, openingRelativeMode, openingRelativeLabel, circleRun, circleRunBars, MissedTake, encodeMissedTake, decodeMissedTake } from "../../src/theory";
+import { parseChord, parsePitchClass, TrainingMode, ChordTypeLevel, resolve as resolveDegree, degreeRoot, romanLabel, ADVANCED_PROGRESSIONS, resolveNamed, romanIsModeAmbiguous, MAJOR_DEGREES, MINOR_DEGREES, ProgFocus, randomProgression, hasOneSixStep, thirdSixthPrimaryPool, thirdSixthContrastPool, THIRD_SIXTH_DRILL_PROGRESSIONS, THIRD_SIXTH_CONTRAST_DRILL, THIRD_SIXTH_CONTRAST_PERCENT, Progression, CarMode, progressionLacksTonic, progressionRelativeTonicMode, progressionRelativeTonicBar, progressionHomeIsObvious, relativeRomanLineFor, openingRelativeMode, openingRelativeLabel, circleRun, circleRunBars, MissedTake, encodeMissedTake, decodeMissedTake, resolveProgressionMixed } from "../../src/theory";
 import { check } from "./harness";
 
 export function run(): void {
@@ -13,6 +13,40 @@ export function run(): void {
   check("ii7 in C major = Dm7, labelled ii7 (not iim7)", iiChord.symbol === "Dm7" && iiChord.romanLabel === "ii7");
   check("degreeRoot vi in C major = A", degreeRoot(parsePitchClass("C"), 6, TrainingMode.Major) === 9);
   check("romanLabel vii°+m7b5 = vii°7", romanLabel("vii°", "m7b5") === "vii°7");
+
+  // --- "Mix all" keeps the harmonic-minor dominant (mirrors Kotlin
+  // `mix-all resolution plays dominant bars as a major V`) ---
+  {
+    const p: Progression = { mode: TrainingMode.Minor, degrees: [1, 4, 5, 1], dominantBars: [2] };
+    let ok = true;
+    for (let n = 0; n < 200; n++) {
+      const bar = resolveProgressionMixed(p, 9)[2];
+      const parsed = parseChord(bar.symbol);
+      if (!parsed || parsed[0] !== 4 || !parsed[1].intervals.includes(4) || !bar.romanLabel.startsWith("V")) ok = false;
+    }
+    check("mix-all resolution plays dominant bars as a major V", ok);
+  }
+
+  // --- Minor Extended chords stay inside natural / harmonic minor (mirrors Kotlin
+  // `minor extended chords stay inside natural or harmonic minor`) ---
+  {
+    const natural = new Set([0, 2, 3, 5, 7, 8, 10].map((x) => (9 + x) % 12));
+    const harmonic = new Set([0, 2, 3, 5, 7, 8, 11].map((x) => (9 + x) % 12));
+    const pcsOf = (sym: string) => { const p = parseChord(sym)!; return p[1].intervals.map((iv) => (p[0] + iv) % 12); };
+    let ok = true;
+    for (let n = 0; n < 50; n++) {
+      for (let deg = 1; deg <= 7; deg++) {
+        const r = resolveDegree(deg, 9, TrainingMode.Minor, ChordTypeLevel.Extended);
+        if (!pcsOf(r.symbol).every((pc) => natural.has(pc))) ok = false;
+      }
+    }
+    check("minor Extended diatonic chords stay in natural minor", ok);
+    const v = resolveDegree(5, 9, TrainingMode.Minor, ChordTypeLevel.Extended);
+    check("minor v at Extended = Em7 / v7", v.symbol === "Em7" && v.romanLabel === "v7");
+    const dom = resolveDegree(5, 9, TrainingMode.Minor, ChordTypeLevel.Extended, undefined, true);
+    check("harmonic V at Extended = E7b9 / V7b9 inside harmonic minor",
+      dom.symbol === "E7b9" && dom.romanLabel === "V7b9" && pcsOf(dom.symbol).every((pc) => harmonic.has(pc)));
+  }
 
   // --- Major/minor-ambiguous Romans (challenge answer disambiguation) ---
   // The harmonic-minor dominant prints exactly like the major key's V7 but is a

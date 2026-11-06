@@ -202,6 +202,28 @@ class EarTrainingTest {
         }
     }
 
+    @Test fun `minor extended chords stay inside natural or harmonic minor`() {
+        // v at Extended was m9 and the harmonic V was 9: both add F# in A minor.
+        val a = PitchClass.A
+        val natural = setOf(0, 2, 3, 5, 7, 8, 10).map { PitchClass.of(a.value + it) }.toSet()
+        val harmonic = setOf(0, 2, 3, 5, 7, 8, 11).map { PitchClass.of(a.value + it) }.toSet()
+        repeat(50) {
+            for (deg in 1..7) {
+                val r = EarTraining.resolve(deg, a, TrainingMode.Minor, ChordTypeLevel.Extended)
+                val (root, q) = ChordLibrary.parse(r.symbol)!!
+                assertTrue(q.notesFrom(root).all { it in natural }, "${r.symbol} leaves A natural minor")
+            }
+        }
+        val v = EarTraining.resolve(5, a, TrainingMode.Minor, ChordTypeLevel.Extended)
+        assertEquals("Em7", v.symbol)
+        assertEquals("v7", v.romanLabel)
+        val dom = EarTraining.resolve(5, a, TrainingMode.Minor, ChordTypeLevel.Extended, asDominant = true)
+        assertEquals("E7b9", dom.symbol)
+        assertEquals("V7b9", dom.romanLabel)
+        val (root, q) = ChordLibrary.parse(dom.symbol)!!
+        assertTrue(q.notesFrom(root).all { it in harmonic }, "${dom.symbol} leaves A harmonic minor")
+    }
+
     // ----- progression library -----
 
     @Test fun `all major progressions resolve to parseable chord symbols`() {
@@ -784,5 +806,19 @@ class EarTrainingTest {
         val p = Progression(TrainingMode.Minor, listOf(4, 5, 6, 3))
         assertEquals(TrainingMode.Major, EarTraining.progressionRelativeTonicMode(p))
         assertEquals("ii  –  iii  –  IV  –  I", EarTraining.relativeRomanLineFor(p))
+    }
+    // ----- "Mix all" keeps the harmonic-minor dominant -----
+
+    @Test fun `mix-all resolution plays dominant bars as a major V`() {
+        val p = Progression(TrainingMode.Minor, listOf(1, 4, 5, 1), dominantBars = setOf(2))
+        val rng = kotlin.random.Random(7)
+        repeat(200) {
+            val bars = EarTraining.resolveProgressionMixed(p, PitchClass.A, rng)
+            val (root, q) = ChordLibrary.parse(bars[2].symbol)!!
+            assertEquals(PitchClass.E, root)
+            // Major third (G#) present: never the natural-minor v.
+            assertTrue(4 in q.intervals.map { it.semitones }, "bar 3 was ${bars[2].symbol}")
+            assertTrue(bars[2].romanLabel.startsWith("V"), bars[2].romanLabel)
+        }
     }
 }

@@ -92,7 +92,9 @@ object EarTraining {
         // degrees carry a flat (bIII, bVI, bVII). Qualities are natural-minor diatonic.
         3 to DegreeInfo("bIII", "",    "maj7", "maj9"),
         4 to DegreeInfo("iv",   "m",   "m7",   "m9"),
-        5 to DegreeInfo("v",    "m",   "m7",   "m9"),
+        // Extended stays m7: an m9 on v adds the 6th degree raised (F# in A minor),
+        // which is in neither natural nor harmonic minor.
+        5 to DegreeInfo("v",    "m",   "m7",   "m7"),
         6 to DegreeInfo("bVI",  "",    "maj7", "maj9"),
         7 to DegreeInfo("bVII", "",    "7",    "7"),
     )
@@ -100,9 +102,10 @@ object EarTraining {
     /** The HARMONIC-MINOR dominant: degree 5 played as a MAJOR V (raised leading tone),
      *  the classic V→i cadence. Same root as the natural-minor `v` (the perfect fifth),
      *  but a major triad / dominant 7th. Used only for a progression's [Progression.dominantBars].
-     *  No random extended set — its per-level suffixes ("", "7", "9") deliberately match the
-     *  natural `v`'s, so the challenge scores a degree-5 answer identically for either. */
-    val MINOR_DOMINANT = DegreeInfo("V", "", "7", "9")
+     *  No random extended set. Its Extended form is 7b9 (the harmonic-minor b9 — F in
+     *  A minor): a plain 9 would add the raised 6th (F#), outside harmonic minor. The
+     *  challenge offers its "7b9" suffix next to the natural `v`'s when harmonic minor is on. */
+    val MINOR_DOMINANT = DegreeInfo("V", "", "7", "7b9")
 
     /** Markers appended to a Roman that prints the same in both keys, saying which one
      *  it is read in. BOTH readings are marked — leaving the major one bare made the
@@ -219,6 +222,18 @@ object EarTraining {
         rng: kotlin.random.Random = kotlin.random.Random.Default,
     ): List<ResolvedChord> =
         p.degrees.mapIndexed { i, d -> resolve(d, key, p.mode, level, rng, asDominant = i in p.dominantBars) }
+
+    /** "Mix all": resolve [p] with an independently random chord-type level per bar.
+     *  Harmonic-minor [Progression.dominantBars] still resolve as the major V. */
+    fun resolveProgressionMixed(
+        p: Progression,
+        key: PitchClass,
+        rng: kotlin.random.Random = kotlin.random.Random.Default,
+    ): List<ResolvedChord> =
+        p.degrees.mapIndexed { i, d ->
+            val lvl = ChordTypeLevel.entries[rng.nextInt(ChordTypeLevel.entries.size)]
+            resolve(d, key, p.mode, lvl, rng, asDominant = i in p.dominantBars)
+        }
 
     // ----- Common progressions ----------------------------------------------------------------
 

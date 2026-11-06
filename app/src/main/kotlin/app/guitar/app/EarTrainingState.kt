@@ -11,6 +11,7 @@ import app.guitar.theory.CarMode
 import app.guitar.theory.ChordLibrary
 import app.guitar.theory.ChordShapeGenerator
 import app.guitar.theory.ChordTypeLevel
+import app.guitar.theory.DegreeInfo
 import app.guitar.theory.EarTraining
 import app.guitar.theory.IntervalChoice
 import app.guitar.theory.IntervalDirection
@@ -313,10 +314,7 @@ class EarTrainingState(
      *  (random chord-type level per bar) or the single [chordTypeLevel]. */
     private fun resolveCurrent(prog: Progression, key: PitchClass): List<ResolvedChord> =
         if (earMixAll) {
-            prog.degrees.map { deg ->
-                val lvl = ChordTypeLevel.entries[rng.nextInt(ChordTypeLevel.entries.size)]
-                EarTraining.resolve(deg, key, prog.mode, lvl, rng)
-            }
+            EarTraining.resolveProgressionMixed(prog, key, rng)
         } else {
             EarTraining.resolveProgression(prog, key, chordTypeLevel, rng)
         }
@@ -1190,19 +1188,27 @@ class EarTrainingState(
 
     /** Distinct extension-label options for the current mode + level. In mix mode the
      *  union spans triad ("") + 7th + extended suffixes so every possible bar is answerable. */
+    /** The harmonic-minor dominant can be a bar: its suffixes (Extended "7b9") join the options. */
+    private val dominantInPlay: Boolean get() =
+        progMode == TrainingMode.Minor && (earHarmonicMinor || progProgression?.dominantBars?.isNotEmpty() == true)
+
+    /** Degree rows whose suffixes the extension row must cover (+ the harmonic dominant). */
+    private fun extDegreeInfos(): List<DegreeInfo> =
+        degreesMap().values.toList() + (if (dominantInPlay) listOf(EarTraining.MINOR_DOMINANT) else emptyList())
+
     fun challengeExtOptions(): List<String> {
         if (!challengeNeedsExt) return emptyList()
-        val m = degreesMap()
+        val infos = extDegreeInfos()
         if (earMixAll) {
             val labels = linkedSetOf("")   // "" = triad / no extension
-            for (info in m.values) {
+            for (info in infos) {
                 labels.add(EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman))
                 if (info.extendedOptions.isNotEmpty()) info.extendedOptions.forEach { labels.add(it.second) }
                 else labels.add(EarTraining.romanLabel(info.roman, info.extendedQuality).removePrefix(info.roman))
             }
             return labels.sorted()
         }
-        return m.values.flatMap { info ->
+        return infos.flatMap { info ->
             when (chordTypeLevel) {
                 ChordTypeLevel.Sevenths ->
                     listOf(EarTraining.romanLabel(info.roman, info.seventhQuality).removePrefix(info.roman))
@@ -1215,8 +1221,7 @@ class EarTrainingState(
     }
 
     /** Correct extension label for bar [i] (suffix of its Roman label), or "" if none.
-     *  A harmonic-minor dominant bar strips the "V" prefix (its suffix "" / "7" / "9"
-     *  matches the natural `v`'s, so degree-5 answers score the same either way). */
+     *  A harmonic-minor dominant bar strips the "V" prefix ("" / "7" / "7b9"). */
     fun correctExtLabel(i: Int): String {
         val deg = progProgression?.degrees?.getOrNull(i) ?: return ""
         val dominant = progMode == TrainingMode.Minor && progProgression?.dominantBars?.contains(i) == true
@@ -1369,8 +1374,12 @@ class EarTrainingState(
         if (earMixAll || chordTypeLevel != ChordTypeLevel.Extended) return challengeExtOptions()
         val deg = EarTraining.degreeFromMajorRelative(majorRelativeDegree, progMode)
         val info = degreesMap()[deg] ?: return emptyList()
-        return if (info.extendedOptions.isNotEmpty()) info.extendedOptions.map { it.second }.distinct()
-        else listOf(EarTraining.romanLabel(info.roman, info.extendedQuality).removePrefix(info.roman))
+        val own = if (info.extendedOptions.isNotEmpty()) info.extendedOptions.map { it.second }.distinct()
+            else listOf(EarTraining.romanLabel(info.roman, info.extendedQuality).removePrefix(info.roman))
+        // Degree 5 in minor may be the harmonic dominant (V7b9): offer its suffix too.
+        if (deg != 5 || !dominantInPlay) return own
+        val dom = EarTraining.MINOR_DOMINANT
+        return (own + EarTraining.romanLabel(dom.roman, dom.extendedQuality).removePrefix(dom.roman)).distinct()
     }
 
     fun toggleKeyboardShift() { keyboardMinor = !keyboardMinor }
@@ -1399,7 +1408,7 @@ class EarTrainingState(
         challengeGuessDegree = challengeGuessDegree.toMutableList().also { it[bar] = deg }
         challengeGuessDominant = challengeGuessDominant.toMutableList().also { it[bar] = dominant }
         // The harmonic dominant answers with MINOR_DOMINANT (major V) rather than the
-        // natural `v`; its per-level suffix ("", "7", "9") is otherwise identical.
+        // natural `v`.
         val info = if (dominant) EarTraining.MINOR_DOMINANT else degreesMap()[deg]
         // label = what shows in the square; roman already carries the 7th in combined
         // mode (from keyboardKeys), so don't append the suffix again there.
