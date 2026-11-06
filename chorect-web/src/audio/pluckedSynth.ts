@@ -105,20 +105,4 @@ export class PluckedSynth {
     }
     return output;
   }
-
-  synthesizeChord(midiNotes: number[], sustainSec: number, strumDelaySamples: number, seedBase = 1, damping = 0.997, amplitude = 0.6): Float32Array {
-    const voices = midiNotes.filter((m) => m >= 0 && m <= 127);
-    if (voices.length === 0) return new Float32Array(0);
-    const perVoiceLen = Math.max(Math.floor(this.sampleRate * sustainSec), 1);
-    const totalLen = perVoiceLen + (voices.length - 1) * strumDelaySamples;
-    const mix = new Float32Array(totalLen);
-    const scale = 1.0 / Math.sqrt(voices.length);
-    voices.forEach((midi, i) => {
-      const voice = this.synthesize(midi, sustainSec, seedBase + i, damping, amplitude);
-      const offset = i * strumDelaySamples;
-      const end = Math.min(offset + voice.length, totalLen);
-      for (let j = 0; j < end - offset; j++) mix[offset + j] += voice[j] * scale;
-    });
-    return mix;
-  }
 }

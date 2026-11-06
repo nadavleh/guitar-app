@@ -136,7 +136,7 @@ class AppState(
     fun setSound(s: GuitarSound) {
         sound = s
         scope.launch { repo.setGuitarSound(s.name) }
-        val modern = (audio as? app.guitar.audio.SwitchableAudioEngine)?.modernEngine
+        val modern = (audio as? app.guitar.audio.AudioTrackEngine)
         pushEq(s)       // (re)apply this sound's saved EQ whenever it becomes current
         pushReverb(s)   // and its saved reverb amount
         if (modern == null) return
@@ -171,7 +171,7 @@ class AppState(
     private fun pushEq(s: GuitarSound) {
         if (s != sound) return
         val e = eqFor(s)
-        (audio as? app.guitar.audio.SwitchableAudioEngine)?.modernEngine?.setEq(e.bassDb, e.midDb, e.trebleDb)
+        (audio as? app.guitar.audio.AudioTrackEngine)?.setEq(e.bassDb, e.midDb, e.trebleDb)
     }
 
     fun setEqBand(s: GuitarSound, band: Band, db: Float) {
@@ -220,7 +220,7 @@ class AppState(
     /** Push [s]'s reverb amount to the live engine iff [s] is the currently-selected sound. */
     private fun pushReverb(s: GuitarSound) {
         if (s != sound) return
-        (audio as? app.guitar.audio.SwitchableAudioEngine)?.modernEngine?.setReverbSend(reverbFor(s))
+        (audio as? app.guitar.audio.AudioTrackEngine)?.setReverbSend(reverbFor(s))
     }
 
     // ---------- Melodic-instrument volume (guitar / cavaquinho) ----------
@@ -242,7 +242,7 @@ class AppState(
     /** Push the selected instrument's level to the engine. Call after any change to the
      *  volumes OR to the selected instrument. */
     fun pushInstrumentVolume() {
-        (audio as? app.guitar.audio.SwitchableAudioEngine)?.modernEngine
+        (audio as? app.guitar.audio.AudioTrackEngine)
             ?.setVoiceLevel(instrumentVolumePct / 100f)
     }
 

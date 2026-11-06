@@ -21,7 +21,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.guitar.audio.AudioRates
 import app.guitar.audio.AudioTrackEngine
-import app.guitar.audio.SwitchableAudioEngine
 
 /**
  * Measured touch-to-sound budget, on screen.
@@ -35,7 +34,7 @@ import app.guitar.audio.SwitchableAudioEngine
 @Composable
 fun AudioLatencyPanel(state: AppState) {
     val context = LocalContext.current
-    val engine = (state.audio as? SwitchableAudioEngine)?.modernEngine as? AudioTrackEngine
+    val engine = state.audio as? AudioTrackEngine
     var tick by remember { mutableStateOf(0) }
 
     Card(
@@ -48,7 +47,7 @@ fun AudioLatencyPanel(state: AppState) {
 
             if (engine == null) {
                 Text(
-                    "Unavailable (the legacy A/B engine is selected).",
+                    "Unavailable on this audio engine.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

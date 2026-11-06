@@ -69,8 +69,6 @@ import androidx.compose.ui.unit.em
 import app.guitar.audio.AudioEngine
 import app.guitar.audio.AudioRates
 import app.guitar.audio.AudioTrackEngine
-import app.guitar.audio.LegacyAudioTrackEngine
-import app.guitar.audio.SwitchableAudioEngine
 import app.guitar.theory.ChordLibrary
 import app.guitar.theory.ChordShape
 import app.guitar.theory.ChordShapeGenerator
@@ -82,13 +80,9 @@ import app.guitar.theory.ScalePositions
 import app.guitar.theory.Tunings
 
 class MainActivity : ComponentActivity() {
-    // A/B scaffolding: run the new voice-graph engine and the legacy engine side by
-    // side so the in-app toggle can compare them. Remove the legacy/switchable wrapper
-    // (revert to plain `AudioTrackEngine()`) before shipping the overhaul.
-    //
     // Built in onCreate rather than as a field initializer: it reads the device's native
     // output rate off AudioManager, which needs an attached Context.
-    private lateinit var audioEngine: AudioEngine
+    private lateinit var audioEngine: AudioTrackEngine
 
     /** Car-mode chord voice. Held by the Activity because TextToSpeech binds a service
      *  that must be shut down in [onDestroy]; AppState only ever sees the (String) -> Unit.
@@ -105,17 +99,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Run at the device's native rate so Android grants the low-latency output path
-        // instead of resampling every note. Both engines share the rate so the A/B
-        // toggle can't invalidate cached sample buffers.
-        val nativeRate = AudioRates.outputRate(this)
-        audioEngine = SwitchableAudioEngine(
-            modern = AudioTrackEngine(nativeRate, AudioRates.framesPerBuffer(this)),
-            legacy = LegacyAudioTrackEngine(nativeRate),
-        )
+        // instead of resampling every note.
+        audioEngine = AudioTrackEngine(AudioRates.outputRate(this), AudioRates.framesPerBuffer(this))
         // Phone speaker → automatic bass shelf; headphones / BT / USB → flat. Re-checked
         // on every plug, unplug, connect and disconnect.
         outputRoute = OutputRoute(this) { onSpeaker ->
-            (audioEngine as? SwitchableAudioEngine)?.modernEngine?.setSpeakerBassBoost(onSpeaker)
+            audioEngine.setSpeakerBassBoost(onSpeaker)
         }.also { it.start() }
         setContent {
             // Theme flag read straight from the repository so the theme wraps the

@@ -410,8 +410,7 @@ private fun SliderRow(
     }
 }
 
-/** Icon + label/sub row with a trailing switch — used for Boost root note and
- *  the New audio engine A/B toggle. */
+/** Icon + label/sub row with a trailing switch — used for Boost root note. */
 @Composable
 private fun SwitchRow(
     icon: ImageVector,
@@ -497,8 +496,7 @@ private fun EqBandSlider(state: AppState, label: String, value: Float, band: Ban
  * The one Tone settings sheet, opened identically from every screen's dock (or,
  * on screens with no transport dock, from a small Tune icon button). Replaces
  * the old "Audio" quick-access dropdown entirely: Sound picker, EQ, Reverb,
- * Strum spread, Ring sustain, Boost root note, and the audio-engine A/B toggle
- * all live here now, reading/writing the exact same [AppState] members the old
+ * Strum spread, Ring sustain and Boost root note all live here now, reading/writing the exact same [AppState] members the old
  * dropdown did.
  */
 @OptIn(ExperimentalMaterial3Api::class)

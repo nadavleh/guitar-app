@@ -120,7 +120,7 @@ class AudioTrackEngine(
 
     /** When set, [playNote]/[playFrequency]/[playChord] play sampled voices from this
      *  bank instead of Karplus-Strong synthesis (M3). Drums ([playSamples]/[playSamplesAt])
-     *  and the legacy engine are unaffected. Null = existing synth behavior (default). */
+     *  are unaffected. Null = existing synth behavior (default). */
     @Volatile var voiceInstrument: SampleInstrument? = null
 
     private val synthesizer = Executors.newSingleThreadExecutor { r ->

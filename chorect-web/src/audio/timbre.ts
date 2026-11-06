@@ -5,14 +5,11 @@ export interface Timbre {
   readonly damping: number;
   /** Peak amplitude in [0, 1]. */
   readonly amplitude: number;
-  /** Stereo position: -1 = hard left, 0 = center, 1 = hard right. Used by the
-   *  MODERN (overhaul) output chain only — the legacy chain is mono/center. */
+  /** Stereo position: -1 = hard left, 0 = center, 1 = hard right. */
   readonly pan: number;
-  /** Fraction of this voice's signal sent to the reverb bus, in [0, 1].
-   *  MODERN chain only. */
+  /** Fraction of this voice's signal sent to the reverb bus, in [0, 1]. */
   readonly reverbSend: number;
-  /** Envelope release time in milliseconds when a voice is stopped. MODERN
-   *  chain only — the legacy chain hard-stops. */
+  /** Envelope release time in milliseconds when a voice is stopped. */
   readonly releaseMs: number;
   /** Short and dry: released after its duration even when it is a sample, no reverb
    *  send, and a darker synth tone. Mirrors Kotlin Timbre.gated. */
