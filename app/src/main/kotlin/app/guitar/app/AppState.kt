@@ -30,6 +30,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 const val MIDI_MIN = 28   // E1
 const val MIDI_MAX = 84   // C6
@@ -1030,11 +1032,16 @@ class AppState(
         // the instant the user navigates, instead of a blank neck until the first slot.
         loopPlayingShape = firstLoopShape() ?: loopPlayingShape
         loopJob = scope.launch {
+            // Absolute onset clock (fractional ms): each slot is scheduled at
+            // `nextOnsetMs`, so per-slot work never accumulates as drift.
+            var nextOnsetMs = System.nanoTime() / 1e6
             while (isLooping) {
                 for (barIdx in loopProgression.indices) {
                     if (!isLooping) break
+                    // The progression may shrink mid-pass (bar removed, shorter one loaded).
+                    val bar = loopProgression.getOrNull(barIdx) ?: break
                     loopCurrentBar = barIdx
-                    playBar(loopProgression[barIdx])
+                    nextOnsetMs = playBar(bar, nextOnsetMs)
                 }
             }
         }
@@ -1048,19 +1055,43 @@ class AppState(
         audio.stop()
     }
 
-    private suspend fun playBar(bar: List<LoopSlot>) {
-        val beatMs = (60_000L / bpm.coerceAtLeast(10))
-        // Each slot is one (whole bar / slotsPerBar) division.
-        val slotMs = beatMs * 4 / bar.size.coerceAtLeast(1)
+    /** Shapes cached per (symbol, tuning, style, span) so a slot doesn't re-run the
+     *  shape generator on every pass. */
+    private data class LoopShapeKey(
+        val symbol: String, val tuning: Tuning, val style: VoicingStyle, val span: Int,
+    )
+    private val loopShapeCache = HashMap<LoopShapeKey, List<ChordShape>>()
+
+    private fun loopSlotShape(slot: LoopSlot): ChordShape? {
+        val symbol = slot.chordSymbol ?: return null
+        val key = LoopShapeKey(symbol, liveTuning, voicingStyle, instrument.maxFretSpan)
+        if (loopShapeCache.size > 256) loopShapeCache.clear()
+        val shapes = loopShapeCache.getOrPut(key) {
+            val parsed = ChordLibrary.parse(symbol)
+            if (parsed == null) emptyList()
+            else loopShapeGen.shapesFor(parsed.first, parsed.second, liveTuning, frets = DISPLAY_FRETS)
+        }
+        return shapes.getOrNull(slot.voicingIndex) ?: shapes.firstOrNull()
+    }
+
+    /** Plays one bar whose first slot is due at [startOnsetMs] (System.nanoTime ms);
+     *  returns the onset of the slot after the bar. */
+    private suspend fun playBar(bar: List<LoopSlot>, startOnsetMs: Double): Double {
+        var nextOnsetMs = startOnsetMs
         for (slotIdx in bar.indices) {
-            if (!isLooping) return
+            if (!isLooping) return nextOnsetMs
+            // Each slot is one (whole bar / slotsPerBar) division; read live so tempo edits apply.
+            val slotMs = 240_000.0 / bpm.coerceAtLeast(10) / bar.size.coerceAtLeast(1)
+            // Fell far behind (e.g. app paused): resync instead of firing a burst.
+            val now = System.nanoTime() / 1e6
+            if (now - nextOnsetMs > slotMs) nextOnsetMs = now
+            val wait = nextOnsetMs - now
+            if (wait > 0) delay(wait.roundToLong())
+            if (!isLooping) return nextOnsetMs
             loopCurrentSlot = slotIdx
             val slot = bar[slotIdx]
-            val parsed = slot.chordSymbol?.let { ChordLibrary.parse(it) }
-            if (parsed != null && slot.strum != StrumPattern.Sustain) {
-                val (root, q) = parsed
-                val shapes = loopShapeGen.shapesFor(root, q, liveTuning, frets = DISPLAY_FRETS)
-                val shape = shapes.getOrNull(slot.voicingIndex) ?: shapes.firstOrNull()
+            if (slot.strum != StrumPattern.Sustain) {
+                val shape = loopSlotShape(slot)
                 if (shape != null) {
                     loopPlayingShape = shape
                     val midis = shape.midis
@@ -1077,11 +1108,12 @@ class AppState(
                     // chord before it ring on.
                     audio.chokeChords()
                     audio.playChord(ordered, strumDelayMillis = strumDelay,
-                        sustainMillis = (slotMs * 0.9).toInt().coerceAtLeast(150),
+                        sustainMillis = (slotMs * 0.9).roundToInt().coerceAtLeast(150),
                         timbre = timbre)
                 }
             }
-            delay(slotMs)
+            nextOnsetMs += slotMs
         }
+        return nextOnsetMs
     }
 }

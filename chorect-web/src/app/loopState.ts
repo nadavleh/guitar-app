@@ -192,11 +192,17 @@ export class LoopState {
     const token = this.token;
     this.notify();
     void (async () => {
+      // Absolute onset clock (fractional ms): each slot is scheduled at nextOnsetMs,
+      // so per-slot work never accumulates as drift.
+      let nextOnsetMs = performance.now();
       while (this.isLooping && token === this.token) {
         for (let barIdx = 0; barIdx < this.progression.length; barIdx++) {
           if (!this.isLooping || token !== this.token) break;
+          // The progression may shrink mid-pass (bar removed, shorter one loaded).
+          const bar = this.progression[barIdx];
+          if (!bar) break;
           this.currentBar = barIdx;
-          await this.playBar(this.progression[barIdx], token);
+          nextOnsetMs = await this.playBar(bar, token, nextOnsetMs);
         }
       }
     })();
@@ -210,17 +216,51 @@ export class LoopState {
     this.notify();
   }
 
-  private async playBar(bar: LoopSlot[], token: number) {
-    const beatMs = 60000 / Math.max(this.bpm, 10);
-    const slotMs = (beatMs * 4) / Math.max(bar.length, 1);
+  /** Shapes cached per (symbol, tuning, style, span) so a slot doesn't rebuild the
+   *  shape generator on every pass. Cleared whenever the tuning/style/span changes. */
+  private shapeCache = new Map<string, ChordShape[]>();
+  private shapeCacheTuning: Tuning | null = null;
+  private shapeCacheStyle: VoicingStyle | null = null;
+  private shapeCacheSpan = -1;
+
+  private slotShape(s: LoopSlot): ChordShape | null {
+    if (!s.chordSymbol) return null;
+    const tuning = this.deps.tuningProvider();
+    const style = this.deps.voicingStyleProvider();
+    const span = this.deps.maxFretSpanProvider();
+    if (tuning !== this.shapeCacheTuning || style !== this.shapeCacheStyle || span !== this.shapeCacheSpan || this.shapeCache.size > 256) {
+      this.shapeCache.clear();
+      this.shapeCacheTuning = tuning;
+      this.shapeCacheStyle = style;
+      this.shapeCacheSpan = span;
+    }
+    let shapes = this.shapeCache.get(s.chordSymbol);
+    if (!shapes) {
+      const parsed = parseChord(s.chordSymbol);
+      shapes = parsed ? this.gen().shapesFor(parsed[0], parsed[1], tuning, DISPLAY_FRETS) : [];
+      this.shapeCache.set(s.chordSymbol, shapes);
+    }
+    return shapes[s.voicingIndex] ?? shapes[0] ?? null;
+  }
+
+  /** Plays one bar whose first slot is due at startOnsetMs (performance.now ms);
+   *  resolves to the onset of the slot after the bar. */
+  private async playBar(bar: LoopSlot[], token: number, startOnsetMs: number): Promise<number> {
+    let nextOnsetMs = startOnsetMs;
     for (let slotIdx = 0; slotIdx < bar.length; slotIdx++) {
-      if (!this.isLooping || token !== this.token) return;
+      if (!this.isLooping || token !== this.token) return nextOnsetMs;
+      // Each slot is one (whole bar / slotsPerBar) division; read live so tempo edits apply.
+      const slotMs = 240000 / Math.max(this.bpm, 10) / Math.max(bar.length, 1);
+      // Fell far behind (e.g. tab hidden): resync instead of firing a burst.
+      const now = performance.now();
+      if (now - nextOnsetMs > slotMs) nextOnsetMs = now;
+      const wait = nextOnsetMs - now;
+      if (wait > 0) await sleep(wait);
+      if (!this.isLooping || token !== this.token) return nextOnsetMs;
       this.currentSlot = slotIdx;
       const s = bar[slotIdx];
-      const parsed = s.chordSymbol ? parseChord(s.chordSymbol) : null;
-      if (parsed && s.strum !== StrumPattern.Sustain) {
-        const shapes = this.gen().shapesFor(parsed[0], parsed[1], this.deps.tuningProvider(), DISPLAY_FRETS);
-        const shape = shapes[s.voicingIndex] ?? shapes[0];
+      if (s.strum !== StrumPattern.Sustain) {
+        const shape = this.slotShape(s);
         if (shape) {
           this.playingShape = shape;
           const midis = shape.midis;
@@ -236,8 +276,9 @@ export class LoopState {
         }
       }
       this.notify();
-      await sleep(slotMs);
+      nextOnsetMs += slotMs;
     }
+    return nextOnsetMs;
   }
 
   // ---- build by degree ----
