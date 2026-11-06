@@ -167,6 +167,7 @@ export class EarTrainingState {
     this.earMode = sub === EarSubMode.Progression ? EarMode.Challenge : EarMode.Practice;
     this.stopLoop();
     this.stopDrill();
+    this.libraryStop();   // Workout's "Hear the loop" must not play on over other tabs
     this.notify();
   }
 

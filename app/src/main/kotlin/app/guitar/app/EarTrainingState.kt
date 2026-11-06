@@ -118,6 +118,7 @@ class EarTrainingState(
         earMode = if (sub == EarSubMode.Progression) EarMode.Challenge else EarMode.Practice
         stopLoop()
         stopDrill()
+        libraryStop()   // Workout's "Hear the loop" must not play on over other tabs
     }
 
     /** Whether the user wants Major mode in the rotation. */
