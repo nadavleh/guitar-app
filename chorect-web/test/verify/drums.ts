@@ -1,7 +1,7 @@
 // Area "drums" of the web parity checks (split out of the old monolithic verify.ts).
 // Run alone: npm run verify -- drums
 
-import { DrumBlock, BUILTIN_BLOCKS, PresetTrack, PercussionCatalog, PercussionPattern, PercussionMeter, swungSlotMs, slotMs, voiceCount, SwingModel, BUILTIN_PATTERNS, STUDY_PATTERNS, PRESET_TRACKS } from "../../src/theory";
+import { DrumBlock, BUILTIN_BLOCKS, PresetTrack, PercussionCatalog, PercussionPattern, PercussionMeter, swungSlotMs, slotMs, voiceCount, SwingModel, BUILTIN_PATTERNS, STUDY_PATTERNS, PRESET_TRACKS, renderPercussion, swungOnsetMsExact } from "../../src/theory";
 import { check } from "./harness";
 
 export function run(): void {
@@ -183,5 +183,26 @@ export function run(): void {
     // ...and the shipped built-in that exercises it round-trips through an edit.
     const builtin = BUILTIN_BLOCKS.find((b) => b.startsWith("Tamborim Block="));
     check("a built-in block with an entrada exists", !!builtin);
+  }
+
+  // --- WAV export: a track's own swing uses the TRACK's swing model, as live playback
+  // does (mirrors Kotlin `a track's own swing uses the track's swing model like live playback`) ---
+  {
+    const p = PercussionPattern.decode("M:2,2,4,16;surdo=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")!.withTrackSwing("surdo", 60);
+    const sr = 44100;
+    const onsetsOf = (model: SwingModel) => {
+      const r = renderPercussion({ pattern: p, bpm: 90, swingModel: SwingModel.Default, trackSwingModel: () => model, sampleRate: sr },
+        () => new Float32Array([0.5]));
+      const out: number[] = [];
+      r.samples.forEach((v, i) => { if (v !== 0) out.push(i); });
+      return out;
+    };
+    const expected = (model: SwingModel) => Array.from({ length: 16 }, (_, k) =>
+      Math.round(((swungOnsetMsExact(k, 90, 60, p.meter, model) - swungOnsetMsExact(0, 90, 60, p.meter, model)) * sr) / 1000));
+    const hem = onsetsOf(SwingModel.Hemiola);
+    const def = onsetsOf(SwingModel.Default);
+    check("export: track swing model changes the feel", hem.join() !== def.join());
+    check("export: track swing follows the track's model (Hemiola)", hem.join() === expected(SwingModel.Hemiola).join());
+    check("export: track swing follows the track's model (Default)", def.join() === expected(SwingModel.Default).join());
   }
 }

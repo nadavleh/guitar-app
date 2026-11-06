@@ -34,6 +34,9 @@ export interface PercussionRenderSpec {
   bpm: number;
   swing?: number;
   swingModel?: SwingModel;
+  /** The swing MODEL each track's own swing uses (the live scheduler's per-track
+   *  toggle, default SwingModel.Default); `swingModel` is the global clock's. */
+  trackSwingModel?: (id: string) => SwingModel;
   /** null/undefined renders the whole kit ("full cycle"); an instrument id renders
    *  that track ALONE (its own volume and swing still apply). */
   onlyTrack?: string | null;
@@ -103,7 +106,7 @@ export function renderPercussion(spec: PercussionRenderSpec, buffers: VoiceBuffe
 
   for (const inst of tracks) {
     const hits: Hit[] = [];
-    const trackDelta = trackOnsetDeltas(pattern, inst.id, bpm, swing, model);
+    const trackDelta = trackOnsetDeltas(pattern, inst.id, bpm, swing, model, spec.trackSwingModel?.(inst.id) ?? SwingModel.Default);
     const trackVol = pattern.trackVolumeOf(inst.id) / 100;
     for (let cycle = 0; cycle < cycles; cycle++) {
       for (let slot = 0; slot < slots; slot++) {
@@ -157,14 +160,15 @@ export function renderPercussion(spec: PercussionRenderSpec, buffers: VoiceBuffe
  * are measured from their OWN slot 0, so the grids start together.
  */
 function trackOnsetDeltas(
-  pattern: PercussionPattern, id: string, bpm: number, swing: number, model: SwingModel,
+  pattern: PercussionPattern, id: string, bpm: number, swing: number, model: SwingModel, trackModel: SwingModel,
 ): number[] {
   const deltas = new Array<number>(pattern.slots).fill(0);
   const trackSwing = pattern.trackSwing.get(id) ?? 0;
   if (swing !== 0 || trackSwing === 0) return deltas;
-  const onset = (k: number, sw: number) =>
-    swungOnsetMsExact(k, bpm, sw, pattern.meter, model) - swungOnsetMsExact(0, bpm, sw, pattern.meter, model);
-  for (let k = 0; k < pattern.slots; k++) deltas[k] = onset(k, trackSwing) - onset(k, swing);
+  // The track clock uses the TRACK's model, the master clock the global one — as live.
+  const onset = (k: number, sw: number, m: SwingModel) =>
+    swungOnsetMsExact(k, bpm, sw, pattern.meter, m) - swungOnsetMsExact(0, bpm, sw, pattern.meter, m);
+  for (let k = 0; k < pattern.slots; k++) deltas[k] = onset(k, trackSwing, trackModel) - onset(k, swing, model);
   return deltas;
 }
 

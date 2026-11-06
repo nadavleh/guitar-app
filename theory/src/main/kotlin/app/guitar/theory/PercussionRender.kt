@@ -50,6 +50,9 @@ object PercussionRender {
      *   the final ring-out is appended instead, giving a clean one-shot ending.
      * @param voiceGain extra per-voice gain from the live mixer (voice volume
      *   sliders); 1f leaves the pattern as authored.
+     * @param trackSwingModel the swing MODEL each track's own swing uses (the live
+     *   scheduler's per-track toggle, default [SwingModel.Default]); [swingModel] is
+     *   the global clock's.
      * @param includeTrack the live mixer's mute/solo state, applied to a FULL-kit
      *   render only. A single-track export ignores it on purpose: you asked for that
      *   stem, so a muted track still renders rather than producing a silent file.
@@ -59,6 +62,7 @@ object PercussionRender {
         val bpm: Int,
         val swing: Int = 0,
         val swingModel: SwingModel = SwingModel.Default,
+        val trackSwingModel: (String) -> SwingModel = { SwingModel.Default },
         val onlyTrack: String? = null,
         val includeTrack: (String) -> Boolean = { true },
         val cycles: Int = 1,
@@ -192,11 +196,13 @@ object PercussionRender {
         if (spec.swing != 0 || trackSwing == 0) return deltas
         // Both clocks are measured from their OWN slot 0, so the two grids start together
         // and the track's hits drift from the master only by its swing (mirrors the live
-        // scheduler, which accumulates per-slot differences from a shared downbeat).
-        fun onset(k: Int, swing: Int) =
-            PercussionTiming.swungOnsetMsExact(k, spec.bpm, swing, pattern.meter, spec.swingModel) -
-                PercussionTiming.swungOnsetMsExact(0, spec.bpm, swing, pattern.meter, spec.swingModel)
-        for (k in 0 until slots) deltas[k] = onset(k, trackSwing) - onset(k, spec.swing)
+        // scheduler, which accumulates per-slot differences from a shared downbeat). The
+        // track clock uses the TRACK's model, the master clock the global one — as live.
+        fun onset(k: Int, swing: Int, model: SwingModel) =
+            PercussionTiming.swungOnsetMsExact(k, spec.bpm, swing, pattern.meter, model) -
+                PercussionTiming.swungOnsetMsExact(0, spec.bpm, swing, pattern.meter, model)
+        val trackModel = spec.trackSwingModel(id)
+        for (k in 0 until slots) deltas[k] = onset(k, trackSwing, trackModel) - onset(k, spec.swing, spec.swingModel)
         return deltas
     }
 

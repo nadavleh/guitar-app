@@ -254,6 +254,25 @@ class PercussionRenderTest {
         }
     }
 
+    @Test fun `a track's own swing uses the track's swing model like live playback`() {
+        val p = patternOf("0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0").withTrackSwing("surdo", 60)
+        fun render(model: SwingModel) = PercussionRender.render(
+            PercussionRender.Spec(p, bpm = 90, swingModel = SwingModel.Default,
+                trackSwingModel = { model }, sampleRate = sr), impulses,
+        )
+        val hemiola = onsets(render(SwingModel.Hemiola).samples)
+        val default = onsets(render(SwingModel.Default).samples)
+        assertTrue(hemiola != default, "the track model must change the feel")
+        // Global swing 0 → straight master grid; each hit sits on the TRACK clock.
+        fun expected(model: SwingModel) = (0 until 16).map { k ->
+            val ms = PercussionTiming.swungOnsetMsExact(k, 90, 60, p.meter, model) -
+                PercussionTiming.swungOnsetMsExact(0, 90, 60, p.meter, model)
+            Math.round(ms * sr / 1000.0).toInt()
+        }
+        assertEquals(expected(SwingModel.Hemiola), hemiola)
+        assertEquals(expected(SwingModel.Default), default)
+    }
+
     @Test fun `a swung render still puts the downbeat at sample zero`() {
         val p = patternOf("0,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-")
         for (swing in listOf(0, 50, 100)) {
