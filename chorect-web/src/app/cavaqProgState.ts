@@ -13,6 +13,7 @@ import {
   Tuning, PitchClass, ChordShape, ChordShapeGenerator, ChordQuality,
   ResolvedChord, resolveNamed, parseChord, spellPc, stringCount, cavaquinhoVoicingPool,
   CavaqSequence, CAVAQ_SEQUENCES, cavaqSequenceById, pickMinMovement,
+  CavaqForm, cavaqFormsFor, cavaqDropOpenStringCopies, QUALITIES, pcOf,
 } from "../theory";
 import { WebAudioEngine, Timbre } from "../audio";
 
@@ -88,9 +89,10 @@ export class CavaqProgState {
     const parsed = parseChord(first.symbol);
     if (!parsed) return [];
     const [root, q] = parsed;
-    return this.voicings(root, q, this.deps.tuningProvider())
+    // An open-string copy of another grip (Dm 0 2 3 3 vs 3 2 3 3) is not a new position.
+    return cavaqDropOpenStringCopies(this.voicings(root, q, this.deps.tuningProvider())
       .slice()
-      .sort((a, b) => this.minFret(a) - this.minFret(b));
+      .sort((a, b) => this.minFret(a) - this.minFret(b)));
   }
 
   /** How many neck-region positions the current sequence offers (>= 1 when playable). */
@@ -228,4 +230,72 @@ export class CavaqProgState {
 
   /** Label like "C" / "Ab" for the current key. */
   keyLabel(): string { return spellPc(this.key); }
+
+  // ---------- Shapes tab: the cavaquinho's movable forms of one chord ----------
+
+  /** Which tab is showing: the sequence looper, or the chord-forms view. */
+  showShapes = false;
+  formRoot: PitchClass = 0;
+  formQuality = "";
+  /** Per form index, which grip is shown: 0 = the main form, k = its k-th branch-out. */
+  formPick = new Map<number, number>();
+  /** The form index currently sounding (Play all / last tapped), -1 = none. */
+  formPlaying = -1;
+  private formsCache: { sig: string; forms: CavaqForm[] } | null = null;
+  private formsToken = 0;
+
+  setShowShapes(v: boolean) { if (v) this.stop(); this.showShapes = v; this.notify(); }
+
+  forms(): CavaqForm[] {
+    const t = this.deps.tuningProvider();
+    const sig = `${this.formRoot}|${this.formQuality}|${t.openStrings.map((o) => o.midi).join(",")}`;
+    if (this.formsCache && this.formsCache.sig === sig) return this.formsCache.forms;
+    const q = QUALITIES.get(this.formQuality);
+    if (!q) return [];
+    const forms = cavaqFormsFor(this.formRoot, q, t, DISPLAY_FRETS);
+    this.formsCache = { sig, forms };
+    return forms;
+  }
+
+  chooseFormRoot(pc: PitchClass) { this.formRoot = pc; this.formPick = new Map(); this.formPlaying = -1; this.notify(); }
+  chooseFormQuality(sym: string) { this.formQuality = sym; this.formPick = new Map(); this.formPlaying = -1; this.notify(); }
+  shiftFormRoot(d: number) { this.chooseFormRoot(pcOf(this.formRoot + d)); }
+
+  /** The grip shown for form i (main or the picked branch-out). */
+  formShape(i: number): ChordShape | null {
+    const f = this.forms()[i];
+    if (!f) return null;
+    const k = this.formPick.get(i) ?? 0;
+    return k === 0 ? f.shape : f.branches[k - 1] ?? f.shape;
+  }
+
+  /** Show (and sound) grip k of form i: 0 = main, k ≥ 1 = branch-out k. */
+  pickForm(i: number, k: number) {
+    this.formPick = new Map(this.formPick).set(i, k);
+    this.playForm(i);
+  }
+
+  playForm(i: number) {
+    const sh = this.formShape(i);
+    if (!sh) return;
+    this.formPlaying = i;
+    const midis = sh.notes.filter((n) => n !== null).map((n) => n!.midi);
+    this.deps.audio.chokeChords();
+    this.deps.audio.playChord(midis, this.deps.strumProvider(), this.deps.sustainProvider(), this.deps.timbreProvider());
+    this.notify();
+  }
+
+  /** Strum each form in turn, up the neck (two beats each at the screen tempo). */
+  playAllForms() {
+    const token = ++this.formsToken;
+    void (async () => {
+      const n = this.forms().length;
+      for (let i = 0; i < n; i++) {
+        if (token !== this.formsToken) return;
+        this.playForm(i);
+        await sleep((60_000 / Math.max(this.bpm, 10)) * 2);
+      }
+      if (token === this.formsToken) { this.formPlaying = -1; this.notify(); }
+    })();
+  }
 }

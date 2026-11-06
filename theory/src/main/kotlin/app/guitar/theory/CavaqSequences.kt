@@ -38,9 +38,9 @@ object CavaqSequences {
         seq("sou_mais_o_samba_a", "Sou Mais o Samba A", "Sou Mais o Samba A", TrainingMode.Major,
             ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I"), ac(9, "7", "VI7"),
             ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I"), ac(7, "7", "V7")).inKey(PitchClass.C),
-        // Sou Mais o Samba, part B — I6 ii V7 I (C6 Dm G7 C).
+        // Sou Mais o Samba, part B — I ii V7 I (C Dm G7 C).
         seq("sou_mais_o_samba_b", "Sou Mais o Samba B", "Sou Mais o Samba B", TrainingMode.Major,
-            ac(0, "6", "I6"), ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I")).inKey(PitchClass.C),
+            ac(0, "", "I"), ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I")).inKey(PitchClass.C),
         // Basic minor — i I7 iv V7 (Cm C7 Fm G7).
         seq("basic_min", "Sequência Menor (Básico)", "Basic Minor", TrainingMode.Minor,
             ac(0, "m", "i"), ac(0, "7", "I7"), ac(5, "m", "iv"), ac(7, "7", "V7")),

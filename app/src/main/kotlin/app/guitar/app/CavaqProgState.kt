@@ -89,7 +89,9 @@ class CavaqProgState(
     private fun firstShapes(): List<ChordShape> {
         val first = resolved.firstOrNull() ?: return emptyList()
         val (root, q) = ChordLibrary.parse(first.symbol) ?: return emptyList()
-        return voicings(root, q, tuningProvider()).sortedBy { minFret(it) }
+        // An open-string copy of another grip (Dm 0 2 3 3 vs 3 2 3 3) is not a new position.
+        return app.guitar.theory.CavaqForms.dropOpenStringCopies(
+            voicings(root, q, tuningProvider()).sortedBy { minFret(it) })
     }
 
     /** How many neck-region positions the current sequence offers (>= 1 when playable). */
@@ -217,4 +219,72 @@ class CavaqProgState(
 
     /** Label like "C" / "A♭" for the current key. */
     fun keyLabel(): String = NoteSpeller.spell(key)
+
+    // ---------- Shapes tab: the cavaquinho's movable forms of one chord ----------
+
+    /** Which tab of the screen is showing: the sequence looper or the chord-forms view. */
+    var showShapes by mutableStateOf(false)
+    var formRoot by mutableStateOf(PitchClass.C)
+        private set
+    var formQuality by mutableStateOf("")
+        private set
+    /** Per form index, which grip is shown: 0 = the main form, k = its k-th branch-out. */
+    var formPick by mutableStateOf<Map<Int, Int>>(emptyMap())
+        private set
+    /** The form index currently sounding in "Play all" (or last tapped), -1 = none. */
+    var formPlaying by mutableStateOf(-1)
+        private set
+    private var formsCache: Pair<String, List<app.guitar.theory.CavaqForm>>? = null
+    private var formsJob: Job? = null
+
+    fun forms(): List<app.guitar.theory.CavaqForm> {
+        val t = tuningProvider()
+        val sig = "${formRoot.value}|$formQuality|${t.openStrings.joinToString(",") { it.midi.value.toString() }}"
+        formsCache?.let { if (it.first == sig) return it.second }
+        val q = ChordLibrary.qualities[formQuality] ?: return emptyList()
+        val f = app.guitar.theory.CavaqForms.formsFor(formRoot, q, t, maxFret = DISPLAY_FRETS)
+        formsCache = sig to f
+        return f
+    }
+
+    fun chooseFormRoot(pc: PitchClass) { formRoot = pc; formPick = emptyMap(); formPlaying = -1 }
+    fun chooseFormQuality(sym: String) { formQuality = sym; formPick = emptyMap(); formPlaying = -1 }
+    fun shiftFormRoot(d: Int) = chooseFormRoot(PitchClass.of(formRoot.value + d))
+
+    /** The grip shown for form [i] (main or the picked branch-out). */
+    fun formShape(i: Int): ChordShape? {
+        val f = forms().getOrNull(i) ?: return null
+        val k = formPick[i] ?: 0
+        return if (k == 0) f.shape else f.branches.getOrNull(k - 1) ?: f.shape
+    }
+
+    /** Show (and sound) grip [k] of form [i]: 0 = main, k ≥ 1 = branch-out k. */
+    fun pickForm(i: Int, k: Int) {
+        formPick = formPick + (i to k)
+        playForm(i)
+    }
+
+    fun playForm(i: Int) {
+        val sh = formShape(i) ?: return
+        formPlaying = i
+        val midis = sh.notes.mapNotNull { it?.midi?.value }
+        scope.launch {
+            audio.chokeChords()
+            audio.playChord(midis, strumDelayMillis = strumProvider(),
+                sustainMillis = sustainProvider(), timbre = timbreProvider())
+        }
+    }
+
+    /** Strum each form in turn, up the neck (at the screen tempo), then stop. */
+    fun playAllForms() {
+        formsJob?.cancel()
+        formsJob = scope.launch {
+            val n = forms().size
+            for (i in 0 until n) {
+                playForm(i)
+                delay(60_000L / bpm.coerceAtLeast(10) * 2)
+            }
+            formPlaying = -1
+        }
+    }
 }

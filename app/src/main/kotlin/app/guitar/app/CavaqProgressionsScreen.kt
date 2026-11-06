@@ -74,6 +74,19 @@ fun CavaqProgressionsScreen(state: AppState, onBack: () -> Unit) {
         }
         Spacer(Modifier.height(8.dp))
 
+        // ---- Tabs: the sequence looper, or the chord-forms ("cavaquinho CAGED") view ----
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            androidx.compose.material3.FilterChip(selected = !cp.showShapes,
+                onClick = { cp.showShapes = false }, label = { Text("Sequences") })
+            androidx.compose.material3.FilterChip(selected = cp.showShapes,
+                onClick = { cp.stop(); cp.showShapes = true }, label = { Text("Shapes") })
+        }
+        Spacer(Modifier.height(8.dp))
+        if (cp.showShapes) {
+            CavaqShapesPanel(state, cp)
+            return@Column
+        }
+
         // ---- Sequence picker ----
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedButton(onClick = { cp.stepSequence(-1) }) { Text("◀") }
@@ -206,4 +219,80 @@ private fun SequenceDropdown(cp: CavaqProgState, modifier: Modifier = Modifier) 
             }
         }
     }
+}
+
+/**
+ * Shapes tab: pick a chord (root + type) and see its movable cavaquinho forms — one per
+ * chord tone in the bass (3 for a triad, 4 for a four-note chord), up the neck. Each
+ * form lists its branch-outs (one string moved to another chord tone); tapping one
+ * shows it on that form's fretboard and strums it.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CavaqShapesPanel(state: AppState, cp: CavaqProgState) {
+    // ---- Chord picker: root ◀ ▶ + type dropdown ----
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedButton(onClick = { cp.shiftFormRoot(-1) }) { Text("◀") }
+        Text(NoteSpeller.spell(cp.formRoot), style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold, modifier = Modifier.width(40.dp))
+        OutlinedButton(onClick = { cp.shiftFormRoot(+1) }) { Text("▶") }
+        var open by remember { mutableStateOf(false) }
+        Box(Modifier.weight(1f)) {
+            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Type: ${cp.formQuality.ifEmpty { "major" }}  ▾", maxLines = 1)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                app.guitar.theory.CavaqForms.QUALITIES.forEach { q ->
+                    DropdownMenuItem(text = { Text(q.ifEmpty { "major" }) },
+                        onClick = { cp.chooseFormQuality(q); open = false })
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    val forms = cp.forms()
+    val chordName = NoteSpeller.spell(cp.formRoot) + cp.formQuality
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("$chordName — ${forms.size} forms", style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f))
+        Button(onClick = { cp.playAllForms() }) { Text("Play all ▶") }
+    }
+    Text("One form per chord tone in the bass, low → high on the neck. Branch-outs move one string to another chord tone.",
+        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (forms.isEmpty()) {
+        Text("No four-string form for this chord.", style = MaterialTheme.typography.bodyMedium)
+        return
+    }
+    forms.forEachIndexed { i, form ->
+        Spacer(Modifier.height(12.dp))
+        val pick = cp.formPick[i] ?: 0
+        val shape = cp.formShape(i) ?: return@forEachIndexed
+        val fretsTxt = { sh: app.guitar.theory.ChordShape -> sh.frets.joinToString(" ") { it?.toString() ?: "x" } }
+        Text("Form ${i + 1} · ${app.guitar.theory.CavaqForms.bassLabel(form.bass)} in the bass",
+            style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+            color = if (cp.formPlaying == i) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            androidx.compose.material3.FilterChip(selected = pick == 0, onClick = { cp.pickForm(i, 0) },
+                label = { Text("Main  ${fretsTxt(form.shape)}") })
+            form.branches.forEachIndexed { k, b ->
+                androidx.compose.material3.FilterChip(selected = pick == k + 1, onClick = { cp.pickForm(i, k + 1) },
+                    label = { Text("${b.templateName?.removeSuffix(" in the bass") ?: ""} bass  ${fretsTxt(b)}") })
+            }
+        }
+        val marks = remember(shape, state.labelMode) { shapeMarks(shape, state.labelMode) }
+        Box(modifier = Modifier.fillMaxWidth().height(150.dp)) {
+            FretboardView(
+                tuning = cp.tuning,
+                marks = marks,
+                selectedPosition = null,
+                onTap = { pos ->
+                    val midi = Fretboard.noteAt(cp.tuning, pos).midi.value
+                    state.audio.playNote(midi, durationMillis = state.ringSustainMs)
+                },
+                numFrets = DISPLAY_FRETS,
+                leftHanded = state.leftHanded,
+            )
+        }
+    }
+    Spacer(Modifier.height(16.dp))
 }

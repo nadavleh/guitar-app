@@ -17,7 +17,7 @@ class CavaqSequencesTest {
     @Test fun `sou mais o samba A and B resolve in C`() {
         assertEquals(listOf("Dm", "G7", "C", "A7", "Dm", "G7", "C", "G7"),
             CavaqSequences.byId("sou_mais_o_samba_a")!!.prog.resolve(PitchClass.C).map { it.symbol })
-        assertEquals(listOf("C6", "Dm", "G7", "C"),
+        assertEquals(listOf("C", "Dm", "G7", "C"),
             CavaqSequences.byId("sou_mais_o_samba_b")!!.prog.resolve(PitchClass.C).map { it.symbol })
         assertEquals(listOf("quadradinho_maj", "sou_mais_o_samba_a", "sou_mais_o_samba_b"),
             CavaqSequences.ALL.take(3).map { it.id })

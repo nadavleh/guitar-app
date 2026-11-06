@@ -23,3 +23,4 @@ export * from "./chordDecomposition";
 export * from "./rhythmUnits";
 export * from "./rhythmPhrases";
 export * from "./carMode";
+export * from "./cavaqForms";

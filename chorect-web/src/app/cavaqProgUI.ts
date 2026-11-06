@@ -6,13 +6,15 @@ import { CavaqProgState } from "./cavaqProgState";
 import { FretboardCanvas } from "./fretboardCanvas";
 import { shapeMarks } from "./marks";
 import { el, btn, valueSlider, labelSm, songLinkRow } from "./dom";
-import { CAVAQ_SEQUENCES, noteAt, cavaqSongsForSequence } from "../theory";
+import { CAVAQ_SEQUENCES, noteAt, cavaqSongsForSequence, CAVAQ_FORM_QUALITIES, cavaqBassLabel, spellPc, ChordShape } from "../theory";
 
 const DISPLAY_FRETS = 14;
 
 export class CavaqProgUI {
   private fbCanvasEl: HTMLCanvasElement | null = null;
   private fb: FretboardCanvas | null = null;
+  /** One canvas per form on the Shapes tab, reused across renders. */
+  private formCanvases: { el: HTMLCanvasElement; fb: FretboardCanvas }[] = [];
 
   // Re-render is driven by CavaqProgState's onChange dep (→ ui.ts scheduleRender),
   // so this view holds no rerender callback of its own.
@@ -31,6 +33,19 @@ export class CavaqProgUI {
     topbar.appendChild(el("span", { style: "flex:1" }));
     topbar.appendChild(songsBtn);
     screen.appendChild(topbar);
+
+    // ---- Tabs: the sequence looper, or the chord-forms ("cavaquinho CAGED") view ----
+    const tab = (label: string, on: boolean, f: () => void) => btn(label, f, on ? "btn primary" : "btn");
+    screen.appendChild(el("div", { class: "row", style: "gap:6px;margin-top:6px" }, [
+      tab("Sequences", !cp.showShapes, () => cp.setShowShapes(false)),
+      tab("Shapes", cp.showShapes, () => cp.setShowShapes(true)),
+    ]));
+    if (cp.showShapes) {
+      const after = this.renderShapes(screen);
+      parent.appendChild(screen);
+      after.forEach((f) => f());   // canvases get their data once they are in the DOM
+      return;
+    }
 
     // ---- Sequence picker ----
     const sel = el("select", { class: "btn", style: "flex:1;min-width:0" });
@@ -107,6 +122,63 @@ export class CavaqProgUI {
       numFrets: DISPLAY_FRETS, playOnTouchDown: false, mutedStrings: new Set<number>(),
       onTap: (pos) => s.audio.playNote(noteAt(this.cp.tuning, pos).midi, s.ringSustainMs),
     });
+  }
+
+  /** Shapes tab: pick a chord (root + type), see its movable forms — one per chord tone
+   *  in the bass, up the neck — each with its branch-outs (one string moved). */
+  private renderShapes(screen: HTMLElement): (() => void)[] {
+    const after: (() => void)[] = [];
+    const cp = this.cp, s = this.state;
+    const sel = el("select", { class: "btn", style: "flex:1;min-width:0" });
+    for (const q of CAVAQ_FORM_QUALITIES) {
+      const opt = el("option", { value: q }, [q === "" ? "major" : q]);
+      if (q === cp.formQuality) opt.setAttribute("selected", "");
+      sel.appendChild(opt);
+    }
+    sel.addEventListener("change", () => cp.chooseFormQuality(sel.value));
+    screen.appendChild(el("div", { class: "row", style: "gap:6px;align-items:center;margin-top:10px" }, [
+      btn("◀", () => cp.shiftFormRoot(-1), "btn"),
+      el("span", { style: "font-weight:700;font-size:18px;min-width:36px;text-align:center" }, [spellPc(cp.formRoot)]),
+      btn("▶", () => cp.shiftFormRoot(+1), "btn"),
+      sel,
+    ]));
+    const forms = cp.forms();
+    const name = spellPc(cp.formRoot) + cp.formQuality;
+    screen.appendChild(el("div", { class: "row", style: "gap:8px;align-items:center;margin-top:8px" }, [
+      el("span", { style: "font-weight:600;flex:1" }, [`${name} — ${forms.length} forms`]),
+      btn("Play all ▶", () => cp.playAllForms(), "btn primary"),
+    ]));
+    screen.appendChild(labelSm("One form per chord tone in the bass, low → high on the neck. Branch-outs move one string to another chord tone."));
+    if (forms.length === 0) { screen.appendChild(el("div", {}, ["No four-string form for this chord."])); return after; }
+    const fretsTxt = (sh: ChordShape) => sh.frets.map((f) => (f === null ? "x" : String(f))).join(" ");
+    forms.forEach((form, i) => {
+      const pick = cp.formPick.get(i) ?? 0;
+      const shape = cp.formShape(i)!;
+      screen.appendChild(el("div", {
+        style: `font-weight:700;margin-top:14px;${cp.formPlaying === i ? "color:var(--act)" : ""}`,
+      }, [`Form ${i + 1} · ${cavaqBassLabel(form.bass)} in the bass`]));
+      const chips = el("div", { class: "row", style: "flex-wrap:wrap;gap:6px;margin-top:4px" });
+      chips.appendChild(btn(`Main  ${fretsTxt(form.shape)}`, () => cp.pickForm(i, 0), pick === 0 ? "btn primary" : "btn"));
+      form.branches.forEach((b, k) => {
+        const bass = (b.templateName ?? "").replace(" in the bass", "");
+        chips.appendChild(btn(`${bass} bass  ${fretsTxt(b)}`, () => cp.pickForm(i, k + 1), pick === k + 1 ? "btn primary" : "btn"));
+      });
+      screen.appendChild(chips);
+      if (!this.formCanvases[i]) {
+        const c = el("canvas", { class: "fretboard" }) as HTMLCanvasElement;
+        this.formCanvases[i] = { el: c, fb: new FretboardCanvas(c) };
+      }
+      const { el: canvas, fb } = this.formCanvases[i];
+      const wrap = el("div", { style: "height:150px;position:relative;margin:6px 0" });
+      wrap.appendChild(canvas);
+      screen.appendChild(wrap);
+      after.push(() => fb.setData({
+        tuning: cp.tuning, marks: shapeMarks(shape, s.labelMode), selectedPosition: null, leftHanded: s.leftHanded,
+        numFrets: DISPLAY_FRETS, playOnTouchDown: false, mutedStrings: new Set<number>(),
+        onTap: (pos) => s.audio.playNote(noteAt(cp.tuning, pos).midi, s.ringSustainMs),
+      }));
+    });
+    return after;
   }
 
   /** Popup of curated samba songs whose functional family matches the current sequence. */
