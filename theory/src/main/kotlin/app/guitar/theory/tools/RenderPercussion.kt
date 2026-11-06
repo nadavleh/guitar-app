@@ -1,6 +1,7 @@
 package app.guitar.theory.tools
 
 import app.guitar.theory.PercussionBuiltins
+import app.guitar.theory.PercussionCatalog
 import app.guitar.theory.PercussionPattern
 import app.guitar.theory.PercussionRender
 import app.guitar.theory.SwingModel
