@@ -17,7 +17,8 @@ export class MicInput {
    *  permission denial or any error. */
   async start(onSamples: (samples: Float32Array) => void): Promise<boolean> {
     const gen = ++this.generation;
-    let stream: MediaStream | null = null;
+    // `as` keeps TS from narrowing the initial null into the catch block.
+    let stream = null as MediaStream | null;
     const stale = () => {
       if (gen === this.generation) return false;
       if (stream) for (const t of stream.getTracks()) t.stop();
