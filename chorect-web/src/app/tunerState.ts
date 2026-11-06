@@ -17,6 +17,7 @@ export class TunerState {
   private detector = new PitchDetector(this.ctx.sampleRate);
   private smoothing: [number, number][] = [];
   private lockedUntilMs = 0;
+  private startToken = 0;
 
   constructor(private ctx: AudioContext, private a4Provider: () => number, private onUpdate: () => void) {
     this.mic = new MicInput(ctx);
@@ -24,15 +25,21 @@ export class TunerState {
 
   async start(): Promise<boolean> {
     if (this.capturing) return true;
+    const token = ++this.startToken;
     const ok = await this.mic.start((samples) => this.onSamples(samples));
+    // A newer start()/stop() superseded this one: it owns `capturing` now.
+    if (token !== this.startToken) return ok;
     this.capturing = ok;
     this.onUpdate();
     return ok;
   }
 
   stop(): void {
-    if (!this.capturing) return;
+    // Always stop the mic: a start() still awaiting getUserMedia has capturing=false,
+    // and MicInput.stop() is what makes that pending start release the stream.
+    this.startToken++;
     this.mic.stop();
+    if (!this.capturing) return;
     this.capturing = false;
     this.freqHz = null;
     this.midi = null;

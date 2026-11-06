@@ -7,18 +7,31 @@ export class MicInput {
   private source: MediaStreamAudioSourceNode | null = null;
   private processor: ScriptProcessorNode | null = null;
   private sink: GainNode | null = null;
+  /** Bumped by every start()/stop(): a start whose awaits finish after a newer
+   *  start/stop sees a stale generation and releases what it acquired. */
+  private generation = 0;
 
   constructor(private readonly ctx: AudioContext, private readonly bufferSize = 2048) {}
 
   /** Begin capture, invoking [onSamples] with each mono window. Resolves false on
    *  permission denial or any error. */
   async start(onSamples: (samples: Float32Array) => void): Promise<boolean> {
+    const gen = ++this.generation;
+    let stream: MediaStream | null = null;
+    const stale = () => {
+      if (gen === this.generation) return false;
+      if (stream) for (const t of stream.getTracks()) t.stop();
+      return true;
+    };
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
+      if (stale()) return false;
       if (this.ctx.state === "suspended") await this.ctx.resume();
-      this.source = this.ctx.createMediaStreamSource(this.stream);
+      if (stale()) return false;
+      this.stream = stream;
+      this.source = this.ctx.createMediaStreamSource(stream);
       this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 1);
       this.processor.onaudioprocess = (e) => {
         // Copy: the underlying buffer is reused by the audio thread.
@@ -32,12 +45,15 @@ export class MicInput {
       this.sink.connect(this.ctx.destination);
       return true;
     } catch {
+      if (stale()) return false;
+      if (stream && this.stream !== stream) for (const t of stream.getTracks()) t.stop();
       this.stop();
       return false;
     }
   }
 
   stop(): void {
+    this.generation++;
     if (this.processor) {
       this.processor.onaudioprocess = null;
       this.processor.disconnect();
