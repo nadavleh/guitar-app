@@ -9,7 +9,7 @@ class MixVoice(
     var gain: Float = 1f,
     delayFrames: Int = 0,
     val envelope: AmpEnvelope = AmpEnvelope(48000, attackMs = 0.0, releaseMs = 0.0),
-    var pan: Double = 0.0,
+    pan: Double = 0.0,
     var reverbSend: Float = 0f,
     /** Self-choke group: adding a new voice with the same key schedules this
      *  voice's release at the new one's start (see [VoiceMixer.addAndCap]). */
@@ -20,6 +20,24 @@ class MixVoice(
      *  other; the caller damps the whole group explicitly when the next chord lands. */
     val group: String? = null,
 ) {
+    /** Constant-power L/R gains for [pan], cached so the audio thread doesn't
+     *  allocate a Pair per voice per block. Recomputed whenever [pan] is set. */
+    var panGainL: Float = 0f
+        private set
+    var panGainR: Float = 0f
+        private set
+
+    var pan: Double = pan
+        set(value) { field = value; updatePanGains() }
+
+    init { updatePanGains() }
+
+    private fun updatePanGains() {
+        val (l, r) = Panner.gains(pan)
+        panGainL = l
+        panGainR = r
+    }
+
     /** Frames still to wait before this voice starts sounding (mixer clock). */
     var remainingDelay: Int = delayFrames.coerceAtLeast(0)
 
@@ -121,7 +139,8 @@ class VoiceMixer(val sampleRate: Int) {
             }
             var produced = false
             var peak = 0f
-            val (gL, gR) = Panner.gains(v.pan)
+            val gL = v.panGainL
+            val gR = v.panGainR
             val gain = v.gain
             val send = v.reverbSend
             while (i < count) {

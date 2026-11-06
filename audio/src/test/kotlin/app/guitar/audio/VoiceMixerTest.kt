@@ -44,6 +44,21 @@ class VoiceMixerTest {
     }
 
     @Test
+    fun `changing pan after creation updates the cached gains`() {
+        val v = MixVoice(BufferSource(floatArrayOf(0.8f, 0.8f)))
+        assertEquals(centerGain, v.panGainL, 1e-6f)
+        v.pan = 1.0
+        val (l, r) = Panner.gains(1.0)
+        assertEquals(l, v.panGainL, 0f)
+        assertEquals(r, v.panGainR, 0f)
+        val m = VoiceMixer(sampleRate = 48000)
+        m.add(v)
+        val bl = FloatArray(1); val br = FloatArray(1)
+        m.mixBlock(bl, br, 1)
+        assertTrue(bl[0] < 0.01f && br[0] > 0.79f, "L=${bl[0]} R=${br[0]}")
+    }
+
+    @Test
     fun `finished voices are removed`() {
         val m = VoiceMixer(sampleRate = 48000)
         m.add(MixVoice(BufferSource(floatArrayOf(0.5f))))

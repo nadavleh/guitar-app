@@ -153,7 +153,9 @@ fun FretboardView(
      *  the fret that sounded (drives the ripple), or null for silence (muted). */
     onStrumPluck: (stringIndex: Int) -> Int? = { null },
 ) {
-    val measurer = rememberTextMeasurer()
+    // Every fret/note label is a distinct string: the default 8-entry layout cache
+    // thrashed on each frame.
+    val measurer = rememberTextMeasurer(cacheSize = 64)
     // Board art follows the theme: dark walnut (original) vs cream maple (light).
     val board = if (LocalSignal.current.isDark) BoardColors.Dark else BoardColors.Light
     // Pluck feedback color = the live accent ("act").
