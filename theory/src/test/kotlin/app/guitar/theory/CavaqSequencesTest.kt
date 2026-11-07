@@ -30,7 +30,7 @@ class CavaqSequencesTest {
 
     @Test fun `sou mais o samba extended A and B resolve and voice on the cavaquinho`() {
         val a = CavaqSequences.byId("sou_mais_o_samba_a_ext")!!.prog.resolve(PitchClass.C).map { it.symbol }
-        assertEquals(listOf("Dm9", "G13", "C6add9", "A7b9", "Dm9", "G7b9", "C6add9"), a)
+        assertEquals(listOf("Dm9", "G13", "C6add9", "A7b9", "Dm9", "G7b9", "C6add9", "G7"), a)
         val b = CavaqSequences.byId("sou_mais_o_samba_b_ext")!!.prog.resolve(PitchClass.C).map { it.symbol }
         assertEquals(listOf("C6add9", "Dm9", "G13", "C6", "Cdim7", "Dm9"), b)
         val cavaq = Tunings.cavaqDgbd

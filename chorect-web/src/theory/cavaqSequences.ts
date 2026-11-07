@@ -28,7 +28,7 @@ export const CAVAQ_SEQUENCES: CavaqSequence[] = [
   // Sou Mais o Samba A / B spiced up (extended) — Nadav's ChatGPT cavaquinho reharmonization.
   { ...seq("sou_mais_o_samba_a_ext", "Sou Mais o Samba A (Estendido)", "Sou Mais o Samba A (Extended)", TrainingMode.Major,
     [ac(2, "m9", "ii9"), ac(7, "13", "V13"), ac(0, "6add9", "I6/9"), ac(9, "7b9", "VI7b9"),
-     ac(2, "m9", "ii9"), ac(7, "7b9", "V7b9"), ac(0, "6add9", "I6/9")]), defaultKey: 0 },
+     ac(2, "m9", "ii9"), ac(7, "7b9", "V7b9"), ac(0, "6add9", "I6/9"), ac(7, "7", "V7")]), defaultKey: 0 },
   { ...seq("sou_mais_o_samba_b_ext", "Sou Mais o Samba B (Estendido)", "Sou Mais o Samba B (Extended)", TrainingMode.Major,
     [ac(0, "6add9", "I6/9"), ac(2, "m9", "ii9"), ac(7, "13", "V13"), ac(0, "6", "I6"),
      ac(0, "dim7", "I°7"), ac(2, "m9", "ii9")]), defaultKey: 0 },

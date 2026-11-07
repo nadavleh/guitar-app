@@ -13,7 +13,7 @@ export function run(): void {
     const syms = (id: string) => resolveNamed(cavaqSequenceById(id)!.prog, 0).map((c) => c.symbol);
     const a = syms("sou_mais_o_samba_a_ext");
     const b = syms("sou_mais_o_samba_b_ext");
-    check("cavaq: SoMiSo A extended resolves in C", a.join() === "Dm9,G13,C6add9,A7b9,Dm9,G7b9,C6add9");
+    check("cavaq: SoMiSo A extended resolves in C", a.join() === "Dm9,G13,C6add9,A7b9,Dm9,G7b9,C6add9,G7");
     check("cavaq: SoMiSo B extended resolves in C", b.join() === "C6add9,Dm9,G13,C6,Cdim7,Dm9");
     const pool = (sym: string) => {
       const [r, q] = parseChord(sym)!;

@@ -41,11 +41,11 @@ object CavaqSequences {
         // Sou Mais o Samba, part B — I ii V7 I (C Dm G7 C).
         seq("sou_mais_o_samba_b", "Sou Mais o Samba B", "Sou Mais o Samba B", TrainingMode.Major,
             ac(0, "", "I"), ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I")).inKey(PitchClass.C),
-        // Sou Mais o Samba, part A spiced up (extended) — ii9 V13 I6/9 VI7b9 ii9 V7b9 I6/9
-        // (Dm9 G13 C6/9 A7b9 Dm9 G7b9 C6/9), from Nadav's ChatGPT cavaquinho reharmonization.
+        // Sou Mais o Samba, part A spiced up (extended) — ii9 V13 I6/9 VI7b9 ii9 V7b9 I6/9 V7
+        // (Dm9 G13 C6/9 A7b9 Dm9 G7b9 C6/9 G7), from Nadav's ChatGPT cavaquinho reharmonization.
         seq("sou_mais_o_samba_a_ext", "Sou Mais o Samba A (Estendido)", "Sou Mais o Samba A (Extended)", TrainingMode.Major,
             ac(2, "m9", "ii9"), ac(7, "13", "V13"), ac(0, "6add9", "I6/9"), ac(9, "7b9", "VI7b9"),
-            ac(2, "m9", "ii9"), ac(7, "7b9", "V7b9"), ac(0, "6add9", "I6/9")).inKey(PitchClass.C),
+            ac(2, "m9", "ii9"), ac(7, "7b9", "V7b9"), ac(0, "6add9", "I6/9"), ac(7, "7", "V7")).inKey(PitchClass.C),
         // Sou Mais o Samba, part B extended — I6/9 ii9 V13 I6 I°7 ii9
         // (C6/9 Dm9 G13 C6 Cdim7 Dm9): the C Cdim7 Dm chromatic passing move.
         seq("sou_mais_o_samba_b_ext", "Sou Mais o Samba B (Estendido)", "Sou Mais o Samba B (Extended)", TrainingMode.Major,
