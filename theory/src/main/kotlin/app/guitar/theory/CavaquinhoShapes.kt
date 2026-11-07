@@ -228,10 +228,18 @@ fun cavaquinhoVoicingPool(
     val fifth = PitchClass((root.value + 7) % 12)
     val fourNote = chordPcs.size >= 4
     val hasPerfectFifth = fifth in chordPcs
+    // Extended chords (a 9th/11th/13th above the octave): the perfect 5th is optional —
+    // it may sound even where the library omits it (Dm9 rootless F A C E), and a rootless
+    // grip needs only the tones above root and 5th (G13 rootless F A B E = b7 9 3 13).
+    // Not when the chord alters the 5th (b5 / #5): then the P5 would be a wrong note.
+    val alteredFifth = PitchClass((root.value + 6) % 12) in chordPcs || PitchClass((root.value + 8) % 12) in chordPcs
+    val extended = quality.intervals.any { it.semitones > 12 } && !alteredFifth
+    val allowedPcs = if (extended) chordPcs + fifth else chordPcs
+    val rootlessNeeds = if (extended) chordPcs - root - fifth else chordPcs - root
     val name = "${NoteSpeller.spell(root)}${quality.symbol}"
 
     val candidates: List<List<Int>> = (0 until tuning.stringCount).map { s ->
-        (0..maxFret).filter { f -> Fretboard.noteAt(tuning, FretPosition(s, f)).pitchClass in chordPcs }
+        (0..maxFret).filter { f -> Fretboard.noteAt(tuning, FretPosition(s, f)).pitchClass in allowedPcs }
     }
     if (candidates.any { it.isEmpty() }) return emptyList()
 
@@ -250,7 +258,7 @@ fun cavaquinhoVoicingPool(
         val intervals = notes.map { ((it.pitchClass.value - root.value) % 12 + 12) % 12 }
         val pos = fretted.minOrNull() ?: 0
         val isComplete = playedPcs.containsAll(chordPcs)
-        val isRootless = fourNote && root !in playedPcs && playedPcs.containsAll(chordPcs - root)
+        val isRootless = fourNote && root !in playedPcs && playedPcs.containsAll(rootlessNeeds)
         val isShell = fourNote && hasPerfectFifth && root in playedPcs &&
             fifth !in playedPcs && playedPcs.containsAll(chordPcs - fifth)
         val (bucket, kind) = when {

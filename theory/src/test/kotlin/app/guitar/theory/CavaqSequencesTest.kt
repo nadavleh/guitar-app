@@ -28,6 +28,26 @@ class CavaqSequencesTest {
         assertEquals(null, CavaqSequences.byId("quadradinho_maj")!!.defaultKey)
     }
 
+    @Test fun `sou mais o samba extended A and B resolve and voice on the cavaquinho`() {
+        val a = CavaqSequences.byId("sou_mais_o_samba_a_ext")!!.prog.resolve(PitchClass.C).map { it.symbol }
+        assertEquals(listOf("Dm9", "G13", "C6add9", "A7b9", "Dm9", "G7b9", "C6add9"), a)
+        val b = CavaqSequences.byId("sou_mais_o_samba_b_ext")!!.prog.resolve(PitchClass.C).map { it.symbol }
+        assertEquals(listOf("C6add9", "Dm9", "G13", "C6", "Cdim7", "Dm9"), b)
+        val cavaq = Tunings.cavaqDgbd
+        fun pool(sym: String): List<List<Int?>> {
+            val (r, q) = ChordLibrary.parse(sym)!!
+            return cavaquinhoVoicingPool(r, q, cavaq, maxFret = 14).map { it.frets }
+        }
+        for (sym in (a + b).toSet()) assertTrue(pool(sym).isNotEmpty(), "no cavaquinho grip for $sym")
+        // The grips from the ChatGPT chart are all in the pool.
+        assertTrue(listOf<Int?>(3, 2, 1, 2) in pool("Dm9"))   // F A C E, rootless
+        assertTrue(listOf<Int?>(3, 2, 0, 2) in pool("G13"))   // F A B E, rootless
+        assertTrue(listOf<Int?>(2, 2, 1, 0) in pool("C6add9")) // E A C D, no 5th
+        assertTrue(listOf<Int?>(5, 3, 2, 2) in pool("A7b9"))  // G Bb C# E, rootless
+        assertTrue(listOf<Int?>(3, 1, 0, 0) in pool("G7b9"))  // F Ab B D, rootless
+        assertTrue(listOf<Int?>(2, 2, 1, 2) in pool("C6"))
+    }
+
     @Test fun `basic minor resolves to Cm C7 Fm G7 in C`() {
         val chords = CavaqSequences.byId("basic_min")!!.prog.resolve(PitchClass.C).map { it.symbol }
         assertEquals(listOf("Cm", "C7", "Fm", "G7"), chords)

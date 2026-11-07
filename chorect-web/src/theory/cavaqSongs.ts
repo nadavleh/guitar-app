@@ -42,6 +42,8 @@ const SEQUENCE_FAMILIES: Record<string, string[]> = {
   quadradinho_maj: ["ii-V-I", "I-vi-ii-V"],
   sou_mais_o_samba_a: ["ii-V-I", "I-vi-ii-V"],
   sou_mais_o_samba_b: ["ii-V-I"],
+  sou_mais_o_samba_a_ext: ["ii-V-I", "I-vi-ii-V"],
+  sou_mais_o_samba_b_ext: ["ii-V-I"],
   basic_min: ["minor-cadence"],
   medio_maj: ["ii-V-I", "circle"],
   medio_min: ["minor-cadence", "circle"],

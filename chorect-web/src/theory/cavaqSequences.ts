@@ -25,6 +25,13 @@ export const CAVAQ_SEQUENCES: CavaqSequence[] = [
      ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I"), ac(7, "7", "V7")]), defaultKey: 0 },
   { ...seq("sou_mais_o_samba_b", "Sou Mais o Samba B", "Sou Mais o Samba B", TrainingMode.Major,
     [ac(0, "", "I"), ac(2, "m", "ii"), ac(7, "7", "V7"), ac(0, "", "I")]), defaultKey: 0 },
+  // Sou Mais o Samba A / B spiced up (extended) — Nadav's ChatGPT cavaquinho reharmonization.
+  { ...seq("sou_mais_o_samba_a_ext", "Sou Mais o Samba A (Estendido)", "Sou Mais o Samba A (Extended)", TrainingMode.Major,
+    [ac(2, "m9", "ii9"), ac(7, "13", "V13"), ac(0, "6add9", "I6/9"), ac(9, "7b9", "VI7b9"),
+     ac(2, "m9", "ii9"), ac(7, "7b9", "V7b9"), ac(0, "6add9", "I6/9")]), defaultKey: 0 },
+  { ...seq("sou_mais_o_samba_b_ext", "Sou Mais o Samba B (Estendido)", "Sou Mais o Samba B (Extended)", TrainingMode.Major,
+    [ac(0, "6add9", "I6/9"), ac(2, "m9", "ii9"), ac(7, "13", "V13"), ac(0, "6", "I6"),
+     ac(0, "dim7", "I°7"), ac(2, "m9", "ii9")]), defaultKey: 0 },
   seq("basic_min", "Sequência Menor (Básico)", "Basic Minor", TrainingMode.Minor,
     [ac(0, "m", "i"), ac(0, "7", "I7"), ac(5, "m", "iv"), ac(7, "7", "V7")]),
   seq("medio_maj", "Sequência Médio (Maior)", "Extended Major (Médio)", TrainingMode.Major,

@@ -682,6 +682,15 @@ export function cavaquinhoVoicingPool(
   const fifth = pcPlus(root, 7);
   const fourNote = chordPcs.size >= 4;
   const hasP5 = chordPcs.has(fifth);
+  // Extended chords (a 9th/11th/13th above the octave): the perfect 5th is optional —
+  // it may sound even where the library omits it (Dm9 rootless F A C E), and a rootless
+  // grip needs only the tones above root and 5th (G13 rootless F A B E = b7 9 3 13).
+  // Not when the chord alters the 5th (b5 / #5): then the P5 would be a wrong note.
+  const alteredFifth = chordPcs.has(pcPlus(root, 6)) || chordPcs.has(pcPlus(root, 8));
+  const extended = quality.intervals.some((iv) => iv > 12) && !alteredFifth;
+  const allowedPcs = new Set(chordPcs);
+  if (extended) allowedPcs.add(fifth);
+  const rootlessNeeds = [...chordPcs].filter((pc) => pc !== root && !(extended && pc === fifth));
   const name = `${spellPc(root)}${quality.symbol}`;
   const n = stringCount(tuning);
 
@@ -689,7 +698,7 @@ export function cavaquinhoVoicingPool(
   for (let s = 0; s < n; s++) {
     const list: number[] = [];
     for (let f = 0; f <= maxFret; f++) {
-      if (chordPcs.has(midiPitchClass(noteAt(tuning, fp(s, f)).midi))) list.push(f);
+      if (allowedPcs.has(midiPitchClass(noteAt(tuning, fp(s, f)).midi))) list.push(f);
     }
     if (list.length === 0) return [];
     candidates.push(list);
@@ -711,7 +720,7 @@ export function cavaquinhoVoicingPool(
     const pos = fretted.length ? Math.min(...fretted) : 0;
     const chordArr = [...chordPcs];
     const isComplete = chordArr.every((pc) => playedPcs.has(pc));
-    const isRootless = fourNote && !playedPcs.has(root) && chordArr.every((pc) => pc === root || playedPcs.has(pc));
+    const isRootless = fourNote && !playedPcs.has(root) && rootlessNeeds.every((pc) => playedPcs.has(pc));
     const isShell = fourNote && hasP5 && playedPcs.has(root) && !playedPcs.has(fifth) &&
       chordArr.every((pc) => pc === fifth || playedPcs.has(pc));
     let bucket: Map<string, ChordShape>;

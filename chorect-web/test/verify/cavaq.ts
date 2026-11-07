@@ -3,8 +3,28 @@
 
 import { QUALITIES, cavaqFormsFor, cavaqDropOpenStringCopies, cavaqDgbd, ChordShape as CShape } from "../../src/theory";
 import { check } from "./harness";
+import { cavaqSequenceById } from "../../src/theory/cavaqSequences";
+import { resolveNamed, parseChord, cavaquinhoVoicingPool } from "../../src/theory";
 
 export function run(): void {
+
+  // --- Sou Mais o Samba extended A / B (mirror of CavaqSequencesTest) ---
+  {
+    const syms = (id: string) => resolveNamed(cavaqSequenceById(id)!.prog, 0).map((c) => c.symbol);
+    const a = syms("sou_mais_o_samba_a_ext");
+    const b = syms("sou_mais_o_samba_b_ext");
+    check("cavaq: SoMiSo A extended resolves in C", a.join() === "Dm9,G13,C6add9,A7b9,Dm9,G7b9,C6add9");
+    check("cavaq: SoMiSo B extended resolves in C", b.join() === "C6add9,Dm9,G13,C6,Cdim7,Dm9");
+    const pool = (sym: string) => {
+      const [r, q] = parseChord(sym)!;
+      return cavaquinhoVoicingPool(r, q, cavaqDgbd, 14).map((s) => s.frets.join());
+    };
+    check("cavaq: every SoMiSo extended chord has a grip", [...a, ...b].every((s) => pool(s).length > 0));
+    check("cavaq: ChatGPT chart grips are in the pool",
+      pool("Dm9").includes("3,2,1,2") && pool("G13").includes("3,2,0,2") &&
+      pool("C6add9").includes("2,2,1,0") && pool("A7b9").includes("5,3,2,2") &&
+      pool("G7b9").includes("3,1,0,0") && pool("C6").includes("2,2,1,2"));
+  }
 
   // --- Cavaquinho forms (mirror of CavaqFormsTest) ---
   {

@@ -49,6 +49,8 @@ object CavaqSongs {
         "quadradinho_maj" to setOf("ii-V-I", "I-vi-ii-V"),
         "sou_mais_o_samba_a" to setOf("ii-V-I", "I-vi-ii-V"),
         "sou_mais_o_samba_b" to setOf("ii-V-I"),
+        "sou_mais_o_samba_a_ext" to setOf("ii-V-I", "I-vi-ii-V"),
+        "sou_mais_o_samba_b_ext" to setOf("ii-V-I"),
         "basic_min" to setOf("minor-cadence"),
         "medio_maj" to setOf("ii-V-I", "circle"),
         "medio_min" to setOf("minor-cadence", "circle"),
