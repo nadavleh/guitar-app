@@ -106,7 +106,7 @@ class EarTrainingState(
     }
     // ---------- Progression trainer ----------
 
-    var progSubMode by mutableStateOf(EarSubMode.Intervals)   // opens on descending major (diatonic) intervals
+    var progSubMode by mutableStateOf(EarSubMode.Intervals)   // opens on the descending major+minor interval challenge
 
     /** Practice (free play) vs Challenge (scored rounds) — applies to the active tab. */
     var earMode by mutableStateOf(EarMode.Challenge)
@@ -114,8 +114,8 @@ class EarTrainingState(
     /** Switch tabs: reset to Practice and stop any audio so modes don't bleed together. */
     fun switchTab(sub: EarSubMode) {
         progSubMode = sub
-        // Progressions land on the scored Challenge; every other tab on Practice.
-        earMode = if (sub == EarSubMode.Progression) EarMode.Challenge else EarMode.Practice
+        // Progressions and Intervals land on the scored Challenge; every other tab on Practice.
+        earMode = if (sub == EarSubMode.Progression || sub == EarSubMode.Intervals) EarMode.Challenge else EarMode.Practice
         stopLoop()
         stopDrill()
         libraryStop()   // Workout's "Hear the loop" must not play on over other tabs
@@ -626,16 +626,37 @@ class EarTrainingState(
         val i = challengeIndex
         if (i < 0 || i >= challengeTotal) return
         if (i in challengeMistakesRecorded) return
-        if (challengeAnswers.getOrNull(i) == false) {
-            challengeMistakesRecorded.add(i)
-            challengeLog.getOrNull(i)?.let { q ->
-                val key = EarTraining.progressionKey(q.prog)
-                onProgressionMistake(key)
-                // Save the rendition too: the octaves are often the whole difficulty, and
-                // they are what a regenerated drill voicing throws away. This runs on Next,
-                // while the current progression state IS still this question's.
-                currentTake(q)?.encode()?.let { onProgressionMistakeTake(key, it) }
-            }
+        if (challengeAnswers.getOrNull(i) == false) recordCurrentMistake()
+    }
+
+    /** Bumped whenever [challengeMistakesRecorded] changes (a plain set isn't observable). */
+    private var challengeMarkTick by mutableStateOf(0)
+
+    /** The current question is already on the Drill list from this round. */
+    val challengeCurrentMarked: Boolean
+        get() { challengeMarkTick; return challengeIndex in challengeMistakesRecorded }
+
+    /** "Mark wrong": put the current progression on the Drill list even though every box
+     *  ends up correct — for when it took several tries to get there. The score is not
+     *  touched; only the mistake tracking (count + exact take). Diatonic only, like misses. */
+    fun markCurrentChallengeWrong() {
+        if (specialProgMode || !challengeActive) return
+        val i = challengeIndex
+        if (i < 0 || i >= challengeTotal || i in challengeMistakesRecorded) return
+        recordCurrentMistake()
+    }
+
+    private fun recordCurrentMistake() {
+        val i = challengeIndex
+        challengeMistakesRecorded.add(i)
+        challengeMarkTick++
+        challengeLog.getOrNull(i)?.let { q ->
+            val key = EarTraining.progressionKey(q.prog)
+            onProgressionMistake(key)
+            // Save the rendition too: the octaves are often the whole difficulty, and
+            // they are what a regenerated drill voicing throws away. This runs on Next,
+            // while the current progression state IS still this question's.
+            currentTake(q)?.encode()?.let { onProgressionMistakeTake(key, it) }
         }
     }
 
@@ -950,6 +971,7 @@ class EarTrainingState(
         challengeStartMs = System.currentTimeMillis()
         challengeDurationMs = 0L
         challengeMistakesRecorded.clear()
+        challengeMarkTick++
         // Fresh question history; generate the first question honoring current settings.
         challengeLog.clear()
         val q = freshChallengeQuestion()
@@ -2486,7 +2508,7 @@ class EarTrainingState(
     /** Scale the diatonic draw uses — also picks the I–V–I vs i–V–i cadence. */
     var intervalMode by mutableStateOf(TrainingMode.Major)
     /** Draw from major AND minor together: the boxes show 3 and ♭3, 6 and ♭6, 7 and ♭7. */
-    var intervalBoth by mutableStateOf(false)
+    var intervalBoth by mutableStateOf(true)
     /** Target STEPS (semitones above the tonic, 0..12) the diatonic draw may pick. Only
      *  the steps shown for the current scale count; the tritone (6) is off by default. */
     var intervalSteps by mutableStateOf(IntervalTrainer.DEFAULT_STEPS)

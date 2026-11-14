@@ -1423,6 +1423,14 @@ export class EarTrainingUI {
     nextBtn.style.flex = "1"; tintGreen(nextBtn);
     parent.appendChild(el("div", { class: "v-gap-8" }));
     parent.appendChild(el("div", { class: "row", style: "gap:8px" }, [prevBtn, nextBtn]));
+    // "Mark wrong": got there only after several tries → still send it to the Drill list.
+    if (!ear.specialProgMode) {
+      const marked = ear.challengeCurrentMarked;
+      const markBtn = btn(marked ? "✓ On the Drill list" : "✗ Mark wrong (add to Drill)", () => ear.markCurrentChallengeWrong(), "btn");
+      markBtn.style.width = "100%"; markBtn.style.marginTop = "4px";
+      if (marked) markBtn.disabled = true;
+      parent.appendChild(markBtn);
+    }
     parent.appendChild(el("div", { class: "et-muted", style: "margin-top:2px" }, ["Unanswered bars count as correct."]));
 
     parent.appendChild(el("div", { class: "v-gap-12" }));

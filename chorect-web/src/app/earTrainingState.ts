@@ -102,8 +102,8 @@ export class EarTrainingState {
   private progShapes: (ChordShape | null)[] = [];
   private progShapesSig = "";
 
-  progSubMode = EarSubMode.Progression;
-  earMode = EarMode.Challenge;   // opens in Progression Challenge by default
+  progSubMode = EarSubMode.Intervals;   // opens on the descending major+minor interval challenge
+  earMode = EarMode.Challenge;   // opens in Challenge by default
 
   includeMajor = true;
   includeMinor = true;
@@ -163,8 +163,8 @@ export class EarTrainingState {
 
   switchTab(sub: EarSubMode) {
     this.progSubMode = sub;
-    // Progressions land on the scored Challenge; every other tab on Practice.
-    this.earMode = sub === EarSubMode.Progression ? EarMode.Challenge : EarMode.Practice;
+    // Progressions and Intervals land on the scored Challenge; every other tab on Practice.
+    this.earMode = sub === EarSubMode.Progression || sub === EarSubMode.Intervals ? EarMode.Challenge : EarMode.Practice;
     this.stopLoop();
     this.stopDrill();
     this.libraryStop();   // Workout's "Hear the loop" must not play on over other tabs
@@ -540,19 +540,36 @@ export class EarTrainingState {
     const i = this.challengeIndex;
     if (i < 0 || i >= this.challengeTotal) return;
     if (this.challengeMistakesRecorded.has(i)) return;
-    if (this.challengeAnswers[i] === false) {
-      this.challengeMistakesRecorded.add(i);
-      const q = this.challengeLog[i];
-      if (q) {
-        const key = progressionKey(q.prog);
-        this.deps.onProgressionMistake?.(key);
-        // Save the rendition too: the octaves are often the whole difficulty, and they are
-        // what a regenerated drill voicing throws away. This runs on Next, while the
-        // current progression state IS still this question's.
-        const take = this.currentTake(q);
-        const enc = take ? encodeMissedTake(take) : null;
-        if (enc) this.deps.onProgressionMistakeTake?.(key, enc);
-      }
+    if (this.challengeAnswers[i] === false) this.recordCurrentMistake();
+  }
+
+  /** The current question is already on the Drill list from this round. */
+  get challengeCurrentMarked(): boolean { return this.challengeMistakesRecorded.has(this.challengeIndex); }
+
+  /** "Mark wrong": put the current progression on the Drill list even though every box
+   *  ends up correct — for when it took several tries to get there. The score is not
+   *  touched; only the mistake tracking (count + exact take). Diatonic only, like misses. */
+  markCurrentChallengeWrong() {
+    if (this.specialProgMode || !this.challengeActive) return;
+    const i = this.challengeIndex;
+    if (i < 0 || i >= this.challengeTotal || this.challengeMistakesRecorded.has(i)) return;
+    this.recordCurrentMistake();
+    this.notify();
+  }
+
+  private recordCurrentMistake() {
+    const i = this.challengeIndex;
+    this.challengeMistakesRecorded.add(i);
+    const q = this.challengeLog[i];
+    if (q) {
+      const key = progressionKey(q.prog);
+      this.deps.onProgressionMistake?.(key);
+      // Save the rendition too: the octaves are often the whole difficulty, and they are
+      // what a regenerated drill voicing throws away. This runs on Next, while the
+      // current progression state IS still this question's.
+      const take = this.currentTake(q);
+      const enc = take ? encodeMissedTake(take) : null;
+      if (enc) this.deps.onProgressionMistakeTake?.(key, enc);
     }
   }
 
@@ -2171,7 +2188,7 @@ export class EarTrainingState {
   intervalMode = TrainingMode.Major;
   setIntervalMode(m: TrainingMode) { this.intervalMode = m; this.intervalBoth = false; this.notify(); }
   /** Draw from major AND minor together: the boxes show 3 and ♭3, 6 and ♭6, 7 and ♭7. */
-  intervalBoth = false;
+  intervalBoth = true;
   setIntervalBoth(v: boolean) { this.intervalBoth = v; this.notify(); }
   /** Target STEPS (semitones above the tonic, 0..12) the diatonic draw may pick. Only the
    *  steps shown for the current scale count; the tritone (6) is off by default. */

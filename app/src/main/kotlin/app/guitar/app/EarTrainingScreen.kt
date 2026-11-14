@@ -1749,6 +1749,15 @@ private fun ProgressionChallengeView(state: AppState, ear: EarTrainingState) {
                 modifier = Modifier.weight(1f),
             ) { Text(if (ear.challengeIndex == ear.challengeTotal - 1) "See score →" else "Next →") }
         }
+        // "Mark wrong": got there only after several tries → still send it to the Drill list.
+        if (!ear.specialProgMode) {
+            val marked = ear.challengeCurrentMarked
+            OutlinedButton(
+                onClick = { ear.markCurrentChallengeWrong() },
+                enabled = !marked,
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            ) { Text(if (marked) "✓ On the Drill list" else "✗ Mark wrong (add to Drill)") }
+        }
         Text(
             "Unanswered bars count as correct.",
             style = MaterialTheme.typography.labelSmall,
