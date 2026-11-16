@@ -2762,8 +2762,9 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
     // "♪ Song refs" — the interval→song reference sheet (same content as the Theory tab).
     var refsOpen by remember { mutableStateOf(false) }
     if (refsOpen) IntervalRefsDialog(ear, anchorMidi = anchor,
-        initialSemitones = if (ear.intervalChActive) ear.intervalSemitones else 1,
-        initialAscending = if (ear.intervalChActive) ear.intervalAscending else true,
+        // Only after answering may it open on the question's interval — before, that is a spoiler.
+        initialSemitones = if (ear.intervalChActive && ear.intervalChAnswered) ear.intervalSemitones else 1,
+        initialAscending = if (ear.intervalChActive && ear.intervalChAnswered) ear.intervalAscending else true,
         onDismiss = { refsOpen = false })
     // "♪ Songs for M3" — after answering, just the answered interval's songs.
     var songsFor by remember { mutableStateOf<Int?>(null) }

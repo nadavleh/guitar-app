@@ -193,7 +193,7 @@ internal fun IntervalSongsDialog(ear: EarTrainingState, semitones: Int, ascendin
     AlertDialog(
         onDismissRequest = { ear.stopIntervalPreview(); onDismiss() },
         confirmButton = { TextButton(onClick = { ear.stopIntervalPreview(); onDismiss() }) { Text("Close") } },
-        title = { Text("Songs: ${IntervalSongs.refFor(semitones, ascending)?.intervalLong ?: ""}") },
+        title = { DialogBackTitle("Songs: ${IntervalSongs.refFor(semitones, ascending)?.intervalLong ?: ""}") { ear.stopIntervalPreview(); onDismiss() } },
         text = {
             Column(modifier = Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
                 if (anchorMidi != null) {
@@ -206,6 +206,16 @@ internal fun IntervalSongsDialog(ear: EarTrainingState, semitones: Int, ascendin
     )
 }
 
+/** Dialog title with a "‹ Back" button in front, back to the trainer. */
+@Composable
+private fun DialogBackTitle(title: String, onBack: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        TextButton(onClick = onBack, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("‹ Back") }
+        Spacer(Modifier.width(6.dp))
+        Text(title, modifier = Modifier.weight(1f))
+    }
+}
+
 @Composable
 internal fun IntervalRefsDialog(ear: EarTrainingState, anchorMidi: Int? = null,
                                 initialSemitones: Int = 1, initialAscending: Boolean = true,
@@ -213,7 +223,7 @@ internal fun IntervalRefsDialog(ear: EarTrainingState, anchorMidi: Int? = null,
     AlertDialog(
         onDismissRequest = { ear.stopIntervalPreview(); onDismiss() },
         confirmButton = { TextButton(onClick = { ear.stopIntervalPreview(); onDismiss() }) { Text("Close") } },
-        title = { Text("Interval song references") },
+        title = { DialogBackTitle("Interval song references") { ear.stopIntervalPreview(); onDismiss() } },
         text = {
             Column(modifier = Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
                 IntervalRefsContent(ear, anchorMidi, initialSemitones, initialAscending)

@@ -2090,7 +2090,9 @@ export class EarTrainingUI {
     const ear = this.ear;
     const keyName = `${spellPc(ear.intervalKey)} ${ear.intervalKeyMode === TrainingMode.Major ? "major" : "minor"}`;
     const openRefs = () => {
-      if (ear.intervalChActive) selectIntervalRef(ear.intervalSemitones, ear.intervalAscending);
+      // Only after answering may it open on the question's interval — before, that is a spoiler.
+      if (ear.intervalChActive && ear.intervalChAnswered) selectIntervalRef(ear.intervalSemitones, ear.intervalAscending);
+      else selectIntervalRef(1, true);
       this.intervalRefsOpen = true; this.intervalOverlayScroll = 0; this.rerender();
     };
     if (!ear.intervalChActive) {
@@ -2443,6 +2445,7 @@ export class EarTrainingUI {
     const close = () => { this.ear.stopIntervalPreview(); this.intervalSongsFor = null; this.rerender(); };
     const body = this.intervalOverlayCard([
       el("div", { style: "display:flex;align-items:baseline;gap:8px;margin-bottom:8px" }, [
+        btn("‹ Back", close, "btn text"),
         el("div", { style: "font-weight:700;font-size:16px;flex:1" }, [`Songs: ${intervalChoiceFor(semitones).longName}`]),
         btn("Close", close, "btn text"),
       ]),
@@ -2480,15 +2483,17 @@ export class EarTrainingUI {
 
   /** "♪ Song refs" overlay for the interval trainer — same content as the Theory tab. */
   private intervalRefsOverlay(): HTMLElement {
+    const close = () => { this.ear.stopIntervalPreview(); this.intervalRefsOpen = false; this.rerender(); };
     const body = this.intervalOverlayCard([
       el("div", { style: "display:flex;align-items:baseline;gap:8px;margin-bottom:8px" }, [
+        btn("‹ Back", close, "btn text"),
         el("div", { style: "font-weight:700;font-size:16px;flex:1" }, ["Interval song references"]),
-        btn("Close", () => { this.intervalRefsOpen = false; this.rerender(); }, "btn text"),
+        btn("Close", close, "btn text"),
       ]),
       intervalRefsContent(this.ear, () => this.rerender(), this.ear.intervalChActive ? this.ear.intervalTonicMidi() : null),
     ]);
     const scrim = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;padding:16px;z-index:50" }, [body]);
-    scrim.addEventListener("click", (e) => { if (e.target === scrim) { this.intervalRefsOpen = false; this.rerender(); } });
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) close(); });
     return scrim;
   }
 
