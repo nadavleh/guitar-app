@@ -17,7 +17,7 @@ import {
   spellPc, noteAt, TrainingMode, ChordTypeLevel, ChordTypeLevelName, PitchClass, decodeMissedTake,
   namedRomanLine, inversionName, n2cAnswerLabel, n2cChordSymbol, n2cTestNoteName,
   parseChord, ChordShapeGenerator, eShapeOrFirst, notesFrom, midiPitchClass, fp, fpKey,
-  IntervalDirection, intervalChoiceFor, IntervalSource, intervalStepLabel, allPositions,
+  IntervalDirection, intervalChoiceFor, intervalMissStats, IntervalSource, intervalStepLabel, allPositions,
   Progression, CarMode,
   MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, MINOR_HARMONIC_PROGRESSIONS, ADVANCED_PROGRESSIONS, ADVANCED2_PROGRESSIONS,
   SUS_PROGRESSIONS, CIRCLE_WINDOWS, romanLineFor, progressionFromKey,
@@ -2104,6 +2104,7 @@ export class EarTrainingUI {
         btn("Start challenge ▶", () => ear.startIntervalChallenge(), "btn primary"),
         btn("♪ Song refs", openRefs),
       ]));
+      this.intervalMissesCard(parent);
       this.intervalSettings(parent, keyName);
       return;
     }
@@ -2114,7 +2115,11 @@ export class EarTrainingUI {
       parent.appendChild(el("div", { class: "row", style: "justify-content:center" }, [btn("⚙ Settings", openSettings)]));
       return;
     }
+    // ‹ Prev: back to the previous question as it was (key, notes and your answer).
+    const prev = btn("‹ Prev", () => ear.previousIntervalQuestion(), "btn text");
+    if (!ear.intervalCanGoBack) prev.disabled = true;
     parent.appendChild(el("div", { class: "row" }, [
+      prev,
       el("div", { style: "font-weight:600" }, [`Q ${ear.intervalChIndex + 1} / ${ear.intervalChallengeTotal}`]),
       el("div", { style: "flex:1;color:var(--act);font-weight:600;margin-left:10px" }, [`Score: ${ear.intervalChScore}`]),
       btn("⚙", openSettings, "btn text"),
@@ -2150,8 +2155,12 @@ export class EarTrainingUI {
       if (ear.intervalStep !== null) parts.push(`degree ${intervalStepLabel(ear.intervalStep)}`);
       if (ear.intervalSemitones > 0) parts.push(dir);
       const choice = intervalChoiceFor(ear.intervalSemitones);
-      parent.appendChild(el("div", { style: `font-weight:700;color:var(--act)` }, [
-        `${ok ? "✔ correct" : `✘ answer: ${choice.longName}`}` + (parts.length ? `  (${parts.join(", ")})` : ""),
+      parent.appendChild(el("div", { class: "row", style: "align-items:center" }, [
+        el("div", { style: `font-weight:700;color:var(--act);flex:1` }, [
+          `${ok ? "✔ correct" : `✘ answer: ${choice.longName}`}` + (parts.length ? `  (${parts.join(", ")})` : ""),
+        ]),
+        // Misclick: take the answer back; the next tap is the answer.
+        btn("↶ Re-answer", () => ear.changeIntervalAnswer(), "btn text"),
       ]));
       // Songs + Next on one row, right under the chips, so Next needs no scrolling.
       const next = btn(ear.intervalChIndex === ear.intervalChallengeTotal - 1 ? "See score →" : "Next →",
@@ -2170,6 +2179,36 @@ export class EarTrainingUI {
     parent.appendChild(switchRow("Show on fretboard (tonic marked)", null, ear.intervalShowFretboard,
       (v) => ear.setIntervalShowFretboard(v)));
     if (ear.intervalShowFretboard) this.intervalFretboardPanel(parent);
+  }
+
+  /** "Your interval misses": every wrong answer is saved on the device; shown per asked
+   *  interval + direction, most-missed first, with the wrong pick made most often.
+   *  Mirrors Android IntervalMissesCard. */
+  private intervalMissesShowAll = false;
+  private intervalMissesCard(parent: HTMLElement): void {
+    const misses = this.state.intervalMisses;
+    if (misses.length === 0) return;
+    const stats = intervalMissStats(misses);
+    const rows: HTMLElement[] = [
+      el("div", { class: "row", style: "align-items:center" }, [
+        el("div", { style: "font-weight:700;flex:1" }, [`Your interval misses (${misses.length})`]),
+        btn("Clear", () => { this.state.clearIntervalMisses(); this.rerender(); }, "btn text"),
+      ]),
+    ];
+    for (const r of this.intervalMissesShowAll ? stats : stats.slice(0, 6)) {
+      const arrow = r.ascending ? "↑" : "↓";
+      rows.push(el("div", { style: "display:flex;gap:8px;align-items:baseline" }, [
+        el("span", { style: "font-weight:700;min-width:64px" }, [`${intervalChoiceFor(r.asked).shortName} ${arrow}`]),
+        el("span", { style: "min-width:36px" }, [`${r.count}×`]),
+        el("span", { class: "et-muted", style: "font-size:12px" }, [
+          `mostly heard as ${intervalChoiceFor(r.topGuess).shortName} ${arrow}` + (r.topGuessCount < r.count ? ` (${r.topGuessCount})` : "")]),
+      ]));
+    }
+    if (stats.length > 6) {
+      rows.push(btn(this.intervalMissesShowAll ? "Show fewer" : `Show all ${stats.length}`,
+        () => { this.intervalMissesShowAll = !this.intervalMissesShowAll; this.rerender(); }, "btn text"));
+    }
+    parent.appendChild(el("div", { class: "et-card", style: "margin-top:12px" }, rows));
   }
 
   // ---------- Drill (mistake repetition) ----------

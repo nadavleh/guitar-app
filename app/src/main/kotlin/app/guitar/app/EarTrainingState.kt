@@ -15,6 +15,7 @@ import app.guitar.theory.DegreeInfo
 import app.guitar.theory.EarTraining
 import app.guitar.theory.IntervalChoice
 import app.guitar.theory.IntervalDirection
+import app.guitar.theory.IntervalMiss
 import app.guitar.theory.IntervalSongs
 import app.guitar.theory.IntervalSource
 import app.guitar.theory.IntervalTrainer
@@ -74,6 +75,9 @@ class EarTrainingState(
     /** The stored take for a progKey, or null when none was ever recorded (drill then
      *  falls back to generating a voicing, as it did before takes existed). */
     private val progressionMistakeTakeProvider: (progKey: String) -> String? = { null },
+    /** Called once per wrongly-answered interval question (on Next / finish / quit), with
+     *  the exact rendition heard — saved on the device for the misses list. */
+    private val onIntervalMiss: (IntervalMiss) -> Unit = { },
     /** Speaks a chord label aloud in car mode at a 0..1 volume (see `Speaker`), or does
      *  nothing on a device with no TTS engine. An EMPTY string means "stop talking now".
      *  Injected rather than constructed here so this class stays Context-free. */
@@ -2758,10 +2762,65 @@ class EarTrainingState(
         return intervalKey != oldKey || intervalKeyMode != oldMode
     }
 
+    /** One asked interval question as it stands — kept so ‹ Prev can revisit it. */
+    private data class IntervalQ(
+        val key: PitchClass, val questionMode: TrainingMode, val semitones: Int, val ascending: Boolean,
+        val step: Int?, val guess: Int?, val answered: Boolean, val missRecorded: Boolean = false,
+    )
+    /** Every question of this challenge so far, index = [intervalChIndex]. */
+    private val intervalLog = mutableListOf<IntervalQ>()
+
+    /** Write the live question back into the log (keeping whether its miss was saved). */
+    private fun saveIntervalQuestion() {
+        val q = IntervalQ(intervalKey, intervalQuestionMode, intervalSemitones, intervalAscending,
+            intervalStep, intervalGuess, intervalChAnswered,
+            intervalLog.getOrNull(intervalChIndex)?.missRecorded ?: false)
+        if (intervalChIndex < intervalLog.size) intervalLog[intervalChIndex] = q else intervalLog.add(q)
+        intervalChScore = intervalLog.count { it.answered && it.guess == it.semitones }
+    }
+
+    private fun applyIntervalQuestion(q: IntervalQ) {
+        intervalKey = q.key; intervalQuestionMode = q.questionMode
+        intervalSemitones = q.semitones; intervalAscending = q.ascending; intervalStep = q.step
+        intervalGuess = q.guess; intervalChAnswered = q.answered
+    }
+
+    /** Save the current question's miss on the device, once, if it was answered wrong. */
+    private fun recordIntervalMissIfWrong() {
+        val q = intervalLog.getOrNull(intervalChIndex) ?: return
+        val g = q.guess
+        if (!q.answered || g == null || g == q.semitones || q.missRecorded) return
+        onIntervalMiss(IntervalMiss(q.semitones, q.ascending, g, intervalTonicMidi(), System.currentTimeMillis()))
+        intervalLog[intervalChIndex] = q.copy(missRecorded = true)
+    }
+
+    /** ‹ Prev is possible from the 2nd question on (not on the score screen). */
+    val intervalCanGoBack: Boolean
+        get() = intervalChActive && intervalChIndex in 1 until intervalChallengeTotal
+
+    /** Back to the previous question, as it was (same key and notes, your answer kept). */
+    fun previousIntervalQuestion() {
+        if (!intervalCanGoBack) return
+        saveIntervalQuestion()
+        intervalChIndex--
+        applyIntervalQuestion(intervalLog[intervalChIndex])
+        launchIntervalSound { soundInterval(intervalTonicMidi(), intervalTargetMidi(), intervalHarmonic) }
+    }
+
+    /** Misclick: take the answer back so the next tap counts as the answer instead. */
+    fun changeIntervalAnswer() {
+        if (!intervalChActive || !intervalChAnswered) return
+        intervalGuess = null
+        intervalChAnswered = false
+        saveIntervalQuestion()
+    }
+
     fun startIntervalChallenge() {
         intervalChActive = true; intervalChIndex = 0; intervalChScore = 0
         markChallengeStart("intervals")
+        intervalLog.clear()
         drawIntervalQuestion()
+        saveIntervalQuestion()
         // Anchor the key (when the cadence is on), then sound the first interval.
         launchIntervalSound {
             if (intervalCadence) {
@@ -2784,20 +2843,29 @@ class EarTrainingState(
         if (!intervalChAnswered) {
             intervalGuess = semitones
             intervalChAnswered = true
-            if (semitones == intervalSemitones) intervalChScore++
+            saveIntervalQuestion()
         }
         launchIntervalSound { soundInterval(intervalTonicMidi(), intervalTargetMidi(semitones), intervalHarmonic) }
     }
 
     fun advanceIntervalChallenge() {
         if (!intervalChActive) return
+        saveIntervalQuestion()
+        recordIntervalMissIfWrong()
         if (intervalChIndex >= intervalChallengeTotal - 1) {
             intervalChIndex = intervalChallengeTotal
             reportChallengeDone("intervals", intervalChScore, intervalChallengeTotal)
             return
         }
         intervalChIndex++
+        if (intervalChIndex < intervalLog.size) {
+            // Forward again after ‹ Prev: the question as it was.
+            applyIntervalQuestion(intervalLog[intervalChIndex])
+            launchIntervalSound { soundInterval(intervalTonicMidi(), intervalTargetMidi(), intervalHarmonic) }
+            return
+        }
         val keyChanged = drawIntervalQuestion()
+        saveIntervalQuestion()
         // A new key in diatonic mode is re-anchored by its cadence; a chromatic interval
         // needs no key, so it sounds straight away.
         launchIntervalSound {
@@ -2810,7 +2878,10 @@ class EarTrainingState(
         }
     }
 
-    fun exitIntervalChallenge() { intervalChActive = false; intervalChIndex = 0; intervalChAnswered = false }
+    fun exitIntervalChallenge() {
+        if (intervalChActive && intervalChIndex < intervalChallengeTotal) { saveIntervalQuestion(); recordIntervalMissIfWrong() }
+        intervalChActive = false; intervalChIndex = 0; intervalChAnswered = false
+    }
 
     private suspend fun playCadenceInline() {
         val map = flavorDegreesMap()

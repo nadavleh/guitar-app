@@ -23,6 +23,7 @@ import {
   melodyNotes, melodyNotesAnchored, INTERVAL_EIGHTH_MS,
   INTERVAL_DEFAULT_STEPS, intervalBoxSteps, intervalStepSemitones, intervalStepAnswerSet, intervalStepMode, intervalChoiceFor,
   randomOtherKey, drawAvoiding,
+  IntervalMiss,
 } from "../theory";
 import { WebAudioEngine, Timbres, renderCueBeep } from "../audio";
 
@@ -65,10 +66,19 @@ export interface EarDeps {
   /** The stored take for a progKey, or null when none was recorded (the drill then falls
    *  back to generating a voicing, as it did before takes existed). */
   progressionMistakeTakeProvider?: (progKey: string) => string | null;
+  /** Fires once per wrongly-answered interval question (on Next / finish / quit), with the
+   *  exact rendition heard — saved on the device for the misses list. */
+  onIntervalMiss?: (m: IntervalMiss) => void;
   /** Speaks a car-mode chord label aloud at a 0..1 volume (see speech.ts); an EMPTY
    *  string means "stop talking now". Injected rather than imported so this class stays
    *  testable and mirrors Android, where the Activity owns the TextToSpeech engine. */
   speak?: (text: string, volume: number) => void;
+}
+
+/** One asked interval question as it stands (Kotlin IntervalQ) — kept so ‹ Prev can revisit it. */
+interface IntervalQ {
+  key: PitchClass; questionMode: TrainingMode; semitones: number; ascending: boolean;
+  step: number | null; guess: number | null; answered: boolean; missRecorded: boolean;
 }
 
 /** Where Progression Challenge questions come from: the generator settings (normal), or
@@ -2430,10 +2440,65 @@ export class EarTrainingState {
     return this.intervalKey !== oldKey || this.intervalKeyMode !== oldMode;
   }
 
+  /** Every question of this challenge so far, index = intervalChIndex — kept so ‹ Prev
+   *  can revisit one as it was. Mirrors Kotlin IntervalQ. */
+  private intervalLog: IntervalQ[] = [];
+
+  /** Write the live question back into the log (keeping whether its miss was saved). */
+  private saveIntervalQuestion(): void {
+    const q: IntervalQ = { key: this.intervalKey, questionMode: this.intervalQuestionMode, semitones: this.intervalSemitones,
+      ascending: this.intervalAscending, step: this.intervalStep, guess: this.intervalGuess,
+      answered: this.intervalChAnswered, missRecorded: this.intervalLog[this.intervalChIndex]?.missRecorded ?? false };
+    if (this.intervalChIndex < this.intervalLog.length) this.intervalLog[this.intervalChIndex] = q; else this.intervalLog.push(q);
+    this.intervalChScore = this.intervalLog.filter((x) => x.answered && x.guess === x.semitones).length;
+  }
+
+  private applyIntervalQuestion(q: IntervalQ): void {
+    this.intervalKey = q.key; this.intervalQuestionMode = q.questionMode;
+    this.intervalSemitones = q.semitones; this.intervalAscending = q.ascending; this.intervalStep = q.step;
+    this.intervalGuess = q.guess; this.intervalChAnswered = q.answered;
+  }
+
+  /** Save the current question's miss on the device, once, if it was answered wrong. */
+  private recordIntervalMissIfWrong(): void {
+    const q = this.intervalLog[this.intervalChIndex];
+    if (!q || !q.answered || q.guess === null || q.guess === q.semitones || q.missRecorded) return;
+    this.deps.onIntervalMiss?.({ asked: q.semitones, ascending: q.ascending, guess: q.guess,
+      tonicMidi: this.intervalTonicMidi(), dateMillis: Date.now() });
+    q.missRecorded = true;
+  }
+
+  /** ‹ Prev is possible from the 2nd question on (not on the score screen). */
+  get intervalCanGoBack(): boolean {
+    return this.intervalChActive && this.intervalChIndex >= 1 && this.intervalChIndex < this.intervalChallengeTotal;
+  }
+
+  /** Back to the previous question, as it was (same key and notes, your answer kept). */
+  previousIntervalQuestion(): void {
+    if (!this.intervalCanGoBack) return;
+    this.saveIntervalQuestion();
+    this.intervalChIndex--;
+    this.applyIntervalQuestion(this.intervalLog[this.intervalChIndex]);
+    this.launchIntervalSound((live) =>
+      this.soundInterval(this.intervalTonicMidi(), this.intervalTargetMidiFor(), this.intervalHarmonic, live));
+    this.notify();
+  }
+
+  /** Misclick: take the answer back so the next tap counts as the answer instead. */
+  changeIntervalAnswer(): void {
+    if (!this.intervalChActive || !this.intervalChAnswered) return;
+    this.intervalGuess = null;
+    this.intervalChAnswered = false;
+    this.saveIntervalQuestion();
+    this.notify();
+  }
+
   startIntervalChallenge() {
     this.intervalChActive = true; this.intervalChIndex = 0; this.intervalChScore = 0;
     this.markChallengeStart("intervals");
+    this.intervalLog = [];
     this.drawIntervalQuestion();
+    this.saveIntervalQuestion();
     // Anchor the key (when the cadence is on), then sound the first interval.
     this.launchIntervalSound(async (live) => {
       if (this.intervalCadence) {
@@ -2454,7 +2519,7 @@ export class EarTrainingState {
     if (!this.intervalChAnswered) {
       this.intervalGuess = semitones;
       this.intervalChAnswered = true;
-      if (semitones === this.intervalSemitones) this.intervalChScore++;
+      this.saveIntervalQuestion();
     }
     this.launchIntervalSound((live) =>
       this.soundInterval(this.intervalTonicMidi(), this.intervalTargetMidiFor(semitones), this.intervalHarmonic, live));
@@ -2462,9 +2527,20 @@ export class EarTrainingState {
 
   advanceIntervalChallenge() {
     if (!this.intervalChActive) return;
+    this.saveIntervalQuestion();
+    this.recordIntervalMissIfWrong();
     if (this.intervalChIndex >= this.intervalChallengeTotal - 1) { this.intervalChIndex = this.intervalChallengeTotal; this.reportChallengeDone("intervals", this.intervalChScore, this.intervalChallengeTotal); this.notify(); return; }
     this.intervalChIndex++;
+    if (this.intervalChIndex < this.intervalLog.length) {
+      // Forward again after ‹ Prev: the question as it was.
+      this.applyIntervalQuestion(this.intervalLog[this.intervalChIndex]);
+      this.launchIntervalSound((live) =>
+        this.soundInterval(this.intervalTonicMidi(), this.intervalTargetMidiFor(), this.intervalHarmonic, live));
+      this.notify();
+      return;
+    }
     const keyChanged = this.drawIntervalQuestion();
+    this.saveIntervalQuestion();
     // A new key in diatonic mode is re-anchored by its cadence; a chromatic interval
     // needs no key, so it sounds straight away.
     this.launchIntervalSound(async (live) => {
@@ -2478,7 +2554,9 @@ export class EarTrainingState {
     });
   }
 
-  exitIntervalChallenge() { this.intervalChActive = false; this.intervalChIndex = 0; this.intervalChAnswered = false; this.notify(); }
+  exitIntervalChallenge() {
+    if (this.intervalChActive && this.intervalChIndex < this.intervalChallengeTotal) { this.saveIntervalQuestion(); this.recordIntervalMissIfWrong(); }
+    this.intervalChActive = false; this.intervalChIndex = 0; this.intervalChAnswered = false; this.notify(); }
 
   // ---------- shared playback helpers ----------
 

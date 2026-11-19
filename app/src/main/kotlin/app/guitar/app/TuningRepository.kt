@@ -1,5 +1,7 @@
 package app.guitar.app
 
+import app.guitar.theory.IntervalMiss
+import app.guitar.theory.IntervalMisses
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -348,6 +350,24 @@ class TuningRepository(private val context: Context) {
             val dt = p[3].toLongOrNull() ?: return@mapNotNull null
             ChallengeScore(s, t, d, dt, p.getOrNull(4) ?: "progression")
         }.sortedWith(CHALLENGE_SCORE_ORDER)
+
+    // ---------- Interval challenge misses ----------
+
+    private val keyIntervalMisses = stringPreferencesKey("interval_misses")
+
+    /** Every saved interval-challenge miss, oldest first (newest [IntervalMisses.MAX_KEPT]). */
+    val intervalMisses: Flow<List<IntervalMiss>> =
+        context.tuningDataStore.data.map { prefs -> IntervalMisses.decode(prefs[keyIntervalMisses] ?: "") }
+
+    suspend fun recordIntervalMiss(m: IntervalMiss) {
+        context.tuningDataStore.edit { prefs ->
+            prefs[keyIntervalMisses] = IntervalMisses.encode(
+                IntervalMisses.append(IntervalMisses.decode(prefs[keyIntervalMisses] ?: ""), m))
+        }
+    }
+    suspend fun clearIntervalMisses() {
+        context.tuningDataStore.edit { prefs -> prefs.remove(keyIntervalMisses) }
+    }
 
     // ---------- Progression mistake-drill counts ----------
 

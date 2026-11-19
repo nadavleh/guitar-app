@@ -1,7 +1,8 @@
 // Area "intervals" of the web parity checks (split out of the old monolithic verify.ts).
 // Run alone: npm run verify -- intervals
 
-import { TrainingMode, INTERVAL_CHOICES, intervalTargetMidi, INTERVAL_DEGREES, intervalDegreeSemitones, intervalDegreeLabel, diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalRefFor, intervalBoxSteps, intervalStepLabel, intervalStepSemitones, intervalStepAnswerSet, intervalStepMode, intervalChoiceFor, IntervalDirection, randomOtherKey, drawAvoiding, melodyNotes, melodyContains, melodyNotesAnchored, INTERVAL_SONGS_ASCENDING, INTERVAL_SONGS_DESCENDING } from "../../src/theory";
+import { TrainingMode, INTERVAL_CHOICES, intervalTargetMidi, INTERVAL_DEGREES, intervalDegreeSemitones, intervalDegreeLabel, diatonicIntervalSemitones, diatonicIntervalAnswerSet, intervalRefFor, intervalBoxSteps, intervalStepLabel, intervalStepSemitones, intervalStepAnswerSet, intervalStepMode, intervalChoiceFor, IntervalDirection, randomOtherKey, drawAvoiding, melodyNotes, melodyContains, melodyNotesAnchored, INTERVAL_SONGS_ASCENDING, INTERVAL_SONGS_DESCENDING,
+  IntervalMiss, encodeIntervalMisses, decodeIntervalMisses, appendIntervalMiss, intervalMissStats, INTERVAL_MISSES_MAX_KEPT } from "../../src/theory";
 import { check } from "./harness";
 
 export function run(): void {
@@ -67,5 +68,25 @@ export function run(): void {
       melodyNotesAnchored("0/2 5/1.5 5/0.5", 5, true, 62).map((n) => n.midi).join() === "62,67,67" &&
       melodyNotesAnchored("0/4 12/4 11/2", 11, true, 60).map((n) => n.midi).join() === "60,72,71" &&
       melodyNotesAnchored("0/4 12/4 11/2 7/1", 1, false, 60).map((n) => n.midi).join() === "48,60,59,55");
+  }
+
+  // --- Interval misses (pinned to Kotlin EarTrainingTest) ---
+  {
+    const ms: IntervalMiss[] = [
+      { asked: 4, ascending: false, guess: 5, tonicMidi: 62, dateMillis: 1000 }, { asked: 4, ascending: false, guess: 5, tonicMidi: 57, dateMillis: 2000 },
+      { asked: 4, ascending: false, guess: 3, tonicMidi: 60, dateMillis: 3000 }, { asked: 7, ascending: true, guess: 5, tonicMidi: 64, dateMillis: 4000 },
+      { asked: 3, ascending: false, guess: 4, tonicMidi: 61, dateMillis: 5000 }, { asked: 3, ascending: true, guess: 4, tonicMidi: 61, dateMillis: 6000 },
+    ];
+    const raw = encodeIntervalMisses(ms);
+    check("interval misses encode (= Kotlin)", raw === "4,0,5,62,1000;4,0,5,57,2000;4,0,3,60,3000;7,1,5,64,4000;3,0,4,61,5000;3,1,4,61,6000");
+    check("interval misses round-trip", JSON.stringify(decodeIntervalMisses(raw)) === JSON.stringify(ms));
+    check("interval misses skip junk rows",
+      JSON.stringify(decodeIntervalMisses("x;13,1,2,60,1;2,1,1,60,7;2,2,1,60,1;")) ===
+      JSON.stringify([{ asked: 2, ascending: true, guess: 1, tonicMidi: 60, dateMillis: 7 }]));
+    check("interval miss stats (= Kotlin)", intervalMissStats(ms).map((r) => `${r.asked}${r.ascending ? "u" : "d"}${r.count}/${r.topGuess}x${r.topGuessCount}`).join() ===
+      "4d3/5x2,3u1/4x1,3d1/4x1,7u1/5x1");
+    let list: IntervalMiss[] = [];
+    for (let i = 0; i < INTERVAL_MISSES_MAX_KEPT + 3; i++) list = appendIntervalMiss(list, { asked: 1, ascending: true, guess: 2, tonicMidi: 60, dateMillis: i });
+    check("interval misses keep only the newest", list.length === INTERVAL_MISSES_MAX_KEPT && list[0].dateMillis === 3);
   }
 }

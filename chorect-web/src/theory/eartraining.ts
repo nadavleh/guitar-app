@@ -886,6 +886,60 @@ export function intervalChoiceFor(semitones: number): IntervalChoice {
   return INTERVAL_CHOICES.find((i) => i.semitones === semitones)!;
 }
 
+/** One wrong answer in the interval challenge, saved exactly as heard: the interval asked
+ *  (semitones), its direction, what was tapped, and the tonic it sounded from (key AND
+ *  octave). Mirror of Kotlin IntervalMiss. */
+export interface IntervalMiss { asked: number; ascending: boolean; guess: number; tonicMidi: number; dateMillis: number }
+/** The misses of one asked interval + direction (Kotlin IntervalMissStat). */
+export interface IntervalMissStat { asked: number; ascending: boolean; count: number; topGuess: number; topGuessCount: number }
+
+/** Only the newest misses are kept (Kotlin IntervalMisses.MAX_KEPT). */
+export const INTERVAL_MISSES_MAX_KEPT = 500;
+
+/** "asked,up(1/0),guess,tonicMidi,dateMillis" rows joined by ';' (Kotlin IntervalMisses.encode). */
+export function encodeIntervalMisses(list: IntervalMiss[]): string {
+  return list.map((m) => `${m.asked},${m.ascending ? 1 : 0},${m.guess},${m.tonicMidi},${m.dateMillis}`).join(";");
+}
+
+export function decodeIntervalMisses(raw: string): IntervalMiss[] {
+  const out: IntervalMiss[] = [];
+  const int = (s: string) => (/^-?\d+$/.test(s) ? Number(s) : null);
+  for (const row of raw.split(";")) {
+    const p = row.split(",");
+    if (p.length !== 5) continue;
+    const asked = int(p[0]), guess = int(p[2]), tonic = int(p[3]), date = int(p[4]);
+    if (asked === null || asked < 0 || asked > 12 || guess === null || guess < 0 || guess > 12) continue;
+    if (p[1] !== "1" && p[1] !== "0") continue;
+    if (tonic === null || date === null) continue;
+    out.push({ asked, ascending: p[1] === "1", guess, tonicMidi: tonic, dateMillis: date });
+  }
+  return out;
+}
+
+/** `list` plus `miss`, trimmed to the newest INTERVAL_MISSES_MAX_KEPT. */
+export function appendIntervalMiss(list: IntervalMiss[], miss: IntervalMiss): IntervalMiss[] {
+  return [...list, miss].slice(-INTERVAL_MISSES_MAX_KEPT);
+}
+
+/** One row per asked interval + direction, most-missed first (ties: smaller interval, then
+ *  ascending first); the top wrong pick breaks ties toward the smaller interval. */
+export function intervalMissStats(list: IntervalMiss[]): IntervalMissStat[] {
+  const groups = new Map<string, IntervalMiss[]>();
+  for (const m of list) {
+    const k = `${m.asked}|${m.ascending}`;
+    const g = groups.get(k);
+    if (g) g.push(m); else groups.set(k, [m]);
+  }
+  const rows: IntervalMissStat[] = [];
+  for (const ms of groups.values()) {
+    const counts = new Map<number, number>();
+    for (const m of ms) counts.set(m.guess, (counts.get(m.guess) ?? 0) + 1);
+    const [topGuess, topGuessCount] = [...counts.entries].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
+    rows.push({ asked: ms[0].asked, ascending: ms[0].ascending, count: ms.length, topGuess, topGuessCount });
+  }
+  return rows.sort((a, b) => b.count - a.count || a.asked - b.asked || Number(b.ascending) - Number(a.ascending));
+}
+
 /** A random key other than `previous`, so consecutive questions never share a key.
  *  Mirror of Kotlin IntervalTrainer.randomOtherKey. */
 export function randomOtherKey(previous: PitchClass, rng: Rng = defaultRng): PitchClass {

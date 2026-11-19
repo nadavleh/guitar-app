@@ -9,13 +9,14 @@ import {
   Instrument, InstrumentInfo, Tuning, note, FretPosition, fp, fpKey,
   noteAt, stringCount, parseNote,
   VoicingStyle, parseChord, ChordShapeGenerator,
+  IntervalMiss, encodeIntervalMisses, decodeIntervalMisses, appendIntervalMiss,
 } from "../theory";
 import * as Tunings from "../theory/tunings";
 import { WebAudioEngine, Timbre, Timbres, midiToFreqA4, SampleBank } from "../audio";
 
 export const DISPLAY_FRETS = 14;
 /** App version shown beside the header wordmark. Keep in sync with package.json on release. */
-export const APP_VERSION = "2.98.1";
+export const APP_VERSION = "2.99.0";
 const MIDI_MIN = 28; // E1
 const MIDI_MAX = 84; // C6
 
@@ -128,6 +129,8 @@ interface Persisted {
   challengeScores: ChallengeScore[];
   progressionMistakes: Record<string, number>;
   progressionMistakeTakes?: Record<string, string>;
+  /** Interval-challenge misses, IntervalMisses-encoded (same rows as Android's DataStore). */
+  intervalMisses?: string;
   drumPatterns: Record<string, string>;
   drumBlocks: Record<string, string>;
   drumTrackPresets: Record<string, string>;
@@ -219,6 +222,8 @@ export class AppState {
    *  Kept beside the counts (not folded into them) so old saves need no migration and a
    *  missing take just means "the drill regenerates a voicing", as it did before. */
   progressionMistakeTakes: Record<string, string> = {};
+  /** Saved interval-challenge misses (exact renditions), oldest first. */
+  intervalMisses: IntervalMiss[] = [];
   /** Saved drum beats: name Ã¢â€ â€™ encoded PercussionPattern string (insertion order). */
   drumPatterns = new Map<string, string>();
   /** Saved drum BLOCKS (phrase sequences), name -> DrumBlock.encode(). */
@@ -317,6 +322,7 @@ export class AppState {
       if (p.progressionMistakeTakes && typeof p.progressionMistakeTakes === "object") {
         for (const [k, v] of Object.entries(p.progressionMistakeTakes)) if (typeof v === "string" && v) this.progressionMistakeTakes[k] = v;
       }
+      if (typeof p.intervalMisses === "string") this.intervalMisses = decodeIntervalMisses(p.intervalMisses);
       if (p.drumPatterns) for (const [name, enc] of Object.entries(p.drumPatterns)) this.drumPatterns.set(name, enc);
       if (p.drumBlocks) for (const [name, enc] of Object.entries(p.drumBlocks)) this.drumBlocks.set(name, enc);
       if (p.drumTrackPresets) for (const [name, enc] of Object.entries(p.drumTrackPresets)) this.drumTrackPresets.set(name, enc);
@@ -364,6 +370,7 @@ export class AppState {
       challengeScores: this.challengeScores,
       progressionMistakes: this.progressionMistakes,
       progressionMistakeTakes: this.progressionMistakeTakes,
+      intervalMisses: encodeIntervalMisses(this.intervalMisses),
       drumPatterns: Object.fromEntries(this.drumPatterns),
       drumBlocks: Object.fromEntries(this.drumBlocks),
       drumTrackPresets: Object.fromEntries(this.drumTrackPresets),
@@ -398,6 +405,14 @@ export class AppState {
   }
   clearChallengeScoresOfKind(kind: string): void {
     this.commit(() => { this.challengeScores = this.challengeScores.filter((s) => (s.kind ?? "progression") !== kind); });
+  }
+
+  /** Save one interval-challenge miss (only the newest INTERVAL_MISSES_MAX_KEPT are kept). */
+  recordIntervalMiss(m: IntervalMiss): void {
+    this.commit(() => { this.intervalMisses = appendIntervalMiss(this.intervalMisses, m); });
+  }
+  clearIntervalMisses(): void {
+    this.commit(() => { this.intervalMisses = []; });
   }
 
   /** Increment the mistake count for a progression (its progressionKey). */

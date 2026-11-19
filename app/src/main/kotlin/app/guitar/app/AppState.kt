@@ -474,6 +474,7 @@ class AppState(
                 scope.launch { repo.setProgressionMistakeTake(progKey, encoded) }
             },
             progressionMistakeTakeProvider = { progKey -> progressionMistakeTakesSnapshot.value[progKey] },
+            onIntervalMiss = { m -> scope.launch { repo.recordIntervalMiss(m) } },
             speak = speak,
         )
     }
@@ -517,6 +518,10 @@ class AppState(
     fun recordProgressionMistake(key: String) { scope.launch { repo.recordProgressionMistake(key) } }
     fun clearProgressionMistake(key: String) { scope.launch { repo.clearProgressionMistake(key) } }
     fun clearProgressionMistakes() { scope.launch { repo.clearProgressionMistakes() } }
+
+    /** Saved interval-challenge misses (exact renditions), oldest first. */
+    val intervalMisses get() = repo.intervalMisses
+    fun clearIntervalMisses() { scope.launch { repo.clearIntervalMisses() } }
 
     /** App-lifetime samba percussion looper (drum-machine tab). Lazily created so
      *  the pattern you build persists across leaving and returning to the screen. */

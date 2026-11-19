@@ -85,6 +85,7 @@ import app.guitar.theory.IntervalTrainer
 import app.guitar.theory.NoteSpeller
 import app.guitar.theory.PitchClass
 import app.guitar.theory.Progression
+import app.guitar.theory.IntervalMisses
 import app.guitar.theory.ProgressionSongs
 import app.guitar.theory.ResolvedChord
 import app.guitar.theory.SongExample
@@ -2754,6 +2755,39 @@ private fun IntervalSettings(ear: EarTrainingState, keyName: String) {
     }
 }
 
+/** "Your interval misses": every wrong answer is saved on the device; shown per asked
+ *  interval + direction, most-missed first, with the wrong pick made most often. */
+@Composable
+private fun IntervalMissesCard(state: AppState) {
+    val misses by state.intervalMisses.collectAsState(initial = emptyList())
+    if (misses.isEmpty()) return
+    val stats = remember(misses) { IntervalMisses.stats(misses) }
+    var showAll by remember { mutableStateOf(false) }
+    Spacer(Modifier.height(12.dp))
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Your interval misses (${misses.size})", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                TextButton(onClick = { state.clearIntervalMisses() }) { Text("Clear") }
+            }
+            for (r in if (showAll) stats else stats.take(6)) {
+                val arrow = if (r.ascending) "↑" else "↓"
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${IntervalTrainer.choiceFor(r.asked).shortName} $arrow", fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(72.dp))
+                    Text("${r.count}×", modifier = Modifier.width(44.dp))
+                    Text("mostly heard as ${IntervalTrainer.choiceFor(r.topGuess).shortName} $arrow" +
+                            if (r.topGuessCount < r.count) " (${r.topGuessCount})" else "",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (stats.size > 6) TextButton(onClick = { showAll = !showAll }) {
+                Text(if (showAll) "Show fewer" else "Show all ${stats.size}")
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun IntervalsView(state: AppState, ear: EarTrainingState) {
@@ -2806,6 +2840,7 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
                 Spacer(Modifier.width(8.dp))
                 OutlinedButton(onClick = { refsOpen = true }) { Text("♪ Song refs") }
             }
+            IntervalMissesCard(state)
             Spacer(Modifier.height(12.dp))
             IntervalSettings(ear, keyName)
             Spacer(Modifier.height(20.dp))
@@ -2820,6 +2855,9 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
             return@Column
         }
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            // ‹ Prev: back to the previous question as it was (key, notes and your answer).
+            TextButton(onClick = { ear.previousIntervalQuestion() }, enabled = ear.intervalCanGoBack,
+                contentPadding = PaddingValues(horizontal = 6.dp)) { Text("‹ Prev") }
             Text("Q ${ear.intervalChIndex + 1} / ${ear.intervalChallengeTotal}",
                 style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.width(10.dp))
@@ -2855,10 +2893,14 @@ private fun IntervalsView(state: AppState, ear: EarTrainingState) {
             val degree = ear.intervalStep?.let { "degree ${IntervalTrainer.stepLabel(it)}" }
             val detail = listOfNotNull(degree, dir.takeIf { ear.intervalSemitones > 0 }).joinToString(", ")
             val choice = IntervalTrainer.choiceFor(ear.intervalSemitones)
-            Text((if (ok) "✔ correct" else "✘ answer: ${choice.longName}") +
-                    (if (detail.isNotEmpty()) "  ($detail)" else ""),
-                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text((if (ok) "✔ correct" else "✘ answer: ${choice.longName}") +
+                        (if (detail.isNotEmpty()) "  ($detail)" else ""),
+                    style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                // Misclick: take the answer back; the next tap is the answer.
+                TextButton(onClick = { ear.changeIntervalAnswer() }) { Text("↶ Re-answer") }
+            }
             Spacer(Modifier.height(6.dp))
             // Songs + Next on one row, right under the chips, so Next needs no scrolling.
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {

@@ -1110,3 +1110,44 @@ object IntervalTrainer {
         else -> null
     }
 }
+
+/** One wrong answer in the interval challenge, saved exactly as heard: the interval asked
+ *  (semitones), its direction, what was tapped, and the tonic it sounded from (key AND
+ *  octave), so a later drill can replay that very rendition. */
+data class IntervalMiss(val asked: Int, val ascending: Boolean, val guess: Int, val tonicMidi: Int, val dateMillis: Long)
+
+/** The misses of one asked interval + direction: how many, and the wrong pick made most. */
+data class IntervalMissStat(val asked: Int, val ascending: Boolean, val count: Int, val topGuess: Int, val topGuessCount: Int)
+
+/** Storage format + statistics for [IntervalMiss] (mirror: TS intervalMiss* in eartraining.ts). */
+object IntervalMisses {
+    /** Only the newest misses are kept, so the stored string stays small. */
+    const val MAX_KEPT = 500
+
+    /** "asked,up(1/0),guess,tonicMidi,dateMillis" rows joined by ';'. */
+    fun encode(list: List<IntervalMiss>): String =
+        list.joinToString(";") { "${it.asked},${if (it.ascending) 1 else 0},${it.guess},${it.tonicMidi},${it.dateMillis}" }
+
+    fun decode(raw: String): List<IntervalMiss> = raw.split(";").mapNotNull { row ->
+        val p = row.split(",")
+        if (p.size != 5) return@mapNotNull null
+        val asked = p[0].toIntOrNull()?.takeIf { it in 0..12 } ?: return@mapNotNull null
+        val up = when (p[1]) { "1" -> true; "0" -> false; else -> return@mapNotNull null }
+        val guess = p[2].toIntOrNull()?.takeIf { it in 0..12 } ?: return@mapNotNull null
+        val tonic = p[3].toIntOrNull() ?: return@mapNotNull null
+        val date = p[4].toLongOrNull() ?: return@mapNotNull null
+        IntervalMiss(asked, up, guess, tonic, date)
+    }
+
+    /** [list] plus [miss], trimmed to the newest [MAX_KEPT]. */
+    fun append(list: List<IntervalMiss>, miss: IntervalMiss): List<IntervalMiss> = (list + miss).takeLast(MAX_KEPT)
+
+    /** One row per asked interval + direction, most-missed first (ties: smaller interval,
+     *  then ascending first). The top wrong pick breaks ties toward the smaller interval. */
+    fun stats(list: List<IntervalMiss>): List<IntervalMissStat> =
+        list.groupBy { it.asked to it.ascending }.map { (k, ms) ->
+            val top = ms.groupingBy { it.guess }.eachCount().entries
+                .sortedWith(compareByDescending<Map.Entry<Int, Int>> { it.value }.thenBy { it.key }).first()
+            IntervalMissStat(k.first, k.second, ms.size, top.key, top.value)
+        }.sortedWith(compareByDescending<IntervalMissStat> { it.count }.thenBy { it.asked }.thenByDescending { it.ascending })
+}

@@ -206,6 +206,7 @@ export class App {
       progressionMistakesProvider: () => state.progressionMistakes,
       onProgressionMistakeTake: (k, enc) => state.setProgressionMistakeTake(k, enc),
       progressionMistakeTakeProvider: (k) => state.progressionMistakeTakes[k] ?? null,
+      onIntervalMiss: (m) => state.recordIntervalMiss(m),
       speak,
     });
     this.loop = new LoopState({

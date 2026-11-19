@@ -861,4 +861,32 @@ class EarTrainingTest {
             assertTrue(bars[2].romanLabel.startsWith("V"), bars[2].romanLabel)
         }
     }
+
+    // ---- Interval misses (pinned in chorect-web test/verify/intervals.ts) ----
+
+    private val sampleMisses = listOf(
+        IntervalMiss(4, false, 5, 62, 1000L), IntervalMiss(4, false, 5, 57, 2000L),
+        IntervalMiss(4, false, 3, 60, 3000L), IntervalMiss(7, true, 5, 64, 4000L),
+        IntervalMiss(3, false, 4, 61, 5000L), IntervalMiss(3, true, 4, 61, 6000L),
+    )
+
+    @Test fun `interval misses round-trip and skip junk rows`() {
+        val raw = IntervalMisses.encode(sampleMisses)
+        assertEquals("4,0,5,62,1000;4,0,5,57,2000;4,0,3,60,3000;7,1,5,64,4000;3,0,4,61,5000;3,1,4,61,6000", raw)
+        assertEquals(sampleMisses, IntervalMisses.decode(raw))
+        assertEquals(listOf(IntervalMiss(2, true, 1, 60, 7L)), IntervalMisses.decode("x;13,1,2,60,1;2,1,1,60,7;2,2,1,60,1;"))
+    }
+
+    @Test fun `interval miss stats are most-missed first with the top wrong pick`() {
+        val s = IntervalMisses.stats(sampleMisses)
+        assertEquals(listOf(IntervalMissStat(4, false, 3, 5, 2), IntervalMissStat(3, true, 1, 4, 1),
+            IntervalMissStat(3, false, 1, 4, 1), IntervalMissStat(7, true, 1, 5, 1)), s)
+    }
+
+    @Test fun `interval misses keep only the newest`() {
+        var list = emptyList<IntervalMiss>()
+        for (i in 0 until IntervalMisses.MAX_KEPT + 3) list = IntervalMisses.append(list, IntervalMiss(1, true, 2, 60, i.toLong()))
+        assertEquals(IntervalMisses.MAX_KEPT, list.size)
+        assertEquals(3L, list.first().dateMillis)
+    }
 }
