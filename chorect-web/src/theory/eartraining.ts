@@ -934,7 +934,7 @@ export function intervalMissStats(list: IntervalMiss[]): IntervalMissStat[] {
   for (const ms of groups.values()) {
     const counts = new Map<number, number>();
     for (const m of ms) counts.set(m.guess, (counts.get(m.guess) ?? 0) + 1);
-    const [topGuess, topGuessCount] = [...counts.entries].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
+    const [topGuess, topGuessCount] = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
     rows.push({ asked: ms[0].asked, ascending: ms[0].ascending, count: ms.length, topGuess, topGuessCount });
   }
   return rows.sort((a, b) => b.count - a.count || a.asked - b.asked || Number(b.ascending) - Number(a.ascending));
