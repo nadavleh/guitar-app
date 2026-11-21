@@ -591,7 +591,7 @@ export class SambaLooperUI {
       swingChildren.push(
         el("div", { class: "label-sm", style: "margin-top:6px" }, ["Swing model  ·  p = swing%/100"]),
         el("div", { class: "row", style: "gap:6px;flex-wrap:wrap" }, [
-          modelChip("Default", SwingModel.Default), modelChip("Hemiola", SwingModel.Hemiola),
+          modelChip("Default", SwingModel.Default), modelChip("Hemiola", SwingModel.Hemiola), modelChip("Brazilian", SwingModel.Brazilian),
         ]),
         el("div", { class: "mono", style: "font-size:11px;opacity:0.85;margin-top:4px" }, [SWING_MODEL_FORMULA[s.swingModel]]),
       );
@@ -1164,7 +1164,7 @@ export class SambaLooperUI {
       swingVS.input,
       el("div", { class: "ans-label", style: "margin-top:6px" }, ["Track swing model"]),
       el("div", { class: "row", style: "gap:6px;flex-wrap:wrap" }, [
-        tModelChip("Default", SwingModel.Default), tModelChip("Hemiola", SwingModel.Hemiola),
+        tModelChip("Default", SwingModel.Default), tModelChip("Hemiola", SwingModel.Hemiola), tModelChip("Brazilian", SwingModel.Brazilian),
       ]),
       el("div", { class: "mono", style: "font-size:11px;opacity:0.85" }, [SWING_MODEL_FORMULA[s.effectiveTrackSwingModel(inst.id)]]),
       el("div", { class: "divider-line" }),

@@ -21,7 +21,7 @@ strictly increasing at every p.
 
 ## Models (played 16th positions, in beat units)
 
-There are exactly two, shown with their live formula in the UI. (History: an
+There are exactly three, shown with their live formula in the UI. (History: an
 earlier draft had V1/V2/V3; V3 was discarded, and V1→**Hemiola**, V2→**Default**.)
 
 **Default** (the app default = former V2) — Hemiola's 2nd/4th shift plus the outer
@@ -37,17 +37,25 @@ Confirmed by Nadav 2026-07-29: intended value, NOT a literal `q/2`.)
 [ 0,  1/4 + q·(1/3−1/4),  1/2,  3/4 − q·(3/4−2/3) ]
 ```
 
+**Brazilian** (added 2026-11-21, v2.100.0) — like Hemiola, but the 2nd 16th is
+ANTICIPATED by the same amount as the 4th (both pulled earlier by q/12 beat):
+```
+[ 0,  1/4 − q·(3/4−2/3),  1/2,  3/4 − q·(3/4−2/3) ]
+```
+
 ### As slot-unit offsets δ (what `swingOffset` returns), s = q
 | model   | δ(0) | δ(1) | δ(2) | δ(3) |
 |---------|------|------|------|------|
 | Default | +s/6 | +s/3 | 0    | −s/6 |
 | Hemiola | 0    | +s/3 | 0    | −s/3 |
+| Brazilian | 0  | −s/3 | 0    | −s/3 |
 
 ### Onsets within the beat at p = 100 % (beat units)
 | model   | 1st  | 2nd | 3rd | 4th   |
 |---------|------|-----|-----|-------|
 | Default | 1/24 | 1/3 | 1/2 | 17/24 |
 | Hemiola | 0    | 1/3 | 1/2 | 2/3   |
+| Brazilian | 0  | 1/6 | 1/2 | 2/3   |
 
 ## Retired feel (NOT in the toggle)
 

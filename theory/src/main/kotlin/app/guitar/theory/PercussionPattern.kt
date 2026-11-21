@@ -950,12 +950,13 @@ private fun parseFlatJsonObject(text: String): Map<String, String>? {
  *
  *  • [Default] (the app default): [ q·(1/3−1/4)/2, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)/2 ]
  *  • [Hemiola]: [0, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)]
+ *  • [Brazilian]: [0, 1/4−q·(3/4−2/3), 1/2, 3/4−q·(3/4−2/3)] — 2nd ANTICIPATED as far as the 4th
  *
  * (1/3−1/4 = 3/4−2/3 = 1/12 beat = 1/3 of a 16th slot.) [swingOffset] returns the
  * offset in SLOT units: the 2nd-16th shift is d = q/3 slots; halves are d/2. All
  * onsets stay strictly increasing at every p. Default = [Default].
  */
-enum class SwingModel { Default, Hemiola }
+enum class SwingModel { Default, Hemiola, Brazilian }
 
 /** Human-readable per-16th position formulas (p = swing%/100). The one place to read
  *  "what are the swing models" without inferring from code; in lock-step with
@@ -963,6 +964,7 @@ enum class SwingModel { Default, Hemiola }
 val SWING_MODEL_FORMULA: Map<SwingModel, String> = mapOf(
     SwingModel.Default to "[p(⅓−¼)/2,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)/2]",
     SwingModel.Hemiola to "[0,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)]",
+    SwingModel.Brazilian to "[0,  ¼−p(¾−⅔),  ½,  ¾−p(¾−⅔)]",
 )
 
 /** Loop timing helpers (kept pure so they're unit-testable on the JVM). */
@@ -974,6 +976,7 @@ object PercussionTiming {
         val d = s / 3.0
         return when (model) {
             SwingModel.Hemiola -> when (pos) { 1 -> d; 3 -> -d; else -> 0.0 }
+            SwingModel.Brazilian -> when (pos) { 1, 3 -> -d; else -> 0.0 }
             SwingModel.Default -> when (pos) { 0 -> d / 2; 1 -> d; 3 -> -d / 2; else -> 0.0 }
         }
     }

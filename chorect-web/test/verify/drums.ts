@@ -89,6 +89,12 @@ export function run(): void {
     check("default model also preserves the beat length", dd[0] + dd[1] + dd[2] + dd[3] === base * 4);
     check("default model nudges the 1st 16th, hemiola does not",
       swungSlotMs(0, 120, 100, M, SwingModel.Default) !== swungSlotMs(0, 120, 100, M, hem));
+    // BRAZILIAN: the 2nd 16th is ANTICIPATED by the same amount as the 4th → [0, 1/6, 1/2, 2/3].
+    const db = [0, 1, 2, 3].map((i) => swungSlotMs(i, 120, 100, M, SwingModel.Brazilian));
+    const onsetB = (slot: number) => db.slice(0, slot).reduce((a, b) => a + b, 0);
+    check("brazilian onsets sit at 0, 1/6, 1/2, 2/3 of the beat",
+      onsetB(0) === 0 && onsetB(1) === Math.round((2 / 3) * base) &&
+      onsetB(2) === 2 * base && onsetB(3) === Math.round((8 / 3) * base) && onsetB(4) === base * 4);
   }
   // non-1/16 grids ignore swing entirely
   const eighths = new PercussionMeter(2, 2, 4, 8);
