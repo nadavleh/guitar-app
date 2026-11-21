@@ -37,10 +37,11 @@ Confirmed by Nadav 2026-07-29: intended value, NOT a literal `q/2`.)
 [ 0,  1/4 + q·(1/3−1/4),  1/2,  3/4 − q·(3/4−2/3) ]
 ```
 
-**Brazilian** (added 2026-11-21, corrected v2.100.1) — Hemiola (2nd delayed toward
-1/3, 4th anticipated toward 2/3), plus the 3rd anticipated by the same amount as the 4th:
+**Brazilian** (added 2026-11-21, corrected v2.100.2 from Nadav's "samba no meio"
+diagrams) — 2nd delayed toward 1/3, 3rd and 4th anticipated equally (4th toward 2/3);
+the anticipation is about double the 2nd's delay:
 ```
-[ 0,  1/4 + q·(1/3−1/4),  1/2 − q·(3/4−2/3),  3/4 − q·(3/4−2/3) ]
+[ 0,  1/4 + q·(1/3−1/4)/2,  1/2 − q·(3/4−2/3),  3/4 − q·(3/4−2/3) ]
 ```
 
 ### As slot-unit offsets δ (what `swingOffset` returns), s = q
@@ -48,14 +49,14 @@ Confirmed by Nadav 2026-07-29: intended value, NOT a literal `q/2`.)
 |---------|------|------|------|------|
 | Default | +s/6 | +s/3 | 0    | −s/6 |
 | Hemiola | 0    | +s/3 | 0    | −s/3 |
-| Brazilian | 0  | +s/3 | −s/3 | −s/3 |
+| Brazilian | 0  | +s/6 | −s/3 | −s/3 |
 
 ### Onsets within the beat at p = 100 % (beat units)
 | model   | 1st  | 2nd | 3rd | 4th   |
 |---------|------|-----|-----|-------|
 | Default | 1/24 | 1/3 | 1/2 | 17/24 |
 | Hemiola | 0    | 1/3 | 1/2 | 2/3   |
-| Brazilian | 0  | 1/3 | 5/12 | 2/3  |
+| Brazilian | 0  | 7/24 | 5/12 | 2/3 |
 
 ## Retired feel (NOT in the toggle)
 
