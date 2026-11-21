@@ -520,7 +520,7 @@ class PercussionPatternTest {
         val base = PercussionTiming.slotMs(120)   // 125 ms
         fun onset(slot: Int) = (0 until slot).sumOf { PercussionTiming.swungSlotMs(it, 120, 100, swingMeter, m) }
         assertEquals(0L, onset(0))                                 // 1st at the beat
-        assertEquals(Math.round((7.0 / 6.0) * base), onset(1))      // 2nd at 7/24
+        assertEquals(Math.round((4.0 / 3.0) * base), onset(1))      // 2nd at 1/3
         assertEquals(2 * base, onset(2))                            // 3rd stays at 1/2
         assertEquals(Math.round((8.0 / 3.0) * base), onset(3))      // 4th at 2/3
     }
