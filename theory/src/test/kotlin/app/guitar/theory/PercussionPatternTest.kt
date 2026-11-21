@@ -525,17 +525,17 @@ class PercussionPatternTest {
         assertEquals(Math.round((8.0 / 3.0) * base), onset(3))      // 4th at 2/3
     }
 
-    @Test fun `full Brazilian swing anticipates the 2nd as far as the 4th`() {
-        // Brazilian at 100 %: [0, 1/6, 1/2, 2/3] of the beat = slot units [0, 2/3, 2, 8/3].
+    @Test fun `full Brazilian swing delays the 2nd and anticipates the 3rd as far as the 4th`() {
+        // Brazilian at 100 %: [0, 1/3, 5/12, 2/3] of the beat = slot units [0, 4/3, 5/3, 8/3].
         val m = SwingModel.Brazilian
         val base = PercussionTiming.slotMs(120)   // 125 ms
         fun onset(slot: Int) = (0 until slot).sumOf { PercussionTiming.swungSlotMs(it, 120, 100, swingMeter, m) }
         assertEquals(0L, onset(0))
-        assertEquals(Math.round((2.0 / 3.0) * base), onset(1))      // 2nd at 1/6
-        assertEquals(2 * base, onset(2))                            // 3rd stays at 1/2
+        assertEquals(Math.round((4.0 / 3.0) * base), onset(1))      // 2nd at 1/3
+        assertEquals(Math.round((5.0 / 3.0) * base), onset(2))      // 3rd at 5/12
         assertEquals(Math.round((8.0 / 3.0) * base), onset(3))      // 4th at 2/3
         assertEquals(onset(4), base * 4)                            // beat length intact
-        assertEquals(PercussionTiming.swingOffset(1, 0.6, m), PercussionTiming.swingOffset(3, 0.6, m), 1e-12)
+        assertEquals(PercussionTiming.swingOffset(2, 0.6, m), PercussionTiming.swingOffset(3, 0.6, m), 1e-12)
     }
 
     @Test fun `swing pattern repeats every beat`() {

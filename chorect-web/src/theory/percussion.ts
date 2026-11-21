@@ -887,7 +887,7 @@ export function swungOnsetMsExact(
  * (p=100 %) at [0,1/3,1/2,2/3]; q = swingPercent/100 interpolates linearly. Positions:
  *  • Default: [q·(1/3−1/4)/2, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)/2]
  *  • Hemiola: [0, 1/4+q·(1/3−1/4), 1/2, 3/4−q·(3/4−2/3)]
- *  • Brazilian: [0, 1/4−q·(3/4−2/3), 1/2, 3/4−q·(3/4−2/3)] — 2nd anticipated as far as the 4th
+ *  • Brazilian: [0, 1/4+q·(1/3−1/4), 1/2−q·(3/4−2/3), 3/4−q·(3/4−2/3)] — Hemiola + 3rd anticipated as far as the 4th
  * swingOffset returns SLOT-unit offsets; the 2nd-16th shift d = q/3 slot (1/12 beat).
  * Default = Default.
  */
@@ -898,7 +898,7 @@ export function swingOffset(pos: number, s: number, model: SwingModel): number {
   const d = s / 3;
   switch (model) {
     case SwingModel.Hemiola: return pos === 1 ? d : pos === 3 ? -d : 0;
-    case SwingModel.Brazilian: return pos === 1 || pos === 3 ? -d : 0;
+    case SwingModel.Brazilian: return pos === 1 ? d : pos === 2 || pos === 3 ? -d : 0;
     default:                 return pos === 0 ? d / 2 : pos === 1 ? d : pos === 3 ? -d / 2 : 0;   // Default
   }
 }
@@ -909,7 +909,7 @@ export function swingOffset(pos: number, s: number, model: SwingModel): number {
 export const SWING_MODEL_FORMULA: Record<SwingModel, string> = {
   [SwingModel.Default]: "[p(⅓−¼)/2,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)/2]",
   [SwingModel.Hemiola]: "[0,  ¼+p(⅓−¼),  ½,  ¾−p(¾−⅔)]",
-  [SwingModel.Brazilian]: "[0,  ¼−p(¾−⅔),  ½,  ¾−p(¾−⅔)]",
+  [SwingModel.Brazilian]: "[0,  ¼+p(⅓−¼),  ½−p(¾−⅔),  ¾−p(¾−⅔)]",
 };
 
 /** Exact duration of [slot] in ms — [swungSlotMs] with no rounding at all. Playback
