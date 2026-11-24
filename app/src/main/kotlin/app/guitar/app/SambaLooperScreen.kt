@@ -1,5 +1,6 @@
 package app.guitar.app
 
+import kotlin.math.roundToInt
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -796,6 +797,23 @@ private fun PatternSection(
                     onValueChange = { samba.swing = it.toInt() },
                     valueRange = 0f..100f,
                     enabled = swingActive,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            // ----- Playhead lead: how far the highlight runs ahead of the sound -----
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                NumericValueText(
+                    "Playhead lead: ${samba.playheadLeadMs} ms",
+                    value = samba.playheadLeadMs.toFloat(), min = 0f,
+                    max = SambaLooperState.PLAYHEAD_LEAD_MAX_MS.toFloat(),
+                    onSet = { samba.setPlayheadLeadMs(it.toInt()) },
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    modifier = Modifier.width(140.dp))
+                Slider(
+                    value = samba.playheadLeadMs.toFloat(),
+                    onValueChange = { samba.setPlayheadLeadMs((it / 10).roundToInt() * 10) },
+                    valueRange = 0f..SambaLooperState.PLAYHEAD_LEAD_MAX_MS.toFloat(),
                     modifier = Modifier.weight(1f),
                 )
             }

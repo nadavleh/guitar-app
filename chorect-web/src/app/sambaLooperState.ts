@@ -73,6 +73,11 @@ export function decodeBeatPatterns(s: string): SavedBeatValue | null {
  *  ids are catalog slugs (`surdo`, `tamborim#2`, …), so a leading "~" can never
  *  collide with one — and an old build simply ignores the unknown key. */
 export const MASTER_VOLUME_KEY = "~master";
+/** Per-device PLAYHEAD LEAD, stored in the volume map (seconds, 0..0.25) under a
+ *  reserved key. Mirror of Kotlin SambaLooperState.PLAYHEAD_LEAD_KEY. */
+export const PLAYHEAD_LEAD_KEY = "~playheadLead";
+export const PLAYHEAD_LEAD_DEFAULT_MS = 80;
+export const PLAYHEAD_LEAD_MAX_MS = 250;
 
 export class SambaLooperState {
   // Web opens with a single "Pandeiro — Reta" track at 0 % TRACK swing, so the
@@ -436,6 +441,21 @@ export class SambaLooperState {
    *  collide with an instrument id), NOT part of the beat: it is a monitoring
    *  level, so saved/exported beats and the WAV render are unaffected by it. */
   get masterVolume(): number { return this.volumes.get(MASTER_VOLUME_KEY) ?? 1; }
+
+  /** PLAYHEAD LEAD (ms): the highlight moves this much BEFORE its hit's audio
+   *  onset. The scheduler is exact on the audio clock, but the screen (frame +
+   *  compositor + display) and the eye answer later than the ear, so an on-time
+   *  playhead LOOKS late — most visibly at slow tempi. Per-device, like master. */
+  get playheadLeadMs(): number {
+    const v = this.volumes.get(PLAYHEAD_LEAD_KEY);
+    return v === undefined ? PLAYHEAD_LEAD_DEFAULT_MS : Math.round(v * 1000);
+  }
+  setPlayheadLeadMs(ms: number) {
+    const v = Math.min(Math.max(Math.round(ms), 0), PLAYHEAD_LEAD_MAX_MS) / 1000;
+    this.volumes.set(PLAYHEAD_LEAD_KEY, v);
+    this.deps.saveVolume(PLAYHEAD_LEAD_KEY, v);
+    this.notify();
+  }
   setMasterVolume(value: number) {
     const v = Math.min(Math.max(value, 0), 1);
     this.volumes.set(MASTER_VOLUME_KEY, v);
@@ -756,7 +776,7 @@ export class SambaLooperState {
             this.schedulePlayheads(this.pattern, 0, nextOnset, token);
           }
           this.playTick();
-          await sleep(Math.max((nextOnset - this.deps.audio.now()) * 1000, 0));
+          await sleep(Math.max((nextOnset - this.deps.audio.now()) * 1000 - this.playheadLeadMs, 0));
         }
         // A stopped/restarted run must not clear the NEW run's opening flag.
         if (token === this.token) this.playingOpening = false;
@@ -783,7 +803,7 @@ export class SambaLooperState {
           }
           this.playTick();
           // Sleep till the next onset (UI playhead only — audio is already queued).
-          await sleep(Math.max((nextOnset - this.deps.audio.now()) * 1000, 0));
+          await sleep(Math.max((nextOnset - this.deps.audio.now()) * 1000 - this.playheadLeadMs, 0));
         }
       }
     })();
@@ -875,7 +895,7 @@ export class SambaLooperState {
       }
     }
     for (const [, ids] of groups) {
-      const fireIn = (onset + this.trackOnsetDeltaSec(snapshot, ids[0], slot) - this.deps.audio.now()) * 1000;
+      const fireIn = (onset + this.trackOnsetDeltaSec(snapshot, ids[0], slot) - this.deps.audio.now()) * 1000 - this.playheadLeadMs;
       setTimeout(() => {
         if (token !== this.token || !this.isPlaying) return;
         for (const id of ids) this.trackPlayhead.set(id, slot);

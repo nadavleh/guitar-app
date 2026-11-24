@@ -276,6 +276,19 @@ class SambaLooperState(
         scope.launch { repo.setDrumVolume(MASTER_VOLUME_KEY, v) }
     }
 
+    /** PLAYHEAD LEAD (ms): the highlight moves this much BEFORE its hit's audio
+     *  onset. The scheduler is exact, but the screen (frame + compositor + display)
+     *  and the eye answer later than the ear, so an on-time playhead LOOKS late —
+     *  most visibly at slow tempi. Per-device, like the master fader. */
+    val playheadLeadMs: Int
+        get() = volumes[PLAYHEAD_LEAD_KEY]?.let { Math.round(it * 1000) } ?: PLAYHEAD_LEAD_DEFAULT_MS
+
+    fun setPlayheadLeadMs(ms: Int) {
+        val v = ms.coerceIn(0, PLAYHEAD_LEAD_MAX_MS) / 1000f
+        volumes = volumes + (PLAYHEAD_LEAD_KEY to v)
+        scope.launch { repo.setDrumVolume(PLAYHEAD_LEAD_KEY, v) }
+    }
+
     /** Combined gain a hit of [voiceIndex] actually plays at: master × track (from [pat]) × per-voice. */
     fun effectiveGain(inst: PercussionInstrument, voiceIndex: Int, pat: PercussionPattern = editPattern): Float =
         masterVolume * (pat.trackVolumeOf(inst.id) / 100f) * voiceVolumeOf(inst, voiceIndex)
@@ -297,6 +310,11 @@ class SambaLooperState(
          *  leading "~" can never collide with one — and an old build simply
          *  ignores the unknown key. */
         const val MASTER_VOLUME_KEY = "~master"
+
+        /** Per-device PLAYHEAD LEAD, stored in the same map (seconds, 0..0.25). */
+        const val PLAYHEAD_LEAD_KEY = "~playheadLead"
+        const val PLAYHEAD_LEAD_DEFAULT_MS = 80
+        const val PLAYHEAD_LEAD_MAX_MS = 250
 
         /** Voices that should start quieter than full. The tamborim "muted clack"
          *  (voice 1) and "tap" (voice 2) are much softer than its open clack, so
@@ -689,7 +707,7 @@ class SambaLooperState(
                     if (s > 0) groups.getOrPut(s) { mutableListOf() }.add(inst.id)
                 }
                 for ((_, ids) in groups) {
-                    val fireIn = (delayMs + trackOnsetDeltaMs(snapshot, ids[0], slot)).coerceAtLeast(0.0).roundToLong()
+                    val fireIn = (delayMs + trackOnsetDeltaMs(snapshot, ids[0], slot) - playheadLeadMs).coerceAtLeast(0.0).roundToLong()
                     launch {
                         delay(fireIn)
                         if (isPlaying) trackPlayhead = trackPlayhead + ids.associateWith { slot }
@@ -719,7 +737,7 @@ class SambaLooperState(
                         scheduleSlot(pattern, 0, delayMs)
                         schedulePlayheads(pattern, 0, delayMs)
                     }
-                    delay(delayNanos / 1_000_000)
+                    delay((delayNanos / 1_000_000 - playheadLeadMs).coerceAtLeast(0))
                 }
                 playingOpening = false
             }
@@ -745,7 +763,7 @@ class SambaLooperState(
                         scheduleSlot(nextSnapshot, nextSlot, delayMs)
                         schedulePlayheads(nextSnapshot, nextSlot, delayMs)
                     }
-                    delay(delayNanos / 1_000_000)
+                    delay((delayNanos / 1_000_000 - playheadLeadMs).coerceAtLeast(0))
                 }
             }
         }

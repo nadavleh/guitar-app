@@ -8,7 +8,7 @@
 // control in the header row adds instruments from the catalog. Save…/Load…/
 // Clear all/Erase/Accent stay in the same header row.
 
-import { SambaLooperState } from "./sambaLooperState";
+import { SambaLooperState, PLAYHEAD_LEAD_MAX_MS } from "./sambaLooperState";
 import { BlocksState } from "./blocksState";
 import { EarTrainingState } from "./earTrainingState";
 import { Colors } from "./theme";
@@ -576,6 +576,9 @@ export class SambaLooperUI {
       (v) => (!swingActive ? "Swing: 1/16 grid only" : Math.round(v) === 0 ? "Swing: straight" : `Swing: ${Math.round(v)}% (16ths)`),
       0, 100, s.swing, (v) => s.setSwing(v));
     swingVS.input.disabled = !swingActive;
+    // Playhead sync: how far the highlight runs ahead of the sound (per device).
+    const leadVS = valueSlider((v) => `Playhead lead: ${Math.round(v)} ms`, 0, PLAYHEAD_LEAD_MAX_MS, s.playheadLeadMs,
+      (v) => s.setPlayheadLeadMs(v), 10);
     const metroBtn = btn(s.metronomeOn ? "Metronome ✓" : "Metronome", () => { s.toggleMetronome(); this.rerender(); }, s.metronomeOn ? "btn primary" : "btn");
     const modelChip = (label: string, m: SwingModel) =>
       btn(label, () => { s.setSwingModel(m); this.rerender(); }, s.swingModel === m ? "btn primary" : "btn");
@@ -585,6 +588,8 @@ export class SambaLooperUI {
       ]),
       el("div", { class: "label-sm" }, [swingVS.label]),
       swingVS.input,
+      el("div", { class: "label-sm", style: "margin-top:6px", title: "Raise it if the highlight still trails the sound" }, [leadVS.label]),
+      leadVS.input,
     ];
     if (swingActive) {
       // Hemiola-based swing models (p = swing%/100). Formula shown for the pick.
